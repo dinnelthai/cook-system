@@ -321,7 +321,7 @@ test("curve replay initializes from observed CreateEvent and stops at migration"
   const logs = [
     `Program ${PUMP_PROGRAM_ID} invoke [1]`,
     `Program data: ${buildCreateEvent().toString("base64")}`,
-    `Program data: ${buildTradeEvent().toString("base64")}`,
+    `Program data: ${buildTradeEvent({ realTokenReserves: 0 }).toString("base64")}`,
     `Program data: ${buildCompleteEvent().toString("base64")}`,
     `Program ${PUMP_PROGRAM_ID} success`,
     `Program ${PUMP_PROGRAM_ID} invoke [1]`,
