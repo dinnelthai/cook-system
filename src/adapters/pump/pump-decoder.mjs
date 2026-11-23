@@ -268,6 +268,12 @@ export function decodeProgramDataLogs(logs, programId) {
   return decodedEvents;
 }
 
+export function getPumpInstructionAccountNames(instructionName) {
+  const definition = (snapshot.pump.instructions ?? []).find((instruction) => instruction.name === instructionName);
+  if (!definition) return null;
+  return (definition.accounts ?? []).map((account) => account.name);
+}
+
 export function getPumpIdlSnapshotMetadata() {
   return structuredClone(snapshot.source);
 }
