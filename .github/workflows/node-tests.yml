@@ -2,7 +2,7 @@ name: Node Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/pump-full-replay-v1.3"]
   pull_request:
     branches: [main]
 
@@ -19,5 +19,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install pinned reference SDK and Solana client
+        run: npm install --no-audit --no-fund
       - name: Run tests
         run: npm test
