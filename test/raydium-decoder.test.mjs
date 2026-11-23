@@ -69,7 +69,7 @@ function launchLabPoolState() {
     u64(699_000_000_000_000),u64(86_000_000_000),
     u64(85_000_000_000),u64(1_000_000),u64(2_000_000),
     u64(1_000_000),u64(1_000_000),
-    u64(0),u64(0),u64(0),u64(0),u64(0),
+    u64(0),u64(0),u64(0),u64(0),
     pubkey(ZERO),pubkey(ZERO),pubkey(MINT),pubkey(WSOL),
     pubkey(ZERO),pubkey(ZERO),pubkey(ZERO),
     u8(0),u8(0),u64(0),Buffer.alloc(54),
