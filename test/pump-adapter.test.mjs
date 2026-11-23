@@ -14,6 +14,8 @@ import {
   encodeBase58,
 } from "../src/adapters/pump/borsh.mjs";
 import { normalizePumpTradeEvent } from "../src/adapters/pump/pump-event-normalizer.mjs";
+import { createInitialCurveState, replayCurveEvents } from "../src/core/market-state.mjs";
+import { buildRawCandles } from "../src/core/candle-builder.mjs";
 import {
   calculateBondingCurveMarketCap,
   calculateFeeTier,
@@ -304,6 +306,55 @@ test("TradeEvent normalizer creates a canonical observed event with exact decima
     }),
     (error) => error.code === "UNSUPPORTED_QUOTE_MINT",
   );
+});
+
+test("decoded and normalized Pump trade flows through state replay and raw OHLCV", () => {
+  const decodedEvent = decodeProgramEvent({
+    programId: PUMP_PROGRAM_ID,
+    data: buildTradeEvent().toString("base64"),
+  });
+  const normalized = normalizePumpTradeEvent({
+    decodedEvent,
+    signature: "integration-signature",
+    ordering: {
+      slot: 100,
+      transactionIndex: 2,
+      instructionIndex: 1,
+      innerInstructionIndex: null,
+      eventSequence: 0,
+    },
+    tokenDecimals: 6,
+    quoteDecimals: 9,
+    network: "mainnet",
+    accountStateReconciled: true,
+    reconciliationRef: "fixture-account-delta",
+  });
+
+  const initialState = createInitialCurveState({
+    market: normalized.market,
+    reserves: {
+      virtual_token_reserves_base_units: "1000900",
+      virtual_quote_reserves_base_units: "1999500",
+      real_token_reserves_base_units: "500900",
+      real_quote_reserves_base_units: "99500",
+      token_total_supply_base_units: "1500000",
+      protocol_fees_base_units: "0",
+      creator_fees_base_units: "0",
+      complete: false,
+    },
+  });
+  const replayed = replayCurveEvents(initialState, [normalized]);
+  const [candle] = buildRawCandles([normalized], 60_000);
+
+  assert.equal(replayed.state.virtual_token_reserves_base_units, "1000000");
+  assert.equal(replayed.state.virtual_quote_reserves_base_units, "2000000");
+  assert.equal(replayed.state.curve_buy_quote_volume_base_units, "500");
+  assert.equal(replayed.state.curve_token_volume_base_units, "900");
+  assert.equal(candle.open_price, normalized.payload.execution_price_decimal);
+  assert.equal(candle.close_price, normalized.payload.execution_price_decimal);
+  assert.equal(candle.quote_volume_base_units, "500");
+  assert.equal(candle.token_volume_base_units, "900");
+  assert.equal(candle.provenance, "observed_chain");
 });
 
 test("program log parser only decodes Program data emitted by the requested program", () => {
