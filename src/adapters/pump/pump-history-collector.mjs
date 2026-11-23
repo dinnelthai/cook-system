@@ -599,6 +599,7 @@ export async function fetchPumpMintHistory({
         poolDataGaps.length === 0 &&
         poolUnresolved.length === 0 &&
         poolReplay.status === "PASS" &&
+        pool.snapshot.errors.length === 0 &&
         poolTradeReconciliationComplete &&
         poolEvents.every((event) => event.ordering.ordering_confidence === "complete");
       if (pool.snapshot.decoded_pool && pool.snapshot.base_vault && pool.snapshot.quote_vault) {
