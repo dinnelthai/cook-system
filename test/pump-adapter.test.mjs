@@ -23,6 +23,8 @@ import {
   buildFeeConfigTimeline,
   resolveFeeConfigAt,
   quoteExactSolIn,
+  feeConfigSnapshotRecordFromDecodedAccount,
+  feeConfigChangeRecordFromDecodedEvent,
 } from "../src/adapters/pump/fee-resolver.mjs";
 
 const ZERO_KEY = "11111111111111111111111111111111";
@@ -131,6 +133,21 @@ function buildTradeEvent() {
     u64(0),
     u64(0),
     u64(0),
+  ]);
+}
+
+
+function buildUpsertFeeTiersEvent() {
+  const fees = Buffer.concat([u64(0), u64(90), u64(40)]);
+  const tier = Buffer.concat([u128(5000), fees]);
+  return Buffer.concat([
+    discriminator(snapshot.fees.events, "UpsertFeeTiersEvent"),
+    i64(1_700_000_002),
+    pubkey(),
+    pubkey(),
+    u32(1),
+    tier,
+    u8(0),
   ]);
 }
 
@@ -418,6 +435,39 @@ test("FeeConfig decoder marks known appended fields as partial when reading an o
   assert.equal(decoded.data.fee_tiers.length, 1);
   assert.ok(decoded.missing_fields.includes("stable_fee_tiers"));
   assert.deepEqual(decoded.data.stable_fee_tiers, []);
+});
+
+test("decoded FeeConfig snapshots and update events produce a safe historical timeline", () => {
+  const decodedAccount = decodeProgramAccount({
+    programId: PUMP_FEES_PROGRAM_ID,
+    data: buildFeeConfigAccount().toString("base64"),
+  });
+  const decodedChange = decodeProgramEvent({
+    programId: PUMP_FEES_PROGRAM_ID,
+    data: buildUpsertFeeTiersEvent().toString("base64"),
+  });
+  assert.equal(decodedChange.event_name, "UpsertFeeTiersEvent");
+
+  const snapshotRecord = feeConfigSnapshotRecordFromDecodedAccount({
+    decodedAccount,
+    eventId: "fee-account-snapshot",
+    ordering: { slot: 10, transaction_index: 0, instruction_index: 0, inner_instruction_index: null, event_sequence: 0 },
+  });
+  const changeRecord = feeConfigChangeRecordFromDecodedEvent({
+    decodedEvent: decodedChange,
+    eventId: "fee-update-event",
+    ordering: { slot: 20, transaction_index: 0, instruction_index: 1, inner_instruction_index: null, event_sequence: 0 },
+  });
+  assert.equal(snapshotRecord.kind, "snapshot");
+  assert.equal(changeRecord.kind, "change");
+
+  const timeline = buildFeeConfigTimeline([snapshotRecord, changeRecord], { coverageComplete: true });
+  assert.equal(resolveFeeConfigAt(timeline, {
+    slot: 15, transaction_index: 0, instruction_index: 0, inner_instruction_index: null, event_sequence: 0,
+  }).status, "available");
+  assert.equal(resolveFeeConfigAt(timeline, {
+    slot: 21, transaction_index: 0, instruction_index: 0, inner_instruction_index: null, event_sequence: 0,
+  }).status, "stale");
 });
 
 test("market-cap calculation and dynamic fee tier selection use exact integer thresholds", () => {
