@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/simulation-ground-truth.schema.json",
+  "title": "SimulationGroundTruth",
+  "description": "Evaluation-only labels. This schema and its records must never be supplied to detector inference or observed-chain pipelines.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "agent_id",
+    "simulated_role",
+    "latent_controller_group",
+    "ground_truth_behavior_labels"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "simulated_role": { "type": "string", "minLength": 1 },
+    "latent_controller_group": { "type": ["string", "null"] },
+    "ground_truth_behavior_labels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "organic_public_signal_response",
+          "simulated_common_control",
+          "legitimate_arbitrage",
+          "ordering_externality",
+          "early_inventory_holder",
+          "unknown"
+        ]
+      }
+    }
+  }
+}
