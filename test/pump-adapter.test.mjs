@@ -85,7 +85,65 @@ function buildCompleteEvent() {
   ]);
 }
 
-function buildFeeConfigAccount() {
+
+function buildTradeEvent() {
+  const text = Buffer.from("buy_v3", "utf8");
+  return Buffer.concat([
+    discriminator(snapshot.pump.events, "TradeEvent"),
+    pubkey(),
+    u64(500),
+    u64(900),
+    u8(1),
+    pubkey(),
+    i64(1_700_000_001),
+    u64(2_000_000),
+    u64(1_000_000),
+    u64(100_000),
+    u64(500_000),
+    pubkey(),
+    u64(100),
+    u64(5),
+    pubkey(),
+    u64(50),
+    u64(3),
+    u8(0),
+    u64(0),
+    u64(0),
+    u64(0),
+    i64(1_700_000_000),
+    u32(text.length),
+    text,
+    u8(0),
+    u64(0),
+    u64(0),
+    u64(0),
+    u64(0),
+    u32(1),
+    pubkey(),
+    u16(2500),
+    pubkey(),
+    u64(500),
+    u64(2_000_000),
+    u64(100_000),
+    u64(0),
+    u64(0),
+    u64(0),
+  ]);
+}
+
+function buildPartialFeeConfigAccount() {
+  const fees = (lp, protocol, creator) => Buffer.concat([u64(lp), u64(protocol), u64(creator)]);
+  const tier = Buffer.concat([u128(0), fees(0, 100, 50)]);
+  return Buffer.concat([
+    discriminator(snapshot.fees.accounts, "FeeConfig"),
+    u8(255),
+    pubkey(),
+    fees(0, 125, 0),
+    u32(1),
+    tier,
+  ]);
+}
+\nfunction buildFeeConfigAccount() {
   const fees = (lp, protocol, creator) => Buffer.concat([u64(lp), u64(protocol), u64(creator)]);
   const tier = Buffer.concat([u128(0), fees(0, 100, 50)]);
   return Buffer.concat([
@@ -154,6 +212,23 @@ test("event decoder reconstructs CompleteEvent fields from Anchor event bytes", 
   assert.equal(decoded.data.quote_mint, ZERO_KEY);
 });
 
+test("TradeEvent decoder handles quote-neutral appended fields and shareholder vectors", () => {
+  const decoded = decodeProgramEvent({
+    programId: PUMP_PROGRAM_ID,
+    data: buildTradeEvent().toString("base64"),
+  });
+  assert.equal(decoded.status, "DECODED");
+  assert.equal(decoded.event_name, "TradeEvent");
+  assert.equal(decoded.data.sol_amount, 500n);
+  assert.equal(decoded.data.token_amount, 900n);
+  assert.equal(decoded.data.is_buy, true);
+  assert.equal(decoded.data.ix_name, "buy_v3");
+  assert.equal(decoded.data.quote_amount, 500n);
+  assert.equal(decoded.data.virtual_quote_reserves, 2_000_000n);
+  assert.equal(decoded.data.shareholders.length, 1);
+  assert.equal(decoded.data.shareholders[0].share_bps, 2500n);
+});
+
 test("program log parser only decodes Program data emitted by the requested program", () => {
   const eventData = buildCompleteEvent().toString("base64");
   const logs = [
@@ -204,6 +279,17 @@ test("FeeConfig account decoder reads nested fee tiers using the pinned IDL", ()
   assert.equal(decoded.data.fee_tiers[0].market_cap_lamports_threshold, 0n);
   assert.equal(decoded.data.fee_tiers[0].fees.protocol_fee_bps, 100n);
   assert.equal(decoded.data.fee_tiers[0].fees.creator_fee_bps, 50n);
+});
+
+test("FeeConfig decoder marks known appended fields as partial when reading an older layout", () => {
+  const decoded = decodeProgramAccount({
+    programId: PUMP_FEES_PROGRAM_ID,
+    data: buildPartialFeeConfigAccount().toString("base64"),
+  });
+  assert.equal(decoded.status, "PARTIAL_ACCOUNT_LAYOUT");
+  assert.equal(decoded.data.fee_tiers.length, 1);
+  assert.ok(decoded.missing_fields.includes("stable_fee_tiers"));
+  assert.deepEqual(decoded.data.stable_fee_tiers, []);
 });
 
 test("market-cap calculation and dynamic fee tier selection use exact integer thresholds", () => {
