@@ -19,6 +19,7 @@ V1.2 adds the first source-driven adapter layer:
 - Dynamic fee tier selection using the Pump Fees FeeConfig.
 - Historical fee-config timeline invalidation when a fee update event occurs without a subsequent full account snapshot.
 - Exact integer quote-in calculation for the documented SOL exact-quote-in formula.
+- Canonical normalization of decoded TradeEvent records into the MarketEvent contract, with explicit token / quote decimals, deterministic event IDs, fee components, post-curve state and reconciliation warnings.
 
 ## 2. Pinned source inputs
 
@@ -58,6 +59,18 @@ Exports:
 The instruction decoder supports the pinned Legacy / V2 / V3 buy and sell discriminators. Optional trailing OptionBool arguments may be omitted where the IDL / official instruction docs allow it. Unknown discriminators and unsupported programs return explicit statuses; they are never guessed from transaction timestamps.
 
 The log decoder only consumes Program data emitted while the requested program is at the top of the invocation stack. This prevents a nested CPI program's event bytes from being attributed to Pump.
+
+### src/adapters/pump/pump-event-normalizer.mjs
+
+Exports normalizePumpTradeEvent(...). It converts a decoded Pump TradeEvent into a canonical observed-chain MarketEvent. It:
+
+- Requires the token mint decimals and quote decimals; it does not infer token decimals from a symbol.
+- Uses quote_amount when present and falls back to legacy sol_amount only when quote_amount is zero; it never adds both fields.
+- Computes the event-reported price with integer arithmetic and a declared decimal precision.
+- Separates protocol / creator fee components and stores the buyback amount as a separate protocol-fee split, avoiding double counting.
+- Adds post-curve reserves for deterministic state replay.
+- Marks the event as warning / incomplete until account-delta reconciliation is supplied with an explicit reconciliation reference.
+- Rejects non-SOL quote mints and incomplete / invalid inputs rather than silently normalizing them.
 
 ### src/adapters/pump/fee-resolver.mjs
 
@@ -122,14 +135,14 @@ test/pump-adapter.test.mjs covers:
 - Stale fee-config timeline behavior.
 - Exact SOL-in integer rounding.
 
-The repository includes a Node.js 22 GitHub Actions workflow for npm test. The latest verified run passed all 21 tests (8 core replay tests and 13 Pump adapter tests). Earlier failures exposed and fixed nested Borsh defined-struct unwrapping and a malformed test-fixture newline; the current green run is the authoritative status.
+The repository includes a Node.js 22 GitHub Actions workflow for npm test. The latest verified run passed all 22 tests (8 core replay tests and 14 Pump adapter / normalization tests). Earlier failures exposed and fixed nested Borsh defined-struct unwrapping, a malformed test-fixture newline, and a missing test import; the current green run is the authoritative status.
 
 ## 8. Next steps
 
 1. Run the Node 22 test suite and fix any failures.
 2. Add differential fixtures from confirmed, successful Pump transactions.
 3. Compare decoded TradeEvent fields with instruction arguments and account deltas.
-4. Implement token / quote decimal-aware normalized execution prices.
+4. Reconcile normalized TradeEvent projections against real transaction account deltas and confirmed historical fixtures.
 5. Implement exact-token-out buy and exact-token-in sell quote paths against the pinned SDK.
 6. Implement a historical FeeConfig snapshot collector / account timeline.
 7. Implement state reconciliation using authoritative pre- and post-transaction account snapshots.
