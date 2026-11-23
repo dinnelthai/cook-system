@@ -13,14 +13,24 @@ function nonNegative(value, name) {
   return result;
 }
 
-function signedString(value) {
-  return toBigInt(value ?? "0", "virtual quote reserves").toString();
-}
-
 function addNonNegative(current, delta, name) {
   const result = toBigInt(current, name) + toBigInt(delta, `${name} delta`);
   if (result < 0n) throw new Error(`${name} would become negative`);
   return result.toString();
+}
+
+function assertPoolReserveInvariants(state, eventId = "unknown") {
+  const virtual = toBigInt(state.virtual_quote_reserves_base_units, "virtual quote reserves");
+  const protocol = nonNegative(state.protocol_fees_base_units, "protocol fees");
+  const creator = nonNegative(state.creator_fees_base_units, "creator fees");
+  const boost = nonNegative(state.boost_reserves_base_units, "boost reserves");
+  if (virtual + protocol + creator !== boost) {
+    throw new Error(`PumpSwap boost reserve invariant failed at ${eventId}`);
+  }
+  const effectiveQuote = nonNegative(state.pool_quote_reserves_base_units, "raw quote reserves") + virtual;
+  if (effectiveQuote < 0n || effectiveQuote > ((1n << 64n) - 1n)) {
+    throw new Error(`PumpSwap effective quote reserves are outside u64 range at ${eventId}`);
+  }
 }
 
 function samePool(a, b) {
@@ -70,7 +80,7 @@ function applyFeeDelta(state, event) {
   const delta = event.payload?.fee_balances_delta ?? {};
   const protocolDelta = toBigInt(delta.protocol_fees_base_units ?? "0", "protocol fee delta");
   const creatorDelta = toBigInt(delta.creator_fees_base_units ?? "0", "creator fee delta");
-  return {
+  const next = {
     ...state,
     protocol_fees_base_units: addNonNegative(
       state.protocol_fees_base_units,
@@ -87,6 +97,8 @@ function applyFeeDelta(state, event) {
       protocolDelta - creatorDelta
     ).toString(),
   };
+  assertPoolReserveInvariants(next, event.event_id);
+  return next;
 }
 
 function applyPoolFeeMovement(state, event) {
@@ -97,7 +109,7 @@ function applyPoolFeeMovement(state, event) {
   if (!field) throw new Error(`unknown PumpSwap fee bucket: ${payload.fee_bucket}`);
   const current = nonNegative(state[field], field);
   if (amount > current) throw new Error(`PumpSwap fee sweep exceeds accrued ${field}`);
-  return {
+  const next = {
     ...state,
     [field]: (current - amount).toString(),
     virtual_quote_reserves_base_units: (
@@ -105,6 +117,8 @@ function applyPoolFeeMovement(state, event) {
     ).toString(),
     fee_sweep_count: state.fee_sweep_count + 1,
   };
+  assertPoolReserveInvariants(next, event.event_id);
+  return next;
 }
 
 function applyVaultDeltas(state, event) {
@@ -122,12 +136,14 @@ function applyVaultDeltas(state, event) {
     delta.quote_delta_base_units,
     "pool_quote_reserves_base_units",
   );
+  const next = {
+    ...state,
+    pool_base_reserves_base_units: base,
+    pool_quote_reserves_base_units: quote,
+  };
+  assertPoolReserveInvariants(next, event.event_id);
   return {
-    state: {
-      ...state,
-      pool_base_reserves_base_units: base,
-      pool_quote_reserves_base_units: quote,
-    },
+    state: next,
     status: "PASS",
     reason: "pool_vault_token_account_deltas_applied",
   };
@@ -305,14 +321,20 @@ export function reconcilePumpSwapPoolSnapshot({
     const actual = String(observed);
     if (expected !== actual) mismatches.push({ field, replayed: expected, observed: actual });
   }
+  const effectiveQuote = nonNegative(quoteVault?.amount_base_units ?? "0", "quote vault amount") +
+    toBigInt(data.virtual_quote_reserves_base_units ?? "0", "virtual quote reserves");
+  if (effectiveQuote < 0n || effectiveQuote > ((1n << 64n) - 1n)) {
+    mismatches.push({
+      field: "effective_quote_reserves_base_units",
+      replayed: "non-negative u64",
+      observed: effectiveQuote.toString(),
+    });
+  }
   return {
     status: mismatches.length ? "FAIL" : missing.length ? "UNKNOWN" : "PASS",
     mismatches,
     missing_fields: missing,
     snapshot_slot: decodedPool.context_slot ?? baseVault?.context_slot ?? quoteVault?.context_slot ?? null,
-    effective_quote_reserves_base_units: (
-      nonNegative(quoteVault?.amount_base_units ?? "0", "quote vault amount") +
-      toBigInt(data.virtual_quote_reserves_base_units ?? "0", "virtual quote reserves")
-    ).toString(),
+    effective_quote_reserves_base_units: effectiveQuote.toString(),
   };
 }
