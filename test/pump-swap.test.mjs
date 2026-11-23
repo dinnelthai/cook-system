@@ -179,7 +179,12 @@ test("PumpSwap BuyEvent decodes, normalizes and reconciles actor and pool-vault 
     base_delta_base_units:deltas.find(x=>x.address===BASE_VAULT).delta_base_units,
     quote_delta_base_units:deltas.find(x=>x.address===QUOTE_VAULT).delta_base_units,
   };
-  const initial=createInitialPumpSwapPoolState({poolCreatedEvent:poolCreatedEvent()});
+  const decodedPoolSnapshot={context_slot:25,data:{
+    virtual_quote_reserves_base_units:"-3",
+    protocol_fees_base_units:"2",
+    creator_fees_base_units:"1",
+  }};
+  const initial=createInitialPumpSwapPoolState({poolCreatedEvent:poolCreatedEvent(),decodedPool:decodedPoolSnapshot});
   const replay=replayPumpSwapPoolEvents(initial,[event]);
   assert.equal(replay.status,"PASS");
   assert.equal(replay.state.pool_base_reserves_base_units,"900");
@@ -188,11 +193,7 @@ test("PumpSwap BuyEvent decodes, normalizes and reconciles actor and pool-vault 
   assert.equal(replay.state.creator_fees_base_units,"1");
   const current=reconcilePumpSwapPoolSnapshot({
     replayedState:replay.state,
-    decodedPool:{context_slot:25,data:{
-      virtual_quote_reserves_base_units:"-3",
-      protocol_fees_base_units:"2",
-      creator_fees_base_units:"1",
-    }},
+    decodedPool:decodedPoolSnapshot,
     baseVault:{amount_base_units:"900"},
     quoteVault:{amount_base_units:"554"},
   });
@@ -205,7 +206,7 @@ test("PumpSwap Pool account and token vault account decoders read current state"
     Buffer.from(poolAccount.discriminator),
     u8(1),u16(0),pubkey(USER),pubkey(BASE_MINT),pubkey(QUOTE_MINT),
     pubkey(USER),pubkey(BASE_VAULT),pubkey(QUOTE_VAULT),
-    u64(1000),pubkey(USER),u8(0),u8(0),i128(0),u64(0),u8(0),u8(0),
+    u64(1000),pubkey(USER),u8(0),u8(0),i128(-3),u64(0),u8(0),u8(0),
     u64(2),u64(1),
   ]);
   const decodedPool=decodePumpSwapPoolAccount({
