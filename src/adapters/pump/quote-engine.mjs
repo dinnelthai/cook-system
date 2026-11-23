@@ -403,14 +403,25 @@ export function quoteMayhemExactTokenOutBuy({
   creatorFeeBps,
   partialFill = false,
 }) {
-  return quoteV3ExactTokenOutBuy({
-    tokenAmountOut,
+  const requested = toUnsigned(tokenAmountOut, "tokenAmountOut", U64_MAX);
+  const curve = curveState(bondingCurve ?? {});
+  const quote = quoteV3ExactTokenOutBuy({
+    tokenAmountOut: requested,
     bondingCurve,
     protocolFeeBps,
     creatorFeeBps,
     isMayhemMode: true,
     partialFill,
   });
+  if (requested > curve.realToken) {
+    return {
+      ...quote,
+      status: "PARTIAL_FILL",
+      method: "mayhem_partial_fill_exact_token_out",
+      requested_output_base_units: requested.toString(),
+    };
+  }
+  return quote;
 }
 
 export function quoteMayhemExactQuoteInBuy({
