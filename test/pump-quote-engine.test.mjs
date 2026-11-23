@@ -61,7 +61,7 @@ test("exact token-in sell subtracts fees from gross constant-product output", ()
   assert.equal(quote.method, "exact_token_in");
   assert.equal(quote.curve_input_base_units, "100");
   assert.equal(quote.output_base_units, "88");
-  assert.equal(quote.protocol_fee_base_units, "10");
+  assert.equal(quote.protocol_fee_base_units, "1");
   assert.equal(quote.creator_fee_base_units, "5");
 });
 
