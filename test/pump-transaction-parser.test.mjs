@@ -135,7 +135,20 @@ function buildPostCompleteBuyEvent() {
   ]);
 }
 
-function buildMigrationEvent() {
+
+function buildSweepFeeEvent(bucket, amount) {
+  return Buffer.concat([
+    discriminator(snapshot.pump.events, "SweepBondingCurveFeeEvent"),
+    i64(1_700_000_004),
+    pubkey(MINT),
+    pubkey(CURVE),
+    pubkey(ZERO_KEY),
+    pubkey(USER),
+    u64(amount),
+    u8(bucket),
+  ]);
+}
+\nfunction buildMigrationEvent() {
   return Buffer.concat([
     discriminator(snapshot.pump.events, "CompletePumpAmmMigrationEvent"),
     pubkey(USER),
@@ -339,6 +352,33 @@ test("curve replay initializes from observed CreateEvent and stops at migration"
   assert.equal(replay.state.lifecycle, "graduated");
   assert.equal(replay.state.complete, true);
   assert.equal(replay.state.curve_buy_quote_volume_base_units, "500");
+});
+
+test("V3 retained fees accrue on the curve and sweep events debit the correct bucket", () => {
+  const logs = [
+    `Program ${PUMP_PROGRAM_ID} invoke [1]`,
+    `Program data: ${buildCreateEvent().toString("base64")}`,
+    `Program data: ${buildTradeEvent().toString("base64")}`,
+    `Program data: ${buildSweepFeeEvent(0, 100).toString("base64")}`,
+    `Program data: ${buildSweepFeeEvent(1, 50).toString("base64")}`,
+    `Program ${PUMP_PROGRAM_ID} success`,
+  ];
+  const transaction = makeTransaction({ logs });
+  const parsed = decodePumpTransaction({
+    transaction,
+    signature: "fee-sweep-replay",
+    transactionIndex: 0,
+    tokenDecimalsByMint: { [MINT]: 6 },
+  });
+  const created = parsed.events.find((event) => event.event_kind === "MARKET_CREATED");
+  const initial = createInitialCurveStateFromMarketCreated({ marketCreatedEvent: created });
+  const replay = replayCurveEvents(initial, parsed.events);
+  assert.equal(replay.state.protocol_fees_base_units, "0");
+  assert.equal(replay.state.creator_fees_base_units, "0");
+  assert.equal(replay.state.fee_movement_count, 2);
+  const trade = parsed.events.find((event) => event.event_kind === "CURVE_BUY_EXECUTED");
+  assert.equal(trade.payload.fee_balances_delta.protocol_fees_base_units, "100");
+  assert.equal(trade.payload.fee_balances_delta.creator_fees_base_units, "50");
 });
 
 test("transaction balance delta extraction aggregates token accounts by owner and mint", () => {
