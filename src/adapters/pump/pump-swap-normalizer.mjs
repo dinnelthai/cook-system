@@ -208,7 +208,8 @@ export function normalizePumpSwapTradeEvent({
     sourceType,
     poolMetadata,
     warnings: [
-      "PumpSwap BuyEvent/SellEvent pool reserve fields are pre-swap observations; post-state must be derived from subsequent event observations or pool-vault token-account deltas",
+      "PumpSwap BuyEvent/SellEvent raw pool reserve fields are pre-swap observations; post-state must be derived from pool-vault token-account deltas",
+      "The signed virtual_quote_reserves event field is checked against both pre- and post-operation fee-adjusted replay values; its timing is not assumed",
       ...(!poolMetadata.pool_base_token_account || !poolMetadata.pool_quote_token_account
         ? ["pool vault addresses are unavailable; exact reserve-delta reconciliation is incomplete"]
         : []),
