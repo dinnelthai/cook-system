@@ -592,10 +592,14 @@ export async function fetchPumpMintHistory({
     if (poolCreatedEvent) {
       const initialState = createInitialPumpSwapPoolState({ poolCreatedEvent, decodedPool: pool.snapshot.decoded_pool });
       poolReplay = replayPumpSwapPoolEvents(initialState, poolEvents);
+      const poolTradeReconciliationComplete = poolEvents
+        .filter((event) => event.event_kind === "POOL_BUY_EXECUTED" || event.event_kind === "POOL_SELL_EXECUTED")
+        .every((event) => event.quality.transaction_balance_reconciliation?.status === "PASS");
       poolReplayComplete = (poolSignatureCollections.find((item) => item.address === pool.poolAddress)?.coverage_complete ?? false) &&
         poolDataGaps.length === 0 &&
         poolUnresolved.length === 0 &&
         poolReplay.status === "PASS" &&
+        poolTradeReconciliationComplete &&
         poolEvents.every((event) => event.ordering.ordering_confidence === "complete");
       if (pool.snapshot.decoded_pool && pool.snapshot.base_vault && pool.snapshot.quote_vault) {
         poolSnapshotReconciliation = reconcilePumpSwapPoolSnapshot({
@@ -621,6 +625,9 @@ export async function fetchPumpMintHistory({
       data_gaps: poolDataGaps,
       unresolved_events: poolUnresolved,
       replay_status: poolStatus,
+      trade_balance_reconciliation_complete: poolEvents
+        .filter((event) => event.event_kind === "POOL_BUY_EXECUTED" || event.event_kind === "POOL_SELL_EXECUTED")
+        .every((event) => event.quality.transaction_balance_reconciliation?.status === "PASS"),
       replay: poolReplay,
       current_account_reconciliation: poolSnapshotReconciliation,
       current_snapshot: pool.snapshot,
