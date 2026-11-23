@@ -52,6 +52,7 @@ The first core slice currently includes:
 - [Canonical Schema Contract — V1](docs/implementation/canonical-schema-contract-v1.md)
 - [Pump.fun Bonding Curve Adapter — V1.1](docs/implementation/pump-bonding-curve-adapter-v1.1.md)
 - [Pump Decoder & Dynamic Fee Resolver — V1.2](docs/implementation/pump-decoder-fee-resolver-v1.2.md)
+- [Pump Full Replay Engine — V1.3](docs/implementation/pump-full-replay-v1.3.md)
 
 ### Machine-readable JSON Schemas
 
@@ -76,8 +77,25 @@ The first core slice currently includes:
 - [Pump instruction / event / account decoder](src/adapters/pump/pump-decoder.mjs)
 - [Dynamic fee resolver and historical config timeline](src/adapters/pump/fee-resolver.mjs)
 - [Canonical Pump TradeEvent normalizer](src/adapters/pump/pump-event-normalizer.mjs)
+- [Pump lifecycle / migration normalizer](src/adapters/pump/pump-lifecycle-normalizer.mjs)
+- [Solana RPC client](src/adapters/pump/solana-rpc.mjs)
+- [Pump account codec](src/adapters/pump/pump-account-codec.mjs)
+- [Pump transaction parser](src/adapters/pump/pump-transaction-parser.mjs)
+- [Transaction balance reconciler](src/adapters/pump/transaction-reconciler.mjs)
+- [Exact buy / sell / migration quote engine](src/adapters/pump/quote-engine.mjs)
+- [Pump fee history collector](src/adapters/pump/pump-fee-history.mjs)
+- [Pump mint history collector](src/adapters/pump/pump-history-collector.mjs)
+- [Mint history replay CLI](scripts/replay-pump-mint.mjs)
+- [Confirmed transaction fixture capture CLI](scripts/capture-pump-fixture.mjs)
+- [SDK Node ESM compatibility patch](scripts/patch-pump-sdk-node-interop.mjs)
 - [Core tests](test/core.test.mjs)
 - [Pump adapter tests](test/pump-adapter.test.mjs)
+- [Pump quote engine tests](test/pump-quote-engine.test.mjs)
+- [Pump SDK differential tests](test/pump-sdk-differential.test.mjs)
+- [Pump transaction parser tests](test/pump-transaction-parser.test.mjs)
+- [Pump RPC / PDA tests](test/pump-rpc.test.mjs)
+- [Pump fee history tests](test/pump-fee-history.test.mjs)
+- [Pump full history collector tests](test/pump-history-collector.test.mjs)
 - [Node.js 22 GitHub Actions workflow](.github/workflows/node-tests.yml)
 
 ## Next implementation steps
@@ -86,9 +104,12 @@ The first core slice currently includes:
 - [x] Add the initial IDL-driven Pump Legacy / V2 / V3 decoder and account / event decoders.
 - [x] Add the initial FeeConfig tier resolver and stale-history guard.
 - [x] Add deterministic event ordering, curve-state replay, and snapshot reconciliation for normalized inputs.
-- [x] Verify the Node.js 22 test suite in GitHub Actions: 24 passed, 0 failed.
-- [ ] Differential-test quote calculations against the pinned Pump SDK and confirmed TradeEvent data.
-- [ ] Implement exact-token-out buys and exact-token-in sells.
-- [ ] Add the curve-completion and synthetic-migration quote boundary.
+- [x] Verify the Node.js 22 test suite in GitHub Actions: 50 passed, 0 failed.
+- [x] Differential-test exact buy / sell and V3 migration quote calculations against Pump SDK 4.3.1.
+- [ ] Validate captured confirmed TradeEvent and account-delta fixtures against mainnet history.
+- [x] Implement exact-token-out buys and exact-token-in sells.
+- [x] Add V3 synthetic-migration curve / PumpSwap pool quote legs and Mayhem partial-fill handling.
+- [x] Add RPC history collection, transaction parsing, balance reconciliation and fixture capture tooling.
+- [ ] Capture and validate confirmed real-chain fixtures with an archive-capable RPC before claiming real-world parity.
 - [ ] Add heterogeneous organic agents and public-information response.
 - [ ] Add isolated defensive scenarios and held-out evaluation.

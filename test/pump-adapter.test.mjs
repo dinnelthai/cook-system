@@ -274,8 +274,8 @@ test("TradeEvent normalizer creates a canonical observed event with exact decima
   assert.equal(normalized.event_time_ms, 1_700_000_001_000);
   assert.equal(normalized.payload.quote_amount_source, "quote_amount");
   assert.equal(normalized.payload.execution_price_decimal, "0.000555555555555555555555");
-  assert.equal(normalized.payload.fee_components.length, 2);
-  assert.equal(normalized.payload.fee_components[0].fee_type, "protocol");
+  assert.equal(normalized.payload.fee_components.length, 3);
+  assert.equal(normalized.payload.fee_components[0].fee_type, "protocol_charged");
   assert.equal(normalized.payload.post_curve_state.real_token_reserves_base_units, "500000");
   assert.equal(normalized.quality.validation_status, "warning");
   assert.equal(normalized.quality.is_complete, false);

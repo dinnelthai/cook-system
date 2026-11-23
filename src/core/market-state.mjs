@@ -24,6 +24,8 @@ const NON_CURVE_EVENT_KINDS = new Set([
   "POST_COMPLETE_POOL_LEG",
   "FEE_CONFIG_CHANGE",
   "FEE_CONFIG_SNAPSHOT",
+  "MARKET_CREATED",
+  "POOL_CREATED",
 ]);
 
 export class CurveStateTransitionError extends Error {
@@ -59,6 +61,19 @@ function addVolume(current, amount, field) {
   return formatBaseUnits(sum, { max: U128_MAX });
 }
 
+export function createInitialCurveStateFromMarketCreated({ marketCreatedEvent }) {
+  if (!marketCreatedEvent || marketCreatedEvent.event_kind !== "MARKET_CREATED") {
+    throw new TypeError("a normalized MARKET_CREATED event is required");
+  }
+  const reserves = marketCreatedEvent.payload?.initial_curve_state;
+  if (!reserves) throw new TypeError("MARKET_CREATED event is missing initial_curve_state");
+  return createInitialCurveState({
+    market: marketCreatedEvent.market,
+    reserves,
+    asOfEventId: marketCreatedEvent.event_id,
+  });
+}
+
 export function createInitialCurveState({ market, reserves, asOfEventId = null }) {
   if (!market || typeof market.token_mint !== "string") throw new TypeError("market identity is required");
   const normalized = normalizeReserveState(reserves);
@@ -73,6 +88,32 @@ export function createInitialCurveState({ market, reserves, asOfEventId = null }
     curve_token_volume_base_units: "0",
     execution_count: 0,
     ignored_non_curve_event_count: 0,
+  };
+}
+
+function applyFeeBalanceDelta(state, event) {
+  const delta = event.payload?.fee_balances_delta ?? {};
+  const protocol = parseBaseUnits(delta.protocol_fees_base_units ?? "0", { name: "fee_balances_delta.protocol_fees_base_units" });
+  const creator = parseBaseUnits(delta.creator_fees_base_units ?? "0", { name: "fee_balances_delta.creator_fees_base_units" });
+  return {
+    ...state,
+    protocol_fees_base_units: formatBaseUnits(checkedAddU128(parseBaseUnits(state.protocol_fees_base_units, { name: "protocol_fees_base_units" }), protocol, "protocol_fees_base_units")),
+    creator_fees_base_units: formatBaseUnits(checkedAddU128(parseBaseUnits(state.creator_fees_base_units, { name: "creator_fees_base_units" }), creator, "creator_fees_base_units")),
+  };
+}
+
+function applyFeeMovement(state, event) {
+  const amount = parseBaseUnits(event.payload?.amount_base_units, { name: "fee movement amount" });
+  const bucket = Number(event.payload?.fee_bucket);
+  const field = bucket === 0 ? "protocol_fees_base_units" : bucket === 1 ? "creator_fees_base_units" : null;
+  if (!field) throw new CurveStateTransitionError(event.event_id, "unknown bonding-curve fee bucket");
+  const current = parseBaseUnits(state[field], { name: field });
+  if (amount > current) throw new CurveStateTransitionError(event.event_id, "fee sweep exceeds accrued fee balance");
+  return {
+    ...state,
+    [field]: formatBaseUnits(current - amount),
+    fee_movement_count: (state.fee_movement_count ?? 0) + 1,
+    as_of_event_id: event.event_id,
   };
 }
 
@@ -111,7 +152,7 @@ function applyCurveExecution(state, event) {
     next.curve_sell_quote_volume_base_units = addVolume(state.curve_sell_quote_volume_base_units, payload.quote_amount_base_units, "curve_sell_quote_volume_base_units");
   }
   if (next.complete) next.lifecycle = "complete_pending_migration";
-  return next;
+  return applyFeeBalanceDelta(next, event);
 }
 
 function compareSnapshot(state, snapshot, eventId) {
@@ -153,6 +194,13 @@ export function replayCurveEvents(initialState, events) {
         break;
       case "CURVE_STATE_SNAPSHOT":
         reconciliations.push(compareSnapshot(state, event.payload?.state ?? {}, event.event_id));
+        break;
+      case "POST_COMPLETE_POOL_LEG":
+        state = applyFeeBalanceDelta(state, event);
+        state = { ...state, post_complete_pool_leg_count: (state.post_complete_pool_leg_count ?? 0) + 1, as_of_event_id: event.event_id };
+        break;
+      case "FEE_MOVEMENT":
+        state = applyFeeMovement(state, event);
         break;
       case "CURVE_COMPLETE":
         if (!state.complete) {

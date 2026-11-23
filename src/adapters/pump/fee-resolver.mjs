@@ -286,21 +286,23 @@ export function quoteExactSolIn({
   const totalBps = protocolBps + creatorBps;
 
   if (budget === 0n || tokenReserve === 0n || quoteReserve === 0n) {
-    throw new RangeError("budget and virtual reserves must be positive");
+    throw new RangeError("spendable input and virtual reserves must be positive");
   }
-  if (10_000n + totalBps === 0n) throw new RangeError("invalid total fee basis points");
+  if (totalBps >= 10_000n) throw new RangeError("combined trade fees must be below 10000 bps");
 
   let netQuote = (budget * 10_000n) / (10_000n + totalBps);
-  const protocolFee = (netQuote * protocolBps + 9_999n) / 10_000n;
-  const creatorFee = (netQuote * creatorBps + 9_999n) / 10_000n;
-  const totalFees = protocolFee + creatorFee;
+  let protocolFee = (netQuote * protocolBps + 9_999n) / 10_000n;
+  let creatorFee = (netQuote * creatorBps + 9_999n) / 10_000n;
+  let totalFees = protocolFee + creatorFee;
   if (netQuote + totalFees > budget) {
     netQuote -= netQuote + totalFees - budget;
+    protocolFee = (netQuote * protocolBps + 9_999n) / 10_000n;
+    creatorFee = (netQuote * creatorBps + 9_999n) / 10_000n;
+    totalFees = protocolFee + creatorFee;
   }
-  if (netQuote <= 0n) throw new RangeError("spendable input is too small after fees");
 
-  const adjustedQuote = netQuote - 1n;
-  const tokensOut = (adjustedQuote * tokenReserve) / (quoteReserve + adjustedQuote);
+  const effectiveQuote = netQuote > 0n ? netQuote - 1n : 0n;
+  const tokensOut = (effectiveQuote * tokenReserve) / (quoteReserve + effectiveQuote);
   if (tokensOut <= 0n) throw new RangeError("quote input is too small to buy one base unit");
 
   return {
@@ -312,5 +314,6 @@ export function quoteExactSolIn({
     token_out_base_units: tokensOut.toString(),
     total_fee_bps: totalBps.toString(),
     quote_mint: DEFAULT_PUBKEY,
+    unspent_quote_in_base_units: (budget - netQuote - totalFees).toString(),
   };
 }

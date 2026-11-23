@@ -165,7 +165,8 @@ test("curve event replay applies confirmed post-state and keeps non-curve events
   assert.equal(result.state.curve_buy_quote_volume_base_units, "100");
   assert.equal(result.state.curve_sell_quote_volume_base_units, "0");
   assert.equal(result.state.execution_count, 1);
-  assert.equal(result.state.ignored_non_curve_event_count, 2);
+  assert.equal(result.state.ignored_non_curve_event_count, 1);
+  assert.equal(result.state.post_complete_pool_leg_count, 1);
 });
 
 test("curve snapshots report mismatches without overwriting replayed state", () => {
