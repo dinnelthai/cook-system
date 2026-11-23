@@ -57,7 +57,7 @@ function bondingCurveAccountInfo() {
     Buffer.from(account.discriminator),
     u64(1_000_000),u64(2_000_000),u64(500_000),u64(100_000),u64(1_500_000),
     u8(0),pubkey(USER),u8(0),u8(0),pubkey(ZERO_KEY),u64(0),u8(0),u8(0),
-    u64(50),u64(100),u8(0),u64(2_000_000),u64(0),u64(0),
+    u64(3),u64(5),u8(0),u64(2_000_000),u64(0),u64(0),
   ]);
   return {context:{slot:101},value:{owner:PUMP_PROGRAM_ID,data:[bytes.toString("base64"),"base64"]}};
 }
@@ -118,8 +118,8 @@ test("mint history collector replays a complete confirmed fixture and reconciles
   assert.equal(result.signature_coverage.fetched_transactions,1);
   assert.equal(result.events.length,2);
   assert.equal(result.replay.state.curve_buy_quote_volume_base_units,"500");
-  assert.equal(result.replay.state.protocol_fees_base_units,"100");
-  assert.equal(result.replay.state.creator_fees_base_units,"50");
+  assert.equal(result.replay.state.protocol_fees_base_units,"5");
+  assert.equal(result.replay.state.creator_fees_base_units,"3");
   assert.equal(result.current_account_reconciliation.status,"PASS");
   assert.equal(result.raw_candles_status,"AVAILABLE");
   assert.equal(result.raw_candles_1m.length,1);
