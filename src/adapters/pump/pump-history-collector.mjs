@@ -14,6 +14,7 @@ import { decodePumpTransaction, findTransactionIndexInBlock } from "./pump-trans
 import { reconcilePumpTradesWithTransaction, reconcileCurveStateSnapshot } from "./transaction-reconciler.mjs";
 import { createInitialCurveStateFromMarketCreated, replayCurveEvents } from "../../core/market-state.mjs";
 import { buildRawCandles } from "../../core/candle-builder.mjs";
+import { fetchPumpFeeConfigHistory } from "./pump-fee-history.mjs";
 
 export function derivePumpBondingCurveAddress(mint) {
   const mintKey = new PublicKey(mint);
@@ -147,15 +148,20 @@ export async function fetchPumpMintHistory({
   until = null,
   commitment = "confirmed",
   includeRawTransactions = false,
+  includeFeeConfigHistory = false,
+  feeConfigBaselineSnapshotRecord = null,
 } = {}) {
   if (!rpc || typeof rpc.getTransaction !== "function") throw new TypeError("Solana RPC client is required");
   if (typeof mint !== "string" || mint.length === 0) throw new TypeError("mint is required");
   const curveAddress = derivePumpBondingCurveAddress(mint);
 
-  const [mintInfo, curveInfo, signatureCollection] = await Promise.all([
+  const [mintInfo, curveInfo, signatureCollection, feeConfigHistory] = await Promise.all([
     rpc.getAccountInfo(mint, { commitment }),
     rpc.getAccountInfo(curveAddress, { commitment }),
     collectSignatures(rpc, curveAddress, { maxSignatures, pageSize, until, commitment }),
+    includeFeeConfigHistory
+      ? fetchPumpFeeConfigHistory({ rpc, initialSnapshotRecord: feeConfigBaselineSnapshotRecord, maxSignatures: Math.min(maxSignatures, 20_000), pageSize, concurrency, commitment, network })
+      : Promise.resolve(null),
   ]);
 
   const mintMetadata = decodeMintAccount(mintInfo);
@@ -286,6 +292,7 @@ export async function fetchPumpMintHistory({
     raw_candles_1m: candles,
     raw_candles_status: candleStatus,
     fee_config_pda: PUMP_FEE_CONFIG_PDA,
+    fee_config_history: feeConfigHistory,
     limitations: [
       "Historical account bytes are not returned by standard Solana getTransaction; replay uses observed event post-state and transaction balance deltas, then compares with the current account snapshot when the lifecycle permits.",
       "A complete replay is claimed only when the CreateEvent is present, signature history is exhausted or the requested until signature is reached, every transaction is fetched, and block transaction indexes are available.",
