@@ -126,7 +126,7 @@ export function quoteExactTokenOutBuy({
     throw error;
   }
   if (amount >= state.virtualToken) throw new RangeError("requested token output exhausts virtual token reserves");
-  const netQuote = (amount * state.virtualQuote) / (state.virtualToken - amount);
+  const netQuote = (amount * state.virtualQuote) / (state.virtualToken - amount) + 1n;
   const fee = feeBreakdown(netQuote, fees);
   const totalCost = netQuote + fee.total_fee_base_units;
   return makeQuote({
@@ -268,7 +268,7 @@ export function quoteV3ExactTokenOutBuy({
     curve,
     curveBaseTokenBalance,
     poolMigrationFee,
-    curveCompletionQuoteIn: BigInt(curveLeg.input_base_units),
+    curveCompletionQuoteIn: BigInt(curveLeg.curve_input_base_units),
   });
   const extraTokens = amount - curve.realToken;
   const poolLeg = quoteConstantProductExactTokenOut({
@@ -374,7 +374,7 @@ export function quoteV3ExactQuoteInBuy({
     curve,
     curveBaseTokenBalance,
     poolMigrationFee,
-    curveCompletionQuoteIn: curveCost,
+    curveCompletionQuoteIn: BigInt(curveLeg.curve_input_base_units),
   });
   const poolBudget = budget - curveCost;
   const poolLeg = quoteConstantProductExactQuoteIn({
