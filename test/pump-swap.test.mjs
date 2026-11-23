@@ -162,6 +162,7 @@ test("PumpSwap BuyEvent decodes, normalizes and reconciles actor and pool-vault 
       },
     },
   });
+  assert.deepEqual(parsed.unresolved_events, []);
   assert.equal(parsed.status,"DECODED");
   assert.equal(parsed.events.length,1);
   const event=parsed.events[0];
