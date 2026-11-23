@@ -590,7 +590,7 @@ export async function fetchPumpMintHistory({
     let poolStatus = "NO_POOL_CREATED_EVENT";
     let poolReplayComplete = false;
     if (poolCreatedEvent) {
-      const initialState = createInitialPumpSwapPoolState({ poolCreatedEvent });
+      const initialState = createInitialPumpSwapPoolState({ poolCreatedEvent, decodedPool: pool.snapshot.decoded_pool });
       poolReplay = replayPumpSwapPoolEvents(initialState, poolEvents);
       poolReplayComplete = (poolSignatureCollections.find((item) => item.address === pool.poolAddress)?.coverage_complete ?? false) &&
         poolDataGaps.length === 0 &&
