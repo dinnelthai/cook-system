@@ -289,7 +289,7 @@ export function normalizePumpAmmCreatePoolEvent({
     sourceType,
     marketPhase: "post_graduation",
   });
-  event.market.curve_program_id = PUMP_AMM_PROGRAM_ID;
+  event.payload.pool_program_id = PUMP_AMM_PROGRAM_ID;
   event.payload = {
     ...event.payload,
     pool_address: data.pool,
