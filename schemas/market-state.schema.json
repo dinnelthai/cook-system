@@ -10,82 +10,191 @@
     "market",
     "as_of_time_ms",
     "adapter_version",
-    "virtual_quote_reserve_base_units",
-    "virtual_token_reserve_base_units",
+    "virtual_quote_reserves_base_units",
+    "virtual_token_reserves_base_units",
     "curve_progress",
     "graduation_status",
-    "mint_supply_base_units",
+    "token_total_supply_base_units",
     "reconciliation",
-    "data_completeness"
+    "data_completeness",
+    "protocol_fees_base_units",
+    "creator_fees_base_units",
+    "complete"
   ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
-    "state_id": { "type": "string", "minLength": 1 },
-    "market": { "$ref": "market-identity.schema.json" },
-    "as_of_event_id": { "type": ["string", "null"] },
-    "as_of_time_ms": { "type": "integer", "minimum": 0 },
-    "adapter_version": { "type": "string", "minLength": 1 },
-    "virtual_quote_reserve_base_units": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "state_id": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)$"
+      "minLength": 1
     },
-    "virtual_token_reserve_base_units": {
+    "market": {
+      "$ref": "market-identity.schema.json"
+    },
+    "as_of_event_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "as_of_time_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "adapter_version": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)$"
+      "minLength": 1
     },
-    "real_quote_reserve_base_units": {
-      "type": ["string", "null"],
-      "pattern": "^(0|[1-9][0-9]*)$"
+    "fee_config_reference": {
+      "type": [
+        "string",
+        "null"
+      ]
     },
-    "real_token_reserve_base_units": {
-      "type": ["string", "null"],
-      "pattern": "^(0|[1-9][0-9]*)$"
-    },
-    "fee_config_reference": { "type": ["string", "null"] },
     "curve_progress": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["value", "denominator_definition"],
+      "required": [
+        "value",
+        "denominator_definition"
+      ],
       "properties": {
-        "value": { "type": "number", "minimum": 0, "maximum": 1 },
-        "denominator_definition": { "type": "string", "minLength": 1 }
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "denominator_definition": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "graduation_status": {
       "type": "string",
-      "enum": ["not_graduated", "graduated", "unknown"]
-    },
-    "mint_supply_base_units": {
-      "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)$"
+      "enum": [
+        "not_graduated",
+        "graduated",
+        "unknown"
+      ]
     },
     "curve_token_inventory_base_units": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^(0|[1-9][0-9]*)$"
     },
-    "holder_balance_root": { "type": ["string", "null"] },
+    "holder_balance_root": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "reconciliation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "difference_base_units"],
+      "required": [
+        "status",
+        "difference_base_units"
+      ],
       "properties": {
         "status": {
           "type": "string",
-          "enum": ["pass", "warning", "fail", "unknown"]
+          "enum": [
+            "pass",
+            "warning",
+            "fail",
+            "unknown"
+          ]
         },
-        "calculated_total_base_units": { "type": ["string", "null"] },
-        "authoritative_total_base_units": { "type": ["string", "null"] },
-        "difference_base_units": { "type": ["string", "null"] },
-        "tolerance_base_units": { "type": ["string", "null"] },
+        "calculated_total_base_units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authoritative_total_base_units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "difference_base_units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tolerance_base_units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "unclassified_accounts": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
     "data_completeness": {
       "type": "string",
-      "enum": ["complete", "partial", "stale", "unknown"]
+      "enum": [
+        "complete",
+        "partial",
+        "stale",
+        "unknown"
+      ]
+    },
+    "virtual_quote_reserves_base_units": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "virtual_token_reserves_base_units": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "real_quote_reserves_base_units": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "real_token_reserves_base_units": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "token_total_supply_base_units": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "protocol_fees_base_units": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "creator_fees_base_units": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": [
+        "bonding_curve",
+        "complete_pending_migration",
+        "graduated",
+        "unknown"
+      ]
     }
   }
 }
