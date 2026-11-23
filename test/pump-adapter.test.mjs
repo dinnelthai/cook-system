@@ -143,7 +143,8 @@ function buildPartialFeeConfigAccount() {
     tier,
   ]);
 }
-\nfunction buildFeeConfigAccount() {
+
+function buildFeeConfigAccount() {
   const fees = (lp, protocol, creator) => Buffer.concat([u64(lp), u64(protocol), u64(creator)]);
   const tier = Buffer.concat([u128(0), fees(0, 100, 50)]);
   return Buffer.concat([
