@@ -169,21 +169,33 @@ export function normalizePumpTradeEvent({
     throw new TypeError("reconciliationRef is required when accountStateReconciled is true");
   }
 
+  if (buybackFee > protocolFee) {
+    throw new RangeError("buyback fee cannot exceed the protocol fee charged");
+  }
+  const isV3 = instructionVersion(resolvedInstructionName) === "v3";
+  const protocolRetained = isV3 ? protocolFee - buybackFee : 0n;
+  const creatorRetained = isV3 ? creatorFee : 0n;
   const feeComponents = [];
-  if (protocolFee > 0n) {
-    feeComponents.push({
-      fee_type: "protocol",
-      amount_base_units: protocolFee.toString(),
-      mint: WRAPPED_SOL_MINT,
-    });
-  }
-  if (creatorFee > 0n) {
-    feeComponents.push({
-      fee_type: "creator",
-      amount_base_units: creatorFee.toString(),
-      mint: WRAPPED_SOL_MINT,
-    });
-  }
+  if (protocolFee > 0n) feeComponents.push({
+    fee_type: "protocol_charged",
+    amount_base_units: protocolFee.toString(),
+    mint: WRAPPED_SOL_MINT,
+  });
+  if (protocolRetained > 0n) feeComponents.push({
+    fee_type: "protocol_retained",
+    amount_base_units: protocolRetained.toString(),
+    mint: WRAPPED_SOL_MINT,
+  });
+  if (creatorFee > 0n) feeComponents.push({
+    fee_type: "creator",
+    amount_base_units: creatorFee.toString(),
+    mint: WRAPPED_SOL_MINT,
+  });
+  if (buybackFee > 0n) feeComponents.push({
+    fee_type: "buyback_paid_immediately",
+    amount_base_units: buybackFee.toString(),
+    mint: WRAPPED_SOL_MINT,
+  });
 
   const metadata = getPumpIdlSnapshotMetadata();
   const eventId = `${signature}:ix${eventOrdering.value.instruction_index ?? "unknown"}:event${eventSequence}`;
@@ -229,6 +241,10 @@ export function normalizePumpTradeEvent({
       buyback_fee_basis_points: asUnsignedBigInt(data.buyback_fee_basis_points ?? 0n, "buyback_fee_basis_points").toString(),
       buyback_fee_base_units: buybackFee.toString(),
       fee_components: feeComponents,
+      fee_balances_delta: {
+        protocol_fees_base_units: protocolRetained.toString(),
+        creator_fees_base_units: creatorRetained.toString(),
+      },
       post_curve_state: {
         virtual_token_reserves_base_units: virtualTokenReserves.toString(),
         virtual_quote_reserves_base_units: virtualQuoteReserves.toString(),
