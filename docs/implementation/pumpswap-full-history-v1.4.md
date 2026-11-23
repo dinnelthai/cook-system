@@ -1,6 +1,6 @@
 # PumpSwap Full History Replay — V1.4
 
-- Status: Implemented; 58 / 58 Node.js 22 tests pass; mainnet fixture validation pending
+- Status: Implemented; 59 / 59 Node.js 22 tests pass; mainnet fixture validation pending
 - Version: 1.4
 - Date: 2026-11-23
 - Parent: Pump Full Replay Engine V1.3
@@ -122,7 +122,7 @@ If an event that can change pool state is not supported, the pool replay remains
 
 ## 9. Verification
 
-The V1.4 suite has 58 passing Node.js 22 tests and covers:
+The V1.4 suite has 59 passing Node.js 22 tests and covers:
 
 - Full official PumpSwap IDL event / instruction presence
 - BuyEvent decoding and normalization
