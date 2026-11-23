@@ -30,7 +30,7 @@ test("Solana RPC client sends JSON-RPC and returns the result", async () => {
     maxRetries: 0,
   });
   const result = await rpc.getSlot();
-  assert.equal(result, 123);
+  assert.deepEqual(result, { slot: 123 });
   assert.equal(request.body.method, "getSlot");
   assert.deepEqual(request.body.params, [{ commitment: "confirmed" }]);
   assert.equal(request.init.method, "POST");
