@@ -85,7 +85,7 @@ The first core slice currently includes:
 - [x] Add the initial IDL-driven Pump Legacy / V2 / V3 decoder and account / event decoders.
 - [x] Add the initial FeeConfig tier resolver and stale-history guard.
 - [x] Add deterministic event ordering, curve-state replay, and snapshot reconciliation for normalized inputs.
-- [ ] Run and verify the Node.js 22 test suite in CI or locally.
+- [x] Verify the Node.js 22 test suite in GitHub Actions: 21 passed, 0 failed.
 - [ ] Differential-test quote calculations against the pinned Pump SDK and confirmed TradeEvent data.
 - [ ] Implement exact-token-out buys and exact-token-in sells.
 - [ ] Add the curve-completion and synthetic-migration quote boundary.
