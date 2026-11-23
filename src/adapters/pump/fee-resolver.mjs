@@ -1,6 +1,68 @@
 import { parseBaseUnits, U64_MAX, U128_MAX } from "../../core/integer.mjs";
 
 export const DEFAULT_PUBKEY = "11111111111111111111111111111111";
+const PUMP_FEES_PROGRAM_ID = "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ";
+const FEE_CONFIG_CHANGE_EVENT_NAMES = new Set([
+  "InitializeFeeConfigEvent",
+  "UpsertFeeTiersEvent",
+  "UpdateFeeConfigEvent",
+  "UpsertStableFeeTiersEvent",
+  "UpdateStableFeeConfigEvent",
+  "SetExoticFlatFeesEvent",
+]);
+
+export function feeConfigSnapshotRecordFromDecodedAccount({
+  decodedAccount,
+  ordering,
+  eventId,
+}) {
+  if (!decodedAccount || decodedAccount.program_id !== PUMP_FEES_PROGRAM_ID) {
+    throw new TypeError("a decoded Pump Fees program account is required");
+  }
+  if (
+    !["DECODED", "PARTIAL_ACCOUNT_LAYOUT"].includes(decodedAccount.status) ||
+    decodedAccount.account_name !== "FeeConfig"
+  ) {
+    throw new TypeError("a decoded FeeConfig account snapshot is required");
+  }
+  if (!decodedAccount.data || !Array.isArray(decodedAccount.data.fee_tiers)) {
+    throw new TypeError("FeeConfig snapshot does not contain fee_tiers");
+  }
+  if (typeof eventId !== "string" || eventId.length === 0) {
+    throw new TypeError("eventId is required for a fee-config snapshot");
+  }
+  return {
+    kind: "snapshot",
+    event_id: eventId,
+    ordering,
+    fee_config: decodedAccount.data,
+    missing_fields: decodedAccount.missing_fields ?? [],
+  };
+}
+
+export function feeConfigChangeRecordFromDecodedEvent({
+  decodedEvent,
+  ordering,
+  eventId,
+}) {
+  if (!decodedEvent || decodedEvent.program_id !== PUMP_FEES_PROGRAM_ID) {
+    throw new TypeError("a decoded Pump Fees program event is required");
+  }
+  if (decodedEvent.status !== "DECODED") {
+    throw new TypeError("fee-config change event must be fully decoded");
+  }
+  if (!FEE_CONFIG_CHANGE_EVENT_NAMES.has(decodedEvent.event_name)) return null;
+  if (typeof eventId !== "string" || eventId.length === 0) {
+    throw new TypeError("eventId is required for a fee-config change");
+  }
+  return {
+    kind: "change",
+    event_id: eventId,
+    event_name: decodedEvent.event_name,
+    ordering,
+  };
+}
+
 export const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 
 function toBigInt(value, name, max = U128_MAX) {
