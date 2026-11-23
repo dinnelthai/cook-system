@@ -11,17 +11,20 @@ import {
 
 export const PUMP_PROGRAM_ID = snapshot.source.pump_program_id;
 export const PUMP_FEES_PROGRAM_ID = snapshot.source.fees_program_id;
+export const PUMP_AMM_PROGRAM_ID = snapshot.source.pump_amm_program_id;
 export const PUMP_FEE_CONFIG_PDA = snapshot.source.fees_config_pda;
 export const PUMP_IDL_SNAPSHOT_VERSION = snapshot.snapshot_version;
 
 const PROGRAMS = new Map([
   [PUMP_PROGRAM_ID, "pump"],
   [PUMP_FEES_PROGRAM_ID, "fees"],
+  [PUMP_AMM_PROGRAM_ID, "pump_amm"],
 ]);
 
 const TYPE_MAPS = {
   pump: createTypeMap(snapshot, "pump"),
   fees: createTypeMap(snapshot, "fees"),
+  pump_amm: createTypeMap(snapshot, "pump_amm"),
 };
 
 const ACCOUNT_MAPS = {
@@ -33,12 +36,22 @@ const ACCOUNT_MAPS = {
     Buffer.from(account.discriminator).toString("hex"),
     account,
   ])),
+  pump_amm: new Map((snapshot.pump_amm.accounts ?? []).map((account) => [
+    Buffer.from(account.discriminator).toString("hex"),
+    account,
+  ])),
 };
 
-const INSTRUCTION_MAP = new Map((snapshot.pump.instructions ?? []).map((instruction) => [
-  Buffer.from(instruction.discriminator).toString("hex"),
-  instruction,
-]));
+const INSTRUCTION_MAPS = {
+  pump: new Map((snapshot.pump.instructions ?? []).map((instruction) => [
+    Buffer.from(instruction.discriminator).toString("hex"),
+    instruction,
+  ])),
+  pump_amm: new Map((snapshot.pump_amm.instructions ?? []).map((instruction) => [
+    Buffer.from(instruction.discriminator).toString("hex"),
+    instruction,
+  ])),
+};
 
 const EVENT_MAPS = {
   pump: new Map((snapshot.pump.events ?? []).map((event) => [
@@ -46,6 +59,10 @@ const EVENT_MAPS = {
     event,
   ])),
   fees: new Map((snapshot.fees.events ?? []).map((event) => [
+    Buffer.from(event.discriminator).toString("hex"),
+    event,
+  ])),
+  pump_amm: new Map((snapshot.pump_amm.events ?? []).map((event) => [
     Buffer.from(event.discriminator).toString("hex"),
     event,
   ])),
@@ -101,8 +118,9 @@ function decodeEventBuffer(programNamespace, bytes) {
   };
 }
 
-export function decodePumpInstruction({ programId = PUMP_PROGRAM_ID, data, encoding = "base58" }) {
-  if (programId !== PUMP_PROGRAM_ID) {
+export function decodeProgramInstruction({ programId, data, encoding = "base58" }) {
+  const programNamespace = getProgramNamespace(programId);
+  if (!programNamespace || !INSTRUCTION_MAPS[programNamespace]) {
     return { status: "UNSUPPORTED_PROGRAM", program_id: programId };
   }
   const bytes = toBuffer(data, encoding);
@@ -110,7 +128,7 @@ export function decodePumpInstruction({ programId = PUMP_PROGRAM_ID, data, encod
     return { status: "TRUNCATED_INSTRUCTION_DISCRIMINATOR", program_id: programId };
   }
   const discriminator = bytes.subarray(0, 8);
-  const instruction = INSTRUCTION_MAP.get(discriminator.toString("hex"));
+  const instruction = INSTRUCTION_MAPS[programNamespace].get(discriminator.toString("hex"));
   if (!instruction) {
     return {
       status: "UNKNOWN_INSTRUCTION_DISCRIMINATOR",
@@ -120,11 +138,11 @@ export function decodePumpInstruction({ programId = PUMP_PROGRAM_ID, data, encod
   }
 
   const reader = new BorshReader(bytes.subarray(8));
-  const typeMap = TYPE_MAPS.pump;
+  const typeMap = TYPE_MAPS[programNamespace];
   const args = {};
   const missingArguments = [];
 
-  for (let index = 0; index < instruction.args.length; index += 1) {
+  for (let index = 0; index < (instruction.args ?? []).length; index += 1) {
     const argument = instruction.args[index];
     if (reader.remaining === 0) {
       const optionalTail = instruction.args.slice(index).every((item) => {
@@ -163,6 +181,16 @@ export function decodePumpInstruction({ programId = PUMP_PROGRAM_ID, data, encod
     missing_arguments: missingArguments,
     idl_snapshot_version: snapshot.snapshot_version,
   };
+}
+
+export function decodePumpInstruction({ programId = PUMP_PROGRAM_ID, ...input }) {
+  if (programId !== PUMP_PROGRAM_ID) return { status: "UNSUPPORTED_PROGRAM", program_id: programId };
+  return decodeProgramInstruction({ programId, ...input });
+}
+
+export function decodePumpAmmInstruction({ programId = PUMP_AMM_PROGRAM_ID, ...input }) {
+  if (programId !== PUMP_AMM_PROGRAM_ID) return { status: "UNSUPPORTED_PROGRAM", program_id: programId };
+  return decodeProgramInstruction({ programId, ...input });
 }
 
 export function decodeProgramEvent({ programId, data, encoding = "base64" }) {
@@ -268,10 +296,15 @@ export function decodeProgramDataLogs(logs, programId) {
   return decodedEvents;
 }
 
-export function getPumpInstructionAccountNames(instructionName) {
-  const definition = (snapshot.pump.instructions ?? []).find((instruction) => instruction.name === instructionName);
+export function getProgramInstructionAccountNames(programId, instructionName) {
+  const namespace = getProgramNamespace(programId);
+  const definition = namespace ? (snapshot[namespace].instructions ?? []).find((instruction) => instruction.name === instructionName) : null;
   if (!definition) return null;
   return (definition.accounts ?? []).map((account) => account.name);
+}
+
+export function getPumpInstructionAccountNames(instructionName) {
+  return getProgramInstructionAccountNames(PUMP_PROGRAM_ID, instructionName);
 }
 
 export function getPumpIdlSnapshotMetadata() {
