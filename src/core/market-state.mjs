@@ -24,6 +24,8 @@ const NON_CURVE_EVENT_KINDS = new Set([
   "POST_COMPLETE_POOL_LEG",
   "FEE_CONFIG_CHANGE",
   "FEE_CONFIG_SNAPSHOT",
+  "MARKET_CREATED",
+  "POOL_CREATED",
 ]);
 
 export class CurveStateTransitionError extends Error {
@@ -57,6 +59,19 @@ function addVolume(current, amount, field) {
     parseBaseUnits(amount, { name: `${field} delta` }),
   );
   return formatBaseUnits(sum, { max: U128_MAX });
+}
+
+export function createInitialCurveStateFromMarketCreated({ marketCreatedEvent }) {
+  if (!marketCreatedEvent || marketCreatedEvent.event_kind !== "MARKET_CREATED") {
+    throw new TypeError("a normalized MARKET_CREATED event is required");
+  }
+  const reserves = marketCreatedEvent.payload?.initial_curve_state;
+  if (!reserves) throw new TypeError("MARKET_CREATED event is missing initial_curve_state");
+  return createInitialCurveState({
+    market: marketCreatedEvent.market,
+    reserves,
+    asOfEventId: marketCreatedEvent.event_id,
+  });
 }
 
 export function createInitialCurveState({ market, reserves, asOfEventId = null }) {
