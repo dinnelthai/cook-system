@@ -1,6 +1,6 @@
 # Raydium LaunchLab → CPMM Full Execution History — V1.5
 
-- Status: Implemented; deterministic end-to-end fixtures and CI validation pending
+- Status: Implemented; Node.js 22 CI green (68 / 68); MCAT mainnet replay pending
 - Version: 1.5
 - Date: 2026-11-23
 - Parent: Pump / PumpSwap Full Replay V1.4
@@ -76,7 +76,7 @@ Unknown instructions and unknown events from either supported program are retain
 - `LpChangeEvent` is retained as a protocol event and is not counted as swap volume.
 - Fee collection instructions are decoded; vault movements are independently reconciled from token balance deltas.
 
-The 1-minute and 5-minute candle outputs are market-phase specific. LaunchLab curve candles and post-graduation CPMM candles are not merged into one synthetic market.
+The Node.js 22 GitHub Actions run for V1.5 passed all 68 tests. The 1-minute and 5-minute candle outputs are market-phase specific. LaunchLab curve candles and post-graduation CPMM candles are not merged into one synthetic market.
 
 ## 6. Raw vault replay
 
@@ -116,7 +116,7 @@ The public Raydium CPMM market record identifies:
 - WSOL vault: `6yxjrn9RLSEsZev6CaP4YACyw3TdRZeMTNEygm4UnDVy`
 - MCAT vault: `2VBQvti8ACZnCa8kPhj1QLmyU5ohxeuCa4T9DS5LJkuP`
 
-The CPMM PDA derived from the AMM config and sorted mint pair matches the reported pool address. This is an identity/PDA cross-check, not yet a live RPC replay.
+The CPMM PDA derived from the AMM config and sorted mint pair matches the reported pool address. This is an identity/PDA cross-check, not yet a live RPC replay. Solscan identifies the token as a Raydium Launchpad asset; the word “Float” appearing in some market UI is not used as the on-chain program identifier.
 
 Secondary Meteora DLMM pools are visible in the historical market snapshot but are outside V1.5. A Raydium-only replay must not be labelled as the token's complete cross-DEX volume history.
 
