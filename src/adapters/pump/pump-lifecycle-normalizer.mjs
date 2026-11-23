@@ -206,6 +206,10 @@ export function normalizePumpPostCompleteBuyEvent({
   const baseOut = uint(data.base_out, "base_out");
   const quoteIn = uint(data.quote_in, "quote_in");
   if (baseOut === 0n || quoteIn === 0n) throw new RangeError("post-completion pool leg amounts must be positive");
+  const protocolFee = uint(data.fee, "fee");
+  const creatorFee = uint(data.creator_fee, "creator_fee");
+  const buybackFee = uint(data.buyback_fee, "buyback_fee");
+  if (buybackFee > protocolFee) throw new RangeError("buyback fee cannot exceed protocol fee charged");
   event.payload = {
     ...event.payload,
     actor_address: data.user,
@@ -221,9 +225,15 @@ export function normalizePumpPostCompleteBuyEvent({
     creator_fee_base_units: uint(data.creator_fee, "creator_fee").toString(),
     buyback_fee_base_units: uint(data.buyback_fee, "buyback_fee").toString(),
     fee_components: [
-      { fee_type: "protocol", amount_base_units: uint(data.fee, "fee").toString(), mint: event.market.quote_mint },
-      { fee_type: "creator", amount_base_units: uint(data.creator_fee, "creator_fee").toString(), mint: event.market.quote_mint },
+      { fee_type: "protocol_charged", amount_base_units: protocolFee.toString(), mint: event.market.quote_mint },
+      { fee_type: "protocol_retained", amount_base_units: (protocolFee - buybackFee).toString(), mint: event.market.quote_mint },
+      { fee_type: "creator", amount_base_units: creatorFee.toString(), mint: event.market.quote_mint },
+      { fee_type: "buyback_paid_immediately", amount_base_units: buybackFee.toString(), mint: event.market.quote_mint },
     ],
+    fee_balances_delta: {
+      protocol_fees_base_units: (protocolFee - buybackFee).toString(),
+      creator_fees_base_units: creatorFee.toString(),
+    },
     pool_base_reserves_before_base_units: uint(data.pool_base_reserves_before, "pool_base_reserves_before").toString(),
     pool_quote_reserves_before_base_units: uint(data.pool_quote_reserves_before, "pool_quote_reserves_before").toString(),
     pool_base_reserves_after_base_units: uint(data.pool_base_reserves_after, "pool_base_reserves_after").toString(),
