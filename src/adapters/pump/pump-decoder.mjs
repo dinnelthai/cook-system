@@ -223,7 +223,7 @@ export function decodeProgramAccount({ programId, data, encoding = "base64" }) {
   }
   const reader = new BorshReader(bytes.subarray(8));
   const decoded = readIdlDefinition(reader, definition, typeMap, 0, {
-    allowMissingTrailingFields: ["BondingCurve", "Global", "FeeConfig"].includes(account.name),
+    allowMissingTrailingFields: ["BondingCurve", "Global", "FeeConfig", "Pool"].includes(account.name),
   });
   if (reader.remaining > 0) {
     return {
