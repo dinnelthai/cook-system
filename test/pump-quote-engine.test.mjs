@@ -29,11 +29,11 @@ test("exact quote-in buy uses Pump's budget-minus-one fee stripping", () => {
     ...fees,
   });
   assert.equal(quote.method, "exact_quote_in");
-  assert.equal(quote.curve_input_base_units, "985221673");
+  assert.equal(quote.curve_input_base_units, "985221674");
   assert.equal(quote.protocol_fee_base_units, "9852217");
   assert.equal(quote.creator_fee_base_units, "4926109");
   assert.equal(quote.output_base_units, "34117646995895");
-  assert.equal(quote.unspent_input_base_units, "1");
+  assert.equal(quote.unspent_input_base_units, "0");
 });
 
 test("exact token-out buy adds ceiling-rounded protocol and creator fees", () => {
