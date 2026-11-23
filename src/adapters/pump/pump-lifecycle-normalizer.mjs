@@ -349,7 +349,7 @@ export function normalizePumpFeeSweepEvent({
     mint: data.mint,
     recipient_address: data.recipient,
     amount_base_units: uint(data.amount, "amount").toString(),
-    fee_bucket: data.bucket,
+    fee_bucket: Number(data.bucket),
     quote_mint: event.market.quote_mint,
   };
   return event;
