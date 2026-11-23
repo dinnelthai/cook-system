@@ -56,7 +56,7 @@ if (!args.mint) {
         pool_address: pool.pool_address,
         replay_status: pool.replay_status,
         signatures_seen: pool.signature_coverage?.signatures?.length ?? 0,
-        fetched_transactions: pool.signature_coverage?.signatures?.length - pool.data_gaps.length ?? null,
+        fetched_transactions: result.transactions.filter((item) => item.source_addresses.includes(pool.pool_address)).length,
         pool_events: pool.replay?.processed_event_ids?.length ?? 0,
         current_account_reconciliation: pool.current_account_reconciliation?.status ?? null,
         unresolved_events: pool.unresolved_events.length,
