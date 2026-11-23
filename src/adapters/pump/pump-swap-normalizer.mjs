@@ -355,6 +355,9 @@ export function normalizePumpSwapBoostBuyAndBurnEvent({
   }
   if (!poolMetadata) throw new TypeError("PumpSwap pool metadata is required");
   const data = decodedEvent.data;
+  if (data.pool !== poolMetadata.pool_address || data.mint !== poolMetadata.base_mint) {
+    throw new Error("PumpSwap boost event pool or mint does not match the resolved Pool account");
+  }
   return baseEvent({
     eventKind: "POOL_BOOST_BUY_BURN",
     decodedEvent,
