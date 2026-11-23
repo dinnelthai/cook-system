@@ -197,7 +197,7 @@ function eventOrdering({ transactionIndex, event, eventSequence, slot }) {
   };
 }
 
-function normalizeLaunchLabTrade({ event, transactionRecord, mint, quoteMint, tokenDecimals, quoteDecimals, eventSequence }) {
+function normalizeLaunchLabTrade({ event, transactionRecord, decodedTransaction, mint, quoteMint, tokenDecimals, quoteDecimals, eventSequence }) {
   const data = event.data;
   const direction = data.trade_direction?.variant;
   if (direction !== "Buy" && direction !== "Sell") return null;
@@ -212,6 +212,7 @@ function normalizeLaunchLabTrade({ event, transactionRecord, mint, quoteMint, to
   });
   if (!ordering || !Number.isSafeInteger(transactionRecord.transaction.blockTime)) return null;
   const signature = transactionRecord.signature;
+  const actor = actorFromInstruction(decodedTransaction, event);
   return {
     schema_version: "1.0.0",
     event_id: `${signature}:launchlab:${event.outer_instruction_index}:${event.inner_instruction_index}:${eventSequence}`,
@@ -229,7 +230,9 @@ function normalizeLaunchLabTrade({ event, transactionRecord, mint, quoteMint, to
       market_phase: "launchlab_curve",
     },
     payload: {
-      actor_address: null,
+      actor_address: actor.address,
+      actor_role: actor.role,
+      actor_attribution_status: actor.status,
       quote_amount_base_units: quoteAmount.toString(),
       token_amount_base_units: tokenAmount.toString(),
       execution_price_decimal: formatPriceDecimal(quoteAmount, tokenAmount, quoteDecimals, tokenDecimals),
@@ -252,7 +255,7 @@ function normalizeLaunchLabTrade({ event, transactionRecord, mint, quoteMint, to
   };
 }
 
-function normalizeCpmmSwap({ event, transactionRecord, mint, quoteMint, tokenDecimals, quoteDecimals, poolAddress, eventSequence }) {
+function normalizeCpmmSwap({ event, transactionRecord, decodedTransaction, mint, quoteMint, tokenDecimals, quoteDecimals, poolAddress, eventSequence }) {
   const data = event.data;
   let isBuy;
   let quoteAmount;
@@ -276,6 +279,7 @@ function normalizeCpmmSwap({ event, transactionRecord, mint, quoteMint, tokenDec
   });
   if (!ordering || !Number.isSafeInteger(transactionRecord.transaction.blockTime)) return null;
   const signature = transactionRecord.signature;
+  const actor = actorFromInstruction(decodedTransaction, event);
   return {
     schema_version: "1.0.0",
     event_id: `${signature}:cpmm:${event.outer_instruction_index}:${event.inner_instruction_index}:${eventSequence}`,
@@ -293,7 +297,9 @@ function normalizeCpmmSwap({ event, transactionRecord, mint, quoteMint, tokenDec
       market_phase: "raydium_cpmm",
     },
     payload: {
-      actor_address: null,
+      actor_address: actor.address,
+      actor_role: actor.role,
+      actor_attribution_status: actor.status,
       quote_amount_base_units: quoteAmount.toString(),
       token_amount_base_units: tokenAmount.toString(),
       execution_price_decimal: formatPriceDecimal(quoteAmount, tokenAmount, quoteDecimals, tokenDecimals),
@@ -598,6 +604,7 @@ export async function fetchRaydiumMintHistory({
         const normalized = normalizeLaunchLabTrade({
           event,
           transactionRecord: record,
+          decodedTransaction: record.decoded,
           mint,
           quoteMint,
           tokenDecimals: mintDecoded.decimals,
@@ -610,6 +617,7 @@ export async function fetchRaydiumMintHistory({
         const normalized = normalizeCpmmSwap({
           event,
           transactionRecord: record,
+          decodedTransaction: record.decoded,
           mint,
           quoteMint,
           tokenDecimals: mintDecoded.decimals,
