@@ -230,6 +230,81 @@ test("TradeEvent decoder handles quote-neutral appended fields and shareholder v
   assert.equal(decoded.data.shareholders[0].share_bps, 2500n);
 });
 
+test("TradeEvent normalizer creates a canonical observed event with exact decimal price", () => {
+  const decodedEvent = decodeProgramEvent({
+    programId: PUMP_PROGRAM_ID,
+    data: buildTradeEvent().toString("base64"),
+  });
+  const normalized = normalizePumpTradeEvent({
+    decodedEvent,
+    signature: "test-signature",
+    ordering: {
+      slot: 100,
+      transactionIndex: 2,
+      instructionIndex: 1,
+      innerInstructionIndex: null,
+      eventSequence: 0,
+    },
+    tokenDecimals: 6,
+    quoteDecimals: 9,
+    network: "mainnet",
+  });
+  assert.equal(normalized.event_kind, "CURVE_BUY_EXECUTED");
+  assert.equal(normalized.provenance, "observed_chain");
+  assert.equal(normalized.event_time_ms, 1_700_000_001_000);
+  assert.equal(normalized.payload.quote_amount_source, "quote_amount");
+  assert.equal(normalized.payload.execution_price_decimal, "0.000555555555555555555555");
+  assert.equal(normalized.payload.fee_components.length, 2);
+  assert.equal(normalized.payload.fee_components[0].fee_type, "protocol");
+  assert.equal(normalized.payload.post_curve_state.real_token_reserves_base_units, "500000");
+  assert.equal(normalized.quality.validation_status, "warning");
+  assert.equal(normalized.quality.is_complete, false);
+  assert.ok(normalized.quality.warnings.some((warning) => warning.includes("not yet been reconciled")));
+
+  const legacyQuote = normalizePumpTradeEvent({
+    decodedEvent: { ...decodedEvent, data: { ...decodedEvent.data, quote_amount: 0n } },
+    signature: "legacy-signature",
+    ordering: {
+      slot: 100,
+      transactionIndex: 2,
+      instructionIndex: 1,
+      innerInstructionIndex: null,
+      eventSequence: 1,
+    },
+    tokenDecimals: 6,
+  });
+  assert.equal(legacyQuote.payload.quote_amount_source, "legacy_sol_amount");
+  assert.equal(legacyQuote.payload.quote_amount_base_units, "500");
+
+  const reconciled = normalizePumpTradeEvent({
+    decodedEvent,
+    signature: "reconciled-signature",
+    ordering: {
+      slot: 100,
+      transactionIndex: 2,
+      instructionIndex: 1,
+      innerInstructionIndex: null,
+      eventSequence: 2,
+    },
+    tokenDecimals: 6,
+    accountStateReconciled: true,
+    reconciliationRef: "reconciliation-123",
+  });
+  assert.equal(reconciled.quality.validation_status, "valid");
+  assert.equal(reconciled.quality.is_complete, true);
+  assert.equal(reconciled.quality.reconciliation_ref, "reconciliation-123");
+
+  assert.throws(
+    () => normalizePumpTradeEvent({
+      decodedEvent: { ...decodedEvent, data: { ...decodedEvent.data, quote_mint: "NotSolMint" } },
+      signature: "unsupported-signature",
+      ordering: { slot: 1, transactionIndex: 0, instructionIndex: 0, eventSequence: 0 },
+      tokenDecimals: 6,
+    }),
+    (error) => error.code === "UNSUPPORTED_QUOTE_MINT",
+  );
+});
+
 test("program log parser only decodes Program data emitted by the requested program", () => {
   const eventData = buildCompleteEvent().toString("base64");
   const logs = [
