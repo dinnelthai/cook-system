@@ -104,7 +104,7 @@ function applyFeeBalanceDelta(state, event) {
 
 function applyFeeMovement(state, event) {
   const amount = parseBaseUnits(event.payload?.amount_base_units, { name: "fee movement amount" });
-  const bucket = event.payload?.fee_bucket;
+  const bucket = Number(event.payload?.fee_bucket);
   const field = bucket === 0 ? "protocol_fees_base_units" : bucket === 1 ? "creator_fees_base_units" : null;
   if (!field) throw new CurveStateTransitionError(event.event_id, "unknown bonding-curve fee bucket");
   const current = parseBaseUnits(state[field], { name: field });
