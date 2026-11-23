@@ -302,5 +302,6 @@ test("exact SOL-in quote follows Pump integer rounding and fee formula", () => {
   assert.equal(quote.net_quote_in_base_units, "985221674");
   assert.equal(quote.protocol_fee_base_units, "9852217");
   assert.equal(quote.creator_fee_base_units, "4926109");
-  assert.equal(quote.total_fee_base_units, "147391?"); // replaced below after deterministic expectation check
+  assert.equal(quote.total_fee_base_units, "14778326");
+  assert.equal(quote.token_out_base_units, "34117646995895");
 });
