@@ -1,10 +1,10 @@
 # Cook System
 
-A research and simulation project for adversarial market-quality analysis, beginning with the Pump.fun pre-graduation bonding-curve phase.
+A research and simulation project for defensive market-quality analysis, beginning with the Pump.fun pre-graduation bonding-curve phase.
 
 ## V1 focus
 
-**Inner Market Adversarial Simulator** — model adversarial and organic participant behavior in an isolated, reproducible simulation, then evaluate whether market-integrity signals can distinguish genuine demand from misleading activity.
+**Inner Market Adversarial Simulator** — model organic and adverse market conditions in an isolated, reproducible simulation, then evaluate whether market-integrity signals can distinguish broad independent demand from concentrated or misleading activity.
 
 This repository is for defensive research, data analysis, and offline simulation. It does not implement live market manipulation, wash trading, self-trading, deceptive volume generation, coordinated-wallet execution, or automated token distribution.
 
@@ -12,9 +12,21 @@ This repository is for defensive research, data analysis, and offline simulation
 
 - Market phase: Pump.fun bonding curve, before graduation.
 - State: curve reserves, price, supply distribution, wallet-level inventory, transaction ordering, fees, and curve progress.
-- Participants: issuer/dev, early holders, snipers, organic buyers/sellers, retail participants, KOL information sources, arbitrage/searcher bots, and MEV actors.
+- Participants: issuer/dev, early holders, fast entrants, organic buyers/sellers, retail participants, KOL information sources, arbitrage/searcher bots, and abstract MEV ordering actors.
 - Outputs: raw OHLCV, volume composition estimates, wallet-cluster evidence, price-impact diagnostics, execution-quality measures, and market-integrity alerts.
 - Execution: offline simulation only; no mainnet signing or transaction submission.
+
+## Runtime and tests
+
+- Runtime: Node.js 22+
+- No runtime dependencies in the initial core.
+- Run tests: `npm test`
+
+The first core slice currently includes:
+- checked BigInt arithmetic for base-unit amounts;
+- deterministic event ordering and duplicate-event checks;
+- immutable OHLCV aggregation from confirmed curve execution events only;
+- strict separation of observed-chain and synthetic event streams.
 
 ## Research principles
 
@@ -51,14 +63,20 @@ This repository is for defensive research, data analysis, and offline simulation
 - [Market Alert](schemas/market-alert.schema.json)
 - [Simulation Ground Truth — evaluation only](schemas/simulation-ground-truth.schema.json)
 
-## Planned work
+## Implemented core
+
+- [Exact integer arithmetic](src/core/integer.mjs)
+- [Deterministic event ordering](src/core/event-order.mjs)
+- [Raw candle builder](src/core/candle-builder.mjs)
+- [Core tests](test/core.test.mjs)
+
+## Next implementation steps
 
 - [ ] Add automated JSON Schema validation and contract tests.
-- [ ] Implement decimal-safe amount utilities.
-- [ ] Verify the exact bonding-curve program adapter and reserve / fee semantics.
-- [ ] Implement deterministic event replay and accounting invariants.
-- [ ] Implement raw OHLCV construction from confirmed executions.
-- [ ] Implement heterogeneous agents and public-information response.
-- [ ] Add isolated adversarial and hard-negative scenarios.
-- [ ] Implement explainable market-integrity and execution-quality features.
-- [ ] Validate detection quality against held-out seeds and historical observations.
+- [ ] Decode versioned Pump instructions, events, and account layouts.
+- [ ] Add fee-config snapshots and dynamic-fee resolution.
+- [ ] Implement the deterministic market-state ledger and reconciliation.
+- [ ] Differential-test quote calculations against the pinned Pump SDK and observed TradeEvent data.
+- [ ] Add the curve-completion and synthetic-migration event boundary.
+- [ ] Add heterogeneous organic agents and public-information response.
+- [ ] Add isolated defensive scenarios and held-out evaluation.
