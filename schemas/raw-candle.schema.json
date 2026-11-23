@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/raw-candle.schema.json",
+  "title": "RawCandle",
+  "description": "OHLCV built only from confirmed curve execution events. Integrity annotations belong in a separate derived record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "market",
+    "interval_start_ms",
+    "interval_end_ms",
+    "open_price",
+    "high_price",
+    "low_price",
+    "close_price",
+    "quote_volume_base_units",
+    "token_volume_base_units",
+    "buy_quote_volume_base_units",
+    "sell_quote_volume_base_units",
+    "execution_count",
+    "first_event_id",
+    "last_event_id",
+    "event_order_completeness",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "market": { "$ref": "market-identity.schema.json" },
+    "interval_start_ms": { "type": "integer", "minimum": 0 },
+    "interval_end_ms": { "type": "integer", "minimum": 0 },
+    "open_price": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "high_price": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "low_price": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "close_price": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "quote_volume_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "token_volume_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "buy_quote_volume_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "sell_quote_volume_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "execution_count": { "type": "integer", "minimum": 0 },
+    "first_event_id": { "type": "string", "minLength": 1 },
+    "last_event_id": { "type": "string", "minLength": 1 },
+    "event_order_completeness": {
+      "type": "string",
+      "enum": ["complete", "partial", "unknown"]
+    },
+    "provenance": { "type": "string", "enum": ["observed_chain", "synthetic"] },
+    "scenario_id": { "type": ["string", "null"] }
+  }
+}
