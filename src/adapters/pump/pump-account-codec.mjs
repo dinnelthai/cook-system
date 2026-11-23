@@ -139,7 +139,7 @@ export function decodePumpSwapPoolAccount(accountInfo) {
     data: accountBytes(accountInfo),
     encoding: "base64",
   });
-  if (decoded.status !== "DECODED" || decoded.account_name !== "Pool") {
+  if (!["DECODED", "PARTIAL_ACCOUNT_LAYOUT"].includes(decoded.status) || decoded.account_name !== "Pool") {
     const error = new Error(`unable to decode PumpSwap Pool account: ${decoded.status}`);
     error.code = "PUMP_AMM_POOL_DECODE_FAILED";
     error.decoded = decoded;
@@ -152,10 +152,10 @@ export function decodePumpSwapPoolAccount(accountInfo) {
     context_slot: accountInfo.context?.slot ?? null,
     data: {
       ...decoded.data,
-      virtual_quote_reserves_base_units: decoded.data.virtual_quote_reserves?.toString?.() ?? null,
-      protocol_fees_base_units: decoded.data.protocol_fees?.toString?.() ?? null,
-      creator_fees_base_units: decoded.data.creator_fees?.toString?.() ?? null,
-      lp_supply_base_units: decoded.data.lp_supply?.toString?.() ?? null,
+      virtual_quote_reserves_base_units: decoded.data.virtual_quote_reserves?.toString?.() ?? "0",
+      protocol_fees_base_units: decoded.data.protocol_fees?.toString?.() ?? "0",
+      creator_fees_base_units: decoded.data.creator_fees?.toString?.() ?? "0",
+      lp_supply_base_units: decoded.data.lp_supply?.toString?.() ?? "0",
     },
   };
 }
