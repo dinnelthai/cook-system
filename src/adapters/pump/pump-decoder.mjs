@@ -81,17 +81,15 @@ function decodeEventBuffer(programNamespace, bytes) {
   if (!definition) {
     return { status: "MISSING_EVENT_TYPE_DEFINITION", program: programNamespace, event_name: event.name };
   }
-  const decoded = readIdlDefinition(
-    new BorshReader(bytes.subarray(8)),
-    definition,
-    typeMap,
-    0,
-    { allowMissingTrailingFields: true },
-  );
   const reader = new BorshReader(bytes.subarray(8));
   const result = readIdlDefinition(reader, definition, typeMap, 0, { allowMissingTrailingFields: true });
+  const status = result.missingFields.length > 0
+    ? "PARTIAL_EVENT_LAYOUT"
+    : reader.remaining > 0
+      ? "TRAILING_EVENT_BYTES"
+      : "DECODED";
   return {
-    status: result.missingFields.length > 0 ? "PARTIAL_EVENT_LAYOUT" : "DECODED",
+    status,
     program: programNamespace,
     event_name: event.name,
     discriminator_hex: discriminator.toString("hex"),
