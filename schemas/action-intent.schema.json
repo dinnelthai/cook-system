@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/action-intent.schema.json",
+  "title": "ActionIntent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "intent_id",
+    "scenario_id",
+    "agent_id",
+    "action_kind",
+    "created_at_ms",
+    "random_stream_id"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "intent_id": { "type": "string", "minLength": 1 },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "action_kind": {
+      "type": "string",
+      "enum": ["HOLD", "BUY_REQUEST", "SELL_REQUEST", "PUBLISH_PUBLIC_SIGNAL", "NO_OP"]
+    },
+    "created_at_ms": { "type": "integer", "minimum": 0 },
+    "observation_reference": { "type": ["string", "null"] },
+    "requested_amount_base_units": {
+      "type": ["string", "null"],
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "expiry_ms": { "type": ["integer", "null"], "minimum": 0 },
+    "random_stream_id": { "type": "string", "minLength": 1 },
+    "public_signal": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["topic", "sentiment", "source_reliability"],
+      "properties": {
+        "topic": { "type": "string", "minLength": 1 },
+        "sentiment": {
+          "type": "string",
+          "enum": ["positive", "negative", "neutral", "mixed"]
+        },
+        "source_reliability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence_reference": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
