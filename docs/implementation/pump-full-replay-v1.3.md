@@ -1,6 +1,6 @@
 # Pump Full Replay Engine — V1.3
 
-- Status: Implementation and CI verification in progress
+- Status: Implemented; Node.js 22 CI green (50 / 50); confirmed real-chain fixture capture pending
 - Version: 1.3
 - Date: 2026-11-23
 - Parent: Pump Decoder / Dynamic Fee Resolver V1.2
@@ -107,7 +107,7 @@ No fabricated transaction is committed as a real fixture. Real-chain differentia
 
 The project pins `@pump-fun/pump-sdk@4.3.1` as a development-only reference. A postinstall compatibility patch adjusts the transitive agent-payments package's CommonJS Anchor BN import for Node.js ESM. It does not modify Pump program logic or runtime quote code.
 
-The CI suite compares local exact-token-out buy, exact-token-in sell, and V3 migration quotes with the SDK using deterministic fixture states. The SDK comparison is a reference check, not a substitute for real transaction fixtures.
+The latest Node.js 22 GitHub Actions run passed all 50 tests. The CI suite compares local exact-token-out buy, exact-token-in sell, and V3 migration quotes with Pump SDK 4.3.1 using deterministic fixture states. The SDK comparison is a reference check, not a substitute for real transaction fixtures.
 
 ## 8. Known boundaries
 
