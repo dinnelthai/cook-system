@@ -197,6 +197,23 @@ function eventOrdering({ transactionIndex, event, eventSequence, slot }) {
   };
 }
 
+function actorFromInstruction(decodedTransaction, event) {
+  const candidates = (decodedTransaction?.instructions ?? []).filter((instruction) =>
+    instruction.program_id === event.program_id &&
+    instruction.outer_instruction_index === event.outer_instruction_index &&
+    instruction.status === "DECODED"
+  );
+  for (const name of ["payer", "user", "trader", "owner"]) {
+    for (const instruction of candidates) {
+      const value = instruction.accounts?.[name];
+      if (typeof value === "string" && value.length > 0) {
+        return { address: value, role: name, status: "OBSERVED_INSTRUCTION_ACCOUNT" };
+      }
+    }
+  }
+  return { address: null, role: null, status: "NOT_FOUND" };
+}
+
 function normalizeLaunchLabTrade({ event, transactionRecord, decodedTransaction, mint, quoteMint, tokenDecimals, quoteDecimals, eventSequence }) {
   const data = event.data;
   const direction = data.trade_direction?.variant;
