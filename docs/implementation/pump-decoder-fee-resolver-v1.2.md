@@ -71,6 +71,7 @@ Exports normalizePumpTradeEvent(...). It converts a decoded Pump TradeEvent into
 - Adds post-curve reserves for deterministic state replay.
 - Marks the event as warning / incomplete until account-delta reconciliation is supplied with an explicit reconciliation reference.
 - Rejects non-SOL quote mints and incomplete / invalid inputs rather than silently normalizing them.
+- An integration test now passes the normalized event through deterministic curve-state replay and raw OHLCV generation.
 
 ### src/adapters/pump/fee-resolver.mjs
 
@@ -135,7 +136,7 @@ test/pump-adapter.test.mjs covers:
 - Stale fee-config timeline behavior.
 - Exact SOL-in integer rounding.
 
-The repository includes a Node.js 22 GitHub Actions workflow for npm test. The latest verified run passed all 22 tests (8 core replay tests and 14 Pump adapter / normalization tests). Earlier failures exposed and fixed nested Borsh defined-struct unwrapping, a malformed test-fixture newline, and a missing test import; the current green run is the authoritative status.
+The repository includes a Node.js 22 GitHub Actions workflow for npm test. The latest verified run passed all 23 tests (8 core replay tests and 15 Pump adapter / normalization / integration tests). Earlier failures exposed and fixed nested Borsh defined-struct unwrapping, a malformed test-fixture newline, and a missing test import; the current green run is the authoritative status.
 
 ## 8. Next steps
 
@@ -145,7 +146,7 @@ The repository includes a Node.js 22 GitHub Actions workflow for npm test. The l
 4. Reconcile normalized TradeEvent projections against real transaction account deltas and confirmed historical fixtures.
 5. Implement exact-token-out buy and exact-token-in sell quote paths against the pinned SDK.
 6. Implement a historical FeeConfig snapshot collector / account timeline.
-7. Implement state reconciliation using authoritative pre- and post-transaction account snapshots.
+7. Expand state reconciliation using authoritative pre- and post-transaction account snapshots and real chain fixtures.
 8. Add synthetic migration and Mayhem-specific quote tests before enabling those quote paths.
 
 ## 9. References
