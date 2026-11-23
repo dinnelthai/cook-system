@@ -257,7 +257,7 @@ test("transaction parser maps Pump TradeEvent to a canonical observed-chain even
 
 test("failed Solana transactions never become observed execution events", () => {
   const transaction = makeTransaction({
-    logs: [`Program ${PUMP_PROGRAM_ID} invoke [1]`, `Program data: ${buildTradeEvent().toString("base64")}`, `Program ${PUMP_PROGRAM_ID} failed: custom program error`],
+    logs: [`Program ${PUMP_PROGRAM_ID} invoke [1]`, `Program data: ${buildTradeEvent({ realTokenReserves: 0 }).toString("base64")}`, `Program ${PUMP_PROGRAM_ID} failed: custom program error`],
     err: { InstructionError: [0, "Custom"] },
   });
   const parsed = decodePumpTransaction({
