@@ -33,6 +33,7 @@ This repository is for defensive research, data analysis, and offline simulation
 - [Initial Inventory & Demand Absorption Model — V1](docs/research/initial-inventory-demand-absorption-v1.md)
 - [Adversarial Dev Model & Manipulation-Resistance Tests — V1](docs/research/adversarial-dev-manipulation-detection-v1.md)
 - [Multi-Agent Inner Market Game Model — V1](docs/research/multi-agent-inner-market-game-model-v1.md)
+- [Agent Impact Attribution & Counterfactual Replay — V1](docs/research/agent-impact-counterfactual-replay-v1.md)
 
 ## Planned work
 
