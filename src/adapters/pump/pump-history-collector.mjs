@@ -2,6 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import {
   PUMP_PROGRAM_ID,
   PUMP_FEE_CONFIG_PDA,
+  getPumpIdlSnapshotMetadata,
 } from "./pump-decoder.mjs";
 import { createRpcClientFromEnv } from "./solana-rpc.mjs";
 import {
@@ -49,10 +50,13 @@ async function collectSignatures(rpc, address, {
   let before;
   let reachedUntil = false;
   let exhausted = false;
+  if (!Number.isSafeInteger(maxSignatures) || maxSignatures < 1) throw new RangeError("maxSignatures must be positive");
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) throw new RangeError("pageSize must be between 1 and 1000");
   while (signatures.length < maxSignatures) {
+    const requested = Math.min(pageSize, maxSignatures - signatures.length);
     const page = await rpc.getSignaturesForAddress(address, {
       commitment,
-      limit: Math.min(pageSize, maxSignatures - signatures.length),
+      limit: requested,
       before,
       until,
     });
@@ -66,10 +70,11 @@ async function collectSignatures(rpc, address, {
       break;
     }
     before = page.at(-1).signature;
-    if (page.length < pageSize) {
+    if (page.length < requested) {
       exhausted = true;
       break;
     }
+    if (signatures.length >= maxSignatures) break;
   }
   return {
     signatures,
@@ -228,7 +233,7 @@ export async function fetchPumpMintHistory({
     mint,
     network,
     curveAccount: curveAddress,
-    idlRevision: null,
+    idlRevision: getPumpIdlSnapshotMetadata().pump_idl_blob_sha,
   });
   const creationEvent = allEvents.find((event) => event.event_kind === "MARKET_CREATED");
   let replay = null;
