@@ -9,7 +9,8 @@
   "scripts": {
     "test": "node --test",
     "replay:pump": "node scripts/replay-pump-mint.mjs",
-    "capture:pump-fixture": "node scripts/capture-pump-fixture.mjs"
+    "capture:pump-fixture": "node scripts/capture-pump-fixture.mjs",
+    "postinstall": "node scripts/patch-pump-sdk-node-interop.mjs"
   },
   "devDependencies": {
     "@pump-fun/pump-sdk": "4.3.1",
