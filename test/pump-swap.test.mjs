@@ -189,7 +189,7 @@ test("PumpSwap BuyEvent decodes, normalizes and reconciles actor and pool-vault 
   const current=reconcilePumpSwapPoolSnapshot({
     replayedState:replay.state,
     decodedPool:{context_slot:25,data:{
-      virtual_quote_reserves_base_units:"0",
+      virtual_quote_reserves_base_units:"-3",
       protocol_fees_base_units:"2",
       creator_fees_base_units:"1",
     }},
