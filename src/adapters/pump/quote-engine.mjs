@@ -126,7 +126,7 @@ export function quoteExactTokenOutBuy({
     throw error;
   }
   if (amount >= state.virtualToken) throw new RangeError("requested token output exhausts virtual token reserves");
-  const netQuote = ((amount * state.virtualQuote) / (state.virtualToken - amount)) + 1n;
+  const netQuote = (amount * state.virtualQuote) / (state.virtualToken - amount);
   const fee = feeBreakdown(netQuote, fees);
   const totalCost = netQuote + fee.total_fee_base_units;
   return makeQuote({
