@@ -57,6 +57,7 @@ The first core slice currently includes:
 - [Market Identity](schemas/market-identity.schema.json)
 - [Market Event](schemas/market-event.schema.json)
 - [Market State](schemas/market-state.schema.json)
+- [Curve Replay State](schemas/curve-replay-state.schema.json)
 - [Agent State](schemas/agent-state.schema.json)
 - [Action Intent](schemas/action-intent.schema.json)
 - [Raw Candle](schemas/raw-candle.schema.json)
