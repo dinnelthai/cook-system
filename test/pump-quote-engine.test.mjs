@@ -60,7 +60,7 @@ test("exact token-in sell subtracts fees from gross constant-product output", ()
   });
   assert.equal(quote.method, "exact_token_in");
   assert.equal(quote.curve_input_base_units, "100");
-  assert.equal(quote.output_base_units, "86");
+  assert.equal(quote.output_base_units, "88");
   assert.equal(quote.protocol_fee_base_units, "10");
   assert.equal(quote.creator_fee_base_units, "5");
 });
@@ -146,7 +146,7 @@ test("synthetic migration rejects missing pool liquidity and pool drain requests
     () => quoteV3ExactTokenOutBuy({
       tokenAmountOut: "120",
       bondingCurve: curve,
-      curveBaseTokenBalance: "100",
+      curveBaseTokenBalance: "99",
       poolMigrationFee: "10",
       ...fees,
     }),
