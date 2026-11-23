@@ -1,5 +1,5 @@
 import { DEFAULT_PUBKEY, WRAPPED_SOL_MINT } from "./fee-resolver.mjs";
-import { PUMP_PROGRAM_ID, PUMP_AMM_PROGRAM_ID, getPumpIdlSnapshotMetadata } from "./pump-decoder.mjs";
+import { PUMP_PROGRAM_ID, PUMP_AMM_PROGRAM_ID, PUMP_FEES_PROGRAM_ID, getPumpIdlSnapshotMetadata } from "./pump-decoder.mjs";
 
 const U64_MAX = (1n << 64n) - 1n;
 
@@ -130,7 +130,7 @@ export function normalizePumpCreateEvent({
     token_total_supply_base_units: uint(data.token_total_supply, "token_total_supply").toString(),
     initial_curve_state: {
       virtual_token_reserves_base_units: uint(data.virtual_token_reserves, "virtual_token_reserves").toString(),
-      virtual_quote_reserves_base_units: uint(data.virtual_quote_reserves ?? data.virtual_sol_reserves, "virtual_quote_reserves").toString(),
+      virtual_quote_reserves_base_units: uint(data.virtual_quote_reserves > 0n ? data.virtual_quote_reserves : data.virtual_sol_reserves, "virtual_quote_reserves").toString(),
       real_token_reserves_base_units: uint(data.real_token_reserves, "real_token_reserves").toString(),
       real_quote_reserves_base_units: "0",
       token_total_supply_base_units: uint(data.token_total_supply, "token_total_supply").toString(),
@@ -352,7 +352,7 @@ export function normalizePumpFeeConfigChangeEvent({
   network = "mainnet",
   sourceType = "rpc",
 }) {
-  if (!decodedEvent || decodedEvent.status !== "DECODED" || !decodedEvent.program_id?.includes("pfee")) {
+  if (!decodedEvent || decodedEvent.status !== "DECODED" || decodedEvent.program_id !== PUMP_FEES_PROGRAM_ID) {
     throw new TypeError("a decoded Pump Fees program event is required");
   }
   const data = decodedEvent.data;
