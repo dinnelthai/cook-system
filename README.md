@@ -35,12 +35,17 @@ This repository is for defensive research, data analysis, and offline simulation
 - [Multi-Agent Inner Market Game Model — V1](docs/research/multi-agent-inner-market-game-model-v1.md)
 - [Agent Impact Attribution & Counterfactual Replay — V1](docs/research/agent-impact-counterfactual-replay-v1.md)
 
+## Implementation contracts
+
+- [Canonical Schema Contract — V1](docs/implementation/canonical-schema-contract-v1.md)
+
 ## Planned work
 
-- [ ] Freeze canonical event, state, observation, and action schemas.
+- [ ] Implement schema validation and decimal-safe amount utilities.
 - [ ] Verify the exact bonding-curve program adapter and reserve / fee semantics.
 - [ ] Implement deterministic event replay and accounting invariants.
-- [ ] Implement heterogeneous organic agents and public-information response.
+- [ ] Implement raw OHLCV construction from confirmed executions.
+- [ ] Implement heterogeneous agents and public-information response.
 - [ ] Add isolated adversarial and hard-negative scenarios.
 - [ ] Implement explainable market-integrity and execution-quality features.
 - [ ] Validate detection quality against held-out seeds and historical observations.
