@@ -16,6 +16,11 @@ import {
   ConflictingDuplicateEventError,
 } from "../src/core/event-order.mjs";
 import { buildRawCandles } from "../src/core/candle-builder.mjs";
+import {
+  createInitialCurveState,
+  replayCurveEvents,
+  CurveStateTransitionError,
+} from "../src/core/market-state.mjs";
 
 const market = {
   chain_id: "solana",
@@ -50,6 +55,34 @@ function execution({ id, sequence, time, kind, price, quote, token, provenance =
     ...(provenance === "synthetic" ? { synthetic_metadata: { scenario_id: "fixture", random_seed: 7, generator_version: "test" } } : {}),
   };
 }
+
+function curveEvent({ id, sequence, kind, payload, provenance = "synthetic" }) {
+  return {
+    event_id: id,
+    provenance,
+    event_kind: kind,
+    market,
+    event_time_ms: 1000 + sequence,
+    ordering: provenance === "synthetic"
+      ? { event_sequence: sequence, ordering_confidence: "synthetic" }
+      : { slot: 20, transaction_index: 0, instruction_index: sequence, inner_instruction_index: null, event_sequence: sequence, ordering_confidence: "complete" },
+    payload,
+  };
+}
+
+const initialCurve = () => createInitialCurveState({
+  market,
+  reserves: {
+    virtual_token_reserves_base_units: "1000000",
+    virtual_quote_reserves_base_units: "1000000",
+    real_token_reserves_base_units: "500000",
+    real_quote_reserves_base_units: "0",
+    token_total_supply_base_units: "1500000",
+    protocol_fees_base_units: "0",
+    creator_fees_base_units: "0",
+    complete: false,
+  },
+});
 
 test("base-unit helpers use exact integer arithmetic and enforce u64 bounds", () => {
   assert.equal(parseBaseUnits("9007199254740993"), 9007199254740993n);
@@ -105,4 +138,106 @@ test("raw candles separate observed and synthetic streams", () => {
   const observed = execution({ id: "o1", sequence: 0, time: 1000, kind: "CURVE_BUY_EXECUTED", price: "1", quote: "10", token: "10", provenance: "observed_chain" });
   const synthetic = execution({ id: "s1", sequence: 0, time: 1000, kind: "CURVE_BUY_EXECUTED", price: "1", quote: "10", token: "10", provenance: "synthetic" });
   assert.throws(() => buildRawCandles([observed, synthetic], 60_000), /replayed separately/);
+});
+
+test("curve event replay applies confirmed post-state and keeps non-curve events out of reserves", () => {
+  const buy = curveEvent({
+    id: "buy-1",
+    sequence: 0,
+    kind: "CURVE_BUY_EXECUTED",
+    payload: {
+      quote_amount_base_units: "100",
+      token_amount_base_units: "900",
+      post_curve_state: {
+        virtual_token_reserves_base_units: "999100",
+        virtual_quote_reserves_base_units: "1000100",
+        real_token_reserves_base_units: "499100",
+        real_quote_reserves_base_units: "100",
+        complete: false,
+      },
+    },
+  });
+  const transfer = curveEvent({ id: "transfer-1", sequence: 1, kind: "TOKEN_TRANSFER", payload: { token_amount_base_units: "50" } });
+  const postCompleteLeg = curveEvent({ id: "pool-leg", sequence: 2, kind: "POST_COMPLETE_POOL_LEG", payload: { quote_amount_base_units: "500" } });
+  const result = replayCurveEvents(initialCurve(), [postCompleteLeg, transfer, buy]);
+  assert.equal(result.state.virtual_quote_reserves_base_units, "1000100");
+  assert.equal(result.state.real_token_reserves_base_units, "499100");
+  assert.equal(result.state.curve_buy_quote_volume_base_units, "100");
+  assert.equal(result.state.curve_sell_quote_volume_base_units, "0");
+  assert.equal(result.state.execution_count, 1);
+  assert.equal(result.state.ignored_non_curve_event_count, 2);
+});
+
+test("curve snapshots report mismatches without overwriting replayed state", () => {
+  const buy = curveEvent({
+    id: "buy-2",
+    sequence: 0,
+    kind: "CURVE_BUY_EXECUTED",
+    payload: {
+      quote_amount_base_units: "100",
+      token_amount_base_units: "900",
+      post_curve_state: {
+        virtual_token_reserves_base_units: "999100",
+        virtual_quote_reserves_base_units: "1000100",
+        real_token_reserves_base_units: "499100",
+        real_quote_reserves_base_units: "100",
+        complete: false,
+      },
+    },
+  });
+  const snapshot = curveEvent({
+    id: "snapshot-1",
+    sequence: 1,
+    kind: "CURVE_STATE_SNAPSHOT",
+    payload: { state: {
+      virtual_token_reserves_base_units: "999100",
+      virtual_quote_reserves_base_units: "1000101",
+      real_token_reserves_base_units: "499100",
+      real_quote_reserves_base_units: "100",
+      token_total_supply_base_units: "1500000",
+      protocol_fees_base_units: "0",
+      creator_fees_base_units: "0",
+      complete: false,
+    } },
+  });
+  const result = replayCurveEvents(initialCurve(), [buy, snapshot]);
+  assert.equal(result.reconciliations[0].status, "FAIL");
+  assert.equal(result.reconciliations[0].mismatches[0].field, "virtual_quote_reserves_base_units");
+  assert.equal(result.state.virtual_quote_reserves_base_units, "1000100");
+});
+
+test("curve execution is rejected after completion", () => {
+  const completeBuy = curveEvent({
+    id: "last-buy",
+    sequence: 0,
+    kind: "CURVE_BUY_EXECUTED",
+    payload: {
+      quote_amount_base_units: "100",
+      token_amount_base_units: "500000",
+      post_curve_state: {
+        virtual_token_reserves_base_units: "499100",
+        virtual_quote_reserves_base_units: "1000100",
+        real_token_reserves_base_units: "0",
+        real_quote_reserves_base_units: "100",
+        complete: true,
+      },
+    },
+  });
+  const invalidSell = curveEvent({
+    id: "after-complete-sell",
+    sequence: 1,
+    kind: "CURVE_SELL_EXECUTED",
+    payload: {
+      quote_amount_base_units: "10",
+      token_amount_base_units: "10",
+      post_curve_state: {
+        virtual_token_reserves_base_units: "499110",
+        virtual_quote_reserves_base_units: "1000090",
+        real_token_reserves_base_units: "10",
+        real_quote_reserves_base_units: "90",
+        complete: false,
+      },
+    },
+  });
+  assert.throws(() => replayCurveEvents(initialCurve(), [completeBuy, invalidSell]), CurveStateTransitionError);
 });
