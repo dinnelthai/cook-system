@@ -110,8 +110,8 @@ function curveAccountInfo() {
   const bytes=Buffer.concat([
     Buffer.from(account.discriminator),
     u64(1_000_000),u64(2_000_000),u64(0),u64(500_000),u64(1_500_000),
-    u8(1),pubkey(USER),u8(0),u8(0),pubkey(ZERO),u64(0),u64(0),u8(0),
-    u64(2_000_000),u64(0),u64(0),
+    u8(1),pubkey(USER),u8(0),u8(0),pubkey(ZERO),u64(0),u8(0),u8(0),
+    u64(0),u64(0),u8(0),u64(2_000_000),u64(0),u64(0),
   ]);
   return {context:{slot:102},value:{owner:PUMP_PROGRAM_ID,data:[bytes.toString("base64"),"base64"]}};
 }
