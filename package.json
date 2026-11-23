@@ -10,7 +10,8 @@
     "test": "node --test",
     "replay:pump": "node scripts/replay-pump-mint.mjs",
     "capture:pump-fixture": "node scripts/capture-pump-fixture.mjs",
-    "postinstall": "node scripts/patch-pump-sdk-node-interop.mjs"
+    "postinstall": "node scripts/patch-pump-sdk-node-interop.mjs",
+    "replay:raydium": "node scripts/replay-raydium-mint.mjs"
   },
   "devDependencies": {
     "@pump-fun/pump-sdk": "4.3.1",
