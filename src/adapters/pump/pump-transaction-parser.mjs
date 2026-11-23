@@ -18,6 +18,11 @@ import {
   normalizePumpFeeConfigChangeEvent,
 } from "./pump-lifecycle-normalizer.mjs";
 import { extractTransactionBalanceDeltas } from "./transaction-reconciler.mjs";
+import {
+  normalizePumpSwapTradeEvent,
+  normalizePumpSwapLiquidityEvent,
+  normalizePumpSwapFeeSweepEvent,
+} from "./pump-swap-normalizer.mjs";
 
 function getAccountKeys(transaction) {
   const message = transaction?.transaction?.message ?? transaction?.message;
@@ -133,6 +138,75 @@ function mapLogOrdering(logs) {
   return byLogIndex;
 }
 
+function relatedProgramInstruction(instructions, logOrder, programId) {
+  if (!logOrder || !Number.isSafeInteger(logOrder.outerIndex)) return null;
+  return instructions.find((instruction) =>
+    instruction.program_id === programId &&
+    instruction.outer_instruction_index === logOrder.outerIndex &&
+    instruction.status.startsWith("DECODED")
+  ) ?? null;
+}
+
+function poolMetadataForEvent({
+  poolAddress,
+  data,
+  instructions,
+  logOrder,
+  poolMetadataByAddress,
+  tokenDecimalsByMint,
+  quoteDecimalsByMint,
+  transaction,
+}) {
+  const known = poolMetadataByAddress instanceof Map
+    ? poolMetadataByAddress.get(poolAddress)
+    : poolMetadataByAddress?.[poolAddress];
+  const related = relatedProgramInstruction(instructions, logOrder, PUMP_AMM_PROGRAM_ID);
+  const baseMint = known?.base_mint ?? data.base_mint ?? related?.accounts?.base_mint ?? null;
+  const quoteMint = known?.quote_mint ?? data.quote_mint ?? related?.accounts?.quote_mint ?? null;
+  const baseDecimals = known?.base_mint_decimals ??
+    (baseMint ? tokenDecimalsByMint[baseMint] ?? tokenDecimalsFromTransaction(transaction, baseMint) : null);
+  const quoteDecimals = known?.quote_mint_decimals ??
+    (quoteMint === "So11111111111111111111111111111111111111112"
+      ? 9
+      : quoteMint
+        ? quoteDecimalsByMint[quoteMint] ?? tokenDecimalsByMint[quoteMint] ?? tokenDecimalsFromTransaction(transaction, quoteMint)
+        : null);
+  return {
+    ...known,
+    pool_address: poolAddress,
+    base_mint: baseMint,
+    quote_mint: quoteMint,
+    base_mint_decimals: baseDecimals,
+    quote_mint_decimals: quoteDecimals,
+    pool_base_token_account: known?.pool_base_token_account ?? related?.accounts?.pool_base_token_account ?? null,
+    pool_quote_token_account: known?.pool_quote_token_account ?? related?.accounts?.pool_quote_token_account ?? null,
+  };
+}
+
+const NON_MARKET_PUMP_AMM_EVENTS = new Set([
+  "AdminCtoPoolEvent",
+  "AdminUpdateTokenIncentivesEvent",
+  "ClaimCashbackEvent",
+  "ClaimTokenIncentivesEvent",
+  "CloseUserVolumeAccumulatorEvent",
+  "CollectCoinCreatorFeeEvent",
+  "CreateConfigEvent",
+  "DisableEvent",
+  "ExtendAccountEvent",
+  "InitBoostEvent",
+  "InitUserVolumeAccumulatorEvent",
+  "MigratePoolCoinCreatorEvent",
+  "ReservedFeeRecipientsEvent",
+  "SetBondingCurveCoinCreatorEvent",
+  "SetBoostAuthorityEvent",
+  "SetMetaplexCoinCreatorEvent",
+  "SyncUserVolumeAccumulatorEvent",
+  "UpdateAdminEvent",
+  "UpdateCreatorFeeConfigEvent",
+  "UpdateFeeConfigEvent",
+  "WithdrawEvent",
+]);
+
 function tokenDecimalsFromTransaction(transaction, mint) {
   const balances = [
     ...(transaction?.meta?.preTokenBalances ?? []),
@@ -172,6 +246,8 @@ export function decodePumpTransaction({
   transactionIndex = null,
   network = "mainnet",
   tokenDecimalsByMint = {},
+  quoteDecimalsByMint = {},
+  poolMetadataByAddress = {},
   sourceType = "rpc",
 }) {
   if (!transaction || !transaction.meta) throw new TypeError("a full Solana transaction with metadata is required");
@@ -265,6 +341,80 @@ export function decodePumpTransaction({
           }));
           break;
         }
+        case "BuyEvent":
+        case "SellEvent": {
+          const poolAddress = decoded.data.pool;
+          const poolMetadata = poolMetadataForEvent({
+            poolAddress,
+            data: decoded.data,
+            instructions: decodedInstructions,
+            logOrder: logOrdering.get(decoded.log_index),
+            poolMetadataByAddress,
+            tokenDecimalsByMint,
+            quoteDecimalsByMint,
+            transaction,
+          });
+          if (!poolMetadata.base_mint || !poolMetadata.quote_mint ||
+              !Number.isInteger(poolMetadata.base_mint_decimals) ||
+              !Number.isInteger(poolMetadata.quote_mint_decimals)) {
+            unresolvedEvents.push({
+              event_name: decoded.event_name,
+              status: "MISSING_PUMPSWAP_POOL_METADATA",
+              pool: poolAddress,
+              log_index: decoded.log_index,
+              decoded_event: decoded,
+            });
+            break;
+          }
+          const related = relatedProgramInstruction(decodedInstructions, logOrdering.get(decoded.log_index), PUMP_AMM_PROGRAM_ID);
+          events.push(normalizePumpSwapTradeEvent({
+            ...context,
+            poolMetadata,
+            instructionName: related?.instruction_name ?? null,
+          }));
+          break;
+        }
+        case "DepositEvent":
+        case "WithdrawEvent": {
+          const poolAddress = decoded.data.pool;
+          const poolMetadata = poolMetadataForEvent({
+            poolAddress,
+            data: decoded.data,
+            instructions: decodedInstructions,
+            logOrder: logOrdering.get(decoded.log_index),
+            poolMetadataByAddress,
+            tokenDecimalsByMint,
+            quoteDecimalsByMint,
+            transaction,
+          });
+          if (!poolMetadata.base_mint || !poolMetadata.quote_mint) {
+            unresolvedEvents.push({
+              event_name: decoded.event_name,
+              status: "MISSING_PUMPSWAP_POOL_METADATA",
+              pool: poolAddress,
+              log_index: decoded.log_index,
+              decoded_event: decoded,
+            });
+            break;
+          }
+          events.push(normalizePumpSwapLiquidityEvent({ ...context, poolMetadata }));
+          break;
+        }
+        case "SweepPoolFeeEvent": {
+          const poolAddress = decoded.data.pool;
+          const poolMetadata = poolMetadataForEvent({
+            poolAddress,
+            data: decoded.data,
+            instructions: decodedInstructions,
+            logOrder: logOrdering.get(decoded.log_index),
+            poolMetadataByAddress,
+            tokenDecimalsByMint,
+            quoteDecimalsByMint,
+            transaction,
+          });
+          events.push(normalizePumpSwapFeeSweepEvent({ ...context, poolMetadata }));
+          break;
+        }
         case "CreateEvent":
           events.push(normalizePumpCreateEvent(context));
           break;
@@ -293,6 +443,8 @@ export function decodePumpTransaction({
         default:
           if (decoded.program_id === PUMP_FEES_PROGRAM_ID) {
             events.push(normalizePumpFeeConfigChangeEvent(context));
+          } else if (decoded.program_id === PUMP_AMM_PROGRAM_ID && NON_MARKET_PUMP_AMM_EVENTS.has(decoded.event_name)) {
+            break;
           } else {
             unresolvedEvents.push({ event_name: decoded.event_name, status: "UNHANDLED_EVENT", log_index: decoded.log_index, decoded_event: decoded });
           }
