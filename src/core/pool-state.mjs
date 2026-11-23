@@ -273,6 +273,7 @@ export function replayPumpSwapPoolEvents(initialState, events) {
       processedEventIds.push(event.event_id);
     }
 
+    assertPoolReserveInvariants(state, group.events.at(-1)?.event_id ?? group.signature);
     reconciliations.push({
       signature: group.signature,
       status: deltaResult.status,
