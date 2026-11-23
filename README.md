@@ -1,6 +1,6 @@
 # Cook System
 
-A research and simulation project for defensive market-quality analysis, beginning with the Pump.fun pre-graduation bonding-curve phase.
+A research and simulation project for defensive market-quality analysis, with read-only history adapters for Pump bonding curves, PumpSwap, Raydium LaunchLab and Raydium CPMM.
 
 ## V1 focus
 
@@ -10,7 +10,7 @@ This repository is for defensive research, data analysis, and offline simulation
 
 ## V1 boundaries
 
-- Market phase: Pump.fun bonding curve, before graduation.
+- Market phase: Pump.fun bonding curve and Raydium LaunchLab / CPMM lifecycle; secondary DEX adapters remain staged.
 - State: curve reserves, price, supply distribution, wallet-level inventory, transaction ordering, fees, and curve progress.
 - Participants: issuer/dev, early holders, fast entrants, organic buyers/sellers, retail participants, KOL information sources, arbitrage/searcher bots, and abstract MEV ordering actors.
 - Outputs: raw OHLCV, volume composition estimates, wallet-cluster evidence, price-impact diagnostics, execution-quality measures, and market-integrity alerts.
@@ -54,6 +54,7 @@ The first core slice currently includes:
 - [Pump Decoder & Dynamic Fee Resolver — V1.2](docs/implementation/pump-decoder-fee-resolver-v1.2.md)
 - [Pump Full Replay Engine — V1.3](docs/implementation/pump-full-replay-v1.3.md)
 - [PumpSwap Full History Replay — V1.4](docs/implementation/pumpswap-full-history-v1.4.md)
+- [Raydium LaunchLab → CPMM Full Execution History — V1.5](docs/implementation/raydium-launchlab-cpmm-history-v1.5.md)
 
 ### Machine-readable JSON Schemas
 
@@ -74,6 +75,10 @@ The first core slice currently includes:
 - [Curve state replay and reconciliation](src/core/market-state.mjs)
 - [Raw candle builder](src/core/candle-builder.mjs)
 - [Pinned Pump / Pump Fees IDL snapshot](src/adapters/pump/pump-idl.snapshot.json)
+- [Official Raydium LaunchLab / CPMM IDL snapshots](src/adapters/raydium/idl/)
+- [IDL-driven Raydium decoder](src/adapters/raydium/raydium-decoder.mjs)
+- [Raydium LaunchLab → CPMM history collector](src/adapters/raydium/raydium-history-collector.mjs)
+- [Raydium mint history replay CLI](scripts/replay-raydium-mint.mjs)
 - [IDL-driven Borsh decoder](src/adapters/pump/borsh.mjs)
 - [Pump instruction / event / account decoder](src/adapters/pump/pump-decoder.mjs)
 - [Dynamic fee resolver and historical config timeline](src/adapters/pump/fee-resolver.mjs)
@@ -102,6 +107,8 @@ The first core slice currently includes:
 - [PumpSwap trade / vault reconciliation tests](test/pump-swap.test.mjs)
 - [Pump + PumpSwap full history integration test](test/pump-pumpswap-history.test.mjs)
 - [Pump full history collector tests](test/pump-history-collector.test.mjs)
+- [Raydium LaunchLab / CPMM decoder tests](test/raydium-decoder.test.mjs)
+- [Raydium LaunchLab → CPMM history / vault replay tests](test/raydium-history-collector.test.mjs)
 - [Node.js 22 GitHub Actions workflow](.github/workflows/node-tests.yml)
 
 ## Next implementation steps
@@ -110,7 +117,8 @@ The first core slice currently includes:
 - [x] Add the initial IDL-driven Pump Legacy / V2 / V3 decoder and account / event decoders.
 - [x] Add the initial FeeConfig tier resolver and stale-history guard.
 - [x] Add deterministic event ordering, curve-state replay, and snapshot reconciliation for normalized inputs.
-- [x] Verify the Node.js 22 test suite in GitHub Actions: 59 passed, 0 failed.
+- [x] Verify the Node.js 22 test suite in GitHub Actions for V1.4: 59 passed, 0 failed.
+- [x] Verify the Node.js 22 V1.5 branch suite: 68 passed, 0 failed.
 - [x] Differential-test exact buy / sell and V3 migration quote calculations against Pump SDK 4.3.1.
 - [ ] Validate captured confirmed TradeEvent and account-delta fixtures against mainnet history.
 - [x] Implement exact-token-out buys and exact-token-in sells.
@@ -121,5 +129,10 @@ The first core slice currently includes:
 - [x] Reconcile PumpSwap pool state, signed virtual quote reserves, retained fees and fee sweeps against current Pool / vault accounts.
 - [x] Replay PumpSwap boost buy-and-burn transitions from explicit post-reserve observations.
 - [ ] Capture and validate confirmed Pump curve → PumpSwap mainnet fixtures with an archive-capable RPC before claiming real-world parity.
+- [x] Add official Raydium LaunchLab / CPMM IDL decoders and PDA derivation.
+- [x] Add LaunchLab migration discovery, CPMM pool verification, trade-event normalization and OHLCV.
+- [x] Reconcile LaunchLab / CPMM raw vault balances from transaction token-account deltas.
+- [ ] Run the MCAT LaunchLab → CPMM replay against an archive-capable mainnet RPC and inspect the resulting artifact.
+- [ ] Add Meteora DLMM / DAMM history adapters for cross-DEX token-wide volume.
 - [ ] Add heterogeneous organic agents and public-information response.
 - [ ] Add isolated defensive scenarios and held-out evaluation.
