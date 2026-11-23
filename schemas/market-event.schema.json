@@ -57,7 +57,8 @@
         "POOL_SELL_EXECUTED",
         "POOL_LIQUIDITY_ADDED",
         "POOL_LIQUIDITY_REMOVED",
-        "POOL_FEE_MOVEMENT"
+        "POOL_FEE_MOVEMENT",
+        "POOL_BOOST_BUY_BURN"
       ]
     },
     "market": {

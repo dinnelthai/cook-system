@@ -338,3 +338,55 @@ export function normalizePumpSwapFeeSweepEvent({
   });
   return event;
 }
+
+
+export function normalizePumpSwapBoostBuyAndBurnEvent({
+  decodedEvent,
+  signature,
+  ordering,
+  network = "mainnet",
+  sourceType = "rpc",
+  poolMetadata,
+}) {
+  if (decodedEvent?.status !== "DECODED" ||
+      decodedEvent.event_name !== "BoostBuyAndBurnEvent" ||
+      decodedEvent.program_id !== PUMP_AMM_PROGRAM_ID) {
+    throw new TypeError("a decoded PumpSwap BoostBuyAndBurnEvent is required");
+  }
+  if (!poolMetadata) throw new TypeError("PumpSwap pool metadata is required");
+  const data = decodedEvent.data;
+  if (data.pool !== poolMetadata.pool_address || data.mint !== poolMetadata.base_mint) {
+    throw new Error("PumpSwap boost event pool or mint does not match the resolved Pool account");
+  }
+  return baseEvent({
+    eventKind: "POOL_BOOST_BUY_BURN",
+    decodedEvent,
+    signature,
+    ordering,
+    network,
+    sourceType,
+    poolMetadata,
+    warnings: [
+      "boost buy-and-burn is a protocol-driven pool state transition, not user swap volume",
+      "post-operation pool reserves are reconciled against transaction pool-vault token-account deltas",
+    ],
+    payload: {
+      actor_address: data.authority,
+      base_mint: poolMetadata.base_mint,
+      quote_mint: poolMetadata.quote_mint,
+      quote_amount_base_units: uint(data.quote_amount_in_used, "quote_amount_in_used").toString(),
+      quote_amount_requested_base_units: uint(data.quote_amount_in_requested, "quote_amount_in_requested").toString(),
+      token_amount_base_units: uint(data.base_amount_burned, "base_amount_burned").toString(),
+      pool_reserves_after: {
+        pool_base_reserves_base_units: uint(data.base_reserves_after, "base_reserves_after").toString(),
+        pool_quote_reserves_base_units: uint(data.real_quote_reserves_after, "real_quote_reserves_after").toString(),
+      },
+      virtual_quote_reserves_reported_base_units: signed(data.virtual_quote_reserves, "virtual_quote_reserves").toString(),
+      boost_vault_remaining_base_units: uint(data.boost_vault_remaining, "boost_vault_remaining").toString(),
+      pool_vault_accounts: {
+        base: poolMetadata.pool_base_token_account ?? null,
+        quote: poolMetadata.pool_quote_token_account ?? null,
+      },
+    },
+  });
+}

@@ -44,6 +44,7 @@ const POOL_EVENT_KINDS = new Set([
   "POOL_LIQUIDITY_ADDED",
   "POOL_LIQUIDITY_REMOVED",
   "POOL_FEE_MOVEMENT",
+  "POOL_BOOST_BUY_BURN",
 ]);
 
 export function derivePumpBondingCurveAddress(mint) {

@@ -72,6 +72,7 @@ export function createInitialPumpSwapPoolState({ poolCreatedEvent, decodedPool =
     liquidity_add_count: 0,
     liquidity_remove_count: 0,
     fee_sweep_count: 0,
+    boost_transition_count: 0,
     as_of_event_id: poolCreatedEvent.event_id,
   };
 }
@@ -267,6 +268,57 @@ export function replayPumpSwapPoolEvents(initialState, events) {
           state = applyPoolFeeMovement(state, event);
           state = { ...state, as_of_event_id: event.event_id };
           break;
+        case "POOL_BOOST_BUY_BURN": {
+          const after = payload.pool_reserves_after ?? {};
+          const mismatches = [];
+          if (String(after.pool_base_reserves_base_units) !== state.pool_base_reserves_base_units) {
+            mismatches.push({
+              field: "pool_base_reserves_base_units",
+              replayed: state.pool_base_reserves_base_units,
+              observed_after: String(after.pool_base_reserves_base_units),
+            });
+          }
+          if (String(after.pool_quote_reserves_base_units) !== state.pool_quote_reserves_base_units) {
+            mismatches.push({
+              field: "pool_quote_reserves_base_units",
+              replayed: state.pool_quote_reserves_base_units,
+              observed_after: String(after.pool_quote_reserves_base_units),
+            });
+          }
+          const reportedVirtual = toBigInt(payload.virtual_quote_reserves_reported_base_units, "reported virtual quote reserves");
+          const nextBoost = reportedVirtual +
+            nonNegative(state.protocol_fees_base_units, "protocol fees") +
+            nonNegative(state.creator_fees_base_units, "creator fees");
+          if (nextBoost < 0n) mismatches.push({
+            field: "boost_reserves_base_units",
+            replayed: "non-negative",
+            observed_after: nextBoost.toString(),
+          });
+          if (mismatches.length) {
+            reconciliations.push({
+              signature: group.signature,
+              event_id: event.event_id,
+              status: "FAIL",
+              reason: "boost buy-and-burn post-state does not match pool vault replay",
+              mismatches,
+            });
+          } else {
+            state = {
+              ...state,
+              virtual_quote_reserves_base_units: reportedVirtual.toString(),
+              boost_reserves_base_units: nextBoost.toString(),
+              boost_transition_count: state.boost_transition_count + 1,
+              as_of_event_id: event.event_id,
+            };
+            reconciliations.push({
+              signature: group.signature,
+              event_id: event.event_id,
+              status: "PASS",
+              observation: "boost_buy_and_burn_post_state",
+            });
+          }
+          break;
+        }
         default:
           throw new Error(`unsupported PumpSwap pool event kind: ${event.event_kind}`);
       }

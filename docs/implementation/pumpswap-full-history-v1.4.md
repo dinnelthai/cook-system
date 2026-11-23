@@ -1,6 +1,6 @@
 # PumpSwap Full History Replay — V1.4
 
-- Status: Implemented; 58 / 58 Node.js 22 tests pass; mainnet fixture validation pending
+- Status: Implemented; 59 / 59 Node.js 22 tests pass; mainnet fixture validation pending
 - Version: 1.4
 - Date: 2026-11-23
 - Parent: Pump Full Replay Engine V1.3
@@ -52,6 +52,7 @@ The parser normalizes:
 - `DepositEvent` → `POOL_LIQUIDITY_ADDED`
 - `WithdrawEvent` → `POOL_LIQUIDITY_REMOVED`
 - `SweepPoolFeeEvent` → `POOL_FEE_MOVEMENT`
+- `BoostBuyAndBurnEvent` → `POOL_BOOST_BUY_BURN`
 
 Trade events include the pool, actor, base / quote mints, base and quote amounts, execution price, fee components, pool vault addresses, raw reserve observations and the signed virtual-quote observation.
 
@@ -61,7 +62,7 @@ Actor base / quote token deltas, pool base-vault deltas, and pool quote-vault di
 
 ## 5. Pool replay
 
-Pool replay starts from the observed `POOL_CREATED` event and applies transaction-level vault deltas once per transaction. It tracks:
+Pool replay starts from the observed `POOL_CREATED` event and applies transaction-level vault deltas once per transaction. Protocol-driven boost buy-and-burn events are applied as explicit post-reserve transitions and are not counted as user swap volume. It tracks:
 
 - Raw base-vault and quote-vault reserves
 - Virtual quote reserves
@@ -115,14 +116,13 @@ If an event that can change pool state is not supported, the pool replay remains
 
 - The Pump bonding-curve quote path remains SOL-paired only.
 - PumpSwap pools with non-SOL quote mints can be decoded when pool metadata and mint decimals are available, but non-SOL bonding-curve replay is not enabled.
-- `BoostBuyAndBurnEvent` is not yet normalized into pool state transitions. A history containing this event remains partial until its state semantics are implemented and tested.
 - Other unknown PumpSwap events are retained as unresolved; unknown market-changing events prevent a full-history claim.
 - Historical FeeConfig resolution still requires a baseline snapshot before the replay window and complete update-event coverage.
 - No confirmed mainnet Pump-to-PumpSwap fixture has yet been captured and checked in. The end-to-end integration test is deterministic and mocked; it is not presented as a real-chain fixture.
 
 ## 9. Verification
 
-The V1.4 suite has 58 passing Node.js 22 tests and covers:
+The V1.4 suite has 59 passing Node.js 22 tests and covers:
 
 - Full official PumpSwap IDL event / instruction presence
 - BuyEvent decoding and normalization
@@ -131,6 +131,7 @@ The V1.4 suite has 58 passing Node.js 22 tests and covers:
 - Signed i128 Borsh decoding
 - Pool reserve / fee replay and current snapshot reconciliation
 - V2 fee retention and sweep invariants, including negative signed virtual quote reserves
+- Boost buy-and-burn event decoding and post-reserve replay
 - End-to-end mocked curve → migration → PumpSwap buy history collection
 
 The real-chain acceptance gate remains: run the replay against an archive-capable Solana RPC for a confirmed migrated token, capture the raw transactions and current pool / vault accounts, and verify that the resulting replay and current-account reconciliation pass.

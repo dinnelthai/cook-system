@@ -2,7 +2,7 @@ name: Node Tests
 
 on:
   push:
-    branches: [main, "feat/pump-full-replay-v1.3", "feat/pumpswap-full-replay-v1.4"]
+    branches: [main, "feat/pump-full-replay-v1.3", "feat/pumpswap-full-replay-v1.4", "feat/pumpswap-boost-buy-burn-v1.4"]
   pull_request:
     branches: [main]
 
