@@ -634,12 +634,17 @@ export async function fetchPumpMintHistory({
   const candles = candleOrderComplete ? buildRawCandles(candleEvents, 60_000) : [];
   const candleStatus = candleOrderComplete ? "AVAILABLE" : "INCOMPLETE_CHAIN_ORDER";
 
-  const allPoolsComplete = poolReplays.length === 0 || poolReplays.every((pool) => pool.replay_status === "REPLAYED_FULL_POOL_HISTORY");
+  const hasMigration = allEvents.some((event) => event.event_kind === "CURVE_MIGRATED");
+  const allPoolsComplete = hasMigration
+    ? poolReplays.length > 0 && poolReplays.every((pool) => pool.replay_status === "REPLAYED_FULL_POOL_HISTORY")
+    : poolReplays.length === 0 || poolReplays.every((pool) => pool.replay_status === "REPLAYED_FULL_POOL_HISTORY");
   const overallStatus = curveReplayComplete && allPoolsComplete
     ? "REPLAYED_FULL_HISTORY"
-    : curveReplayComplete
-      ? "REPLAYED_CURVE_WITH_PARTIAL_PUMPSWAP_HISTORY"
-      : replayStatus;
+    : curveReplayComplete && hasMigration && poolReplays.length === 0
+      ? "MISSING_PUMPSWAP_POOL_DISCOVERY"
+      : curveReplayComplete
+        ? "REPLAYED_CURVE_WITH_PARTIAL_PUMPSWAP_HISTORY"
+        : replayStatus;
 
   return {
     schema_version: "1.1.0",
