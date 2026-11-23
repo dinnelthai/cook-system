@@ -7,6 +7,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "replay:pump": "node scripts/replay-pump-mint.mjs",
+    "capture:pump-fixture": "node scripts/capture-pump-fixture.mjs"
+  },
+  "devDependencies": {
+    "@pump-fun/pump-sdk": "4.1.0",
+    "@solana/web3.js": "1.98.4"
   }
 }
