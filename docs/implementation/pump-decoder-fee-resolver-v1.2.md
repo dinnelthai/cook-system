@@ -1,6 +1,6 @@
 # Pump Decoder and Dynamic Fee Resolver — V1.2
 
-- Status: Initial implementation committed; runtime verification pending
+- Status: Implemented; Node.js 22 CI verified
 - Version: 1.2
 - Date: 2026-11-23
 - Parent: Pump.fun Bonding Curve Adapter V1.1
@@ -122,7 +122,7 @@ test/pump-adapter.test.mjs covers:
 - Stale fee-config timeline behavior.
 - Exact SOL-in integer rounding.
 
-The repository includes a Node.js 22 GitHub Actions workflow for npm test. The workflow file is committed, but a successful Actions run has not yet been observed; do not report these tests as passed until CI or a local Node 22 run confirms them.
+The repository includes a Node.js 22 GitHub Actions workflow for npm test. The latest verified run passed all 21 tests (8 core replay tests and 13 Pump adapter tests). Earlier failures exposed and fixed nested Borsh defined-struct unwrapping and a malformed test-fixture newline; the current green run is the authoritative status.
 
 ## 8. Next steps
 
