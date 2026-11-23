@@ -95,6 +95,7 @@ The first core slice currently includes:
 - [Pump transaction parser tests](test/pump-transaction-parser.test.mjs)
 - [Pump RPC / PDA tests](test/pump-rpc.test.mjs)
 - [Pump fee history tests](test/pump-fee-history.test.mjs)
+- [Pump full history collector tests](test/pump-history-collector.test.mjs)
 - [Node.js 22 GitHub Actions workflow](.github/workflows/node-tests.yml)
 
 ## Next implementation steps
@@ -103,8 +104,9 @@ The first core slice currently includes:
 - [x] Add the initial IDL-driven Pump Legacy / V2 / V3 decoder and account / event decoders.
 - [x] Add the initial FeeConfig tier resolver and stale-history guard.
 - [x] Add deterministic event ordering, curve-state replay, and snapshot reconciliation for normalized inputs.
-- [x] Verify the Node.js 22 test suite in GitHub Actions: 24 passed, 0 failed.
-- [ ] Differential-test quote calculations against the pinned Pump SDK and confirmed TradeEvent data.
+- [x] Verify the Node.js 22 test suite in GitHub Actions: 50 passed, 0 failed.
+- [x] Differential-test exact buy / sell and V3 migration quote calculations against Pump SDK 4.3.1.
+- [ ] Validate captured confirmed TradeEvent and account-delta fixtures against mainnet history.
 - [x] Implement exact-token-out buys and exact-token-in sells.
 - [x] Add V3 synthetic-migration curve / PumpSwap pool quote legs and Mayhem partial-fill handling.
 - [x] Add RPC history collection, transaction parsing, balance reconciliation and fixture capture tooling.
