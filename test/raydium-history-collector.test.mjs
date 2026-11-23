@@ -120,8 +120,14 @@ function cpmmSwapEvent(){
     u8(1),pubkey(WSOL),pubkey(MINT),u64(1),u64(0),u8(0),
   ]);
 }
-function eventTx(signature,slot,blockTime,programId,poolAddress,eventBytes,balances){
-  const keys=[programId,poolAddress,...balances.map(x=>x.address)];
+function eventTx(signature,slot,blockTime,programId,poolAddress,eventBytes,balances,tradeInstruction){
+  const idl=programId===RAYDIUM_LAUNCHLAB_PROGRAM_ID?launchpadIdl:cpmmIdl;
+  const ixDef=idl.instructions.find(x=>x.name===tradeInstruction.name);
+  const keys=[...new Set([
+    programId,poolAddress,
+    ...Object.values(tradeInstruction.accounts),
+    ...balances.map(x=>x.address),
+  ])];
   const pre=balances.filter(x=>x.pre!==null).map(x=>({
     accountIndex:keys.indexOf(x.address),mint:x.mint,owner:USER,
     uiTokenAmount:{amount:String(x.pre),decimals:x.mint===MINT?6:9,uiAmount:null},
@@ -130,15 +136,22 @@ function eventTx(signature,slot,blockTime,programId,poolAddress,eventBytes,balan
     accountIndex:keys.indexOf(x.address),mint:x.mint,owner:USER,
     uiTokenAmount:{amount:String(x.post),decimals:x.mint===MINT?6:9,uiAmount:null},
   }));
+  const instructionData=Buffer.concat([disc(idl.instructions,tradeInstruction.name),...tradeInstruction.args]);
   return {
     slot,blockTime,
-    transaction:{signatures:[signature],message:{accountKeys:keys,instructions:[]}},
+    transaction:{signatures:[signature],message:{accountKeys:keys,instructions:[{
+      programIdIndex:keys.indexOf(programId),
+      accounts:ixDef.accounts.map(a=>keys.indexOf(tradeInstruction.accounts[a.name]??ZERO)),
+      data:b58(instructionData),
+    }]}},
     meta:{
       err:null,fee:5000,
       preBalances:Array(keys.length).fill(0),postBalances:Array(keys.length).fill(0),
       preTokenBalances:pre,postTokenBalances:post,
       innerInstructions:[{index:0,instructions:[{
-        programIdIndex:0,accounts:[1],data:b58(Buffer.concat([Buffer.from("e445a52e51cb9a1d","hex"),eventBytes])),
+        programIdIndex:keys.indexOf(programId),
+        accounts:[keys.indexOf(poolAddress)],
+        data:b58(Buffer.concat([Buffer.from("e445a52e51cb9a1d","hex"),eventBytes])),
       }]}],
       loadedAddresses:{writable:[],readonly:[]},
       logMessages:[],
@@ -219,7 +232,16 @@ test("collector follows a LaunchLab pool through CPMM migration, swaps, and vaul
   const launchTrade=eventTx(TRADE_SIG,99,1_795_371_301,RAYDIUM_LAUNCHLAB_PROGRAM_ID,LAUNCH_POOL,launchTradeEvent(),[
     {address:LAUNCH_BASE_VAULT,mint:MINT,pre:1000,post:900},
     {address:LAUNCH_QUOTE_VAULT,mint:WSOL,pre:100,post:110},
-  ]);
+  ],{
+    name:"buy_exact_in",
+    accounts:{
+      payer:USER,authority:ZERO,global_config:ZERO,platform_config:ZERO,pool_state:LAUNCH_POOL,
+      user_base_token:USER,user_quote_token:USER,base_vault:LAUNCH_BASE_VAULT,quote_vault:LAUNCH_QUOTE_VAULT,
+      base_token_mint:MINT,quote_token_mint:WSOL,base_token_program:TOKEN_PROGRAM,
+      quote_token_program:TOKEN_PROGRAM,event_authority:ZERO,program:RAYDIUM_LAUNCHLAB_PROGRAM_ID,
+    },
+    args:[u64(10),u64(100),u64(0)],
+  });
   const migration=createOrMigrationTx(MIGRATE_SIG,100,1_795_371_302,{
     payer:USER,base_mint:MINT,quote_mint:WSOL,platform_config:ZERO,
     cpswap_program:RAYDIUM_CPMM_PROGRAM_ID,cpswap_pool:CPMM_POOL,
@@ -246,7 +268,16 @@ test("collector follows a LaunchLab pool through CPMM migration, swaps, and vaul
   const cpmmSwap=eventTx(SWAP_SIG,101,1_795_371_303,RAYDIUM_CPMM_PROGRAM_ID,CPMM_POOL,cpmmSwapEvent(),[
     {address:CPMM_BASE_VAULT,mint:MINT,pre:900,post:850},
     {address:CPMM_QUOTE_VAULT,mint:WSOL,pre:110,post:115},
-  ]);
+  ],{
+    name:"swap_base_input",
+    accounts:{
+      payer:USER,authority:ZERO,amm_config:AMM_CONFIG,pool_state:CPMM_POOL,
+      input_token_account:USER,output_token_account:USER,input_vault:CPMM_QUOTE_VAULT,
+      output_vault:CPMM_BASE_VAULT,input_token_program:TOKEN_PROGRAM,output_token_program:TOKEN_PROGRAM,
+      input_token_mint:WSOL,output_token_mint:MINT,observation_state:ZERO,
+    },
+    args:[u64(5),u64(50)],
+  });
   const transactions=new Map([
     [CREATE_SIG,launchCreate],[TRADE_SIG,launchTrade],[MIGRATE_SIG,migration],[SWAP_SIG,cpmmSwap],
   ]);
@@ -286,7 +317,11 @@ test("collector follows a LaunchLab pool through CPMM migration, swaps, and vaul
   assert.equal(result.cpmm.pool_address,CPMM_POOL);
   assert.equal(result.normalized_events.length,2);
   assert.equal(result.normalized_events[0].event_kind,"CURVE_BUY_EXECUTED");
+  assert.equal(result.normalized_events[0].payload.actor_address,USER);
+  assert.equal(result.normalized_events[0].payload.actor_role,"payer");
   assert.equal(result.normalized_events[1].event_kind,"POOL_BUY_EXECUTED");
+  assert.equal(result.normalized_events[1].payload.actor_address,USER);
+  assert.equal(result.normalized_events[1].payload.actor_role,"payer");
   assert.equal(result.raw_candles_1m.length,2);
   assert.equal(result.launchlab.vault_delta_replay.status,"PASS");
   assert.equal(result.cpmm.vault_delta_replay.status,"PASS");
