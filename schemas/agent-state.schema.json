@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/agent-state.schema.json",
+  "title": "AgentState",
+  "description": "Simulation-only agent configuration and state. Never expose this object to detector inference.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "agent_id",
+    "role_class",
+    "quote_balance_base_units",
+    "token_balance_base_units",
+    "risk_aversion",
+    "holding_horizon_ms",
+    "observation_latency_ms",
+    "execution_latency_ms",
+    "observation_noise",
+    "public_information_sensitivity",
+    "transaction_cost_sensitivity",
+    "random_stream_id"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "role_class": {
+      "type": "string",
+      "enum": [
+        "issuer_dev",
+        "early_holder",
+        "fast_entry",
+        "independent_trader",
+        "retail",
+        "kol_broadcaster",
+        "arbitrage",
+        "mev_ordering",
+        "observer"
+      ]
+    },
+    "quote_balance_base_units": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "token_balance_base_units": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "risk_aversion": { "type": "number", "minimum": 0 },
+    "holding_horizon_ms": { "type": "integer", "minimum": 0 },
+    "observation_latency_ms": { "type": "integer", "minimum": 0 },
+    "execution_latency_ms": { "type": "integer", "minimum": 0 },
+    "observation_noise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "scale"],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": ["none", "low", "medium", "high", "custom"]
+        },
+        "scale": { "type": "number", "minimum": 0 }
+      }
+    },
+    "public_information_sensitivity": { "type": "number", "minimum": 0, "maximum": 1 },
+    "transaction_cost_sensitivity": { "type": "number", "minimum": 0 },
+    "random_stream_id": { "type": "string", "minLength": 1 }
+  }
+}
