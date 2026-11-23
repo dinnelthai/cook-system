@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/market-event.schema.json",
+  "title": "MarketEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "provenance",
+    "event_kind",
+    "market",
+    "event_time_ms",
+    "ordering",
+    "source",
+    "payload",
+    "quality"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "event_id": { "type": "string", "minLength": 1 },
+    "provenance": {
+      "type": "string",
+      "enum": ["observed_chain", "synthetic"]
+    },
+    "event_kind": {
+      "type": "string",
+      "enum": [
+        "CURVE_BUY_EXECUTED",
+        "CURVE_SELL_EXECUTED",
+        "TOKEN_TRANSFER",
+        "FEE_MOVEMENT",
+        "AUTHORITY_CHANGE",
+        "PUBLIC_INFORMATION",
+        "ORDERING_METADATA",
+        "ACCOUNT_BALANCE_SNAPSHOT",
+        "CURVE_STATE_SNAPSHOT",
+        "DATA_GAP",
+        "SIMULATION_INTENT",
+        "SIMULATION_REJECTED_INTENT"
+      ]
+    },
+    "market": { "$ref": "market-identity.schema.json" },
+    "event_time_ms": { "type": "integer", "minimum": 0 },
+    "ordering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_sequence", "ordering_confidence"],
+      "properties": {
+        "slot": { "type": ["integer", "null"], "minimum": 0 },
+        "transaction_index": { "type": ["integer", "null"], "minimum": 0 },
+        "instruction_index": { "type": ["integer", "null"], "minimum": 0 },
+        "inner_instruction_index": { "type": ["integer", "null"], "minimum": 0 },
+        "event_sequence": { "type": "integer", "minimum": 0 },
+        "ordering_confidence": {
+          "type": "string",
+          "enum": ["complete", "partial", "synthetic"]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "source_id"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "enum": ["rpc", "indexer", "simulator", "manual_import"]
+        },
+        "source_id": { "type": "string", "minLength": 1 },
+        "signature": { "type": ["string", "null"] },
+        "adapter_version": { "type": ["string", "null"] }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "Type-specific payload. Validate against the event_kind contract in the implementation layer.",
+      "additionalProperties": true
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["is_complete", "validation_status"],
+      "properties": {
+        "is_complete": { "type": "boolean" },
+        "validation_status": {
+          "type": "string",
+          "enum": ["valid", "warning", "invalid", "unknown"]
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reconciliation_ref": { "type": ["string", "null"] }
+      }
+    },
+    "synthetic_metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["scenario_id", "random_seed", "generator_version"],
+      "properties": {
+        "scenario_id": { "type": "string", "minLength": 1 },
+        "random_seed": { "type": "integer" },
+        "generator_version": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "provenance": { "const": "synthetic" } } },
+      "then": { "required": ["synthetic_metadata"] }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "enum": ["CURVE_BUY_EXECUTED", "CURVE_SELL_EXECUTED"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "signature",
+              "actor_address",
+              "token_amount_base_units",
+              "quote_amount_base_units",
+              "quote_mint",
+              "execution_price_decimal",
+              "fee_components"
+            ],
+            "properties": {
+              "signature": { "type": "string", "minLength": 1 },
+              "actor_address": { "type": "string", "minLength": 1 },
+              "token_amount_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+              "quote_amount_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+              "quote_mint": { "type": "string", "minLength": 1 },
+              "execution_price_decimal": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+              "fee_components": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["fee_type", "amount_base_units", "mint"],
+                  "properties": {
+                    "fee_type": { "type": "string" },
+                    "amount_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+                    "mint": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_kind": { "const": "TOKEN_TRANSFER" } } },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "signature",
+              "source_owner",
+              "destination_owner",
+              "token_amount_base_units",
+              "transfer_type"
+            ],
+            "properties": {
+              "signature": { "type": "string", "minLength": 1 },
+              "source_owner": { "type": "string", "minLength": 1 },
+              "destination_owner": { "type": "string", "minLength": 1 },
+              "token_amount_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+              "transfer_type": {
+                "type": "string",
+                "enum": ["wallet", "custody", "escrow", "program", "unknown"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
