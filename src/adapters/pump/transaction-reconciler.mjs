@@ -141,9 +141,10 @@ export function reconcilePumpTradesWithTransaction({
   const tokenDelta = balances.tokens.find((item) => item.owner === actor && item.mint === mint);
   const walletLamports = balances.lamports.find((item) => item.address === actor);
   const rawLamportDelta = walletLamports ? BigInt(walletLamports.delta_lamports) : null;
+  const feePayer = accountKeys(transaction)[0] ?? null;
   const adjustedLamportDelta = rawLamportDelta === null
     ? null
-    : rawLamportDelta + (transaction.transaction?.signatures?.[0] === actor ? BigInt(balances.fee_lamports) : 0n);
+    : rawLamportDelta + (feePayer === actor ? BigInt(balances.fee_lamports) : 0n);
   const expectedTokenDelta = side === "buy" ? expectedToken : -expectedToken;
   const expectedQuoteDelta = side === "buy" ? -expectedQuote : expectedQuote;
   const tokenMatches = tokenDelta ? BigInt(tokenDelta.delta_base_units) === expectedTokenDelta : false;
