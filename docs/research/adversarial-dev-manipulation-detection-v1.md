@@ -360,3 +360,64 @@ Recommended alert types:
 - [ ] Raw OHLCV is preserved and alerts are overlays.
 - [ ] Every alert includes evidence, counter-evidence, unknowns, confidence, and data completeness.
 - [ ] No live manipulation, concealment, or automated execution functionality exists.
+
+
+## 12. Realized distribution and cost-basis accounting
+
+A high chart price does not prove that a holder realized a profit. To analyze inventory distribution accurately, the ledger must distinguish mark-to-market value, token transfers, actual market sells, and realized quote proceeds.
+
+### 12.1 Acquisition lots
+
+Maintain token acquisition lots per owner where provenance is observable:
+
+- curve purchase lots, with quote cost and fees;
+- transfer-in lots, inheriting cost basis only when the prior lot can be reliably traced;
+- creator / allocation lots, with documented or explicitly unknown basis;
+- bridge / custody movements, kept distinct from market acquisitions;
+- unknown-basis lots.
+
+Never invent a cost basis for creator allocations or transferred tokens whose provenance cannot be established.
+
+### 12.2 Realized proceeds
+
+For confirmed curve sells:
+
+RealizedNetProceeds = observed quote output − attributable sell fees
+
+A sale is an observed execution event. A token transfer is not a sale and produces no realized quote proceeds by itself.
+
+### 12.3 Realized profit and uncertainty
+
+Where acquisition lots and sale attribution are sufficiently complete:
+
+RealizedPnL = RealizedNetProceeds − AllocatedCostBasis − attributable acquisition costs
+
+The allocation method (FIFO, weighted average, or another explicitly selected accounting convention) must be recorded and applied consistently. Report alternative cost-basis views when lot ordering is ambiguous.
+
+If cost basis or ownership attribution is unknown, report realized proceeds separately and mark realized PnL as unavailable or bounded. Do not substitute current market price for realized proceeds.
+
+### 12.4 Cohort distribution metrics
+
+For cohort C over interval W, report:
+
+- opening token inventory;
+- confirmed market-sell token amount;
+- transfer-out token amount;
+- transfer-in token amount;
+- closing inventory;
+- confirmed quote proceeds;
+- known-basis realized PnL, if supportable;
+- unknown-basis share;
+- attribution confidence.
+
+A cohort's distribution ratio may be reported as confirmed market-sold tokens divided by opening cohort inventory, with clear handling for new acquisitions during the interval. Transfers are reported separately and do not count as market distribution.
+
+### 12.5 Interpretation limits
+
+- A large realized sale does not by itself establish manipulation.
+- A high mark-to-market valuation is not realized profit.
+- A transfer to a new address does not establish a sale or a new independent holder.
+- A high-price sale cannot be attributed to the Dev unless control evidence supports that attribution.
+- Public on-chain data may not reveal off-chain consideration, private agreements, or beneficial ownership.
+
+The dashboard should therefore separate: observed sells, observed quote proceeds, estimated cost basis, realized PnL confidence, and unknown ownership.
