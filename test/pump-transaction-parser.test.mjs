@@ -148,7 +148,8 @@ function buildSweepFeeEvent(bucket, amount) {
     u8(bucket),
   ]);
 }
-\nfunction buildMigrationEvent() {
+
+function buildMigrationEvent() {
   return Buffer.concat([
     discriminator(snapshot.pump.events, "CompletePumpAmmMigrationEvent"),
     pubkey(USER),
