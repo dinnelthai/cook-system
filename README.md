@@ -51,6 +51,7 @@ The first core slice currently includes:
 
 - [Canonical Schema Contract — V1](docs/implementation/canonical-schema-contract-v1.md)
 - [Pump.fun Bonding Curve Adapter — V1.1](docs/implementation/pump-bonding-curve-adapter-v1.1.md)
+- [Pump Decoder & Dynamic Fee Resolver — V1.2](docs/implementation/pump-decoder-fee-resolver-v1.2.md)
 
 ### Machine-readable JSON Schemas
 
@@ -70,15 +71,23 @@ The first core slice currently includes:
 - [Deterministic event ordering](src/core/event-order.mjs)
 - [Curve state replay and reconciliation](src/core/market-state.mjs)
 - [Raw candle builder](src/core/candle-builder.mjs)
+- [Pinned Pump / Pump Fees IDL snapshot](src/adapters/pump/pump-idl.snapshot.json)
+- [IDL-driven Borsh decoder](src/adapters/pump/borsh.mjs)
+- [Pump instruction / event / account decoder](src/adapters/pump/pump-decoder.mjs)
+- [Dynamic fee resolver and historical config timeline](src/adapters/pump/fee-resolver.mjs)
 - [Core tests](test/core.test.mjs)
+- [Pump adapter tests](test/pump-adapter.test.mjs)
+- [Node.js 22 GitHub Actions workflow](.github/workflows/node-tests.yml)
 
 ## Next implementation steps
 
 - [ ] Add automated JSON Schema validation and contract tests.
-- [ ] Decode versioned Pump instructions, events, and account layouts.
-- [ ] Add fee-config snapshots and dynamic-fee resolution.
-- [ ] Implement the deterministic market-state ledger and reconciliation.
-- [ ] Differential-test quote calculations against the pinned Pump SDK and observed TradeEvent data.
-- [ ] Add the curve-completion and synthetic-migration event boundary.
+- [x] Add the initial IDL-driven Pump Legacy / V2 / V3 decoder and account / event decoders.
+- [x] Add the initial FeeConfig tier resolver and stale-history guard.
+- [x] Add deterministic event ordering, curve-state replay, and snapshot reconciliation for normalized inputs.
+- [ ] Run and verify the Node.js 22 test suite in CI or locally.
+- [ ] Differential-test quote calculations against the pinned Pump SDK and confirmed TradeEvent data.
+- [ ] Implement exact-token-out buys and exact-token-in sells.
+- [ ] Add the curve-completion and synthetic-migration quote boundary.
 - [ ] Add heterogeneous organic agents and public-information response.
 - [ ] Add isolated defensive scenarios and held-out evaluation.
