@@ -80,11 +80,16 @@ export function quoteExactQuoteInBuy({
   const state = curveState({ virtualTokenReserves, virtualQuoteReserves, realTokenReserves });
   const fees = normalizeFees({ protocolFeeBps, creatorFeeBps });
   if (budget <= 1n) throw new RangeError("spendable quote input must exceed one base unit");
-  const netQuote = ((budget - 1n) * 10_000n) / (10_000n + fees.total);
-  const tokenOutRaw = (netQuote * state.virtualToken) / (state.virtualQuote + netQuote);
+  let netQuote = (budget * 10_000n) / (10_000n + fees.total);
+  let fee = feeBreakdown(netQuote, fees);
+  if (netQuote + fee.total_fee_base_units > budget) {
+    netQuote -= netQuote + fee.total_fee_base_units - budget;
+    fee = feeBreakdown(netQuote, fees);
+  }
+  const effectiveQuote = netQuote > 0n ? netQuote - 1n : 0n;
+  const tokenOutRaw = (effectiveQuote * state.virtualToken) / (state.virtualQuote + effectiveQuote);
   const tokenOut = tokenOutRaw > state.realToken ? state.realToken : tokenOutRaw;
   if (tokenOut === 0n) throw new RangeError("quote input is too small to buy one token base unit");
-  const fee = feeBreakdown(netQuote, fees);
   const spent = netQuote + fee.total_fee_base_units;
   return makeQuote({
     side: "buy",
@@ -168,16 +173,21 @@ export function quoteExactTokenInSell({
 
 function quoteConstantProductExactQuoteIn({ budget, baseReserve, quoteReserve, fees }) {
   if (budget <= 1n) return { tokenOut: 0n, quoteIn: 0n, fee: feeBreakdown(0n, fees), spent: 0n, unspent: budget };
-  const netQuote = ((budget - 1n) * 10_000n) / (10_000n + fees.total);
-  const tokenOut = (netQuote * baseReserve) / (quoteReserve + netQuote);
-  const fee = feeBreakdown(netQuote, fees);
+  let netQuote = (budget * 10_000n) / (10_000n + fees.total);
+  let fee = feeBreakdown(netQuote, fees);
+  if (netQuote + fee.total_fee_base_units > budget) {
+    netQuote -= netQuote + fee.total_fee_base_units - budget;
+    fee = feeBreakdown(netQuote, fees);
+  }
+  const effectiveQuote = netQuote > 0n ? netQuote - 1n : 0n;
+  const tokenOut = (effectiveQuote * baseReserve) / (quoteReserve + effectiveQuote);
   const spent = netQuote + fee.total_fee_base_units;
   return { tokenOut, quoteIn: netQuote, fee, spent, unspent: budget > spent ? budget - spent : 0n };
 }
 
 function quoteConstantProductExactTokenOut({ amount, baseReserve, quoteReserve, fees }) {
   if (amount <= 0n || amount >= baseReserve) throw new RangeError("pool token output must be positive and below pool base reserves");
-  const netQuote = ((amount * quoteReserve) / (baseReserve - amount)) + 1n;
+  const netQuote = ceilDiv(amount * quoteReserve, baseReserve - amount);
   const fee = feeBreakdown(netQuote, fees);
   return { tokenOut: amount, quoteIn: netQuote, fee, spent: netQuote + fee.total_fee_base_units };
 }
