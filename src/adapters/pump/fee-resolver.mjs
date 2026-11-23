@@ -285,18 +285,24 @@ export function quoteExactSolIn({
   const creatorBps = toBigInt(creatorFeeBps, "creatorFeeBps", U64_MAX);
   const totalBps = protocolBps + creatorBps;
 
-  if (budget <= 1n || tokenReserve === 0n || quoteReserve === 0n) {
-    throw new RangeError("spendable input must exceed one base unit and virtual reserves must be positive");
+  if (budget === 0n || tokenReserve === 0n || quoteReserve === 0n) {
+    throw new RangeError("spendable input and virtual reserves must be positive");
   }
   if (totalBps >= 10_000n) throw new RangeError("combined trade fees must be below 10000 bps");
 
-  // Pump's documented exact-quote-in formula intentionally subtracts one
-  // base unit before fee stripping to preserve the program's rounding parity.
-  const netQuote = ((budget - 1n) * 10_000n) / (10_000n + totalBps);
-  const protocolFee = (netQuote * protocolBps + 9_999n) / 10_000n;
-  const creatorFee = (netQuote * creatorBps + 9_999n) / 10_000n;
-  const totalFees = protocolFee + creatorFee;
-  const tokensOut = (netQuote * tokenReserve) / (quoteReserve + netQuote);
+  let netQuote = (budget * 10_000n) / (10_000n + totalBps);
+  let protocolFee = (netQuote * protocolBps + 9_999n) / 10_000n;
+  let creatorFee = (netQuote * creatorBps + 9_999n) / 10_000n;
+  let totalFees = protocolFee + creatorFee;
+  if (netQuote + totalFees > budget) {
+    netQuote -= netQuote + totalFees - budget;
+    protocolFee = (netQuote * protocolBps + 9_999n) / 10_000n;
+    creatorFee = (netQuote * creatorBps + 9_999n) / 10_000n;
+    totalFees = protocolFee + creatorFee;
+  }
+
+  const effectiveQuote = netQuote > 0n ? netQuote - 1n : 0n;
+  const tokensOut = (effectiveQuote * tokenReserve) / (quoteReserve + effectiveQuote);
   if (tokensOut <= 0n) throw new RangeError("quote input is too small to buy one base unit");
 
   return {
