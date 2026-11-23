@@ -224,30 +224,10 @@ export function decodeRaydiumTransaction({ transaction, signature = null, transa
   const visitInstruction = (compiled, outerIndex, innerIndex = null, innerGroupIndex = null) => {
     const programId = Number.isSafeInteger(compiled.programIdIndex) ? keys[compiled.programIdIndex] : compiled.programId;
     if (!REGISTRY.has(programId)) return;
-    let decoded;
-    try {
-      decoded = decodeRaydiumInstruction({ programId, data: compiled.data, encoding: "base58" });
-    } catch (error) {
-      decoded = { status: "INSTRUCTION_DECODE_ERROR", program_id: programId, error: error instanceof Error ? error.message : String(error) };
-    }
-    if (decoded.status !== "UNSUPPORTED_PROGRAM") {
-      const entry = REGISTRY.get(programId);
-      const instructionDefinition = entry.instructions.get(Buffer.from(asBuffer(compiled.data, "base58").subarray(0, 8)).toString("hex"));
-      instructions.push({
-        ...decoded,
-        signature,
-        slot: transaction.slot ?? null,
-        transaction_index: transactionIndex,
-        outer_instruction_index: outerIndex,
-        inner_instruction_index: innerIndex,
-        inner_group_index: innerGroupIndex,
-        accounts: instructionDefinition ? accountNameMap(instructionDefinition, compiled, keys) : {},
-      });
-    }
-
     try {
       const bytes = asBuffer(compiled.data, "base58");
-      if (bytes.length >= 16 && bytes.subarray(0, 8).equals(ANCHOR_EVENT_IX_TAG)) {
+      const isEventCpi = bytes.length >= 16 && bytes.subarray(0, 8).equals(ANCHOR_EVENT_IX_TAG);
+      if (isEventCpi) {
         const event = decodeRaydiumEvent({ programId, data: bytes });
         const record = {
           ...event,
@@ -262,10 +242,42 @@ export function decodeRaydiumTransaction({ transaction, signature = null, transa
         };
         if (event.status === "DECODED") events.push(record);
         else unresolvedEvents.push(record);
+        return;
+      }
+
+      let decoded;
+      try {
+        decoded = decodeRaydiumInstruction({ programId, data: bytes });
+      } catch (error) {
+        decoded = { status: "INSTRUCTION_DECODE_ERROR", program_id: programId, error: error instanceof Error ? error.message : String(error) };
+      }
+      const entry = REGISTRY.get(programId);
+      const instructionDefinition = entry.instructions.get(bytes.subarray(0, 8).toString("hex"));
+      const record = {
+        ...decoded,
+        signature,
+        slot: transaction.slot ?? null,
+        transaction_index: transactionIndex,
+        outer_instruction_index: outerIndex,
+        inner_instruction_index: innerIndex,
+        inner_group_index: innerGroupIndex,
+        accounts: instructionDefinition ? accountNameMap(instructionDefinition, compiled, keys) : {},
+      };
+      instructions.push(record);
+      if (decoded.status !== "DECODED" && decoded.status !== "DECODED_WITH_OMITTED_OPTIONAL_ARGS") {
+        unresolvedEvents.push({
+          status: "UNRESOLVED_PROGRAM_INSTRUCTION",
+          program_id: programId,
+          instruction_status: decoded.status,
+          signature,
+          outer_instruction_index: outerIndex,
+          inner_instruction_index: innerIndex,
+          discriminator_hex: decoded.discriminator_hex ?? bytes.subarray(0, 8).toString("hex"),
+        });
       }
     } catch (error) {
       unresolvedEvents.push({
-        status: "EVENT_CPI_DECODE_ERROR",
+        status: "INSTRUCTION_OR_EVENT_DECODE_ERROR",
         program_id: programId,
         signature,
         outer_instruction_index: outerIndex,
@@ -297,7 +309,7 @@ export function decodeRaydiumTransaction({ transaction, signature = null, transa
         source: "program_data_log",
       };
       if (event.status === "DECODED") events.push(record);
-      else if (event.status !== "UNKNOWN_EVENT_DISCRIMINATOR") unresolvedEvents.push(record);
+      else unresolvedEvents.push(record);
     }
   }
 
