@@ -315,13 +315,13 @@ function normalizeCpmmSwap({ event, transactionRecord, mint, quoteMint, tokenDec
 function extractTokenAccountDelta(transaction, tokenAccountAddress) {
   const keys = transactionAccountKeys(transaction);
   const index = keys.indexOf(tokenAccountAddress);
-  if (index < 0) return { delta: 0n, complete: true, touched: false };
+  if (index < 0) return { address: tokenAccountAddress, delta: 0n, complete: true, touched: false };
   const pre = (transaction.meta?.preTokenBalances ?? []).find((item) => item.accountIndex === index);
   const post = (transaction.meta?.postTokenBalances ?? []).find((item) => item.accountIndex === index);
-  if (!pre && !post) return { delta: 0n, complete: false, touched: true, reason: "token_balance_delta_missing" };
+  if (!pre && !post) return { address: tokenAccountAddress, delta: 0n, complete: false, touched: true, reason: "token_balance_delta_missing" };
   const preAmount = BigInt(pre?.uiTokenAmount?.amount ?? "0");
   const postAmount = BigInt(post?.uiTokenAmount?.amount ?? "0");
-  return { delta: postAmount - preAmount, complete: true, touched: true };
+  return { address: tokenAccountAddress, delta: postAmount - preAmount, complete: true, touched: true };
 }
 
 function inspectStateChangingTransactions(transactionRecords, decodedBySignature, vaultAddresses, programId, recognizedEventNames) {
