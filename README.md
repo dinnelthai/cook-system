@@ -12,8 +12,8 @@ This repository is for defensive research, data analysis, and offline simulation
 
 - Market phase: Pump.fun bonding curve, before graduation.
 - State: curve reserves, price, supply distribution, wallet-level inventory, transaction ordering, fees, and curve progress.
-- Participants: issuer/dev, early holders, snipers, organic buyers/sellers, retail participants, arbitrage/searcher bots, and MEV actors.
-- Outputs: raw OHLCV, volume composition estimates, wallet-cluster evidence, price-impact diagnostics, and market-integrity alerts.
+- Participants: issuer/dev, early holders, snipers, organic buyers/sellers, retail participants, KOL information sources, arbitrage/searcher bots, and MEV actors.
+- Outputs: raw OHLCV, volume composition estimates, wallet-cluster evidence, price-impact diagnostics, execution-quality measures, and market-integrity alerts.
 - Execution: offline simulation only; no mainnet signing or transaction submission.
 
 ## Research principles
@@ -23,7 +23,7 @@ This repository is for defensive research, data analysis, and offline simulation
 3. Treat wallet clustering as probabilistic evidence, not proof of common control.
 4. Do not equate arbitrage with manipulation or gross volume with independent demand.
 5. Make every simulation reproducible through explicit seeds and scenario metadata.
-6. Keep synthetic events clearly labeled and separate from real chain data.
+6. Keep synthetic data clearly labeled and separate from real chain data.
 
 ## V1 research documents
 
@@ -32,11 +32,14 @@ This repository is for defensive research, data analysis, and offline simulation
 - [Inner Market Participant Game Model — V1](docs/research/inner-market-agent-game-model-v1.md)
 - [Initial Inventory & Demand Absorption Model — V1](docs/research/initial-inventory-demand-absorption-v1.md)
 - [Adversarial Dev Model & Manipulation-Resistance Tests — V1](docs/research/adversarial-dev-manipulation-detection-v1.md)
+- [Multi-Agent Inner Market Game Model — V1](docs/research/multi-agent-inner-market-game-model-v1.md)
 
 ## Planned work
 
-- [ ] Define the bonding-curve state adapter against the exact deployed program version.
-- [ ] Implement a deterministic event-driven simulator.
-- [ ] Add labeled adversarial and organic scenarios.
-- [ ] Implement explainable market-integrity features.
-- [ ] Validate detection quality against held-out synthetic scenarios and labeled historical observations.
+- [ ] Freeze canonical event, state, observation, and action schemas.
+- [ ] Verify the exact bonding-curve program adapter and reserve / fee semantics.
+- [ ] Implement deterministic event replay and accounting invariants.
+- [ ] Implement heterogeneous organic agents and public-information response.
+- [ ] Add isolated adversarial and hard-negative scenarios.
+- [ ] Implement explainable market-integrity and execution-quality features.
+- [ ] Validate detection quality against held-out seeds and historical observations.
