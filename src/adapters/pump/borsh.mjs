@@ -217,7 +217,7 @@ export function readIdlType(reader, type, typeMap, depth = 0) {
     const name = resolveDefinedName(type);
     const definition = typeMap.get(name);
     if (!definition) throw new BorshDecodeError(`unknown IDL type ${name}`, reader.offset);
-    return readIdlDefinition(reader, definition, typeMap, depth + 1);
+    return readIdlDefinition(reader, definition, typeMap, depth + 1).value;
   }
 
   throw new BorshDecodeError("unsupported compound IDL type", reader.offset);
