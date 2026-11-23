@@ -13,6 +13,7 @@ import {
   decodeBase58,
   encodeBase58,
 } from "../src/adapters/pump/borsh.mjs";
+import { normalizePumpTradeEvent } from "../src/adapters/pump/pump-event-normalizer.mjs";
 import {
   calculateBondingCurveMarketCap,
   calculateFeeTier,
