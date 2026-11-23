@@ -342,6 +342,10 @@ test("dynamic fee resolver prefers FeeConfig and uses Global only as documented 
     () => resolveBondingCurveFees({ bondingCurve, feeConfig, feeConfigStatus: "stale" }),
     (error) => error.code === "FEE_CONFIG_NOT_VERIFIED",
   );
+  assert.throws(
+    () => resolveBondingCurveFees({ bondingCurve: { ...bondingCurve, quote_mint: "NotSolMint" }, feeConfig }),
+    (error) => error.code === "UNSUPPORTED_QUOTE_MINT",
+  );
 });
 
 test("fee config timeline invalidates a snapshot after an update event", () => {
@@ -375,6 +379,15 @@ test("fee config timeline invalidates a snapshot after an update event", () => {
   assert.equal(resolveFeeConfigAt(timeline, {
     slot: 22, transaction_index: 0, instruction_index: 0, inner_instruction_index: null, event_sequence: 0,
   }).status, "available");
+  const incompleteCoverage = buildFeeConfigTimeline([{
+    kind: "snapshot",
+    event_id: "fee-snapshot-only",
+    ordering: { slot: 10, transaction_index: 0, instruction_index: 0, inner_instruction_index: null, event_sequence: 0 },
+    fee_config: { fee_tiers: [] },
+  }], { coverageComplete: false });
+  assert.equal(resolveFeeConfigAt(incompleteCoverage, {
+    slot: 15, transaction_index: 0, instruction_index: 0, inner_instruction_index: null, event_sequence: 0,
+  }).status, "unverified");
 });
 
 test("exact SOL-in quote follows Pump integer rounding and fee formula", () => {
