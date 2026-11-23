@@ -38,6 +38,7 @@ This repository is for defensive research, data analysis, and offline simulation
 ## Implementation contracts
 
 - [Canonical Schema Contract — V1](docs/implementation/canonical-schema-contract-v1.md)
+- [Pump.fun Bonding Curve Adapter — V1.1](docs/implementation/pump-bonding-curve-adapter-v1.1.md)
 
 ### Machine-readable JSON Schemas
 
