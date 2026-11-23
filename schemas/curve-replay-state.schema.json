@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/curve-replay-state.schema.json",
+  "title": "CurveReplayState",
+  "description": "Deterministic internal replay projection. It is not a replacement for raw source events or an authoritative on-chain account snapshot.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "market",
+    "virtual_token_reserves_base_units",
+    "virtual_quote_reserves_base_units",
+    "real_token_reserves_base_units",
+    "real_quote_reserves_base_units",
+    "token_total_supply_base_units",
+    "protocol_fees_base_units",
+    "creator_fees_base_units",
+    "complete",
+    "lifecycle",
+    "as_of_event_id",
+    "curve_buy_quote_volume_base_units",
+    "curve_sell_quote_volume_base_units",
+    "curve_token_volume_base_units",
+    "execution_count",
+    "ignored_non_curve_event_count"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "market": { "$ref": "market-identity.schema.json" },
+    "virtual_token_reserves_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "virtual_quote_reserves_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "real_token_reserves_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "real_quote_reserves_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "token_total_supply_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "protocol_fees_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "creator_fees_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "complete": { "type": "boolean" },
+    "lifecycle": {
+      "type": "string",
+      "enum": ["bonding_curve", "complete_pending_migration", "graduated"]
+    },
+    "as_of_event_id": { "type": ["string", "null"] },
+    "curve_buy_quote_volume_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "curve_sell_quote_volume_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "curve_token_volume_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "execution_count": { "type": "integer", "minimum": 0 },
+    "ignored_non_curve_event_count": { "type": "integer", "minimum": 0 }
+  }
+}
