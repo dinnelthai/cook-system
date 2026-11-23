@@ -373,6 +373,7 @@ test("PumpSwap Pool account and token vault account decoders read current state"
   assert.equal(decodedPool.data.base_mint,BASE_MINT);
   assert.equal(decodedPool.data.pool_quote_token_account,QUOTE_VAULT);
   assert.equal(decodedPool.data.protocol_fees_base_units,"2");
+  assert.equal(decodedPool.data.virtual_quote_reserves_base_units,"-3");
 
   const tokenBytes=Buffer.alloc(165);
   pubkey(BASE_MINT).copy(tokenBytes,0);
