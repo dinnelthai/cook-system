@@ -30,6 +30,7 @@ This repository is for defensive research, data analysis, and offline simulation
 - [Inner Market Adversarial Simulator — V1](docs/research/inner-market-adversarial-simulator-v1.md)
 - [Inner Market Mathematical Model — V1](docs/research/inner-market-math-model-v1.md)
 - [Inner Market Participant Game Model — V1](docs/research/inner-market-agent-game-model-v1.md)
+- [Initial Inventory & Demand Absorption Model — V1](docs/research/initial-inventory-demand-absorption-v1.md)
 
 ## Planned work
 
