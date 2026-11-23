@@ -5242,6 +5242,19 @@
           88,
           51
         ]
+      },
+      {
+        "name": "InitializeFeeConfigEvent",
+        "discriminator": [
+          89,
+          138,
+          244,
+          230,
+          10,
+          56,
+          226,
+          126
+        ]
       }
     ],
     "types": [
@@ -5655,6 +5668,26 @@
                   7
                 ]
               }
+            }
+          ]
+        }
+      },
+      {
+        "name": "InitializeFeeConfigEvent",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "timestamp",
+              "type": "i64"
+            },
+            {
+              "name": "admin",
+              "type": "pubkey"
+            },
+            {
+              "name": "fee_config",
+              "type": "pubkey"
             }
           ]
         }
