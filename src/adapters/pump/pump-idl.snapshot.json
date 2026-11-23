@@ -10,7 +10,7 @@
     "pump_program_id": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
     "fees_program_id": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
     "fees_config_pda": "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
-    "sdk_reference": "@pump-fun/pump-sdk@4.1.0",
+    "sdk_reference": "@pump-fun/pump-sdk@4.3.1",
     "pump_amm_program_id": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
     "pump_amm_idl_path": "idl/pump_amm.json"
   },
