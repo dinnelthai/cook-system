@@ -29,7 +29,7 @@ function samePool(a, b) {
     a?.market?.quote_mint === b?.market?.quote_mint;
 }
 
-export function createInitialPumpSwapPoolState({ poolCreatedEvent }) {
+export function createInitialPumpSwapPoolState({ poolCreatedEvent, decodedPool = null }) {
   if (!poolCreatedEvent || poolCreatedEvent.event_kind !== "POOL_CREATED") {
     throw new TypeError("a normalized POOL_CREATED event is required");
   }
@@ -37,6 +37,11 @@ export function createInitialPumpSwapPoolState({ poolCreatedEvent }) {
   const base = nonNegative(payload.pool_base_reserves_base_units, "initial pool base reserves");
   const quote = nonNegative(payload.pool_quote_reserves_base_units, "initial pool quote reserves");
   if (base === 0n || quote === 0n) throw new RangeError("initial PumpSwap pool reserves must be positive");
+  const currentVirtual = toBigInt(decodedPool?.data?.virtual_quote_reserves_base_units ?? "0", "current virtual quote reserves");
+  const currentProtocol = nonNegative(decodedPool?.data?.protocol_fees_base_units ?? "0", "current protocol fees");
+  const currentCreator = nonNegative(decodedPool?.data?.creator_fees_base_units ?? "0", "current creator fees");
+  const boostReserves = currentVirtual + currentProtocol + currentCreator;
+  if (boostReserves < 0n) throw new RangeError("derived PumpSwap boost reserves cannot be negative");
   return {
     schema_version: "1.0.0",
     pool_address: payload.pool_address,
@@ -45,7 +50,9 @@ export function createInitialPumpSwapPoolState({ poolCreatedEvent }) {
     quote_mint: payload.quote_mint,
     pool_base_reserves_base_units: base.toString(),
     pool_quote_reserves_base_units: quote.toString(),
-    virtual_quote_reserves_base_units: "0",
+    virtual_quote_reserves_base_units: boostReserves.toString(),
+    boost_reserves_base_units: boostReserves.toString(),
+    boost_reserves_baseline_status: decodedPool ? "DERIVED_FROM_POOL_ACCOUNT_INVARIANT" : "UNKNOWN",
     protocol_fees_base_units: "0",
     creator_fees_base_units: "0",
     pool_buy_quote_volume_base_units: "0",
@@ -61,18 +68,24 @@ export function createInitialPumpSwapPoolState({ poolCreatedEvent }) {
 
 function applyFeeDelta(state, event) {
   const delta = event.payload?.fee_balances_delta ?? {};
+  const protocolDelta = toBigInt(delta.protocol_fees_base_units ?? "0", "protocol fee delta");
+  const creatorDelta = toBigInt(delta.creator_fees_base_units ?? "0", "creator fee delta");
   return {
     ...state,
     protocol_fees_base_units: addNonNegative(
       state.protocol_fees_base_units,
-      delta.protocol_fees_base_units ?? "0",
+      protocolDelta,
       "protocol_fees_base_units",
     ),
     creator_fees_base_units: addNonNegative(
       state.creator_fees_base_units,
-      delta.creator_fees_base_units ?? "0",
+      creatorDelta,
       "creator_fees_base_units",
     ),
+    virtual_quote_reserves_base_units: (
+      toBigInt(state.virtual_quote_reserves_base_units, "virtual quote reserves") -
+      protocolDelta - creatorDelta
+    ).toString(),
   };
 }
 
@@ -87,6 +100,9 @@ function applyPoolFeeMovement(state, event) {
   return {
     ...state,
     [field]: (current - amount).toString(),
+    virtual_quote_reserves_base_units: (
+      toBigInt(state.virtual_quote_reserves_base_units, "virtual quote reserves") + amount
+    ).toString(),
     fee_sweep_count: state.fee_sweep_count + 1,
   };
 }
@@ -167,11 +183,13 @@ export function replayPumpSwapPoolEvents(initialState, events) {
         mismatches,
         observation: "pre_operation_pool_reserves",
       });
-      if (before.virtual_quote_reserves_base_units !== undefined) {
-        state = {
-          ...state,
-          virtual_quote_reserves_base_units: signedString(before.virtual_quote_reserves_base_units),
-        };
+      if (state.boost_reserves_baseline_status === "UNKNOWN") {
+        reconciliations.push({
+          signature: group.signature,
+          event_id: firstObserved.event_id,
+          status: "UNKNOWN",
+          reason: "current Pool account is required to derive immutable boost reserve baseline",
+        });
       }
     }
 
@@ -199,7 +217,28 @@ export function replayPumpSwapPoolEvents(initialState, events) {
               : state.pool_sell_quote_volume_base_units,
             as_of_event_id: event.event_id,
           };
+          const virtualBefore = state.virtual_quote_reserves_base_units;
           state = applyFeeDelta(state, event);
+          const reportedVirtual = payload.virtual_quote_reserves_reported_base_units;
+          if (reportedVirtual !== undefined && String(reportedVirtual) !== state.virtual_quote_reserves_base_units &&
+              String(reportedVirtual) !== virtualBefore) {
+            reconciliations.push({
+              signature: group.signature,
+              event_id: event.event_id,
+              status: "FAIL",
+              reason: "reported virtual_quote_reserves matches neither pre- nor post-trade replay state",
+              virtual_before: virtualBefore,
+              virtual_after: state.virtual_quote_reserves_base_units,
+              virtual_reported: String(reportedVirtual),
+            });
+          } else if (reportedVirtual !== undefined) {
+            reconciliations.push({
+              signature: group.signature,
+              event_id: event.event_id,
+              status: "PASS",
+              virtual_observation: String(reportedVirtual) === state.virtual_quote_reserves_base_units ? "post_operation" : "pre_operation",
+            });
+          }
           break;
         }
         case "POOL_LIQUIDITY_ADDED":
