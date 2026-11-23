@@ -169,7 +169,18 @@ function defaultForDefinition(definition, typeMap, depth = 0) {
       defaultForType(field.type, typeMap, depth + 1),
     ]));
   }
-  throw new BorshDecodeError("no default defined for non-struct IDL type");
+  if (shape.kind === "enum") {
+    const variant = shape.variants?.[0];
+    if (!variant) throw new BorshDecodeError("enum has no variants");
+    const fields = variant.fields ?? [];
+    if (fields.length === 0) return { variant: variant.name, fields: null };
+    const tuple = fields.every((field) => typeof field === "string");
+    const value = tuple
+      ? fields.map((field) => defaultForType(field, typeMap, depth + 1))
+      : Object.fromEntries(fields.map((field) => [field.name, defaultForType(field.type, typeMap, depth + 1)]));
+    return { variant: variant.name, fields: value };
+  }
+  throw new BorshDecodeError(`no default defined for IDL definition kind: ${shape.kind}`);
 }
 
 export function readIdlType(reader, type, typeMap, depth = 0) {
@@ -233,6 +244,27 @@ export function readIdlType(reader, type, typeMap, depth = 0) {
 export function readIdlDefinition(reader, definition, typeMap, depth = 0, options = {}) {
   if (depth > 32) throw new BorshDecodeError("IDL definition recursion limit exceeded", reader.offset);
   const shape = definition.type ?? definition;
+
+  if (shape.kind === "enum") {
+    const variants = shape.variants ?? [];
+    const variantIndex = reader.readU8();
+    const variant = variants[variantIndex];
+    if (!variant) throw new BorshDecodeError(`enum variant index ${variantIndex} is out of range`, reader.offset - 1);
+    const fields = variant.fields ?? [];
+    if (fields.length === 0) return { value: { variant: variant.name, fields: null }, missingFields: [] };
+    const tuple = fields.every((field) => typeof field === "string");
+    const value = tuple ? [] : {};
+    for (let index = 0; index < fields.length; index += 1) {
+      const field = fields[index];
+      const name = tuple ? String(index) : field.name;
+      const fieldType = tuple ? field : field.type;
+      const fieldValue = readIdlType(reader, fieldType, typeMap, depth + 1);
+      if (tuple) value.push(fieldValue);
+      else value[name] = fieldValue;
+    }
+    return { value: { variant: variant.name, fields: value }, missingFields: [] };
+  }
+
   if (shape.kind !== "struct") {
     throw new BorshDecodeError(`unsupported IDL definition kind: ${shape.kind}`, reader.offset);
   }
