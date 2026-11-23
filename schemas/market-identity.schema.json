@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/market-identity.schema.json",
+  "title": "MarketIdentity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chain_id",
+    "network",
+    "token_mint",
+    "quote_mint",
+    "curve_program_id",
+    "market_phase"
+  ],
+  "properties": {
+    "chain_id": { "type": "string", "minLength": 1 },
+    "network": {
+      "type": "string",
+      "enum": ["mainnet", "devnet", "local_sim"]
+    },
+    "token_mint": { "type": "string", "minLength": 1 },
+    "quote_mint": { "type": "string", "minLength": 1 },
+    "curve_program_id": { "type": "string", "minLength": 1 },
+    "curve_account": { "type": ["string", "null"] },
+    "program_version": { "type": ["string", "null"] },
+    "idl_revision": { "type": ["string", "null"] },
+    "market_phase": {
+      "type": "string",
+      "enum": ["bonding_curve", "graduated", "post_graduation"]
+    }
+  }
+}
