@@ -23,6 +23,7 @@ const global = {
   feeBasisPoints: bn(100),
   creatorFeeBasisPoints: bn(50),
   poolMigrationFee: bn(10),
+  buybackBasisPoints: bn(0),
 };
 const feeConfig = {
   flatFees: { lpFeeBps: bn(0), protocolFeeBps: bn(100), creatorFeeBps: bn(50) },
@@ -55,7 +56,7 @@ const bondingCurve = {
   postCompleteQuoteIn: bn(0),
 };
 
-test("Pump SDK 4.1.0 is installed and exposes the pinned quote oracle functions", () => {
+test("Pump SDK 4.3.1 is installed and exposes the pinned quote oracle functions", () => {
   for (const fn of [
     getBuySolAmountFromTokenAmount,
     getSellSolAmountFromTokenAmount,
@@ -64,7 +65,7 @@ test("Pump SDK 4.1.0 is installed and exposes the pinned quote oracle functions"
   ]) assert.equal(typeof fn, "function");
 });
 
-test("exact token-out buy and exact token-in sell match Pump SDK 4.1.0", () => {
+test("exact token-out buy and exact token-in sell match Pump SDK 4.3.1", () => {
   const sdkBuy = getBuySolAmountFromTokenAmount({
     global,
     feeConfig,
@@ -97,7 +98,7 @@ test("exact token-out buy and exact token-in sell match Pump SDK 4.1.0", () => {
   assert.equal(localSell.output_base_units, sdkSell.toString());
 });
 
-test("V3 synthetic migration exact token-out quote matches Pump SDK 4.1.0", () => {
+test("V3 synthetic migration exact token-out quote matches Pump SDK 4.3.1", () => {
   const sdkQuote = getBuyV3QuoteAmountFromTokenAmount({
     global,
     feeConfig,
@@ -121,7 +122,7 @@ test("V3 synthetic migration exact token-out quote matches Pump SDK 4.1.0", () =
   assert.equal(localQuote.input_base_units, sdkQuote.toString());
 });
 
-test("V3 synthetic migration exact quote-in token output matches Pump SDK 4.1.0", () => {
+test("V3 synthetic migration exact quote-in token output matches Pump SDK 4.3.1", () => {
   const sdkQuote = getBuyV3TokenAmountFromQuoteAmount({
     global,
     feeConfig,
