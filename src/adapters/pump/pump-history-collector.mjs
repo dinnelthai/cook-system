@@ -212,6 +212,12 @@ export async function fetchPumpMintHistory({
     }
   }
 
+  const curveQuoteMint = decodedCurve?.data?.quote_mint;
+  if (curveQuoteMint && curveQuoteMint !== "11111111111111111111111111111111" && curveQuoteMint !== "So11111111111111111111111111111111111111112") {
+    const error = new Error(`unsupported quote mint for current SOL-only history collector: ${curveQuoteMint}`);
+    error.code = "UNSUPPORTED_QUOTE_MINT";
+    throw error;
+  }
   const market = normalizeBondingCurveMarket({
     mint,
     network,
@@ -249,10 +255,12 @@ export async function fetchPumpMintHistory({
     }
   }
 
-  const candles = buildRawCandles(
-    allEvents.filter((event) => event.market.token_mint === mint && event.market.curve_program_id === PUMP_PROGRAM_ID),
-    60_000,
-  );
+  const candleEvents = allEvents.filter((event) => event.market.token_mint === mint && event.market.curve_program_id === PUMP_PROGRAM_ID);
+  const candleOrderComplete = candleEvents
+    .filter((event) => event.event_kind === "CURVE_BUY_EXECUTED" || event.event_kind === "CURVE_SELL_EXECUTED")
+    .every((event) => event.ordering.ordering_confidence === "complete");
+  const candles = candleOrderComplete ? buildRawCandles(candleEvents, 60_000) : [];
+  const candleStatus = candleOrderComplete ? "AVAILABLE" : "INCOMPLETE_CHAIN_ORDER";
 
   return {
     schema_version: "1.0.0",
@@ -276,6 +284,7 @@ export async function fetchPumpMintHistory({
     } : null,
     current_account_reconciliation: snapshotReconciliation,
     raw_candles_1m: candles,
+    raw_candles_status: candleStatus,
     fee_config_pda: PUMP_FEE_CONFIG_PDA,
     limitations: [
       "Historical account bytes are not returned by standard Solana getTransaction; replay uses observed event post-state and transaction balance deltas, then compares with the current account snapshot when the lifecycle permits.",
