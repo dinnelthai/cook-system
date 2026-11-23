@@ -22,6 +22,7 @@ import {
   normalizePumpSwapTradeEvent,
   normalizePumpSwapLiquidityEvent,
   normalizePumpSwapFeeSweepEvent,
+  normalizePumpSwapBoostBuyAndBurnEvent,
 } from "./pump-swap-normalizer.mjs";
 
 function getAccountKeys(transaction) {
@@ -398,6 +399,31 @@ export function decodePumpTransaction({
             break;
           }
           events.push(normalizePumpSwapLiquidityEvent({ ...context, poolMetadata }));
+          break;
+        }
+        case "BoostBuyAndBurnEvent": {
+          const poolAddress = decoded.data.pool;
+          const poolMetadata = poolMetadataForEvent({
+            poolAddress,
+            data: decoded.data,
+            instructions: decodedInstructions,
+            logOrder: logOrdering.get(decoded.log_index),
+            poolMetadataByAddress,
+            tokenDecimalsByMint,
+            quoteDecimalsByMint,
+            transaction,
+          });
+          if (!poolMetadata.base_mint || !poolMetadata.quote_mint) {
+            unresolvedEvents.push({
+              event_name: decoded.event_name,
+              status: "MISSING_PUMPSWAP_POOL_METADATA",
+              pool: poolAddress,
+              log_index: decoded.log_index,
+              decoded_event: decoded,
+            });
+            break;
+          }
+          events.push(normalizePumpSwapBoostBuyAndBurnEvent({ ...context, poolMetadata }));
           break;
         }
         case "SweepPoolFeeEvent": {
