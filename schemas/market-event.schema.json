@@ -17,11 +17,19 @@
     "quality"
   ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
-    "event_id": { "type": "string", "minLength": 1 },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "provenance": {
       "type": "string",
-      "enum": ["observed_chain", "synthetic"]
+      "enum": [
+        "observed_chain",
+        "synthetic"
+      ]
     },
     "event_kind": {
       "type": "string",
@@ -37,39 +45,104 @@
         "CURVE_STATE_SNAPSHOT",
         "DATA_GAP",
         "SIMULATION_INTENT",
-        "SIMULATION_REJECTED_INTENT"
+        "SIMULATION_REJECTED_INTENT",
+        "POST_COMPLETE_POOL_LEG",
+        "CURVE_COMPLETE",
+        "CURVE_MIGRATED",
+        "FEE_CONFIG_CHANGE",
+        "FEE_CONFIG_SNAPSHOT"
       ]
     },
-    "market": { "$ref": "market-identity.schema.json" },
-    "event_time_ms": { "type": "integer", "minimum": 0 },
+    "market": {
+      "$ref": "market-identity.schema.json"
+    },
+    "event_time_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
     "ordering": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["event_sequence", "ordering_confidence"],
+      "required": [
+        "event_sequence",
+        "ordering_confidence"
+      ],
       "properties": {
-        "slot": { "type": ["integer", "null"], "minimum": 0 },
-        "transaction_index": { "type": ["integer", "null"], "minimum": 0 },
-        "instruction_index": { "type": ["integer", "null"], "minimum": 0 },
-        "inner_instruction_index": { "type": ["integer", "null"], "minimum": 0 },
-        "event_sequence": { "type": "integer", "minimum": 0 },
+        "slot": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "transaction_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "instruction_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "inner_instruction_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "event_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
         "ordering_confidence": {
           "type": "string",
-          "enum": ["complete", "partial", "synthetic"]
+          "enum": [
+            "complete",
+            "partial",
+            "synthetic"
+          ]
         }
       }
     },
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_type", "source_id"],
+      "required": [
+        "source_type",
+        "source_id"
+      ],
       "properties": {
         "source_type": {
           "type": "string",
-          "enum": ["rpc", "indexer", "simulator", "manual_import"]
+          "enum": [
+            "rpc",
+            "indexer",
+            "simulator",
+            "manual_import"
+          ]
         },
-        "source_id": { "type": "string", "minLength": 1 },
-        "signature": { "type": ["string", "null"] },
-        "adapter_version": { "type": ["string", "null"] }
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signature": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adapter_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "payload": {
@@ -80,41 +153,86 @@
     "quality": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["is_complete", "validation_status"],
+      "required": [
+        "is_complete",
+        "validation_status"
+      ],
       "properties": {
-        "is_complete": { "type": "boolean" },
+        "is_complete": {
+          "type": "boolean"
+        },
         "validation_status": {
           "type": "string",
-          "enum": ["valid", "warning", "invalid", "unknown"]
+          "enum": [
+            "valid",
+            "warning",
+            "invalid",
+            "unknown"
+          ]
         },
         "warnings": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
-        "reconciliation_ref": { "type": ["string", "null"] }
+        "reconciliation_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "synthetic_metadata": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
-      "required": ["scenario_id", "random_seed", "generator_version"],
+      "required": [
+        "scenario_id",
+        "random_seed",
+        "generator_version"
+      ],
       "properties": {
-        "scenario_id": { "type": "string", "minLength": 1 },
-        "random_seed": { "type": "integer" },
-        "generator_version": { "type": "string", "minLength": 1 }
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "random_seed": {
+          "type": "integer"
+        },
+        "generator_version": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   },
   "allOf": [
     {
-      "if": { "properties": { "provenance": { "const": "synthetic" } } },
-      "then": { "required": ["synthetic_metadata"] }
+      "if": {
+        "properties": {
+          "provenance": {
+            "const": "synthetic"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "synthetic_metadata"
+        ]
+      }
     },
     {
       "if": {
         "properties": {
           "event_kind": {
-            "enum": ["CURVE_BUY_EXECUTED", "CURVE_SELL_EXECUTED"]
+            "enum": [
+              "CURVE_BUY_EXECUTED",
+              "CURVE_SELL_EXECUTED"
+            ]
           }
         }
       },
@@ -131,21 +249,50 @@
               "fee_components"
             ],
             "properties": {
-              "signature": { "type": "string", "minLength": 1 },
-              "actor_address": { "type": "string", "minLength": 1 },
-              "token_amount_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
-              "quote_amount_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
-              "quote_mint": { "type": "string", "minLength": 1 },
-              "execution_price_decimal": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+              "signature": {
+                "type": "string",
+                "minLength": 1
+              },
+              "actor_address": {
+                "type": "string",
+                "minLength": 1
+              },
+              "token_amount_base_units": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "quote_amount_base_units": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "quote_mint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "execution_price_decimal": {
+                "type": "string",
+                "pattern": "^[0-9]+(\\.[0-9]+)?$"
+              },
               "fee_components": {
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "required": ["fee_type", "amount_base_units", "mint"],
+                  "required": [
+                    "fee_type",
+                    "amount_base_units",
+                    "mint"
+                  ],
                   "properties": {
-                    "fee_type": { "type": "string" },
-                    "amount_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
-                    "mint": { "type": "string" }
+                    "fee_type": {
+                      "type": "string"
+                    },
+                    "amount_base_units": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "mint": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -155,7 +302,13 @@
       }
     },
     {
-      "if": { "properties": { "event_kind": { "const": "TOKEN_TRANSFER" } } },
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "TOKEN_TRANSFER"
+          }
+        }
+      },
       "then": {
         "properties": {
           "payload": {
@@ -167,13 +320,99 @@
               "transfer_type"
             ],
             "properties": {
-              "signature": { "type": "string", "minLength": 1 },
-              "source_owner": { "type": "string", "minLength": 1 },
-              "destination_owner": { "type": "string", "minLength": 1 },
-              "token_amount_base_units": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+              "signature": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_owner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "destination_owner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "token_amount_base_units": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
               "transfer_type": {
                 "type": "string",
-                "enum": ["wallet", "custody", "escrow", "program", "unknown"]
+                "enum": [
+                  "wallet",
+                  "custody",
+                  "escrow",
+                  "program",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_kind": {
+            "const": "POST_COMPLETE_POOL_LEG"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "signature",
+              "actor_address",
+              "token_amount_base_units",
+              "quote_amount_base_units",
+              "quote_mint",
+              "fee_components",
+              "pool_base_reserves_before_base_units",
+              "pool_quote_reserves_before_base_units",
+              "pool_base_reserves_after_base_units",
+              "pool_quote_reserves_after_base_units"
+            ],
+            "properties": {
+              "signature": {
+                "type": "string",
+                "minLength": 1
+              },
+              "actor_address": {
+                "type": "string",
+                "minLength": 1
+              },
+              "token_amount_base_units": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "quote_amount_base_units": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "quote_mint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pool_base_reserves_before_base_units": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "pool_quote_reserves_before_base_units": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "pool_base_reserves_after_base_units": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "pool_quote_reserves_after_base_units": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "fee_components": {
+                "type": "array"
               }
             }
           }
