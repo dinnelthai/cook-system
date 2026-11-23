@@ -39,9 +39,21 @@ This repository is for defensive research, data analysis, and offline simulation
 
 - [Canonical Schema Contract — V1](docs/implementation/canonical-schema-contract-v1.md)
 
+### Machine-readable JSON Schemas
+
+- [Market Identity](schemas/market-identity.schema.json)
+- [Market Event](schemas/market-event.schema.json)
+- [Market State](schemas/market-state.schema.json)
+- [Agent State](schemas/agent-state.schema.json)
+- [Action Intent](schemas/action-intent.schema.json)
+- [Raw Candle](schemas/raw-candle.schema.json)
+- [Market Alert](schemas/market-alert.schema.json)
+- [Simulation Ground Truth — evaluation only](schemas/simulation-ground-truth.schema.json)
+
 ## Planned work
 
-- [ ] Implement schema validation and decimal-safe amount utilities.
+- [ ] Add automated JSON Schema validation and contract tests.
+- [ ] Implement decimal-safe amount utilities.
 - [ ] Verify the exact bonding-curve program adapter and reserve / fee semantics.
 - [ ] Implement deterministic event replay and accounting invariants.
 - [ ] Implement raw OHLCV construction from confirmed executions.
