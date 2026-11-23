@@ -6,8 +6,9 @@ import {
   PUMP_FEES_PROGRAM_ID,
   decodePumpInstruction,
   decodeProgramEvent,
-  encodeBase58,
+  PUMP_AMM_PROGRAM_ID,
 } from "../src/adapters/pump/pump-decoder.mjs";
+import { encodeBase58, decodeBase58 } from "../src/adapters/pump/borsh.mjs";
 import { decodeBase58 } from "../src/adapters/pump/borsh.mjs";
 import { decodePumpTransaction } from "../src/adapters/pump/pump-transaction-parser.mjs";
 import {
