@@ -324,6 +324,42 @@ function extractTokenAccountDelta(transaction, tokenAccountAddress) {
   return { delta: postAmount - preAmount, complete: true, touched: true };
 }
 
+function inspectStateChangingTransactions(transactionRecords, decodedBySignature, vaultAddresses, programId, recognizedEventNames) {
+  const gaps = [];
+  for (const record of transactionRecords) {
+    const tx = record.transaction;
+    if (!tx || (tx.meta?.err !== null && tx.meta?.err !== undefined)) continue;
+    const deltas = vaultAddresses.map((address) => extractTokenAccountDelta(tx, address));
+    const missing = deltas.filter((item) => !item.complete);
+    if (missing.length > 0) {
+      gaps.push({
+        signature: record.signature,
+        reason: "vault_balance_delta_missing",
+        vaults: missing.map((item) => item.address ?? null),
+      });
+      continue;
+    }
+    const changed = deltas.some((item) => item.delta !== 0n);
+    if (!changed) continue;
+    const decoded = decodedBySignature.get(record.signature);
+    const recognizedEvent = decoded?.events?.some((event) =>
+      event.program_id === programId && recognizedEventNames.includes(event.event_name)
+    ) ?? false;
+    const recognizedInstruction = decoded?.instructions?.some((instruction) =>
+      instruction.program_id === programId &&
+      instruction.status === "DECODED"
+    ) ?? false;
+    if (!recognizedEvent && !recognizedInstruction) {
+      gaps.push({
+        signature: record.signature,
+        reason: "unexplained_pool_vault_balance_change",
+        program_id: programId,
+      });
+    }
+  }
+  return gaps;
+}
+
 function replayVaultDeltas(transactionRecords, vaultAddresses, currentAmounts) {
   const totals = Object.fromEntries(vaultAddresses.map((address) => [address, 0n]));
   const gaps = [];
@@ -549,6 +585,7 @@ export async function fetchRaydiumMintHistory({
   const unresolved = [];
   const normalizedEvents = [];
   const protocolEvents = [];
+  const decodedBySignature = new Map(parsedTransactions.map((record) => [record.signature, record.decoded]));
   for (const record of parsedTransactions) {
     if (record.decoded.failed) continue;
     if (record.decoded.unresolved_events.length) {
@@ -606,18 +643,37 @@ export async function fetchRaydiumMintHistory({
   ]);
   const launchCurrentAmounts = Object.fromEntries(launchVaultSnapshots.map((item) => [item.address, item.amount_base_units]));
   const cpmmCurrentAmounts = Object.fromEntries(cpmmVaultSnapshots.map((item) => [item.address, item.amount_base_units]));
+  const cpmmTransactionRecords = allTransactions.transactions.filter((item) =>
+    cpmmCoverage.signatures.some((signature) => signature.signature === item.signature)
+  );
   const launchVaultReplay = replayVaultDeltas(
     launchTransactions.transactions,
     [launchData.base_vault, launchData.quote_vault],
     launchCurrentAmounts,
   );
   const cpmmVaultReplay = replayVaultDeltas(
-    allTransactions.transactions.filter((item) =>
-      cpmmCoverage.signatures.some((signature) => signature.signature === item.signature)
-    ),
+    cpmmTransactionRecords,
     [cpmmData.token_0_vault, cpmmData.token_1_vault],
     cpmmCurrentAmounts,
   );
+  const unexplainedLaunchChanges = inspectStateChangingTransactions(
+    launchTransactions.transactions,
+    decodedBySignature,
+    [launchData.base_vault, launchData.quote_vault],
+    RAYDIUM_LAUNCHLAB_PROGRAM_ID,
+    ["TradeEvent", "PoolCreateEvent", "CreateVestingEvent", "ClaimVestedEvent"],
+  );
+  const unexplainedCpmmChanges = inspectStateChangingTransactions(
+    cpmmTransactionRecords,
+    decodedBySignature,
+    [cpmmData.token_0_vault, cpmmData.token_1_vault],
+    RAYDIUM_CPMM_PROGRAM_ID,
+    ["SwapEvent", "LpChangeEvent"],
+  );
+  const unexplainedStateChanges = [
+    ...unexplainedLaunchChanges.map((item) => ({ venue: "launchlab", ...item })),
+    ...unexplainedCpmmChanges.map((item) => ({ venue: "cpmm", ...item })),
+  ];
 
   const launchLatest = await latestSignatureStillMatches(rpc, launchLabPda.address, launchCoverage.signatures[0]?.signature ?? null);
   const cpmmLatest = await latestSignatureStillMatches(rpc, cpmmPoolAddress, cpmmCoverage.signatures[0]?.signature ?? null);
@@ -626,7 +682,7 @@ export async function fetchRaydiumMintHistory({
   const coverageComplete = launchCoverage.exhausted && cpmmCoverage.exhausted &&
     transactionGaps.length === 0 && orderingGaps.length === 0 &&
     launchLatest.stable && cpmmLatest.stable;
-  const eventOrderComplete = unresolved.length === 0 &&
+  const eventOrderComplete = unresolved.length === 0 && unexplainedStateChanges.length === 0 &&
     normalizedEvents.every((event) => event.ordering?.ordering_confidence === "complete");
   const vaultReconciliationPass = launchVaultReplay.status === "PASS" && cpmmVaultReplay.status === "PASS" &&
     launchVaultSnapshots.every((item) => item.status === "PASS") &&
@@ -690,6 +746,7 @@ export async function fetchRaydiumMintHistory({
       protocol_events: protocolEvents.length,
       transaction_gaps: transactionGaps,
       ordering_gaps: orderingGaps,
+      unexplained_state_changes: unexplainedStateChanges,
       ordering_complete: eventOrderComplete,
     },
     raw_candles_status: normalizedEvents.length > 0 ? "AVAILABLE" : "NO_EXECUTIONS",
