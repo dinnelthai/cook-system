@@ -373,6 +373,8 @@ test("V3 retained fees accrue on the curve and sweep events debit the correct bu
   });
   const created = parsed.events.find((event) => event.event_kind === "MARKET_CREATED");
   const initial = createInitialCurveStateFromMarketCreated({ marketCreatedEvent: created });
+  const sweepEvents = parsed.events.filter((event) => event.event_kind === "FEE_MOVEMENT");
+  assert.deepEqual(sweepEvents.map((event) => event.payload.fee_bucket), [0, 1]);
   const replay = replayCurveEvents(initial, parsed.events);
   assert.equal(replay.state.protocol_fees_base_units, "0");
   assert.equal(replay.state.creator_fees_base_units, "0");
