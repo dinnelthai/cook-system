@@ -100,7 +100,7 @@ export function resolveBondingCurveFees({
   if (feeConfig) {
     const marketCap = calculateBondingCurveMarketCap({
       tokenTotalSupply: bondingCurve.token_total_supply ?? bondingCurve.tokenTotalSupply,
-      virtualQuoteReserves: bondingCurve.virtual_quote_reserves ?? bondingCurve.virtual_quote_reserves_base_units ?? bondingCurve.virtualQuoteReserves,
+      virtualQuoteReserves: bondingCurve.virtual_quote_reserves ?? bondingCurve.virtual_quote_reserves_base_units ?? bondingCurve.virtual_sol_reserves ?? bondingCurve.virtualQuoteReserves,
       virtualTokenReserves: bondingCurve.virtual_token_reserves ?? bondingCurve.virtual_token_reserves_base_units ?? bondingCurve.virtualTokenReserves,
     });
     const selected = calculateFeeTier({
@@ -130,7 +130,7 @@ export function resolveBondingCurveFees({
   const fallback = normalizeFeeRecord({
     lp_fee_bps: 0n,
     protocol_fee_bps: global.fee_basis_points ?? global.feeBasisPoints,
-    creator_fee_bps: global.creator_fee_basis_points ?? global.creatorFeeBasisPoints,
+    creator_fee_bps: global.creator_fee_basis_points ?? global.creatorFeeBasisPoints ?? 0n,
   });
   return {
     status: "RESOLVED_WITH_FALLBACK",
