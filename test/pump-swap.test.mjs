@@ -200,6 +200,57 @@ test("PumpSwap BuyEvent decodes, normalizes and reconciles actor and pool-vault 
   assert.equal(current.status,"PASS");
 });
 
+test("PumpSwap v2 fee sweeps move virtual reserves opposite to quote-vault balances",()=>{
+  const transaction=makeTransaction();
+  const parsed=decodePumpTransaction({
+    transaction,
+    signature:"pool-buy-with-fees",
+    transactionIndex:2,
+    poolMetadataByAddress:{
+      [POOL]:{
+        pool_address:POOL,base_mint:BASE_MINT,quote_mint:QUOTE_MINT,
+        base_mint_decimals:6,quote_mint_decimals:9,
+        pool_base_token_account:BASE_VAULT,pool_quote_token_account:QUOTE_VAULT,
+      },
+    },
+  });
+  const buy=parsed.events[0];
+  buy.payload.pool_vault_deltas={base_delta_base_units:"-100",quote_delta_base_units:"54"};
+  const market=buy.market;
+  const sweep=(signature,slot,bucket,amount,quoteDelta)=>({
+    schema_version:"1.0.0",event_id:signature,provenance:"observed_chain",
+    event_kind:"POOL_FEE_MOVEMENT",market,event_time_ms:1_700_000_200_000+slot,
+    ordering:{slot,transaction_index:0,instruction_index:0,inner_instruction_index:null,event_sequence:0,ordering_confidence:"complete"},
+    source:{source_type:"rpc",source_id:signature,signature},
+    payload:{pool_address:POOL,amount_base_units:String(amount),fee_bucket:bucket,
+      pool_vault_deltas:{base_delta_base_units:"0",quote_delta_base_units:String(quoteDelta)}},
+    quality:{is_complete:true,validation_status:"valid",warnings:[],reconciliation_ref:null},
+  });
+  const finalPool={data:{
+    virtual_quote_reserves_base_units:"0",
+    protocol_fees_base_units:"0",
+    creator_fees_base_units:"0",
+  }};
+  const initial=createInitialPumpSwapPoolState({
+    poolCreatedEvent:poolCreatedEvent(),
+    decodedPool:finalPool,
+  });
+  const replay=replayPumpSwapPoolEvents(initial,[
+    buy,
+    sweep("protocol-sweep",21,0,2,-2),
+    sweep("creator-sweep",22,1,1,-1),
+  ]);
+  assert.equal(replay.status,"PASS");
+  assert.equal(replay.state.pool_quote_reserves_base_units,"551");
+  assert.equal(replay.state.protocol_fees_base_units,"0");
+  assert.equal(replay.state.creator_fees_base_units,"0");
+  assert.equal(replay.state.virtual_quote_reserves_base_units,"0");
+  assert.equal(
+    BigInt(replay.state.pool_quote_reserves_base_units)+BigInt(replay.state.virtual_quote_reserves_base_units),
+    551n,
+  );
+});
+
 test("PumpSwap Pool account and token vault account decoders read current state",()=>{
   const poolAccount=snapshot.pump_amm.accounts.find(x=>x.name==="Pool");
   const poolBytes=Buffer.concat([
