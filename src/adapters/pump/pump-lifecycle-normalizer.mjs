@@ -44,13 +44,16 @@ function baseEvent({
   sourceId,
   marketPhase = "bonding_curve",
   curveAccount = null,
+  allowNonSolQuoteMint = false,
 }) {
   if (!["mainnet", "devnet"].includes(network)) throw new TypeError("network must be mainnet or devnet");
   const eventSequence = Number.isSafeInteger(ordering?.eventSequence) && ordering.eventSequence >= 0 ? ordering.eventSequence : 0;
   const completeOrder = ["slot", "transactionIndex", "instructionIndex"].every((field) =>
     Number.isSafeInteger(ordering?.[field]) && ordering[field] >= 0
   ) && Number.isSafeInteger(ordering?.eventSequence) && ordering.eventSequence >= 0;
-  const quoteMint = normalizedQuoteMint(data.quote_mint);
+  const quoteMint = allowNonSolQuoteMint && typeof data.quote_mint === "string"
+    ? data.quote_mint
+    : normalizedQuoteMint(data.quote_mint);
   const metadata = getPumpIdlSnapshotMetadata();
   const timestamp = timestampMs(data.timestamp);
   const signatureValue = signature ?? "unknown-signature";
@@ -298,6 +301,7 @@ export function normalizePumpAmmCreatePoolEvent({
     network,
     sourceType,
     marketPhase: "post_graduation",
+    allowNonSolQuoteMint: true,
   });
   event.payload.pool_program_id = PUMP_AMM_PROGRAM_ID;
   event.payload = {

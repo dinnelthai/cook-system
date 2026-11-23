@@ -41,6 +41,23 @@ function tokenBalanceMap(balances = [], keys = []) {
   return result;
 }
 
+function tokenAccountBalanceMap(balances = [], keys = []) {
+  const result = new Map();
+  for (const item of balances) {
+    const address = keys[item.accountIndex] ?? null;
+    if (!address || typeof item.mint !== "string") continue;
+    const amount = BigInt(item.uiTokenAmount?.amount ?? "0");
+    result.set(address, {
+      address,
+      mint: item.mint,
+      owner: item.owner ?? null,
+      amount,
+      decimals: item.uiTokenAmount?.decimals ?? null,
+    });
+  }
+  return result;
+}
+
 export function extractTransactionBalanceDeltas(transaction) {
   const meta = transaction?.meta;
   if (!meta) throw new TypeError("transaction metadata is required for balance reconciliation");
@@ -63,6 +80,8 @@ export function extractTransactionBalanceDeltas(transaction) {
 
   const preTokens = tokenBalanceMap(meta.preTokenBalances ?? [], keys);
   const postTokens = tokenBalanceMap(meta.postTokenBalances ?? [], keys);
+  const preTokenAccounts = tokenAccountBalanceMap(meta.preTokenBalances ?? [], keys);
+  const postTokenAccounts = tokenAccountBalanceMap(meta.postTokenBalances ?? [], keys);
   const tokenKeys = new Set([...preTokens.keys(), ...postTokens.keys()]);
   const tokens = [];
   for (const key of tokenKeys) {
@@ -83,10 +102,29 @@ export function extractTransactionBalanceDeltas(transaction) {
     });
   }
 
+  const tokenAccountKeys = new Set([...preTokenAccounts.keys(), ...postTokenAccounts.keys()]);
+  const tokenAccounts = [];
+  for (const address of tokenAccountKeys) {
+    const before = preTokenAccounts.get(address);
+    const after = postTokenAccounts.get(address);
+    const pre = before?.amount ?? 0n;
+    const post = after?.amount ?? 0n;
+    tokenAccounts.push({
+      address,
+      mint: before?.mint ?? after?.mint ?? null,
+      owner: before?.owner ?? after?.owner ?? null,
+      pre_amount_base_units: pre.toString(),
+      post_amount_base_units: post.toString(),
+      delta_base_units: (post - pre).toString(),
+      decimals: before?.decimals ?? after?.decimals ?? null,
+    });
+  }
+
   return {
     fee_lamports: String(meta.fee ?? 0),
     lamports,
     tokens,
+    token_accounts: tokenAccounts,
   };
 }
 
@@ -220,5 +258,100 @@ export function reconcileCurveStateSnapshot({ replayedState, decodedBondingCurve
     mismatches,
     missing_fields: missing,
     snapshot_slot: decodedBondingCurve.context_slot ?? null,
+  };
+}
+
+
+export function reconcilePumpSwapTradesWithTransaction({
+  transaction,
+  tradeEvents,
+}) {
+  if (!Array.isArray(tradeEvents) || tradeEvents.length === 0) {
+    throw new TypeError("at least one normalized PumpSwap trade event is required");
+  }
+  const meta = transaction?.meta;
+  if (!meta) throw new TypeError("transaction metadata is required");
+  if (meta.err !== null && meta.err !== undefined) {
+    return { status: "INVALID", reason: "transaction_failed", transaction_error: meta.err, checks: [] };
+  }
+
+  const balances = extractTransactionBalanceDeltas(transaction);
+  const first = tradeEvents[0];
+  const actor = first.payload.actor_address;
+  const baseMint = first.market.token_mint;
+  const quoteMint = first.market.quote_mint;
+  const pool = first.payload.pool_address;
+  const side = first.event_kind === "POOL_BUY_EXECUTED" ? "buy" : "sell";
+  const mixed = tradeEvents.some((event) =>
+    event.payload.actor_address !== actor ||
+    event.market.token_mint !== baseMint ||
+    event.market.quote_mint !== quoteMint ||
+    event.payload.pool_address !== pool ||
+    (event.event_kind === "POOL_BUY_EXECUTED" ? "buy" : "sell") !== side
+  );
+  if (mixed) {
+    return { status: "WARNING", reason: "mixed_pool_trade_actors_mints_sides_or_pools", checks: [], balance_deltas: balances };
+  }
+
+  const expectedBase = tradeEvents.reduce((sum, event) =>
+    sum + asBigInt(event.payload.token_amount_base_units, "base token amount"), 0n);
+  const expectedQuote = tradeEvents.reduce((sum, event) =>
+    sum + asBigInt(event.payload.quote_amount_base_units, "quote token amount"), 0n);
+  const actorBase = balances.tokens.find((item) => item.owner === actor && item.mint === baseMint);
+  const actorQuote = balances.tokens.find((item) => item.owner === actor && item.mint === quoteMint);
+  const baseVault = first.payload.pool_vault_accounts?.base;
+  const quoteVault = first.payload.pool_vault_accounts?.quote;
+  const baseVaultDelta = balances.token_accounts.find((item) => item.address === baseVault && item.mint === baseMint);
+  const quoteVaultDelta = balances.token_accounts.find((item) => item.address === quoteVault && item.mint === quoteMint);
+
+  const expectedActorBase = side === "buy" ? expectedBase : -expectedBase;
+  const expectedActorQuote = side === "buy" ? -expectedQuote : expectedQuote;
+  const expectedPoolBase = -expectedActorBase;
+  const actorBaseMatches = actorBase ? BigInt(actorBase.delta_base_units) === expectedActorBase : false;
+  const actorQuoteMatches = actorQuote ? BigInt(actorQuote.delta_base_units) === expectedActorQuote : false;
+  const poolBaseMatches = baseVaultDelta ? BigInt(baseVaultDelta.delta_base_units) === expectedPoolBase : false;
+  const poolQuoteObserved = quoteVaultDelta ? BigInt(quoteVaultDelta.delta_base_units) : null;
+  const poolQuoteDirectionMatches = poolQuoteObserved !== null &&
+    (side === "buy" ? poolQuoteObserved > 0n : poolQuoteObserved < 0n);
+
+  const checks = [
+    {
+      name: "actor_base_token_balance_delta",
+      status: actorBaseMatches ? "PASS" : actorBase ? "MISMATCH" : "UNKNOWN",
+      expected: expectedActorBase.toString(),
+      observed: actorBase?.delta_base_units ?? null,
+    },
+    {
+      name: "actor_quote_token_balance_delta",
+      status: actorQuoteMatches ? "PASS" : actorQuote ? "MISMATCH" : "UNKNOWN",
+      expected: expectedActorQuote.toString(),
+      observed: actorQuote?.delta_base_units ?? null,
+    },
+    {
+      name: "pool_base_vault_balance_delta",
+      status: poolBaseMatches ? "PASS" : baseVaultDelta ? "MISMATCH" : "UNKNOWN",
+      expected: expectedPoolBase.toString(),
+      observed: baseVaultDelta?.delta_base_units ?? null,
+    },
+    {
+      name: "pool_quote_vault_balance_direction",
+      status: poolQuoteDirectionMatches ? "PASS" : quoteVaultDelta ? "MISMATCH" : "UNKNOWN",
+      expected: side === "buy" ? "positive" : "negative",
+      observed: quoteVaultDelta?.delta_base_units ?? null,
+      note: "quote-vault delta includes pool fees, buyback transfers and any other quote-vault movement in this transaction; direction is checked, not an exact amount",
+    },
+  ];
+  const allPass = checks.every((check) => check.status === "PASS");
+  const mismatch = checks.some((check) => check.status === "MISMATCH");
+  return {
+    status: allPass ? "PASS" : mismatch ? "WARNING" : "UNKNOWN",
+    reason: allPass ? "actor_and_pool_base_vault_deltas_match" : "one_or_more_pool_trade_balance_checks_not_passed",
+    checks,
+    balance_deltas: balances,
+    event_count: tradeEvents.length,
+    actor_address: actor,
+    pool_address: pool,
+    base_mint: baseMint,
+    quote_mint: quoteMint,
   };
 }

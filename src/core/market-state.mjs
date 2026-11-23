@@ -26,6 +26,11 @@ const NON_CURVE_EVENT_KINDS = new Set([
   "FEE_CONFIG_SNAPSHOT",
   "MARKET_CREATED",
   "POOL_CREATED",
+  "POOL_BUY_EXECUTED",
+  "POOL_SELL_EXECUTED",
+  "POOL_LIQUIDITY_ADDED",
+  "POOL_LIQUIDITY_REMOVED",
+  "POOL_FEE_MOVEMENT",
 ]);
 
 export class CurveStateTransitionError extends Error {

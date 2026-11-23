@@ -1,7 +1,7 @@
 import { parseBaseUnits, formatBaseUnits, checkedAddU128, U128_MAX } from "./integer.mjs";
 import { sortForReplay } from "./event-order.mjs";
 
-const EXECUTION_KINDS = new Set(["CURVE_BUY_EXECUTED", "CURVE_SELL_EXECUTED"]);
+const EXECUTION_KINDS = new Set(["CURVE_BUY_EXECUTED", "CURVE_SELL_EXECUTED", "POOL_BUY_EXECUTED", "POOL_SELL_EXECUTED"]);
 
 function parseDecimal(value, name = "price") {
   if (typeof value !== "string" || !/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value)) {
@@ -79,7 +79,7 @@ export function buildRawCandles(events, intervalMs) {
     const scenarioId = event.synthetic_metadata?.scenario_id ?? null;
     const start = bucketStart(event.event_time_ms, intervalMs);
     const key = `${marketKey(event.market, event.provenance, scenarioId)}:${start}`;
-    const side = event.event_kind === "CURVE_BUY_EXECUTED" ? "buy" : "sell";
+    const side = event.event_kind === "CURVE_BUY_EXECUTED" || event.event_kind === "POOL_BUY_EXECUTED" ? "buy" : "sell";
     let candle = candles.get(key);
 
     if (!candle) {

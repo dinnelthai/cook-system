@@ -21,7 +21,7 @@ function parseArgs(argv) {
 
 const args = parseArgs(process.argv.slice(2));
 if (!args.mint) {
-  console.error("Usage: npm run replay:pump -- --mint <TOKEN_MINT> [--limit 10000] [--network mainnet] [--out artifacts/history.json]");
+  console.error("Usage: npm run replay:pump -- --mint <TOKEN_MINT> [--limit 10000] [--concurrency 5] [--fee-history] [--include-raw] [--network mainnet] [--out artifacts/history.json]");
   process.exitCode = 2;
 } else {
   try {
@@ -49,9 +49,22 @@ if (!args.mint) {
       transactions_fetched: result.signature_coverage.fetched_transactions,
       events: result.events.length,
       data_gaps: result.data_gaps.length,
+      curve_replay_status: result.curve_replay_status,
       replay_lifecycle: result.replay?.state.lifecycle ?? null,
-      snapshot_reconciliation: result.current_account_reconciliation?.status ?? null,
+      curve_snapshot_reconciliation: result.current_account_reconciliation?.status ?? null,
+      pool_replays: result.pool_replays.map((pool) => ({
+        pool_address: pool.pool_address,
+        replay_status: pool.replay_status,
+        signatures_seen: pool.signature_coverage?.signatures?.length ?? 0,
+        fetched_transactions: result.transactions.filter((item) => item.source_addresses.includes(pool.pool_address)).length,
+        pool_events: pool.replay?.processed_event_ids?.length ?? 0,
+        trade_balance_reconciliation_complete: pool.trade_balance_reconciliation_complete,
+        current_account_reconciliation: pool.current_account_reconciliation?.status ?? null,
+        unresolved_events: pool.unresolved_events.length,
+      })),
+      unresolved_events: result.transactions.reduce((sum, item) => sum + item.unresolved_count, 0),
       candles_1m: result.raw_candles_1m.length,
+      candle_status: result.raw_candles_status,
     }, null, 2));
     if (result.status !== "REPLAYED_FULL_HISTORY") process.exitCode = 1;
   } catch (error) {

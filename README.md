@@ -53,6 +53,7 @@ The first core slice currently includes:
 - [Pump.fun Bonding Curve Adapter — V1.1](docs/implementation/pump-bonding-curve-adapter-v1.1.md)
 - [Pump Decoder & Dynamic Fee Resolver — V1.2](docs/implementation/pump-decoder-fee-resolver-v1.2.md)
 - [Pump Full Replay Engine — V1.3](docs/implementation/pump-full-replay-v1.3.md)
+- [PumpSwap Full History Replay — V1.4](docs/implementation/pumpswap-full-history-v1.4.md)
 
 ### Machine-readable JSON Schemas
 
@@ -78,6 +79,9 @@ The first core slice currently includes:
 - [Dynamic fee resolver and historical config timeline](src/adapters/pump/fee-resolver.mjs)
 - [Canonical Pump TradeEvent normalizer](src/adapters/pump/pump-event-normalizer.mjs)
 - [Pump lifecycle / migration normalizer](src/adapters/pump/pump-lifecycle-normalizer.mjs)
+- [PumpSwap trade / liquidity / fee normalizer](src/adapters/pump/pump-swap-normalizer.mjs)
+- [PumpSwap pool and token vault account decoder](src/adapters/pump/pump-account-codec.mjs)
+- [PumpSwap pool state replay](src/core/pool-state.mjs)
 - [Solana RPC client](src/adapters/pump/solana-rpc.mjs)
 - [Pump account codec](src/adapters/pump/pump-account-codec.mjs)
 - [Pump transaction parser](src/adapters/pump/pump-transaction-parser.mjs)
@@ -95,6 +99,8 @@ The first core slice currently includes:
 - [Pump transaction parser tests](test/pump-transaction-parser.test.mjs)
 - [Pump RPC / PDA tests](test/pump-rpc.test.mjs)
 - [Pump fee history tests](test/pump-fee-history.test.mjs)
+- [PumpSwap trade / vault reconciliation tests](test/pump-swap.test.mjs)
+- [Pump + PumpSwap full history integration test](test/pump-pumpswap-history.test.mjs)
 - [Pump full history collector tests](test/pump-history-collector.test.mjs)
 - [Node.js 22 GitHub Actions workflow](.github/workflows/node-tests.yml)
 
@@ -104,12 +110,15 @@ The first core slice currently includes:
 - [x] Add the initial IDL-driven Pump Legacy / V2 / V3 decoder and account / event decoders.
 - [x] Add the initial FeeConfig tier resolver and stale-history guard.
 - [x] Add deterministic event ordering, curve-state replay, and snapshot reconciliation for normalized inputs.
-- [x] Verify the Node.js 22 test suite in GitHub Actions: 50 passed, 0 failed.
+- [x] Verify the Node.js 22 test suite in GitHub Actions: 58 passed, 0 failed.
 - [x] Differential-test exact buy / sell and V3 migration quote calculations against Pump SDK 4.3.1.
 - [ ] Validate captured confirmed TradeEvent and account-delta fixtures against mainnet history.
 - [x] Implement exact-token-out buys and exact-token-in sells.
 - [x] Add V3 synthetic-migration curve / PumpSwap pool quote legs and Mayhem partial-fill handling.
 - [x] Add RPC history collection, transaction parsing, balance reconciliation and fixture capture tooling.
-- [ ] Capture and validate confirmed real-chain fixtures with an archive-capable RPC before claiming real-world parity.
+- [x] Discover PumpSwap pools from migration events and collect each pool's post-graduation signature history.
+- [x] Decode PumpSwap buy / sell / liquidity / fee-sweep events and replay pool vault reserves.
+- [x] Reconcile PumpSwap pool state, signed virtual quote reserves, retained fees and fee sweeps against current Pool / vault accounts.
+- [ ] Capture and validate confirmed Pump curve → PumpSwap mainnet fixtures with an archive-capable RPC before claiming real-world parity.
 - [ ] Add heterogeneous organic agents and public-information response.
 - [ ] Add isolated defensive scenarios and held-out evaluation.

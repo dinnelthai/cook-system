@@ -92,6 +92,12 @@ export class BorshReader {
     return this.readBytes(8).readBigInt64LE(0);
   }
 
+  readI128() {
+    const bytes = this.readBytes(16);
+    const unsigned = bytes.readBigUInt64LE(0) | (bytes.readBigUInt64LE(8) << 64n);
+    return (unsigned & (1n << 127n)) !== 0n ? unsigned - (1n << 128n) : unsigned;
+  }
+
   readBool() {
     const value = this.readU8();
     if (value !== 0 && value !== 1) {
@@ -124,7 +130,7 @@ function resolveDefinedName(type) {
 function defaultForType(type, typeMap, depth = 0) {
   if (depth > 32) throw new BorshDecodeError("IDL type recursion limit exceeded");
   if (typeof type === "string") {
-    if (["u8", "u16", "u32", "u64", "u128", "i64"].includes(type)) return 0n;
+    if (["u8", "u16", "u32", "u64", "u128", "i64", "i128"].includes(type)) return 0n;
     if (type === "bool") return false;
     if (type === "pubkey") return "11111111111111111111111111111111";
     if (type === "string") return "";
@@ -176,6 +182,7 @@ export function readIdlType(reader, type, typeMap, depth = 0) {
       case "u64": return reader.readU64();
       case "u128": return reader.readU128();
       case "i64": return reader.readI64();
+      case "i128": return reader.readI128();
       case "bool": return reader.readBool();
       case "pubkey": return reader.readPubkey();
       case "string": return reader.readString();

@@ -1,7 +1,9 @@
 import {
   PUMP_PROGRAM_ID,
+  PUMP_AMM_PROGRAM_ID,
   decodeProgramAccount,
 } from "./pump-decoder.mjs";
+import { encodeBase58 } from "./borsh.mjs";
 
 export const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 export const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
@@ -121,5 +123,62 @@ export function normalizeBondingCurveMarket({
     program_version: null,
     idl_revision: idlRevision ?? null,
     market_phase: "bonding_curve",
+  };
+}
+
+
+export function decodePumpSwapPoolAccount(accountInfo) {
+  const owner = accountInfo?.value?.owner;
+  if (owner !== PUMP_AMM_PROGRAM_ID) {
+    const error = new Error(`PumpSwap pool is not owned by Pump AMM: ${owner}`);
+    error.code = "INVALID_PUMP_AMM_POOL_OWNER";
+    throw error;
+  }
+  const decoded = decodeProgramAccount({
+    programId: PUMP_AMM_PROGRAM_ID,
+    data: accountBytes(accountInfo),
+    encoding: "base64",
+  });
+  if (!["DECODED", "PARTIAL_ACCOUNT_LAYOUT"].includes(decoded.status) || decoded.account_name !== "Pool") {
+    const error = new Error(`unable to decode PumpSwap Pool account: ${decoded.status}`);
+    error.code = "PUMP_AMM_POOL_DECODE_FAILED";
+    error.decoded = decoded;
+    throw error;
+  }
+  return {
+    ...decoded,
+    account_address: accountInfo.address ?? null,
+    account_owner: owner,
+    context_slot: accountInfo.context?.slot ?? null,
+    data: {
+      ...decoded.data,
+      virtual_quote_reserves_base_units: decoded.data.virtual_quote_reserves?.toString?.() ?? "0",
+      protocol_fees_base_units: decoded.data.protocol_fees?.toString?.() ?? "0",
+      creator_fees_base_units: decoded.data.creator_fees?.toString?.() ?? "0",
+      lp_supply_base_units: decoded.data.lp_supply?.toString?.() ?? "0",
+    },
+  };
+}
+
+export function decodeTokenAccount(accountInfo) {
+  const ownerProgram = accountInfo?.value?.owner;
+  if (ownerProgram !== SPL_TOKEN_PROGRAM_ID && ownerProgram !== TOKEN_2022_PROGRAM_ID) {
+    const error = new Error(`unsupported token account owner program: ${ownerProgram}`);
+    error.code = "UNSUPPORTED_TOKEN_PROGRAM";
+    throw error;
+  }
+  const bytes = accountBytes(accountInfo);
+  if (bytes.length < 165) throw new RangeError("token account data is shorter than the base SPL Token Account layout");
+  const state = bytes.readUInt8(108);
+  if (state !== 1 && state !== 2) throw new Error("token account is not initialized");
+  return {
+    owner_program_id: ownerProgram,
+    mint: encodeBase58(bytes.subarray(0, 32)),
+    token_authority: encodeBase58(bytes.subarray(32, 64)),
+    amount_base_units: bytes.readBigUInt64LE(64).toString(),
+    state: state === 1 ? "initialized" : "frozen",
+    is_token_2022: ownerProgram === TOKEN_2022_PROGRAM_ID,
+    account_data_length: bytes.length,
+    context_slot: accountInfo.context?.slot ?? null,
   };
 }
