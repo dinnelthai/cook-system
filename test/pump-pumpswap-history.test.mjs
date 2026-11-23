@@ -253,6 +253,9 @@ test("full mint collector follows migration into PumpSwap and reconciles post-gr
   assert.equal(result.status,"REPLAYED_FULL_HISTORY");
   assert.equal(result.pool_replays[0].replay.state.pool_base_reserves_base_units,"900");
   assert.equal(result.pool_replays[0].replay.state.pool_quote_reserves_base_units,"554");
+  assert.equal(result.pool_replays[0].replay.state.virtual_quote_reserves_base_units,"-3");
+  assert.equal(BigInt(result.pool_replays[0].replay.state.pool_quote_reserves_base_units)+BigInt(result.pool_replays[0].replay.state.virtual_quote_reserves_base_units),551n);
+  assert.equal(result.pool_replays[0].trade_balance_reconciliation_complete,true);
   assert.equal(result.pool_replays[0].current_account_reconciliation.status,"PASS");
   assert.equal(result.events.filter(x=>x.event_kind==="POOL_BUY_EXECUTED").length,1);
   assert.equal(result.raw_candles_status,"AVAILABLE");
