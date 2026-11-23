@@ -58,6 +58,7 @@ if (!args.mint) {
         signatures_seen: pool.signature_coverage?.signatures?.length ?? 0,
         fetched_transactions: result.transactions.filter((item) => item.source_addresses.includes(pool.pool_address)).length,
         pool_events: pool.replay?.processed_event_ids?.length ?? 0,
+        trade_balance_reconciliation_complete: pool.trade_balance_reconciliation_complete,
         current_account_reconciliation: pool.current_account_reconciliation?.status ?? null,
         unresolved_events: pool.unresolved_events.length,
       })),
