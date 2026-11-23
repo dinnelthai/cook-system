@@ -48,7 +48,7 @@ The Pump IDL metadata version is not sufficient to identify an on-chain deployme
 - Dynamic fee configuration snapshots and fee-tier changes.
 - V3 fee accrual and later fee-sweep events.
 - Ordinary non-Mayhem curve completion.
-- Mayhem flag recognition and a fail-closed unsupported branch until dedicated tests pass.
+- Mayhem flag recognition and raw observed-event decoding. Mayhem quote simulation must use its own partial-fill semantics; it must not use ordinary synthetic migration.
 - Curve account snapshots and event-to-account reconciliation.
 
 ### Deferred
@@ -155,6 +155,10 @@ Pin `@pump-fun/pump-sdk` 4.1.0 in the adapter test environment. Use its public q
 - V3 quote that crosses the completion boundary.
 
 The Cook adapter remains a deterministic state / event normalizer. SDK outputs must be checked against recorded execution events and account deltas; the SDK is not a substitute for source-event provenance.
+
+### 6.4 Interface-level platform fees are not Pump protocol fees
+
+Pump.fun's published fee page states that, from 2026-10-17, the Pump.fun web and mobile apps charge an additional 0.45% platform fee for wallets without a referral code or 0.40% for wallets with a referral code. The same page says this fee does not apply to trades placed through Terminal or third-party interfaces. This is an interface-level fee, not a Pump on-chain `FeeConfig` tier and not a field that should be inferred from `TradeEvent`. If the simulator models a specific app route, store this as a separate off-chain execution-cost overlay; never merge it into protocol / creator fee bps.
 
 ## 7. Dynamic fee history
 
