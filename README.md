@@ -110,12 +110,15 @@ The first core slice currently includes:
 - [x] Add the initial IDL-driven Pump Legacy / V2 / V3 decoder and account / event decoders.
 - [x] Add the initial FeeConfig tier resolver and stale-history guard.
 - [x] Add deterministic event ordering, curve-state replay, and snapshot reconciliation for normalized inputs.
-- [x] Verify the Node.js 22 test suite in GitHub Actions: 50 passed, 0 failed.
+- [x] Verify the Node.js 22 test suite in GitHub Actions: 55 passed, 0 failed.
 - [x] Differential-test exact buy / sell and V3 migration quote calculations against Pump SDK 4.3.1.
 - [ ] Validate captured confirmed TradeEvent and account-delta fixtures against mainnet history.
 - [x] Implement exact-token-out buys and exact-token-in sells.
 - [x] Add V3 synthetic-migration curve / PumpSwap pool quote legs and Mayhem partial-fill handling.
 - [x] Add RPC history collection, transaction parsing, balance reconciliation and fixture capture tooling.
-- [ ] Capture and validate confirmed real-chain fixtures with an archive-capable RPC before claiming real-world parity.
+- [x] Discover PumpSwap pools from migration events and collect each pool's post-graduation signature history.
+- [x] Decode PumpSwap buy / sell / liquidity / fee-sweep events and replay pool vault reserves.
+- [x] Reconcile PumpSwap pool state, signed virtual quote reserves, retained fees and fee sweeps against current Pool / vault accounts.
+- [ ] Capture and validate confirmed Pump curve → PumpSwap mainnet fixtures with an archive-capable RPC before claiming real-world parity.
 - [ ] Add heterogeneous organic agents and public-information response.
 - [ ] Add isolated defensive scenarios and held-out evaluation.
