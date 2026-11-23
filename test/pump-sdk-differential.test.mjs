@@ -15,24 +15,24 @@ import {
   quoteV3ExactQuoteInBuy,
 } from "../src/adapters/pump/quote-engine.mjs";
 
-const fees = { protocolFeeBps: 100, creatorFeeBps: 50 };
+const fees = { protocolFeeBps: 100, creatorFeeBps: 0 };
 const bn = (value) => new BN(String(value));
 const publicKey = (value) => new PublicKey(value);
 const defaultKey = PublicKey.default;
 const global = {
   feeBasisPoints: bn(100),
-  creatorFeeBasisPoints: bn(50),
+  creatorFeeBasisPoints: bn(0),
   poolMigrationFee: bn(10),
   buybackBasisPoints: bn(0),
 };
 const feeConfig = {
-  flatFees: { lpFeeBps: bn(0), protocolFeeBps: bn(100), creatorFeeBps: bn(50) },
+  flatFees: { lpFeeBps: bn(0), protocolFeeBps: bn(100), creatorFeeBps: bn(0) },
   feeTiers: [{
     marketCapLamportsThreshold: bn(0),
-    fees: { lpFeeBps: bn(0), protocolFeeBps: bn(100), creatorFeeBps: bn(50) },
+    fees: { lpFeeBps: bn(0), protocolFeeBps: bn(100), creatorFeeBps: bn(0) },
   }],
   stableFeeTiers: [],
-  exoticFlatFees: { lpFeeBps: bn(0), protocolFeeBps: bn(100), creatorFeeBps: bn(50) },
+  exoticFlatFees: { lpFeeBps: bn(0), protocolFeeBps: bn(100), creatorFeeBps: bn(0) },
 };
 const bondingCurve = {
   virtualTokenReserves: bn(1000),
