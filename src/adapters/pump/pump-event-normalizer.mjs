@@ -81,6 +81,7 @@ export function normalizePumpTradeEvent({
   curveAccount = null,
   instructionName = null,
   accountStateReconciled = false,
+  reconciliationRef = null,
   pricePrecision = 24,
 }) {
   if (!decodedEvent || decodedEvent.status !== "DECODED" || decodedEvent.event_name !== "TradeEvent") {
@@ -91,7 +92,7 @@ export function normalizePumpTradeEvent({
   if (typeof signature !== "string" || signature.length === 0) {
     throw new TypeError("transaction signature is required");
   }
-  if (!["mainnet", "devnet", "local_sim"].includes(network)) {
+  if (!["mainnet", "devnet"].includes(network)) {
     throw new TypeError("unsupported network");
   }
   if (!["rpc", "indexer", "manual_import"].includes(sourceType)) {
@@ -129,15 +130,15 @@ export function normalizePumpTradeEvent({
   const creatorFee = asUnsignedBigInt(data.creator_fee ?? 0n, "creator_fee");
   const buybackFee = asUnsignedBigInt(data.buyback_fee ?? 0n, "buyback_fee");
   const virtualTokenReserves = asUnsignedBigInt(data.virtual_token_reserves, "virtual_token_reserves");
-  const virtualQuoteReserves = asUnsignedBigInt(
-    data.virtual_quote_reserves ?? data.virtual_sol_reserves,
-    "virtual_quote_reserves",
-  );
+  const eventVirtualQuote = asUnsignedBigInt(data.virtual_quote_reserves ?? 0n, "virtual_quote_reserves");
+  const virtualQuoteReserves = eventVirtualQuote > 0n
+    ? eventVirtualQuote
+    : asUnsignedBigInt(data.virtual_sol_reserves ?? 0n, "virtual_sol_reserves");
   const realTokenReserves = asUnsignedBigInt(data.real_token_reserves, "real_token_reserves");
-  const realQuoteReserves = asUnsignedBigInt(
-    data.real_quote_reserves ?? data.real_sol_reserves,
-    "real_quote_reserves",
-  );
+  const eventRealQuote = asUnsignedBigInt(data.real_quote_reserves ?? 0n, "real_quote_reserves");
+  const realQuoteReserves = eventRealQuote > 0n
+    ? eventRealQuote
+    : asUnsignedBigInt(data.real_sol_reserves ?? 0n, "real_sol_reserves");
 
   const priceNumerator = quoteAmount * (10n ** BigInt(tokenScale));
   const priceDenominator = tokenAmount * (10n ** BigInt(quoteScale));
@@ -164,6 +165,8 @@ export function normalizePumpTradeEvent({
   }
   if (!accountStateReconciled) {
     warnings.push("TradeEvent has not yet been reconciled with authoritative transaction account deltas");
+  } else if (typeof reconciliationRef !== "string" || reconciliationRef.length === 0) {
+    throw new TypeError("reconciliationRef is required when accountStateReconciled is true");
   }
 
   const feeComponents = [];
@@ -235,10 +238,10 @@ export function normalizePumpTradeEvent({
       },
     },
     quality: {
-      is_complete: eventOrdering.complete,
+      is_complete: warnings.length === 0,
       validation_status: warnings.length === 0 ? "valid" : "warning",
       warnings,
-      reconciliation_ref: accountStateReconciled ? `${signature}:account-delta-reconciliation` : null,
+      reconciliation_ref: accountStateReconciled ? reconciliationRef : null,
     },
   };
 
