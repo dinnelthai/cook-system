@@ -130,6 +130,17 @@ function buildWithdrawEvent() {
   ]);
 }
 
+
+function buildBoostBuyAndBurnEvent() {
+  return Buffer.concat([
+    disc(snapshot.pump_amm.events,"BoostBuyAndBurnEvent"),
+    i64(1_700_000_105),
+    pubkey(BASE_MINT),pubkey(ZERO),pubkey(POOL),pubkey(USER),
+    u64(60),u64(50),u64(100),i128(0),
+    u64(550),u64(900),u64(1000),
+  ]);
+}
+
 function buildSweepPoolFeeEvent(bucket=0, amount=2) {
   return Buffer.concat([
     disc(snapshot.pump_amm.events,"SweepPoolFeeEvent"),
@@ -354,6 +365,34 @@ test("PumpSwap SweepPoolFeeEvent decodes protocol and creator fee buckets",()=>{
   assert.equal(protocol.payload.amount_base_units,"2");
   assert.equal(creator.payload.fee_bucket,1);
   assert.equal(creator.payload.amount_base_units,"3");
+});
+
+test("PumpSwap boost buy-and-burn applies explicit post-reserve state without counting swap volume",()=>{
+  const parsed=parsePoolEvent(buildBoostBuyAndBurnEvent(),"pool-boost-buy-burn");
+  assert.equal(parsed.status,"DECODED");
+  const event=parsed.events[0];
+  assert.equal(event.event_kind,"POOL_BOOST_BUY_BURN");
+  assert.equal(event.payload.token_amount_base_units,"100");
+  assert.equal(event.payload.quote_amount_base_units,"50");
+  assert.equal(event.payload.pool_reserves_after.pool_base_reserves_base_units,"900");
+  event.payload.pool_vault_deltas={
+    base_delta_base_units:"-100",
+    quote_delta_base_units:"50",
+  };
+  const initial=createInitialPumpSwapPoolState({
+    poolCreatedEvent:poolCreatedEvent(),
+    decodedPool:{data:{
+      virtual_quote_reserves_base_units:"0",
+      protocol_fees_base_units:"0",
+      creator_fees_base_units:"0",
+    }},
+  });
+  const replay=replayPumpSwapPoolEvents(initial,[event]);
+  assert.equal(replay.status,"PASS");
+  assert.equal(replay.state.pool_base_reserves_base_units,"900");
+  assert.equal(replay.state.pool_quote_reserves_base_units,"550");
+  assert.equal(replay.state.trade_count,0);
+  assert.equal(replay.state.boost_transition_count,1);
 });
 
 test("PumpSwap Pool account and token vault account decoders read current state",()=>{
