@@ -32,6 +32,7 @@ if (!args.mint) {
       concurrency: Number(args.concurrency ?? 5),
       until: args.until ?? null,
       includeRawTransactions: args["include-raw"] === true,
+      includeFeeConfigHistory: args["fee-history"] === true,
     });
     const json = JSON.stringify(result, (_, value) => typeof value === "bigint" ? value.toString() : value, 2);
     if (args.out) {
