@@ -153,13 +153,10 @@ function baseEvent({
 function reserveBefore(data) {
   const base = uint(data.pool_base_token_reserves, "pool_base_token_reserves");
   const quote = uint(data.pool_quote_token_reserves, "pool_quote_token_reserves");
-  const virtualQuote = signed(data.virtual_quote_reserves ?? 0n, "virtual_quote_reserves");
-  if (quote + virtualQuote <= 0n) throw new RangeError("effective quote reserves must be positive");
+  if (quote <= 0n) throw new RangeError("raw quote vault reserves must be positive");
   return {
     pool_base_reserves_base_units: base.toString(),
     pool_quote_reserves_base_units: quote.toString(),
-    virtual_quote_reserves_base_units: virtualQuote.toString(),
-    effective_quote_reserves_base_units: (quote + virtualQuote).toString(),
     observation: "pre_swap",
   };
 }
@@ -232,6 +229,7 @@ export function normalizePumpSwapTradeEvent({
         creator_fees_base_units: isV2 ? creatorFee.toString() : "0",
       },
       pool_reserves_before: reserve,
+      virtual_quote_reserves_reported_base_units: signed(data.virtual_quote_reserves ?? 0n, "virtual_quote_reserves").toString(),
       pool_vault_accounts: {
         base: poolMetadata.pool_base_token_account ?? null,
         quote: poolMetadata.pool_quote_token_account ?? null,
