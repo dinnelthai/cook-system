@@ -94,6 +94,78 @@ function poolCreatedEvent() {
   };
 }
 
+
+function buildSellEvent() {
+  return Buffer.concat([
+    disc(snapshot.pump_amm.events,"SellEvent"),
+    i64(1_700_000_101),
+    u64(100),u64(40),u64(0),u64(0),u64(1000),u64(500),
+    u64(50),u64(100),u64(2),u64(100),u64(2),u64(48),u64(45),
+    pubkey(POOL),pubkey(USER),pubkey(USER_BASE),pubkey(USER_QUOTE),
+    pubkey(ZERO),pubkey(ZERO),pubkey(USER),u64(50),u64(1),
+    u64(0),u64(0),u64(0),u64(1),i128(-3),u8(1),
+    u64(1_000_000),u64(0),u64(0),u64(1),
+  ]);
+}
+
+function buildDepositEvent() {
+  return Buffer.concat([
+    disc(snapshot.pump_amm.events,"DepositEvent"),
+    i64(1_700_000_102),
+    u64(10),u64(120),u64(60),
+    u64(0),u64(0),u64(1000),u64(500),
+    u64(100),u64(50),u64(1000),
+    pubkey(POOL),pubkey(USER),pubkey(USER_BASE),pubkey(USER_QUOTE),pubkey(USER),
+  ]);
+}
+
+function buildWithdrawEvent() {
+  return Buffer.concat([
+    disc(snapshot.pump_amm.events,"WithdrawEvent"),
+    i64(1_700_000_103),
+    u64(10),u64(80),u64(40),
+    u64(0),u64(0),u64(1000),u64(500),
+    u64(100),u64(50),u64(1000),
+    pubkey(POOL),pubkey(USER),pubkey(USER_BASE),pubkey(USER_QUOTE),pubkey(USER),
+  ]);
+}
+
+function buildSweepPoolFeeEvent(bucket=0, amount=2) {
+  return Buffer.concat([
+    disc(snapshot.pump_amm.events,"SweepPoolFeeEvent"),
+    i64(1_700_000_104),pubkey(POOL),pubkey(BASE_MINT),pubkey(QUOTE_MINT),
+    pubkey(USER),pubkey(USER),u64(amount),u8(bucket),
+  ]);
+}
+
+function parsePoolEvent(bytes, signature) {
+  return decodePumpTransaction({
+    transaction:{
+      slot:30,
+      transaction:{signatures:[signature],message:{accountKeys:[]}},
+      meta:{
+        err:null,fee:0,preBalances:[],postBalances:[],
+        preTokenBalances:[],postTokenBalances:[],
+        innerInstructions:[],loadedAddresses:{writable:[],readonly:[]},
+        logMessages:[
+          `Program ${PUMP_AMM_PROGRAM_ID} invoke [1]`,
+          `Program data: ${bytes.toString("base64")}`,
+          `Program ${PUMP_AMM_PROGRAM_ID} success`,
+        ],
+      },
+    },
+    signature,
+    transactionIndex:0,
+    poolMetadataByAddress:{
+      [POOL]:{
+        pool_address:POOL,base_mint:BASE_MINT,quote_mint:QUOTE_MINT,
+        base_mint_decimals:6,quote_mint_decimals:9,
+        pool_base_token_account:BASE_VAULT,pool_quote_token_account:QUOTE_VAULT,
+      },
+    },
+  });
+}
+
 function makeTransaction() {
   const keys=[
     POOL,USER,GLOBAL_CONFIG,BASE_MINT,QUOTE_MINT,USER_BASE,USER_QUOTE,
@@ -249,6 +321,39 @@ test("PumpSwap v2 fee sweeps move virtual reserves opposite to quote-vault balan
     BigInt(replay.state.pool_quote_reserves_base_units)+BigInt(replay.state.virtual_quote_reserves_base_units),
     551n,
   );
+});
+
+test("PumpSwap SellEvent uses actual user quote output and signed virtual reserves",()=>{
+  const parsed=parsePoolEvent(buildSellEvent(),"pool-sell");
+  assert.equal(parsed.status,"DECODED");
+  const event=parsed.events[0];
+  assert.equal(event.event_kind,"POOL_SELL_EXECUTED");
+  assert.equal(event.payload.token_amount_base_units,"100");
+  assert.equal(event.payload.quote_amount_base_units,"45");
+  assert.equal(event.payload.virtual_quote_reserves_reported_base_units,"-3");
+  assert.equal(event.payload.pool_trade_version,"v2");
+});
+
+test("PumpSwap deposit and withdraw events preserve pre-operation reserves",()=>{
+  const deposit=parsePoolEvent(buildDepositEvent(),"pool-deposit").events[0];
+  const withdraw=parsePoolEvent(buildWithdrawEvent(),"pool-withdraw").events[0];
+  assert.equal(deposit.event_kind,"POOL_LIQUIDITY_ADDED");
+  assert.equal(deposit.payload.base_amount_base_units,"100");
+  assert.equal(deposit.payload.quote_amount_base_units,"50");
+  assert.equal(deposit.payload.pool_reserves_before.pool_base_reserves_base_units,"1000");
+  assert.equal(withdraw.event_kind,"POOL_LIQUIDITY_REMOVED");
+  assert.equal(withdraw.payload.base_amount_base_units,"100");
+  assert.equal(withdraw.payload.quote_amount_base_units,"50");
+});
+
+test("PumpSwap SweepPoolFeeEvent decodes protocol and creator fee buckets",()=>{
+  const protocol=parsePoolEvent(buildSweepPoolFeeEvent(0,2),"pool-sweep-protocol").events[0];
+  const creator=parsePoolEvent(buildSweepPoolFeeEvent(1,3),"pool-sweep-creator").events[0];
+  assert.equal(protocol.event_kind,"POOL_FEE_MOVEMENT");
+  assert.equal(protocol.payload.fee_bucket,0);
+  assert.equal(protocol.payload.amount_base_units,"2");
+  assert.equal(creator.payload.fee_bucket,1);
+  assert.equal(creator.payload.amount_base_units,"3");
 });
 
 test("PumpSwap Pool account and token vault account decoders read current state",()=>{
