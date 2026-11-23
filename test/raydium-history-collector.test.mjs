@@ -34,6 +34,8 @@ const SWAP_SIG="cpmm-swap";
 function u8(v){const b=Buffer.alloc(1);b.writeUInt8(v);return b;}
 function u16(v){const b=Buffer.alloc(2);b.writeUInt16LE(v);return b;}
 function u64(v){const b=Buffer.alloc(8);b.writeBigUInt64LE(BigInt(v));return b;}
+function u32(v){const b=Buffer.alloc(4);b.writeUInt32LE(v);return b;}
+function str(v){const b=Buffer.from(v);return Buffer.concat([u32(b.length),b]);}
 function pubkey(v){const b=decodeBase58(v);assert.equal(b.length,32);return b;}
 function b64(b){return b.toString("base64");}
 function b58(bytes){
@@ -91,6 +93,15 @@ function cpmmPoolInfo(){
   ]);
   return {context:{slot:110},value:{owner:RAYDIUM_CPMM_PROGRAM_ID,data:[b64(b),"base64"]}};
 }
+function launchPoolCreateEvent(){
+  return Buffer.concat([
+    disc(launchpadIdl.events,"PoolCreateEvent"),
+    pubkey(LAUNCH_POOL),pubkey(USER),pubkey(ZERO),
+    u8(6),str("Moon Cat"),str("MCAT"),str("https://example.invalid/mcat"),
+    u8(0),u64(1_000_000_000),u64(793_100_000),u64(85_000_000),u8(1),
+    u64(0),u64(0),u64(0),u8(0),
+  ]);
+}
 function launchTradeEvent(){
   return Buffer.concat([
     disc(launchpadIdl.events,"TradeEvent"),
@@ -134,7 +145,7 @@ function eventTx(signature,slot,blockTime,programId,poolAddress,eventBytes,balan
     },
   };
 }
-function createOrMigrationTx(signature,slot,blockTime,instruction=null,balances=[]){
+function createOrMigrationTx(signature,slot,blockTime,instruction=null,balances=[],innerInstructions=[]){
   const keys=[RAYDIUM_LAUNCHLAB_PROGRAM_ID,LAUNCH_POOL,USER,MINT,WSOL,
     ...balances.map(x=>x.address)];
   const pre=balances.filter(x=>x.pre!==null).map(x=>({
@@ -165,7 +176,12 @@ function createOrMigrationTx(signature,slot,blockTime,instruction=null,balances=
         preBalances:Array(accountKeys.length).fill(0),postBalances:Array(accountKeys.length).fill(0),
         preTokenBalances:pre.map(x=>({...x,accountIndex:accountKeys.indexOf(keys[x.accountIndex])})),
         postTokenBalances:post.map(x=>({...x,accountIndex:accountKeys.indexOf(keys[x.accountIndex])})),
-        innerInstructions:[],loadedAddresses:{writable:[],readonly:[]},logMessages:[],
+        innerInstructions:innerInstructions.length?[{index:0,instructions:innerInstructions.map(item=>({
+          programIdIndex:accountKeys.indexOf(item.programId),
+          accounts:item.accounts??[],
+          data:b58(item.data),
+        }))}]:[],
+        loadedAddresses:{writable:[],readonly:[]},logMessages:[],
       },
     };
   }
@@ -176,7 +192,12 @@ function createOrMigrationTx(signature,slot,blockTime,instruction=null,balances=
       err:null,fee:5000,
       preBalances:Array(keys.length).fill(0),postBalances:Array(keys.length).fill(0),
       preTokenBalances:pre,postTokenBalances:post,
-      innerInstructions:[],loadedAddresses:{writable:[],readonly:[]},logMessages:[],
+      innerInstructions:innerInstructions.length?[{index:0,instructions:innerInstructions.map(item=>({
+        programIdIndex:keys.indexOf(item.programId),
+        accounts:item.accounts??[],
+        data:b58(item.data),
+      }))}]:[],
+      loadedAddresses:{writable:[],readonly:[]},logMessages:[],
     },
   };
 }
@@ -190,7 +211,11 @@ test("collector follows a LaunchLab pool through CPMM migration, swaps, and vaul
   const launchCreate=createOrMigrationTx(CREATE_SIG,98,1_795_371_300,null,[
     {address:LAUNCH_BASE_VAULT,mint:MINT,pre:null,post:1000},
     {address:LAUNCH_QUOTE_VAULT,mint:WSOL,pre:null,post:100},
-  ]);
+  ],[{
+    programId:RAYDIUM_LAUNCHLAB_PROGRAM_ID,
+    accounts:[1],
+    data:Buffer.concat([Buffer.from("e445a52e51cb9a1d","hex"),launchPoolCreateEvent()]),
+  }]);
   const launchTrade=eventTx(TRADE_SIG,99,1_795_371_301,RAYDIUM_LAUNCHLAB_PROGRAM_ID,LAUNCH_POOL,launchTradeEvent(),[
     {address:LAUNCH_BASE_VAULT,mint:MINT,pre:1000,post:900},
     {address:LAUNCH_QUOTE_VAULT,mint:WSOL,pre:100,post:110},
@@ -210,7 +235,14 @@ test("collector follows a LaunchLab pool through CPMM migration, swaps, and vaul
     {address:LAUNCH_QUOTE_VAULT,mint:WSOL,pre:110,post:0},
     {address:CPMM_BASE_VAULT,mint:MINT,pre:null,post:900},
     {address:CPMM_QUOTE_VAULT,mint:WSOL,pre:null,post:110},
-  ]);
+  ],[{
+    programId:RAYDIUM_CPMM_PROGRAM_ID,
+    accounts:[],
+    data:Buffer.concat([
+      disc(cpmmIdl.instructions,"initialize"),
+      u64(110),u64(900),u64(0),
+    ]),
+  }]);
   const cpmmSwap=eventTx(SWAP_SIG,101,1_795_371_303,RAYDIUM_CPMM_PROGRAM_ID,CPMM_POOL,cpmmSwapEvent(),[
     {address:CPMM_BASE_VAULT,mint:MINT,pre:900,post:850},
     {address:CPMM_QUOTE_VAULT,mint:WSOL,pre:110,post:115},
