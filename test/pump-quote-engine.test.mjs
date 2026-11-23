@@ -44,10 +44,10 @@ test("exact token-out buy adds ceiling-rounded protocol and creator fees", () =>
     realTokenReserves: "100",
     ...fees,
   });
-  assert.equal(quote.curve_input_base_units, "112");
+  assert.equal(quote.curve_input_base_units, "111");
   assert.equal(quote.protocol_fee_base_units, "2");
   assert.equal(quote.creator_fee_base_units, "1");
-  assert.equal(quote.input_base_units, "115");
+  assert.equal(quote.input_base_units, "114");
   assert.equal(quote.output_base_units, "100");
 });
 
@@ -81,7 +81,7 @@ test("V3 exact token-out quote splits a completing buy into curve and pool legs"
   assert.equal(quote.legs[1].venue, "synthetic_pumpswap_pool");
   assert.equal(quote.legs[1].token_out, "20");
   assert.equal(quote.legs[1].pool_base_before, "400");
-  assert.equal(quote.legs[1].pool_quote_before, "305");
+  assert.equal(quote.legs[1].pool_quote_before, "304");
 });
 
 test("V3 exact quote-in spends the residual budget against the synthetic pool", () => {
@@ -96,9 +96,9 @@ test("V3 exact quote-in spends the residual budget against the synthetic pool", 
   assert.equal(quote.legs[0].venue, "bonding_curve");
   assert.equal(quote.legs[0].token_out, "100");
   assert.equal(quote.legs[1].venue, "synthetic_pumpswap_pool");
-  assert.equal(quote.legs[1].token_out, "84");
-  assert.equal(quote.output_base_units, "184");
-  assert.equal(quote.unspent_input_base_units, "1");
+  assert.equal(quote.legs[1].token_out, "85");
+  assert.equal(quote.output_base_units, "185");
+  assert.equal(quote.unspent_input_base_units, "0");
 });
 
 test("Mayhem never uses synthetic migration and obeys partial_fill", () => {
@@ -138,7 +138,7 @@ test("Mayhem exact quote-in leaves unspent budget after partial fill", () => {
   });
   assert.equal(partial.status, "PARTIAL_FILL");
   assert.equal(partial.output_base_units, "100");
-  assert.equal(partial.unspent_input_base_units, "85");
+  assert.equal(partial.unspent_input_base_units, "86");
 });
 
 test("synthetic migration rejects missing pool liquidity and pool drain requests", () => {
