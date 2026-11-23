@@ -18,6 +18,7 @@ V1.2 adds the first source-driven adapter layer:
 - Program-scoped Program data log extraction.
 - Dynamic fee tier selection using the Pump Fees FeeConfig.
 - Historical fee-config timeline invalidation when a fee update event occurs without a subsequent full account snapshot.
+- Helpers that convert decoded FeeConfig account snapshots and decoded Pump Fees update events into historical timeline records.
 - Exact integer quote-in calculation for the documented SOL exact-quote-in formula.
 - Canonical normalization of decoded TradeEvent records into the MarketEvent contract, with explicit token / quote decimals, deterministic event IDs, fee components, post-curve state and reconciliation warnings.
 
@@ -82,6 +83,8 @@ Exports:
 - resolveBondingCurveFees(...)
 - buildFeeConfigTimeline(...)
 - resolveFeeConfigAt(...)
+- feeConfigSnapshotRecordFromDecodedAccount(...)
+- feeConfigChangeRecordFromDecodedEvent(...)
 - quoteExactSolIn(...)
 
 For a SOL-paired bonding curve:
@@ -106,7 +109,7 @@ All calculations use BigInt. The buyback fee is a split of the protocol fee, not
 
 ## 5. Historical fee configuration
 
-Fee configuration updates such as UpsertFeeTiersEvent, UpdateFeeConfigEvent, UpsertStableFeeTiersEvent, UpdateStableFeeConfigEvent, and SetExoticFlatFeesEvent are decoded as change signals.
+Fee configuration updates such as InitializeFeeConfigEvent, UpsertFeeTiersEvent, UpdateFeeConfigEvent, UpsertStableFeeTiersEvent, UpdateStableFeeConfigEvent, and SetExoticFlatFeesEvent are decoded as change signals. The snapshot / change helper functions connect the Borsh-decoded Pump Fees records directly to the timeline builder.
 
 A change signal invalidates the last known snapshot. The adapter waits for a subsequent authoritative FeeConfig account snapshot before marking the configuration available again. This intentionally favors an explicit unknown fee state over silently applying today's tiers to historical trades.
 
@@ -134,9 +137,10 @@ test/pump-adapter.test.mjs covers:
 - Market-cap and fee-tier threshold boundaries.
 - FeeConfig-first resolution and Global fallback.
 - Stale fee-config timeline behavior.
+- Decoded FeeConfig snapshots plus decoded update-event timeline construction.
 - Exact SOL-in integer rounding.
 
-The repository includes a Node.js 22 GitHub Actions workflow for npm test. The latest verified run passed all 23 tests (8 core replay tests and 15 Pump adapter / normalization / integration tests). Earlier failures exposed and fixed nested Borsh defined-struct unwrapping, a malformed test-fixture newline, and a missing test import; the current green run is the authoritative status.
+The repository includes a Node.js 22 GitHub Actions workflow for npm test. The latest verified run passed all 24 tests (8 core replay tests and 16 Pump adapter / normalization / integration tests). Earlier failures exposed and fixed nested Borsh defined-struct unwrapping, a malformed test-fixture newline, and a missing test import; the current green run is the authoritative status.
 
 ## 8. Next steps
 
