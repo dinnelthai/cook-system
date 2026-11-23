@@ -6,9 +6,9 @@ import {
   PUMP_FEES_PROGRAM_ID,
   decodePumpInstruction,
   decodeProgramEvent,
-  decodeBase58,
   encodeBase58,
 } from "../src/adapters/pump/pump-decoder.mjs";
+import { decodeBase58 } from "../src/adapters/pump/borsh.mjs";
 import { decodePumpTransaction } from "../src/adapters/pump/pump-transaction-parser.mjs";
 import {
   reconcilePumpTradesWithTransaction,
@@ -63,7 +63,7 @@ function buildCreateEvent() {
   ]);
 }
 
-function buildTradeEvent() {
+function buildTradeEvent({ realTokenReserves = 500_000 } = {}) {
   const ixName = Buffer.from("buy_v3");
   return Buffer.concat([
     discriminator(snapshot.pump.events, "TradeEvent"),
@@ -76,7 +76,7 @@ function buildTradeEvent() {
     u64(2_000_000),
     u64(1_000_000),
     u64(100_000),
-    u64(500_000),
+    u64(realTokenReserves),
     pubkey(ZERO_KEY),
     u64(100),
     u64(5),
