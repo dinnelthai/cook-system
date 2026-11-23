@@ -19,14 +19,17 @@ async function mapLimit(items, limit, mapper) {
 }
 
 async function collectSignatures(rpc, address, { maxSignatures, pageSize, commitment }) {
+  if (!Number.isSafeInteger(maxSignatures) || maxSignatures < 1) throw new RangeError("maxSignatures must be positive");
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) throw new RangeError("pageSize must be between 1 and 1000");
   const signatures = [];
   let before;
   let exhausted = false;
   while (signatures.length < maxSignatures) {
+    const requested = Math.min(pageSize, maxSignatures - signatures.length);
     const page = await rpc.getSignaturesForAddress(address, {
       commitment,
       before,
-      limit: Math.min(pageSize, maxSignatures - signatures.length),
+      limit: requested,
     });
     if (!page.length) {
       exhausted = true;
@@ -34,10 +37,11 @@ async function collectSignatures(rpc, address, { maxSignatures, pageSize, commit
     }
     signatures.push(...page);
     before = page.at(-1).signature;
-    if (page.length < pageSize) {
+    if (page.length < requested) {
       exhausted = true;
       break;
     }
+    if (signatures.length >= maxSignatures) break;
   }
   return { signatures, exhausted, stopped_at_limit: signatures.length >= maxSignatures && !exhausted };
 }
