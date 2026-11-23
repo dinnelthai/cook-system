@@ -360,8 +360,8 @@ test("V3 retained fees accrue on the curve and sweep events debit the correct bu
     `Program ${PUMP_PROGRAM_ID} invoke [1]`,
     `Program data: ${buildCreateEvent().toString("base64")}`,
     `Program data: ${buildTradeEvent().toString("base64")}`,
-    `Program data: ${buildSweepFeeEvent(0, 100).toString("base64")}`,
-    `Program data: ${buildSweepFeeEvent(1, 50).toString("base64")}`,
+    `Program data: ${buildSweepFeeEvent(0, 5).toString("base64")}`,
+    `Program data: ${buildSweepFeeEvent(1, 3).toString("base64")}`,
     `Program ${PUMP_PROGRAM_ID} success`,
   ];
   const transaction = makeTransaction({ logs });
@@ -378,8 +378,8 @@ test("V3 retained fees accrue on the curve and sweep events debit the correct bu
   assert.equal(replay.state.creator_fees_base_units, "0");
   assert.equal(replay.state.fee_movement_count, 2);
   const trade = parsed.events.find((event) => event.event_kind === "CURVE_BUY_EXECUTED");
-  assert.equal(trade.payload.fee_balances_delta.protocol_fees_base_units, "100");
-  assert.equal(trade.payload.fee_balances_delta.creator_fees_base_units, "50");
+  assert.equal(trade.payload.fee_balances_delta.protocol_fees_base_units, "5");
+  assert.equal(trade.payload.fee_balances_delta.creator_fees_base_units, "3");
 });
 
 test("transaction balance delta extraction aggregates token accounts by owner and mint", () => {
