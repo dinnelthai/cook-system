@@ -92,7 +92,7 @@ function poolBuyEvent() {
     pubkey(POOL),pubkey(USER),pubkey(USER_BASE),pubkey(USER_QUOTE),
     pubkey(ZERO),pubkey(ZERO),pubkey(USER),u64(50),u64(1),u8(1),
     u64(0),u64(0),u64(0),i64(1_700_000_100),u64(90),str("buy_v2"),
-    u64(0),u64(0),u64(0),u64(1),i128(0),u8(0),u64(1_000_000),
+    u64(0),u64(0),u64(0),u64(1),i128(-3),u8(0),u64(1_000_000),
     u64(0),u64(0),u64(1),
   ]);
 }
@@ -122,7 +122,7 @@ function poolAccountInfo() {
     Buffer.from(account.discriminator),
     u8(1),u16(0),pubkey(USER),pubkey(MINT),pubkey("So11111111111111111111111111111111111111112"),
     pubkey(USER),pubkey(BASE_VAULT),pubkey(QUOTE_VAULT),u64(1000),pubkey(USER),
-    u8(0),u8(0),i128(0),u64(50),u8(0),u8(0),u64(2),u64(1),
+    u8(0),u8(0),i128(-3),u64(50),u8(0),u8(0),u64(2),u64(1),
   ]);
   return {context:{slot:102},value:{owner:PUMP_AMM_PROGRAM_ID,data:[bytes.toString("base64"),"base64"]}};
 }
