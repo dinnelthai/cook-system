@@ -25,9 +25,10 @@ This repository is for defensive research, data analysis, and offline simulation
 5. Make every simulation reproducible through explicit seeds and scenario metadata.
 6. Keep synthetic events clearly labeled and separate from real chain data.
 
-## V1 specification
+## V1 research documents
 
-See [Inner Market Adversarial Simulator — V1](docs/research/inner-market-adversarial-simulator-v1.md).
+- [Inner Market Adversarial Simulator — V1](docs/research/inner-market-adversarial-simulator-v1.md)
+- [Inner Market Mathematical Model — V1](docs/research/inner-market-math-model-v1.md)
 
 ## Planned work
 
