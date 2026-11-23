@@ -53,9 +53,9 @@ The parser normalizes:
 - `WithdrawEvent` → `POOL_LIQUIDITY_REMOVED`
 - `SweepPoolFeeEvent` → `POOL_FEE_MOVEMENT`
 
-Trade events include the pool, actor, base / quote mints, base and quote amounts, execution price, fee components, pool vault addresses, and the pool reserve observation.
+Trade events include the pool, actor, base / quote mints, base and quote amounts, execution price, fee components, pool vault addresses, raw reserve observations and the signed virtual-quote observation.
 
-PumpSwap BuyEvent / SellEvent reserve fields are treated as **pre-swap observations**, not post-swap balances. Post-state is reconstructed from the pool base / quote token-account deltas in the transaction metadata. The collector does not infer post-state from the trader's gross quote amount because fees and fee transfers can make those amounts differ.
+PumpSwap BuyEvent / SellEvent raw `pool_base_token_reserves` and `pool_quote_token_reserves` are treated as **pre-swap observations**, not post-swap balances. Post-state is reconstructed from the pool base / quote token-account deltas in transaction metadata. The collector does not infer post-state from the trader's gross quote amount because fees and fee transfers can make those amounts differ. The appended `virtual_quote_reserves` event value is checked against both the replayed pre-operation and post-operation values; the implementation does not assume which side of the state mutation the log captured.
 
 Actor base / quote token deltas, pool base-vault deltas, and pool quote-vault direction are reconciled independently.
 
@@ -77,6 +77,8 @@ The current account reconciliation compares replayed state with:
 - `Pool.virtual_quote_reserves`
 - The current base token vault amount
 - The current quote token vault amount
+
+The initial boost-reserve baseline is derived from the current-account invariant `boost_reserves = virtual_quote_reserves + protocol_fees + creator_fees`. The replay then subtracts protocol / creator fees retained by V2 trades from signed virtual quote reserves and adds them back when the corresponding fee bucket is swept. This preserves the boost-reserve invariant while the raw vault balance and virtual offset move in opposite directions.
 
 Effective quote reserves are calculated as:
 
