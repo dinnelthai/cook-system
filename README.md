@@ -67,6 +67,7 @@ The first core slice currently includes:
 
 - [Exact integer arithmetic](src/core/integer.mjs)
 - [Deterministic event ordering](src/core/event-order.mjs)
+- [Curve state replay and reconciliation](src/core/market-state.mjs)
 - [Raw candle builder](src/core/candle-builder.mjs)
 - [Core tests](test/core.test.mjs)
 
