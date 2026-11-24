@@ -82,3 +82,37 @@ test("matching historical gross capital totals remain internally consistent",()=
   assert.equal(r.status,"REPORT_READY");
   assert.ok(!r.issues.includes("NAV_CASH_CAPITAL_FLOW_MISMATCH"));
 });
+
+test("project journal cannot reference a missing or opposite-side market event",()=>{
+ for(const [mutate,issue] of [
+  [f=>f.market.trades[0].id="unrelated","PROJECT_TRADE_MARKET_EVENT_MISSING:b"],
+  [f=>f.market.trades[0].side="SELL","PROJECT_TRADE_SIDE_MISMATCH:b"]
+ ]){
+  const f=fixture();mutate(f);const r=buildHistoricalMvpReport(f);
+  assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.issues.includes(issue));
+  assert.equal(r.accounting.realized_project_pnl_base_units,null);
+ }
+});
+test("legacy event links remain partial without quantity or signature evidence",()=>{
+ const r=buildHistoricalMvpReport(fixture());
+ assert.equal(r.status,"REPORT_READY");
+ assert.equal(r.trade_evidence.status,"PARTIAL");
+ assert.equal(r.trade_evidence.matched_trade_count,2);
+ assert.equal(r.trade_evidence.source_attestation,"UNKNOWN");
+});
+test("project quantity must match supplied market quantity but gross notional need not equal net cash",()=>{
+ const f=fixture();
+ f.market.trades[0].tokenAmountBaseUnits="100";f.market.trades[0].quoteNotionalBaseUnits="190";
+ assert.equal(buildHistoricalMvpReport(f).status,"REPORT_READY");
+ f.market.trades[0].tokenAmountBaseUnits="99";
+ const r=buildHistoricalMvpReport(f);
+ assert.ok(r.issues.includes("PROJECT_TRADE_QUANTITY_MISMATCH:b"));
+ assert.equal(r.status,"REVIEW_REQUIRED");
+});
+test("conflicting transaction identity blocks financial readiness",()=>{
+ const f=fixture();
+ f.cash.entries[0].signature="receipt-a";f.market.trades[0].signature="receipt-b";
+ const r=buildHistoricalMvpReport(f);
+ assert.ok(r.issues.includes("PROJECT_TRADE_SIGNATURE_MISMATCH:b"));
+ assert.equal(r.status,"REVIEW_REQUIRED");
+});

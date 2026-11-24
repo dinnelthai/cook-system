@@ -44,3 +44,12 @@ test("inconsistent evidence is suppressed and prevents settlement",()=>{
  }
 });
 test("unsupported interval cannot silently change calculation",()=>assert.throws(()=>buildTerminalCandles(withEvidence(),123)));
+
+test("candle event quantity must agree with the corresponding project journal",()=>{
+ const i=withEvidence();i.market.candleEvidence.events[0].payload.token_amount_base_units="99";
+ const s=buildTerminalState(i);
+ assert.equal(s.status,"REVIEW_REQUIRED");
+ assert.ok(s.issues.includes("PROJECT_TRADE_QUANTITY_MISMATCH:b"));
+ assert.equal(s.treasury.realized_project_pnl_base_units,null);
+ assert.equal(s.settlement_allowed,false);
+});
