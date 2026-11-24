@@ -1,5 +1,6 @@
-import { parseBaseUnits, U128_MAX } from "../core/integer.mjs";
+import { parseBaseUnits } from "../core/integer.mjs";
 import { replayCurveEvents } from "../core/market-state.mjs";
+import { sortForReplay } from "../core/event-order.mjs";
 import { quoteExactQuoteInBuy, quoteExactTokenOutBuy } from "../adapters/pump/quote-engine.mjs";
 
 const BPS = 10_000n;
@@ -77,6 +78,15 @@ function quoteReferenceBudget(state, amount, protocolFeeBps, creatorFeeBps) {
   });
 }
 
+function getAttribution(eventId, attributionByEventId) {
+  return attributionByEventId instanceof Map ? attributionByEventId.get(eventId) : attributionByEventId[eventId];
+}
+
+function participantClassFor(eventId, attributionByEventId) {
+  const value = getAttribution(eventId, attributionByEventId)?.participantClass;
+  return PARTICIPANT_CLASSES.has(value) ? value : "UNKNOWN";
+}
+
 function aggregateParticipantFlow(events, attributionByEventId = {}) {
   const classes = {
     TREASURY: { buyQuote: 0n, sellQuote: 0n, buyTokens: 0n, sellTokens: 0n, executions: 0 },
@@ -95,9 +105,7 @@ function aggregateParticipantFlow(events, attributionByEventId = {}) {
     const payload = event.payload ?? {};
     const quote = parseBaseUnits(payload.quote_amount_base_units, { name: "payload.quote_amount_base_units" });
     const tokens = parseBaseUnits(payload.token_amount_base_units, { name: "payload.token_amount_base_units" });
-    const rawAttribution = attributionByEventId instanceof Map
-      ? attributionByEventId.get(event.event_id)
-      : attributionByEventId[event.event_id];
+    const rawAttribution = getAttribution(event.event_id, attributionByEventId);
     const participantClass = PARTICIPANT_CLASSES.has(rawAttribution?.participantClass)
       ? rawAttribution.participantClass
       : "UNKNOWN";
@@ -179,8 +187,43 @@ export function assessInnerMarketRisk({
   }
   const confirmedEvents = interveningEvents.filter((event) => event.status === "CONFIRMED");
   const ignoredUnconfirmedEventCount = interveningEvents.length - confirmedEvents.length;
-  const replay = replayCurveEvents(baselineCurveState, confirmedEvents);
-  const current = replay.state;
+  const orderedEvents = sortForReplay(confirmedEvents);
+  let current = structuredClone(baselineCurveState);
+  const replayReconciliations = [];
+  const eventImpactJournal = [];
+  for (const event of orderedEvents) {
+    const beforeState = current;
+    const step = replayCurveEvents(beforeState, [event]);
+    current = step.state;
+    replayReconciliations.push(...step.reconciliations);
+    if (event.event_kind !== BUY && event.event_kind !== SELL) continue;
+    const payload = event.payload ?? {};
+    const impact = {
+      event_id: event.event_id,
+      event_kind: event.event_kind,
+      participant_class: participantClassFor(event.event_id, attributionByEventId),
+      quote_amount_base_units: payload.quote_amount_base_units,
+      token_amount_base_units: payload.token_amount_base_units,
+      marginal_price_change_bps: priceMoveBps(beforeState, current),
+      real_token_reserves_after_base_units: current.real_token_reserves_base_units,
+      curve_complete_after: current.complete,
+      reference_token_cost_after_base_units: null,
+      reference_token_cost_change_from_previous_base_units: null,
+    };
+    if (referenceTokenProbeBaseUnits !== null && !current.complete) {
+      try {
+        const beforeProbe = quoteReferenceToken(beforeState, referenceTokenProbeBaseUnits, protocolFeeBps, creatorFeeBps);
+        const afterProbe = quoteReferenceToken(current, referenceTokenProbeBaseUnits, protocolFeeBps, creatorFeeBps);
+        const beforeCost = BigInt(beforeProbe.input_base_units);
+        const afterCost = BigInt(afterProbe.input_base_units);
+        impact.reference_token_cost_after_base_units = afterCost.toString();
+        impact.reference_token_cost_change_from_previous_base_units = (afterCost - beforeCost).toString();
+      } catch (error) {
+        impact.reference_token_probe_status = error.code === "INSUFFICIENT_CURVE_INVENTORY" ? "INSUFFICIENT_CURVE_INVENTORY" : "UNAVAILABLE";
+      }
+    }
+    eventImpactJournal.push(impact);
+  }
   const priceChange = priceMoveBps(baselineCurveState, current);
   const absolutePriceMove = priceChange === null ? null : (BigInt(priceChange) < 0n ? (-BigInt(priceChange)).toString() : priceChange);
 
@@ -270,6 +313,8 @@ export function assessInnerMarketRisk({
     curve_complete: current.complete,
     confirmed_event_count: confirmedEvents.length,
     ignored_unconfirmed_event_count: ignoredUnconfirmedEventCount,
+    replay_reconciliations: replayReconciliations,
+    event_impact_journal: eventImpactJournal,
     curve_state: {
       baseline_virtual_token_reserves_base_units: baselineCurveState.virtual_token_reserves_base_units,
       current_virtual_token_reserves_base_units: current.virtual_token_reserves_base_units,
