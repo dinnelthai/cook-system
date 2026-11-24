@@ -54,17 +54,21 @@ Only confirmed, normalized executions affect trade PnL. Transfers, allocations, 
 For each treasury account, track the full position over time, not only the launch-day allocation:
 
 - opening inventory and its explicitly supplied opening cost basis;
-- every confirmed buy as a separate acquisition tranche, including signature, order, token amount, gross quote, fee, and total cash cost;
+- every confirmed buy as a separate acquisition tranche, including signature, order, token amount, reconciled quote cash debit, program-fee breakdown, network fee, and total cash cost;
 - cumulative gross buy spend and cumulative net sell proceeds;
 - current token balance, remaining cost basis, and weighted-average cost per token after every event;
-- every confirmed sell, its allocated cost basis, net proceeds, and realized PnL;
+- every confirmed sell, its allocated cost basis, reconciled quote cash credit, network fee, net proceeds, and realized PnL;
 - unrealized mark-to-market PnL using the current curve marginal price, clearly separated from realizable proceeds;
 - transaction signatures, treasury account identity, and event provenance;
 - account snapshots and explicit reconciliation for transfers, allocations, burns, and other non-trade inventory changes.
 
 Repeated additions are normal ledger events: the Nth confirmed buy increases cumulative acquisition cost and inventory, then recomputes weighted-average cost. A sell reduces both inventory and remaining cost basis proportionally. A later buy starts a new tranche and recomputes the average over the then-current remaining position. Do not reset the cost basis when adding again.
 
-`CumulativeBuyCash = Σ(grossBuyQuote_i + buyFee_i)`
+`ObservedBuyCashCost = ReconciledQuoteDebit + TreasuryPaidNetworkFee`
+
+`ObservedSellCashProceeds = ReconciledQuoteCredit - TreasuryPaidNetworkFee`
+
+For observed-chain events, the reconciled quote debit/credit already includes Pump program fees; program fee components are disclosure fields, not another cash add-on. Synthetic fixtures may express gross quote and a separate fee explicitly.
 
 `RemainingCostBasis = OpeningCostBasis + CumulativeBuyCash - CostBasisAllocatedToConfirmedSells`
 
@@ -72,7 +76,7 @@ Repeated additions are normal ledger events: the Nth confirmed buy increases cum
 
 `NetCashDeployed = CumulativeBuyCash - CumulativeNetSellProceeds`
 
-The opening allocation must not be silently treated as a zero-cost purchase. If its basis is unknown, mark the position basis incomplete rather than presenting a misleading average. Transfers are not buys; they require an explicit basis transfer or a reconciliation exception.
+The opening allocation must not be silently treated as a zero-cost purchase. If its basis is unknown, mark the position basis incomplete rather than presenting a misleading average. Transfers are not buys. A transfer between Treasury wallets must move inventory and its associated cost basis as a separate ledger adjustment; until that adjustment is available and reconciled, pause the affected wallet rather than treating the transfer as a market buy or sell.
 
 V1 uses weighted-average cost for a deterministic first implementation. Accounting method is not tax advice. If a transfer or external allocation changes inventory, reconcile against an account snapshot before treating the trade-only ledger as complete.
 
@@ -94,7 +98,7 @@ For every Treasury buy or sell, retain the wallet address, signature, event orde
 
 Observed-chain `payload.quote_amount_base_units` is the actor's quote cash movement confirmed against transaction balance deltas (excluding the network transaction fee). Program fee components are already reflected in that cash movement; they are reported separately and must not be added or subtracted a second time. Network transaction fees are counted once per signature and only when the fee payer belongs to the configured Treasury wallet set.
 
-Treasury inventory is computed from confirmed buys and sells, then reconciled against an authoritative owner+mint token balance snapshot. Transfers between Treasury wallets are internal movements, not buys or sells; external transfers, allocations, burns, and other inventory changes require separate basis adjustments and a new account reconciliation. A balance mismatch is a hard pause.
+Treasury inventory is computed from confirmed buys and sells, then reconciled against an authoritative owner+mint token balance snapshot. Transfers between Treasury wallets are internal movements, not buys or sells; they require a separate quantity and cost-basis transfer adjustment. External transfers, allocations, burns, and other inventory changes require separate basis adjustments and a new account reconciliation. Until those adjustments are supplied, a balance mismatch is a hard pause.
 
 V1 uses weighted-average cost:
 - each additional buy increases current inventory and remaining cost basis;
