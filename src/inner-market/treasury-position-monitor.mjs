@@ -135,11 +135,11 @@ export function buildTreasuryPositionMonitor({
         creatorFeeBps,
       });
       liquidationQuote = BigInt(quote.output_base_units);
-      liquidationPnl = liquidationQuote - costBasis;
+      liquidationPnl = ledger.cost_basis_complete === false ? null : liquidationQuote - costBasis;
       liquidationDiscountBps = marginalMarkValue === 0n
         ? null
         : ((marginalMarkValue - liquidationQuote) * BPS / marginalMarkValue).toString();
-      if (liquidationPnl < 0n) {
+      if (liquidationPnl !== null && liquidationPnl < 0n) {
         addFlag(flags, "POSITION_BELOW_COST_ON_CURVE_EXIT", "HIGH", "Estimated full-position curve exit proceeds are below remaining cost basis", liquidationPnl.toString(), "0");
       }
       if (liquidationDiscountBps !== null && riskLimits.maxLiquidationDiscountBps !== undefined &&
