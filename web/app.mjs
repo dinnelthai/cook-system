@@ -52,6 +52,15 @@ function seriesChart(points,kind){
  svg+='<text x="40" y="145" fill="#92a6c0" font-size="10">'+esc(p[0].label)+'</text><text x="560" y="145" text-anchor="end" fill="#92a6c0" font-size="10">'+esc(p.at(-1).label)+'</text></svg>';
  return svg+'<p class="muted">事件序号 · 原始报价资产 base units · '+p.length+' 个观测点 · 最大 '+esc(max)+'</p>';
 }
+function details(title,value){return '<details class="raw-details"><summary>'+esc(title)+'</summary><pre>'+esc(JSON.stringify(value,null,2))+'</pre></details>'}
+function metrics(items){return '<div class="stats">'+items.map(([k,v])=>stat(k,v)).join("")+'</div>'}
+function emptyState(title,desc){return '<div class="empty-state"><strong>'+esc(title)+'</strong><span>'+esc(desc)+'</span></div>'}
+function compareBars(items,unit){
+ const nums=items.map(x=>Number(x[1]));const max=Math.max(1,...nums.filter(Number.isFinite));
+ return '<div class="comparison">'+items.map(([label,value,color],i)=>'<div class="comparison-row"><div class="row"><span>'+esc(label)+'</span><strong>'+esc(value==null?"未知":value+" "+unit)+'</strong></div><div class="meter"><span class="'+(color==="red"?"sell":color==="green"?"buy":"neutral")+'" style="width:'+((value==null||!Number.isFinite(nums[i])||nums[i]<0)?0:Math.min(100,nums[i]/max*100))+'%"></span></div></div>').join("")+'</div>';
+}
+function splitView(left,right){return '<div class="terminal-grid"><div>'+left+'</div><div>'+right+'</div></div>'}
+function screenHeading(title,sub){return '<div class="terminal-heading"><div><p class="eyebrow">COOK / OPERATIONS</p><h2>'+esc(title)+'</h2><span class="muted">'+esc(sub)+'</span></div><span class="source-chip">'+esc(report.source_mode)+' / OFFLINE</span></div>'}
 function render(){
  main.dataset.page=page;
  document.querySelector(".tag").textContent="OFFLINE · "+report.source_mode;
@@ -81,29 +90,48 @@ function render(){
  main.innerHTML='<h2>发行资料</h2>'+note("仅用于整理测试资料，不创建 Token、不构造或提交交易。")+'<form id="metadata" class="panel"><div class="grid"><div><label>名称</label><input name="name" required maxlength="32" placeholder="Test Token"></div><div><label>Symbol</label><input name="symbol" required maxlength="10" placeholder="TEST"></div><div><label>Decimals</label><input disabled value="由协议配置读取"></div><div><label>Supply</label><input disabled value="由协议配置读取"></div><div><label>描述</label><textarea name="description" maxlength="1000"></textarea></div><div><label>图片（本地预览）</label><input type="file" id="image" accept="image/png,image/jpeg"><img id="preview" class="preview hidden" alt="图片预览"></div></div><div class="grid"><div><label>Website</label><input name="website" type="url"></div><div><label>Telegram</label><input name="telegram" type="url"></div><div><label>Twitter / X</label><input name="twitter" type="url"></div></div><p class="muted">权限、费用、初始交易结果需由测试环境实际数据验证；本页面不支持钱包连接或买入提交。</p><button class="primary" type="submit">导出本地资料 JSON</button></form>';
  document.querySelector("#metadata").onsubmit=e=>{e.preventDefault();download("synthetic-token-metadata.json",JSON.stringify({sourceMode:"SYNTHETIC",...Object.fromEntries(new FormData(e.currentTarget))},null,2))};
  document.querySelector("#image").onchange=e=>{const f=e.target.files[0];if(!f)return;const p=document.querySelector("#preview");const url=URL.createObjectURL(f);p.onload=()=>URL.revokeObjectURL(url);p.src=url;p.classList.remove("hidden")};
- }else if(page==="wallet"){
- main.innerHTML='<h2>Treasury · 资金中心</h2>'+note("此合成样本仅提供项目总账，未提供逐钱包归属或余额证据，不虚构拆分持仓。")+'<div class="stats">'+stat("项目现金（lamports）",a.closing_cash_base_units)+stat("库存（base units）",a.closing_token_balance_base_units)+stat("成本（lamports）",a.remaining_cost_basis_base_units)+'</div>'+panel("项目资产流水",table(["记录","类型","金额","对账"],data.cash.entries.map(x=>[x.id,x.kind,x.amountBaseUnits,x.reconciliation])))+panel("钱包级数据","<p class='muted'>待输入经验证的逐钱包历史账本。所有自有钱包应在报告范围内披露；本页不提供私钥录入或批量交易。</p>");
+ }else if(page=="wallet"){
+ const d=buildHistoricalDashboard(data),t=d.treasury;
+ main.innerHTML=screenHeading("Treasury / 资金中心","项目账本 · 报价资产原始单位")+
+ metrics([["期末现金",a.closing_cash_base_units],["已实现盈亏",a.realized_project_pnl_base_units],["创作者费",a.creator_cash_income_base_units],["独立费用",t.recorded_expenses_base_units]])+
+ splitView(panel("资金收支",compareBars([["交易支出",t.actual_trade_spend_base_units,"red"],["交易回款",t.actual_trade_receipts_base_units,"green"],["创作者收入",a.creator_cash_income_base_units,"green"],["独立费用",t.recorded_expenses_base_units,"red"]],"base units")),panel("财务对账",table(["检查","结果"],[["总账",report.status],["资本流入",t.recorded_capital_in_base_units],["资本流出",t.recorded_capital_out_base_units]]))+emptyState("钱包余额未接入","当前报告仅包含项目级资金证据")))+
+ panel("资金流水",table(["记录","类型","金额","对账"],data.cash.entries.map(x=>[x.id,x.kind,x.amountBaseUnits,x.reconciliation])));
+
  }else if(page==="lab"){
- main.innerHTML='<h2>历史成交测试</h2>'+note("读取固定的合成或已归档历史报告数据，仅进行离线核算。")+'<div class="panel"><div class="row"><button id="reset">恢复默认样本</button><button id="bad">测试缺失交易</button><button id="export">导出报告</button></div><label>导入已标准化历史 JSON</label><input id="load" type="file" accept=".json"><p id="error" class="negative"></p></div>'+panel("逐笔成交记录",table(["事件","序号","方向","金额（base units）","状态"],data.market.trades.map(t=>[t.id,t.sequence,t.side,t.quoteNotionalBaseUnits,t.status])))+panel("核算结果","<pre>"+esc(JSON.stringify(report,null,2))+"</pre>");
+ main.innerHTML='<h2>历史成交测试</h2>'+note("读取固定的合成或已归档历史报告数据，仅进行离线核算。")+'<div class="panel"><div class="row"><button id="reset">恢复默认样本</button><button id="bad">测试缺失交易</button><button id="export">导出报告</button></div><label>导入已标准化历史 JSON</label><input id="load" type="file" accept=".json"><p id="error" class="negative"></p></div>'+panel("逐笔成交记录",table(["事件","序号","方向","金额（base units）","状态"],data.market.trades.map(t=>[t.id,t.sequence,t.side,t.quoteNotionalBaseUnits,t.status])))+details("核算结果原始数据",report);
  document.querySelector("#reset").onclick=()=>{record("sample.reset",{page});data=structuredClone(original);report=auditedReport(data);render()};
  document.querySelector("#bad").onclick=()=>{record("sample.incomplete",{page},"WARN");data=structuredClone(original);data.market.historyComplete=false;report=auditedReport(data);render()};
  document.querySelector("#export").onclick=()=>download("mvp-historical-report.json",JSON.stringify(report,null,2));
  document.querySelector("#load").onchange=async e=>{try{const file=e.target.files[0];if(!file)return;record("report.import.started",{page,file_bytes:file.size});const next=JSON.parse(await file.text());const nextReport=auditedReport(next);data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");document.querySelector("#error").textContent=err.message}};
- }else if(page==="market"){
- main.innerHTML='<h2>Markets · 市场工作台</h2>'+note("仅显示已归档的成交汇总和储备，不进行市场预测。数据模式："+report.source_mode)+'<div class="stats">'+stat("买入记录",m.confirmed_buy_count)+stat("卖出记录",m.confirmed_sell_count)+stat("真实 SOL 储备（lamports）",m.real_quote_reserves_base_units)+stat("真实 Token 储备（base units）",m.real_token_reserves_base_units)+'</div>'+panel("储备快照",table(["项目","数值（base units）"],[["虚拟 SOL",m.virtual_quote_reserves_base_units],["虚拟 Token",m.virtual_token_reserves_base_units],["真实 SOL",m.real_quote_reserves_base_units],["真实 Token",m.real_token_reserves_base_units]]))+panel("历史成交汇总",table(["方向","名义成交额"],[["BUY",m.gross_buy_notional_base_units],["SELL",m.gross_sell_notional_base_units]]))+panel("价格 / OHLCV",'<div class="chart-empty">等待带时间戳及成交价格的验证数据 · K线未接入</div>')+panel("已确认成交金额",seriesChart(data.market.trades.filter(x=>x.status==="FINALIZED"&&x.reconciliation==="PASS").map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE"))+panel("成交明细",table(["序号","事件","方向","报价金额（base units）","状态"],data.market.trades.map(x=>[x.sequence,x.id,x.side,x.quoteNotionalBaseUnits,x.status])));
- }else if(page==="inventory"){
- main.innerHTML='<h2>Inventory · 筹码中心</h2>'+context()+'<div class="stats">'+stat("项目库存（base units）",a.closing_token_balance_base_units)+stat("剩余成本（base units）",a.remaining_cost_basis_base_units)+stat("审计状态",report.status)+'</div>'+panel("库存审计","<pre>"+esc(JSON.stringify(report.audits,null,2))+"</pre>")+panel("钱包级持仓","<p class='muted'>当前输入不提供已验证的逐钱包持仓及成本分配；待接入。</p>");
- }else if(page==="liquidity"){
- main.innerHTML='<h2>Liquidity · 流动性中心</h2>'+context()+'<div class="stats">'+stat("真实报价资产储备",m.real_quote_reserves_base_units)+stat("真实 Token 储备",m.real_token_reserves_base_units)+stat("虚拟报价资产储备",m.virtual_quote_reserves_base_units)+stat("虚拟 Token 储备",m.virtual_token_reserves_base_units)+'</div>'+panel("储备与数据质量",table(["指标","状态"],[["储备单位","base units"],["统一审计",report.status],["实时深度","待接入"],["滑点验证","待接入"],["LP 仓位","待接入"]]));
+ }else if(page=="market"){
+ const trades=data.market.trades.filter(x=>x.status==="FINALIZED"&&x.reconciliation==="PASS");
+ main.innerHTML=screenHeading("Markets / 市场终端",data.scope.projectId+" · "+data.scope.tokenMint)+
+ metrics([["买入笔数",m.confirmed_buy_count],["卖出笔数",m.confirmed_sell_count],["买入名义额",m.gross_buy_notional_base_units],["卖出名义额",m.gross_sell_notional_base_units]])+
+ splitView(panel("价格 / OHLCV",emptyState("尚无可验证 OHLCV","需要带时间戳、价格与成交数量的数据"))+panel("成交金额",seriesChart(trades.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE")),panel("储备快照",table(["指标","base units"],[["真实报价储备",m.real_quote_reserves_base_units],["真实 Token 储备",m.real_token_reserves_base_units],["虚拟报价储备",m.virtual_quote_reserves_base_units],["虚拟 Token 储备",m.virtual_token_reserves_base_units]]))+panel("数据质量",table(["检查","状态"],[["审计",report.status],["实时连接","未接入"]])))+
+ panel("成交记录",table(["序号","事件","方向","名义金额","状态"],data.market.trades.map(x=>[x.sequence,x.id,x.side,x.quoteNotionalBaseUnits,x.status])));
+
+ }else if(page=="inventory"){
+ const valid=report.status==="REPORT_READY",i=data.inventory;
+ const journal=valid?i.ledger.position_journal:[];
+ main.innerHTML=screenHeading("Inventory / 筹码中心","已核算项目库存 · 不推断外部钱包归属")+
+ metrics([["期末库存（base units）",a.closing_token_balance_base_units],["剩余成本（base units）",a.remaining_cost_basis_base_units],["已实现项目盈亏",a.realized_project_pnl_base_units],["库存审计",valid?"通过":"待复核"]])+
+ splitView(panel("库存数量变动",compareBars([["期初库存",valid?i.opening.tokens:null,"neutral"],["已买入数量",valid?i.tradeSummary.boughtTokens:null,"green"],["已卖出数量",valid?i.tradeSummary.soldTokens:null,"red"],["期末库存",a.closing_token_balance_base_units,"neutral"]],"base units")),panel("库存数据覆盖",table(["指标","状态"],[["库存成本",valid?"已核算":"未知"],["钱包级归属","未接入"],["成本分布","未接入"],["可验证估值","未接入"]]))+panel("钱包持仓",emptyState("暂无逐钱包持仓","等待经核验的持仓数据，禁止虚构拆分")))+
+ panel("库存交易明细",table(["事件","方向","数量","买入成本","卖出净收入"],journal.map(x=>[x.event_id,x.side,x.token_amount_base_units,x.cash_cost_quote_base_units,x.net_quote_proceeds_base_units])))+details("库存审计原始记录",report.audits);
+
+ }else if(page=="liquidity"){
+ main.innerHTML=screenHeading("Liquidity / 流动性中心","Bonding Curve / 储备快照 · 不等同于未来可成交深度")+
+ metrics([["真实报价储备",m.real_quote_reserves_base_units],["真实 Token 储备",m.real_token_reserves_base_units],["虚拟报价储备",m.virtual_quote_reserves_base_units],["虚拟 Token 储备",m.virtual_token_reserves_base_units]])+
+ splitView(panel("报价资产储备",compareBars([["真实储备",m.real_quote_reserves_base_units,"green"],["虚拟储备",m.virtual_quote_reserves_base_units,"neutral"]],"base units"))+panel("Token 储备",compareBars([["真实储备",m.real_token_reserves_base_units,"green"],["虚拟储备",m.virtual_token_reserves_base_units,"neutral"]],"base units")),panel("市场状态",table(["检查","状态"],[["统一审计",report.status],["生命周期",data.market.snapshot.lifecycle],["深度数据","未接入"],["LP 仓位","未接入"]]))+panel("流动性质量",emptyState("暂无验证深度","需要独立验证的市场深度数据")));
+
  }else if(page==="participants"){
  const roles=getParticipantCatalogue();
  const results=evaluateParticipantStressCases({base:original,reportBuilder:buildHistoricalMvpReport});
- main.innerHTML='<h2>Intelligence · 市场情报</h2>'+note("固定合成压力场景：验证风险提示和数据核算，不模拟攻击执行、不预测真实钱包行为。角色标签只属于实验。")+
+ main.innerHTML=screenHeading("Intelligence / 市场情报","合成风险场景 · 独立于真实历史数据")+note("固定合成压力场景：验证风险提示和数据核算，不模拟攻击执行、不预测真实钱包行为。角色标签只属于实验。")+
  '<div class="stats">'+stat("角色类别",roles.length)+stat("合成场景",results.length)+stat("预期结果匹配",results.filter(r=>r.passed).length+" / "+results.length)+'</div>'+
  panel("角色与风险特征",table(["角色","特征","观测关注","局限"],roles.map(r=>[r.role,r.traits.join(" / "),r.observable,r.limitation])))+
  panel("固定场景验收",table(["场景","风险","预期","实际","结果"],results.map(r=>[r.title,r.risk_category,r.expected_status,r.actual_status,r.passed?"PASS":"FAIL"])))+
  panel("随机压力实验",'<div class="grid"><div><label for="experiment-seed">随机种子</label><input id="experiment-seed" type="number" min="0" max="4294967295" value="42"></div><div><label for="experiment-runs">每类实验次数</label><input id="experiment-runs" type="number" min="1" max="1000" value="100"></div></div><p class="muted">仅随机抽取预置风险场景，不生成交易；采样权重并非真实行为概率。</p><button id="run-experiment" class="primary">运行随机实验</button> <button id="export-experiment" disabled>导出实验</button><div id="experiment-result"></div>')+
- panel("场景报告",'<button id="export-participants">导出实验结果 JSON</button><pre>'+esc(JSON.stringify(results,null,2))+"</pre>");
+ panel("场景报告",'<button id="export-participants">导出实验结果 JSON</button>'+details("实验原始数据",results));
  let experiment=null;
  document.querySelector("#run-experiment").onclick=()=>{
   const el=document.querySelector("#experiment-result"),exportButton=document.querySelector("#export-experiment");
@@ -120,7 +148,7 @@ function render(){
  document.querySelector("#export-participants").onclick=()=>download("synthetic-participant-stress-results.json",JSON.stringify(results,null,2));
  }else if(page==="logs"){
  const logs=diagnostics.snapshot();
- main.innerHTML='<h2>System · 系统中心</h2>'+note("仅保存当前页面会话的最近 1000 条结构化诊断事件，刷新页面会重置。不会记录原始输入、钱包地址、私钥、RPC URL 或原始错误信息。")+
+ main.innerHTML=screenHeading("System / 系统中心","连接状态 · 诊断事件 · 数据导入")+panel("服务状态",table(["服务","状态"],[["浏览器应用","已初始化"],["报告引擎",report.status],["Localnet RPC","未接入"],["交易执行","禁用"]]))+note("仅保存当前页面会话的最近 1000 条结构化诊断事件，刷新页面会重置。不会记录原始输入、钱包地址、私钥、RPC URL 或原始错误信息。")+
  '<div class="stats">'+stat("日志条数",logs.entries.length)+stat("警告",logs.entries.filter(x=>x.level==="WARN").length)+stat("错误",logs.entries.filter(x=>x.level==="ERROR").length)+stat("已滚动丢弃",logs.dropped_count)+'</div>'+
  panel("日志工具",'<div class="row"><button id="log-download" class="primary">导出诊断日志 JSON</button><button id="log-refresh">刷新</button><button id="log-clear">清空日志</button></div>')+
  panel("最近事件",table(["时间 (UTC)","级别","事件","详情"],logs.entries.slice().reverse().map(x=>[x.time,x.level,x.event,JSON.stringify(x.detail)])));
@@ -128,7 +156,7 @@ function render(){
  document.querySelector("#log-refresh").onclick=()=>render();
  document.querySelector("#log-clear").onclick=()=>{if(window.confirm("清空当前会话诊断日志？")){diagnostics.clear();render()}};
  }else{
- main.innerHTML='<h2>Risk Center · 风险中心</h2>'+note("仅核算已发生的历史事件；未通过统一审计时，财务输出为未知。")+'<div class="stats">'+stat("已实现项目盈亏（lamports）",a.realized_project_pnl_base_units)+stat("已到账手续费（lamports）",a.creator_cash_income_base_units)+stat("历史观测回撤（bps）",a.max_observed_drawdown_bps)+stat("审计状态",report.status)+'</div>'+panel("异常清单",report.issues.length?table(["异常"],report.issues.map(x=>[x])):"<p class='positive'>输入样本通过当前审计规则。</p>")+panel("详细审计","<pre>"+esc(JSON.stringify(report.audits,null,2))+"</pre>")+"<p class='muted'>合成样本通过不等于本地链数据已验证，也不意味着收益可实现。</p>";
+ main.innerHTML=screenHeading("Risk Center / 风险中心","已观测风险与数据质量 · 非交易信号")+panel("风险检查矩阵",table(["类别","状态"],[["财务对账",report.status],["库存核算",report.status==="REPORT_READY"?"已核算":"待复核"],["历史回撤",a.max_observed_drawdown_bps==null?"未知":Number(a.max_observed_drawdown_bps)/100+"%"],["实时流动性","未知"],["市场行为风险","未验证"]]))+note("仅核算已发生的历史事件；未通过统一审计时，财务输出为未知。")+'<div class="stats">'+stat("已实现项目盈亏（lamports）",a.realized_project_pnl_base_units)+stat("已到账手续费（lamports）",a.creator_cash_income_base_units)+stat("历史观测回撤（bps）",a.max_observed_drawdown_bps)+stat("审计状态",report.status)+'</div>'+panel("异常清单",report.issues.length?table(["异常"],report.issues.map(x=>[x])):"<p class='positive'>输入样本通过当前审计规则。</p>")+details("详细审计",report.audits)+"<p class='muted'>合成样本通过不等于本地链数据已验证，也不意味着收益可实现。</p>";
  }
  main.insertAdjacentHTML("beforeend",'<div class="row"><button id="quick-log-export">导出诊断日志</button></div>');
  document.querySelector("#quick-log-export").onclick=exportDiagnostics;
