@@ -86,7 +86,7 @@ Do not mix quote assets or silently convert between SOL and USD. FX conversion m
 
 Batch means grouping already-authorized transaction receipts for audit and accounting. The module deduplicates signatures, separates confirmed / pending / failed results, and aggregates actual fills and fees. It does not construct coordinated multi-wallet buy/sell sequences, split orders to influence price, or automate market-moving behavior.
 
-### 3.6 External-flow and curve-risk analytics
+### 3.5 External-flow and curve-risk analytics
 
 A treasury position cannot be evaluated from Dev fills alone. Every confirmed curve execution between two treasury decisions changes the shared curve state, regardless of who submitted it. The next decision must be based on the latest replayed state, never on the reserve snapshot from the prior Dev fill.
 
@@ -123,7 +123,7 @@ The initial numeric thresholds in `DEFAULT_CURVE_RISK_THRESHOLDS` are provisiona
 
 Creator/treasury buys remain part of the curve replay because they changed the actual market state, but they are excluded from external-flow concentration and external sell-share calculations when correctly attributed. This keeps the actual curve state separate from the participant-flow explanation.
 
-### 3.7 Risk and data-quality guard
+### 3.6 Risk and data-quality guard
 
 Hard gates:
 
