@@ -15,6 +15,7 @@ const PARTICIPANT_CLASSES = new Set(["TREASURY", "SNIPER", "OTHER", "UNKNOWN"]);
 export const DEFAULT_CURVE_RISK_THRESHOLDS = Object.freeze({
   absolutePriceMoveBps: Object.freeze({ watch: "500", high: "1000", critical: "2000" }),
   referenceTokenCostIncreaseBps: Object.freeze({ watch: "500", high: "1000", critical: "2000" }),
+  referenceQuoteOutputReductionBps: Object.freeze({ watch: "500", high: "1000", critical: "2000" }),
   curveInventoryDepletionBps: Object.freeze({ watch: "1000", high: "3000", critical: "6000" }),
   externalSellShareBps: Object.freeze({ watch: "2500", high: "5000", critical: "7500" }),
   buyerConcentrationHhiBps: Object.freeze({ watch: "2500", high: "5000", critical: "7500" }),
@@ -305,6 +306,8 @@ export function assessInnerMarketRisk({
         token_output_change_base_units: (afterOutput - beforeOutput).toString(),
         token_output_reduction_bps: outputReduction,
       };
+      const positiveOutputReduction = outputReduction === null ? null : (BigInt(outputReduction) > 0n ? outputReduction : "0");
+      dimensions.push(riskDimension(positiveOutputReduction, thresholds.referenceQuoteOutputReductionBps, "REFERENCE_QUOTE_OUTPUT_REDUCTION"));
     }
   }
 
