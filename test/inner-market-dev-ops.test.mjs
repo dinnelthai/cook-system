@@ -6,6 +6,20 @@ import { replayTreasuryTradePnl } from "../src/inner-market/treasury-pnl.mjs";
 import { reconcileExecutionBatch } from "../src/inner-market/batch-reconciliation.mjs";
 import { evaluateInnerMarketPolicy } from "../src/inner-market/policy-guard.mjs";
 
+function syntheticTrade(eventId, sequence, eventKind, tokenAmount, quoteAmount, fee = "0", status = "CONFIRMED") {
+  return {
+    event_id: eventId,
+    provenance: "synthetic",
+    event_time_ms: sequence * 1000,
+    ordering: { ordering_confidence: "synthetic", event_sequence: sequence },
+    status,
+    event_kind: eventKind,
+    token_amount_base_units: tokenAmount,
+    quote_amount_base_units: quoteAmount,
+    fee_quote_base_units: fee,
+  };
+}
+
 test("curve valuation keeps virtual pricing reserves separate from real balances", () => {
   const result = calculateCurveValuation({
     virtualTokenReservesBaseUnits: "1000000000", virtualQuoteReservesBaseUnits: "100000000",
@@ -43,10 +57,10 @@ test("token allocations reconcile exactly", () => {
 test("treasury PnL uses confirmed trades only and weighted-average cost", () => {
   const result = replayTreasuryTradePnl({
     events: [
-      { event_id: "1", slot: "1", status: "CONFIRMED", event_kind: "CURVE_BUY_EXECUTED", token_amount_base_units: "100", quote_amount_base_units: "1000", fee_quote_base_units: "10" },
-      { event_id: "2", slot: "2", status: "CONFIRMED", event_kind: "CURVE_BUY_EXECUTED", token_amount_base_units: "100", quote_amount_base_units: "1200", fee_quote_base_units: "10" },
-      { event_id: "3", slot: "3", status: "CONFIRMED", event_kind: "CURVE_SELL_EXECUTED", token_amount_base_units: "100", quote_amount_base_units: "1500", fee_quote_base_units: "10" },
-      { event_id: "4", slot: "4", status: "PENDING", event_kind: "CURVE_SELL_EXECUTED", token_amount_base_units: "100", quote_amount_base_units: "2000", fee_quote_base_units: "10" },
+      syntheticTrade("1", 1, "CURVE_BUY_EXECUTED", "100", "1000", "10"),
+      syntheticTrade("2", 2, "CURVE_BUY_EXECUTED", "100", "1200", "10"),
+      syntheticTrade("3", 3, "CURVE_SELL_EXECUTED", "100", "1500", "10"),
+      syntheticTrade("4", 4, "CURVE_SELL_EXECUTED", "100", "2000", "10", "PENDING"),
     ],
   });
   assert.equal(result.ending_token_balance_base_units, "100");
@@ -57,7 +71,7 @@ test("treasury PnL uses confirmed trades only and weighted-average cost", () => 
 
 test("treasury ledger rejects sells larger than verified inventory", () => {
   assert.throws(() => replayTreasuryTradePnl({
-    events: [{ event_id: "x", status: "CONFIRMED", event_kind: "CURVE_SELL_EXECUTED", token_amount_base_units: "1", quote_amount_base_units: "1" }],
+    events: [syntheticTrade("x", 1, "CURVE_SELL_EXECUTED", "1", "1")],
   }), /exceeds treasury token inventory/);
 });
 
