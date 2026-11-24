@@ -133,3 +133,36 @@ test("financial contradiction has one review grade across unified output",async(
  assert.ok(r.trust.review_checks.includes("accounting"));
  assert.ok(Object.values(r.accounting).every(v=>v===null));
 });
+
+test("historical market state carries the same scope and remains provisional",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const i=fixture();i.sourceMode="ARCHIVED_HISTORICAL";
+ const r=buildUnifiedHistoricalReport(i);
+ assert.deepEqual(r.market_state,r.terminal_state.market_state);
+ assert.equal(r.market_state.status,"PROVISIONAL");
+ assert.equal(r.market_state.scope.network,null);
+ assert.equal(r.market_state.scope.token_mint,i.scope.tokenMint);
+ assert.equal(r.market_state.snapshot.real_quote_reserves_base_units,"500");
+ assert.equal(r.market_state.history_complete_attested,false);
+ assert.equal(r.market_state.live_state,false);
+});
+test("contradictory scope is rejected even without archived receipt evidence",()=>{
+ for(const mutate of [
+  i=>{i.scope.network="localnet";i.market.scope.network="mainnet"},
+  i=>{i.scope.genesisHash="a";i.cash.scope.genesisHash="b"},
+  i=>{i.market.trades[0].tokenMint="other"},
+  i=>{i.market.snapshot.openingCutoff="other"}
+ ]){
+  const i=fixture();i.sourceMode="ARCHIVED_HISTORICAL";mutate(i);
+  assert.throws(()=>buildTerminalState(i),/HISTORICAL_REPORT_SCOPE_MISMATCH/);
+ }
+});
+test("missing historical coverage suppresses canonical reserve snapshot",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const i=fixture();i.market.historyComplete=false;
+ const r=buildUnifiedHistoricalReport(i);
+ assert.equal(r.market_state.status,"REVIEW_REQUIRED");
+ assert.equal(r.market_state.snapshot.real_quote_reserves_base_units,null);
+ assert.equal(r.market_history.real_quote_reserves_base_units,null);
+ assert.equal(r.terminal_state.market.verified_real_reserve_base_units,null);
+});

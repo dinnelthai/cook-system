@@ -22,6 +22,9 @@ export function buildTerminalCandles(input,intervalMs=60000){
   if(!Number.isSafeInteger(evidence.startTimeMs)||!Number.isSafeInteger(evidence.endTimeMs)||evidence.startTimeMs<0||evidence.endTimeMs<=evidence.startTimeMs||evidence.endTimeMs>8640000000000000-3600000)return result("REVIEW","TIME_RANGE_INVALID");
   if(!Array.isArray(evidence.events)||!Array.isArray(input.market.trades))return result("REVIEW","EVENTS_MISSING");
   const provenance=input.sourceMode==="SYNTHETIC"?"synthetic":input.sourceMode==="ARCHIVED_HISTORICAL"?"observed_chain":null;
+  const declaredNetwork=input.scope.network;
+  const expectedNetwork=provenance==="synthetic"?"synthetic":declaredNetwork==="localnet"?"local_sim":declaredNetwork;
+  if(expectedNetwork!=null&&identity.network!==expectedNetwork)return result("REVIEW","NETWORK_IDENTITY_MISMATCH");
   if(!provenance)return result("REVIEW","PROVENANCE_MISMATCH");
   const trades=input.market.trades;
   if(trades.some(t=>t.status!=="FINALIZED"||t.reconciliation!=="PASS"))return result("REVIEW","UNCONFIRMED_REPORT_TRADE");

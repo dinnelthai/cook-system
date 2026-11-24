@@ -5,6 +5,7 @@ import { summarizeHistoricalNav } from "./historical-nav.mjs";
 import { auditHistoricalNavEndpoints } from "./historical-nav-evidence.mjs";
 import { auditHistoricalTradeEvidence } from "./historical-trade-evidence.mjs";
 import { auditHistoricalCostBasis } from "./historical-cost-basis-audit.mjs";
+import { assertHistoricalReportScope } from "./historical-market-state.mjs";
 import { parseBaseUnits,U128_MAX } from "../core/integer.mjs";
 const amount=(v,n)=>parseBaseUnits(v,{name:n,max:U128_MAX});
 const keys=["projectId","quoteAsset","tokenMint","openingCutoff","closingCutoff"];
@@ -19,6 +20,7 @@ export function buildHistoricalMvpReport(input){
   if(!["SYNTHETIC","ARCHIVED_HISTORICAL"].includes(sourceMode))throw new Error("unsupported source mode");
   if(!equalScope(scope,scope))throw new Error("report scope required");
   for(const item of [cash,inventory,creator,nav,market])if(!equalScope(scope,item?.scope))throw new Error("report scope mismatch");
+  assertHistoricalReportScope(input);
   const dual=auditProjectLedgers({reportScope:scope,inventoryScope:inventory.scope,cashScope:cash.scope,cashEntries:cash.entries,inventoryLedger:inventory.ledger,openingCashBaseUnits:cash.openingCashBaseUnits,observedClosingCashBaseUnits:cash.observedClosingCashBaseUnits,cashHistoryComplete:cash.historyComplete,inventoryHistoryComplete:inventory.historyComplete});
   const fees=reconcileCreatorReceivables({...scope,openingReceivableBaseUnits:creator.openingReceivableBaseUnits,observedClosingReceivableBaseUnits:creator.observedClosingReceivableBaseUnits,feeEntries:creator.entries,cashEntries:cash.entries,historyComplete:creator.historyComplete});
   const inv=auditInventoryAdjustments({scope,opening:inventory.opening,closing:inventory.closing,tradeSummary:inventory.tradeSummary,adjustments:inventory.adjustments,historyComplete:inventory.historyComplete});
