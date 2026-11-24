@@ -1,6 +1,6 @@
 // Local, bounded diagnostics. Never store raw input, exception messages, URLs or wallet data.
-const EVENTS=new Set(["app.start","fixture.loaded","fixture.failed","report.built","report.failed","page.open","report.import.started","report.import.failed","report.import.completed","sample.reset","sample.incomplete","experiment.started","experiment.completed","experiment.failed","file.export","log.export","log.cleared","runtime.error","runtime.rejection"]);
-const PAGES=new Set(["dashboard","create","wallet","lab","market","profit","participants","logs"]);
+const EVENTS=new Set(["app.start","fixture.loaded","fixture.failed","report.built","report.failed","page.open","report.import.started","report.import.failed","report.import.completed","sample.reset","sample.incomplete","experiment.started","experiment.completed","experiment.failed","file.export","log.export","log.cleared","runtime.error","runtime.rejection","metadata.saved","review.settled","review.archived","review.restored","review.reset"]);
+const PAGES=new Set(["dashboard","create","wallet","lab","market","profit","participants","logs","terminal","projects","inventory","liquidity"]);
 const MODES=new Set(["SYNTHETIC","ARCHIVED_HISTORICAL"]);
 const STATUSES=new Set(["REPORT_READY","REVIEW_REQUIRED"]);
 const ERRORS=new Set(["Error","TypeError","RangeError","SyntaxError","ReferenceError","AbortError","NetworkError","UnknownError"]);
