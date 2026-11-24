@@ -226,6 +226,7 @@ export function assessInnerMarketRisk({
         const afterCost = BigInt(afterProbe.input_base_units);
         impact.reference_token_cost_after_base_units = afterCost.toString();
         impact.reference_token_cost_change_from_previous_base_units = (afterCost - beforeCost).toString();
+        impact.reference_token_probe_status = "AVAILABLE";
       } catch (error) {
         impact.reference_token_probe_status = error.code === "INSUFFICIENT_CURVE_INVENTORY" ? "INSUFFICIENT_CURVE_INVENTORY" : "UNAVAILABLE";
       }
