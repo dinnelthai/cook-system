@@ -1,0 +1,8 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/dinnelthai/cook-system/blob/main/schemas/risk-alert-event.schema.json",
+ "title":"RiskAlertEvent","type":"object","additionalProperties":false,
+ "required":["sequence","type","alert_id","at_ms","payload","previous_hash","record_hash"],
+ "properties":{"sequence":{"type":"integer","minimum":1},"type":{"type":"string","enum":["ALERT_OPENED","ALERT_ACKNOWLEDGED","ALERT_RESOLVED"]},
+ "alert_id":{"type":"string","minLength":1},"at_ms":{"type":"integer","minimum":0},"payload":{"type":"object"},
+ "previous_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},"record_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}}
+}
