@@ -36,7 +36,9 @@ test("all checked-in schema contracts accept representative minimal objects",()=
  "curve-replay-state.schema.json":{schema_version:"1.0.0",market,virtual_token_reserves_base_units:"1",virtual_quote_reserves_base_units:"1",real_token_reserves_base_units:"1",real_quote_reserves_base_units:"1",token_total_supply_base_units:"1",protocol_fees_base_units:"0",creator_fees_base_units:"0",complete:false,lifecycle:"bonding_curve",as_of_event_id:null,curve_buy_quote_volume_base_units:"0",curve_sell_quote_volume_base_units:"0",curve_token_volume_base_units:"0",execution_count:0,ignored_non_curve_event_count:0},
  "simulation-ground-truth.schema.json":{schema_version:"1.0.0",scenario_id:"s",agent_id:"a",simulated_role:"retail",latent_controller_group:null,ground_truth_behavior_labels:["unknown"]},
  "source-evidence.schema.json":{schema_version:"cook-source-evidence.1",status:"UNVERIFIED",scope:{},source:{},capture:{},issues:[],source_attestation:"UNKNOWN",signature_verified:false},
- "historical-event-index.schema.json":{schema_version:"cook-historical-event-index.1",batch_ids:[],batch_count:0,event_occurrence_count:0,duplicate_count:0,unique_event_count:0,entries:[],source_attestation:"UNKNOWN",history_complete_attested:false,index_sha256:"a".repeat(64)}
+ "historical-event-index.schema.json":{schema_version:"cook-historical-event-index.1",batch_ids:[],batch_manifest:[],batch_count:0,event_occurrence_count:0,duplicate_count:0,unique_event_count:0,entries:[],source_attestation:"UNKNOWN",history_complete_attested:false,index_sha256:"a".repeat(64)},
+ "paper-quote-plan.schema.json":{schema_version:"cook-paper-quote-plan.1",status:"BLOCKED",quote:{},reasons:[],paper_only:true,execution_enabled:false,transaction_signing_enabled:false,transaction_submission_enabled:false},
+ "risk-alert-event.schema.json":{sequence:1,type:"ALERT_OPENED",alert_id:"a",at_ms:1,payload:{},previous_hash:"0".repeat(64),record_hash:"1".repeat(64)}
  };
  for(const [name,sample] of Object.entries(samples)){const result=validateJsonSchema(sample,registry.get(name),registry);assert.equal(result.valid,true,name+": "+JSON.stringify(result.errors));}
 });

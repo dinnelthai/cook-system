@@ -22,7 +22,8 @@ export function assessPortfolioRisk({positions,account,marketSnapshots,limits,no
  const maxLoss=units(limits.max_daily_loss_quote_base_units,"max daily loss");
  if(dailyLoss>maxLoss)findings.push({code:"DAILY_LOSS_LIMIT",severity:"BLOCK",actual:dailyLoss.toString(),limit:maxLoss.toString()});
  if(unknownExposure>0n)findings.push({code:"POSITION_OWNERSHIP_OR_VALUATION_UNKNOWN",severity:"UNKNOWN",exposure_quote_base_units:unknownExposure.toString()});
- const snapshots=new Map(marketSnapshots.map(s=>[s.market_id,s]));
+ const snapshots=new Map();
+ for(const snapshot of marketSnapshots){if(!snapshot?.market_id||snapshots.has(snapshot.market_id))throw Error("DUPLICATE_OR_INVALID_MARKET_SNAPSHOT");snapshots.set(snapshot.market_id,snapshot);}
  for(const [marketId,exposure] of byMarket){
   const snapshot=snapshots.get(marketId);
   if(!snapshot){findings.push({code:"MARKET_SNAPSHOT_MISSING",severity:"UNKNOWN",market_id:marketId});continue;}

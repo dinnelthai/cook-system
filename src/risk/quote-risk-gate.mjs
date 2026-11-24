@@ -14,8 +14,9 @@ export function evaluateQuotePlan({market,portfolio,policy,riskState={halted:fal
  if(!market||!portfolio||!policy||!Number.isSafeInteger(nowMs)||nowMs<0)throw Error("INVALID_QUOTE_PLAN_INPUT");
  for(const k of ["max_market_age_ms","base_spread_bps","min_spread_bps","max_spread_bps","max_inventory_skew_bps","max_drawdown_bps"])
   if(!Number.isSafeInteger(policy[k])||policy[k]<0)throw Error("INVALID_QUOTE_POLICY:"+k);
- if(policy.min_spread_bps>policy.max_spread_bps||policy.base_spread_bps>10000||policy.max_spread_bps>10000)throw Error("INVALID_SPREAD_POLICY");
- const reasons=[],halted=riskState.halted===true,mid=price(market.mid_price_decimal),observed=market.observed_at_ms;
+ if(policy.min_spread_bps>policy.max_spread_bps||policy.base_spread_bps>10000||policy.max_spread_bps>10000||policy.max_inventory_skew_bps>10000)throw Error("INVALID_SPREAD_POLICY");
+ const reasons=[],halted=riskState.halted!==false,mid=price(market.mid_price_decimal),observed=market.observed_at_ms;
+ if(riskState.halted!==true&&riskState.halted!==false)reasons.push("HALT_STATE_UNKNOWN");
  if(!Number.isSafeInteger(observed)||observed<0||observed>nowMs)reasons.push("MARKET_TIMESTAMP_INVALID");
  else if(nowMs-observed>policy.max_market_age_ms)reasons.push("MARKET_DATA_STALE");
  if(!["complete","synthetic"].includes(market.data_completeness))reasons.push("MARKET_DATA_NOT_COMPLETE");

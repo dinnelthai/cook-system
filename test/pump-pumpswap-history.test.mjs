@@ -250,6 +250,9 @@ test("full mint collector follows migration into PumpSwap and reconciles post-gr
   const result=await fetchPumpMintHistory({rpc,mint:MINT,network,maxSignatures:20});
   assert.ok(result.events.every(event => event.market.network === network && event.provenance === "observed_chain"));
   assert.equal(result.curve_replay_status,"REPLAYED_FULL_CURVE_HISTORY");
+  assert.notEqual(result.event_timeline_audit.curve.status,"REVIEW_REQUIRED");
+  assert.equal(result.candle_integrity_audit.status,"CONSISTENT");
+  assert.equal(result.source_provenance.source_attestation,"UNKNOWN");
   assert.equal(result.pool_replays.length,1);
   assert.equal(result.pool_replays[0].replay_status,"REPLAYED_FULL_POOL_HISTORY");
   assert.equal(result.status,"REPLAYED_FULL_HISTORY");
