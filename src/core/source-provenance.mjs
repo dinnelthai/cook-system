@@ -15,7 +15,8 @@ export function assessSourceProvenance({scope,source,capture,rawPayload}={}){
  if(scope.provenance!=="observed_chain")issues.push("PROVENANCE_SCOPE_MISMATCH");
  if(!["rpc","indexer"].includes(source.source_type))issues.push("SOURCE_TYPE_NOT_INDEPENDENTLY_CHECKABLE");
  if(!nonempty(source.source_id)||!nonempty(source.endpoint_id))issues.push("SOURCE_IDENTITY_MISSING");
- if(!nonempty(source.observed_genesis_hash)||source.observed_genesis_hash!==scope.genesis_hash)issues.push("GENESIS_IDENTITY_MISMATCH");
+ if(!nonempty(source.observed_genesis_hash))issues.push("GENESIS_IDENTITY_UNAVAILABLE");
+ else if(nonempty(scope.genesis_hash)&&source.observed_genesis_hash!==scope.genesis_hash)issues.push("GENESIS_IDENTITY_MISMATCH");
  if(!["confirmed","finalized"].includes(capture.commitment))issues.push("COMMITMENT_UNAVAILABLE");
  if(!Number.isSafeInteger(capture.captured_at_ms)||capture.captured_at_ms<0)issues.push("CAPTURE_TIME_MISSING");
  if(!nonempty(capture.adapter_version)||!nonempty(capture.query_fingerprint))issues.push("CAPTURE_METADATA_INCOMPLETE");

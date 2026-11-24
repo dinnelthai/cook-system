@@ -121,6 +121,10 @@ export class SolanaRpcClient {
     return this.request("getSignaturesForAddress", [address, config]);
   }
 
+  getGenesisHash() {
+    return this.request("getGenesisHash", []);
+  }
+
   getSlot({ commitment = this.commitment } = {}) {
     return this.request("getSlot", [{ commitment }]);
   }
