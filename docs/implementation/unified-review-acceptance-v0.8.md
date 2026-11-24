@@ -1,0 +1,7 @@
+# V0.8 unified review and acceptance
+
+All historical presentation pages and exports use buildUnifiedHistoricalReport, which projects the current terminal audit into legacy summary fields. The dashboard reads the same terminal state; a historical evidence discrepancy suppresses accounting and NAV metrics rather than allowing stale internal totals. Market reserve summary fields are withheld if market coverage is incomplete. Raw inputs remain available for evidence review and are not independently authenticated. The synthetic stress experiment deliberately uses the old standalone report builder for fixed test cases, not current project reporting.
+
+All browser report imports are bounded to 16 MiB. Navigation/reset/new import invalidates pending imports; local report reads have a 15-second timeout. Structured diagnostics record known audit issue codes and severity counts without raw wallet data. Exported report includes the unified terminal state. New report schema is unified-historical-report.1 (derived export, not raw import).
+
+Acceptance: npm ci; npm test; start existing loopback server; import consistent and mismatching archived fixtures; compare terminal, dashboard, project archive and exported JSON; confirm mismatching financial values are unavailable; verify no historical execution or settlement. Test fixtures remain synthetic and cannot attest chain authenticity. This does not complete actual Localnet acceptance, persistent audit storage integration, or live monitoring. Do not reset or redeploy the validator solely for these offline checks.

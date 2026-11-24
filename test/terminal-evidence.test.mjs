@@ -49,3 +49,26 @@ test("receipt signature mapping is required and inconsistent cash amounts are fl
  const j=fixture();j.cash.entries[0].signature=j.cash.entries[1].signature;const s=buildTerminalState(j);
  assert.equal(s.archived_evidence.status,"REVIEW_REQUIRED");assert.equal(s.treasury.realized_project_pnl_base_units,null);
 });
+
+test("unified presentation suppresses all accounting metrics when raw evidence disagrees",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const i=fixture();i.archivedEvidence.accountInterval.closing.tokenAmount="49";
+ const r=buildUnifiedHistoricalReport(i);
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.equal(r.terminal_state.status,r.status);
+ assert.ok(Object.values(r.accounting).every(v=>v===null));
+ assert.ok(Object.values(r.terminal_state.treasury).every(v=>v===null));
+ assert.equal(r.settlement_allowed,false);assert.equal(r.source_attestation,"UNKNOWN");
+});
+test("unified report preserves consistent internal metrics and synthetic provenance",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const r=buildUnifiedHistoricalReport(fixture());assert.equal(r.accounting.closing_cash_base_units,"887");
+ assert.equal(r.accounting.closing_cash_base_units,r.terminal_state.treasury.closing_cash_base_units);assert.equal(r.settlement_allowed,false);
+ const sample=buildUnifiedHistoricalReport(raw());assert.equal(sample.source_mode,"SYNTHETIC");
+ assert.equal(sample.accounting.closing_cash_base_units,"887");
+});
+test("unified report suppresses unverified reserve snapshots",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const i=raw();i.market.historyComplete=false;const r=buildUnifiedHistoricalReport(i);
+ assert.equal(r.market_history.real_quote_reserves_base_units,null);
+ assert.equal(r.market_history.virtual_token_reserves_base_units,null);
+});

@@ -5,8 +5,8 @@ import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-rep
 import { getParticipantCatalogue, evaluateParticipantStressCases } from "../src/inner-market/participant-stress-lab.mjs";
 import { runParticipantExperiment } from "../src/inner-market/participant-experiment.mjs";
 import {buildTerminalCandles} from "../src/inner-market/terminal-candles.mjs";
-import {buildTerminalState,advanceReview,makeReviewArchive,restoreReviewArchive} from "../src/inner-market/terminal-state.mjs";
-import { buildHistoricalDashboard } from "../src/inner-market/historical-dashboard.mjs";
+import {advanceReview,makeReviewArchive,restoreReviewArchive} from "../src/inner-market/terminal-state.mjs";
+import { buildUnifiedHistoricalReport } from "../src/inner-market/unified-historical-report.mjs";
 import {createDiagnosticLog,errorKind} from "./diagnostic-log.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 const diagnostics=createDiagnosticLog();
@@ -25,8 +25,8 @@ function startupFailure(error){
 function auditedReport(input){
  const start=performance.now();
  try{
-  const r=buildHistoricalMvpReport(input);
-  record("report.built",{source_mode:r.source_mode,status:r.status,issue_count:r.issues.length,issues:r.issues,buy_count:r.market_history.confirmed_buy_count,sell_count:r.market_history.confirmed_sell_count,duration_ms:Math.round(performance.now()-start)},r.status==="REPORT_READY"?"INFO":"WARN");
+  const r=buildUnifiedHistoricalReport(input);
+  record("report.built",{source_mode:r.source_mode,status:r.status,issue_count:r.issues.length,issues:r.issues,critical_count:r.terminal_state.risk.counts.critical,warning_count:r.terminal_state.risk.counts.warning,unknown_count:r.terminal_state.risk.counts.unknown,buy_count:r.market_history.confirmed_buy_count,sell_count:r.market_history.confirmed_sell_count,duration_ms:Math.round(performance.now()-start)},r.status==="REPORT_READY"?"INFO":"WARN");
   return r;
  }catch(e){record("report.failed",{error_kind:errorKind(e),duration_ms:Math.round(performance.now()-start)},"ERROR");throw e;}
 }
@@ -37,7 +37,8 @@ const fixture=await (async()=>{
  catch(e){record("fixture.failed",{error_kind:errorKind(e)},"ERROR");startupFailure(e);throw e;}
 })();
 const original=structuredClone(fixture);
-let data=structuredClone(fixture),report,page="terminal";
+let data=structuredClone(fixture),report,page="terminal",importTicket=0;
+const importCurrent=(ticket,startPage)=>ticket===importTicket&&page===startPage;
 try{report=auditedReport(data)}catch(e){startupFailure(e);throw e;}
 const esc=s=>String(s??"—").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const solAmount=x=>{if(x==null)return "—";const n=BigInt(x),v=n<0n?-n:n;return (n<0n?"-":"")+(v/1000000000n)+"."+String(v%1000000000n).padStart(9,"0").replace(/0+$/,"").padEnd(2,"0")+" SOL"};
@@ -84,7 +85,7 @@ function candleChart(result){
  return svg+'<p class="muted">历史成交 · UTC · 价格按来源口径 · 图表原始数值 · 图形为近似显示，原始数值保持精确。</p>';
 }
 function renderTerminal(){
- const d=buildTerminalState(data),a=d.treasury,m=d.market,scope=d.scope;
+ const d=report.terminal_state,a=d.treasury,m=d.market,scope=d.scope;
  const ready=d.status==="REPORT_READY";
  const candleResult=buildTerminalCandles(data,candleInterval);
  const candleControls='<div class="row candle-controls">'+[[60000,"1m"],[300000,"5m"],[900000,"15m"],[3600000,"1h"]].map(([ms,label])=>'<button data-candle-interval="'+ms+'" aria-pressed="'+(candleInterval===ms)+'">'+label+'</button>').join("")+'</div>';
@@ -123,21 +124,21 @@ function renderTerminal(){
  main.querySelector("#open-data").onclick=()=>main.querySelector("#data-dialog").showModal();
  main.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>main.querySelector("#"+b.dataset.close).close());
  main.querySelectorAll("[data-candle-interval]").forEach(b=>b.onclick=()=>{candleInterval=Number(b.dataset.candleInterval);render()});
- main.querySelector("#terminal-local-load").onclick=async()=>{const before=data;try{const response=await fetch("/api/terminal/report",{cache:"no-store"});if(!response.ok)throw Error("本地报告桥未配置或数据无效");const next=await response.json();const nextReport=auditedReport(next);buildTerminalState(next);if(data!==before||page!=="terminal")return;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");const el=document.querySelector("#terminal-error");if(el)el.textContent=err.message}};
+ main.querySelector("#terminal-local-load").onclick=async()=>{const before=data,ticket=++importTicket,startPage=page;try{const response=await fetch("/api/terminal/report",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("本地报告桥未配置或数据无效");const next=await response.json();const nextReport=auditedReport(next);if(data!==before||!importCurrent(ticket,startPage))return;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#terminal-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
  main.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{terminalTab=b.dataset.tab;render()});
  main.querySelector("#terminal-meta").onsubmit=e=>{e.preventDefault();metadata=Object.fromEntries(new FormData(e.currentTarget));record("metadata.saved");render()};
  main.querySelector("#terminal-pause").onclick=()=>{reviewPaused=!reviewPaused;render()};
- main.querySelector("#terminal-export").onclick=()=>download("closed-interval-report.json",JSON.stringify({metadata,reviewStage,report,state:d},null,2));
+ main.querySelector("#terminal-export").onclick=()=>download("closed-interval-report.json",JSON.stringify({metadata,reviewStage,report},null,2));
  main.querySelector("#terminal-settle").onclick=()=>{reviewStage=advanceReview(reviewStage,"settle",d);record("review.settled",{page});render()};
  main.querySelector("#terminal-archive").onclick=()=>{if(reviewStage==="SETTLED")reviewStage=advanceReview(reviewStage,"archive",d);download("cook-review-archive.json",JSON.stringify(makeReviewArchive(data,metadata,reviewStage),null,2));record("review.archived",{page});render()};
- main.querySelector("#terminal-import").onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>16*1024*1024)throw Error("报告文件超过 16 MiB");const raw=JSON.parse(await f.text());const restored=raw?.schema_version==="cook-review-archive.1"?restoreReviewArchive(raw):null;const next=restored?.input??raw;const nextReport=auditedReport(next);buildTerminalState(next);data=next;report=nextReport;reviewInput=data;reviewStage=restored?.stage??"REVIEW";metadata=restored?.metadata??null;reviewPaused=false;if(restored)record("review.restored",{page});record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");const el=document.querySelector("#terminal-error");if(el)el.textContent=err.message}};
+ main.querySelector("#terminal-import").onchange=async e=>{const ticket=++importTicket,startPage=page;try{const f=e.target.files[0];if(!f)return;if(f.size>16*1024*1024)throw Error("报告文件超过 16 MiB");const raw=JSON.parse(await f.text());const restored=raw?.schema_version==="cook-review-archive.1"?restoreReviewArchive(raw):null;const next=restored?.input??raw;const nextReport=auditedReport(next);if(!importCurrent(ticket,startPage))return;data=next;report=nextReport;reviewInput=data;reviewStage=restored?.stage??"REVIEW";metadata=restored?.metadata??null;reviewPaused=false;if(restored)record("review.restored",{page});record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#terminal-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
 }
 function render(){
  if(reviewInput!==data){reviewInput=data;reviewStage="REVIEW";metadata=null;reviewPaused=false;}
  main.dataset.page=page;
  document.querySelector(".tag").textContent="LOCALNET";
  nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+((page===id||id==="market"&&["lab","create"].includes(page))?"active":"")+'"'+(page===id?' aria-current="page"':'')+'><span class="nav-num" aria-hidden="true">'+label.slice(0,2)+'</span><span>'+esc(label.slice(3))+'</span></button>').join("");
- nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{page=b.dataset.page;record("page.open",{page});render()});
+ nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.page;record("page.open",{page});render()});
  const a=report.accounting,m=report.market_history;
  const links=(items)=>'<div class="row subnav">'+items.map(([id,label])=>'<button data-subpage="'+id+'">'+esc(label)+'</button>').join("")+'</div>';
  const context=()=>note("数据来源："+report.source_mode+" · 离线区间报告；Localnet 实时接口尚未接入。未知值不作估算。");
@@ -148,7 +149,7 @@ function render(){
  }else if(page==="projects"){
  main.innerHTML=screenHeading("项目档案","当前会话 · 历史区间")+panel("项目记录",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status+" / "+reviewStage]]))+panel("资料",metadata?table(["字段","内容"],Object.entries(metadata)):emptyState("尚未保存项目资料","在操作台中整理资料"))+details("当前报告",report);
  }else if(page==="dashboard"){
- const d=buildHistoricalDashboard(data),t=d.treasury,v=d.market;
+ const d=report.terminal_state,t=d.treasury,v=d.market;
  const sol=x=>{if(x==null)return "未知";if(d.scope.quoteAsset!=="SOL_LAMPORTS")return x+" base units";const n=BigInt(x),abs=n<0n?-n:n;return (n<0n?"-":"")+(abs/1000000000n).toString()+"."+(abs%1000000000n).toString().padStart(9,"0")+" SOL"};
  const known=x=>x==null?"未知":x;
  const fmt=x=>quoteAmount(x,d.scope.quoteAsset);
@@ -158,18 +159,18 @@ function render(){
  '<div class="terminal-kpis stats">'+stat("期末现金",fmt(t.closing_cash_base_units))+stat("已实现净收益",fmt(t.realized_project_pnl_base_units))+stat("库存成本",fmt(t.remaining_cost_basis_base_units))+stat("创作者费",fmt(t.creator_cash_income_base_units))+stat("历史回撤",t.max_observed_drawdown_bps==null?"未知":Number(t.max_observed_drawdown_bps)/100+"%")+'</div>'+
  '<div class="terminal-grid"><div>'+panel("资产净值 · 历史快照",seriesChart(navPoints,"NAV"))+panel("成交金额 · 已确认事件",seriesChart(confirmed.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE"))+'</div><div>'+
  panel("市场状态",'<div class="stats">'+stat("买入笔数",v.buy_trade_count)+stat("卖出笔数",v.sell_trade_count)+'</div>'+table(["指标","数值"],[["买入名义额",fmt(v.buy_notional_base_units)],["卖出名义额",fmt(v.sell_notional_base_units)],["真实储备",fmt(v.verified_real_reserve_base_units)],["买入地址",known(v.buy_address_count)],["卖出地址",known(v.sell_address_count)]]))+
- panel("风险与数据",table(["检查","结果"],[["统一审计",d.status],["历史覆盖",v.history_complete?"已声明完整":"待复核"],["Localnet","未接入"]])+(d.issues.length?table(["待复核事项"],d.issues.map(x=>[x])):""))+'</div></div>'+
+ panel("风险与数据",table(["检查","结果"],[["统一审计",d.status],["历史证据",d.archived_evidence.status],["来源认证","UNKNOWN"],["历史覆盖",v.history_complete?"已声明完整":"待复核"],["Localnet","未接入"]])+(d.issues.length?table(["待复核事项"],d.issues.map(x=>[x])):""))+'</div></div>'+
  panel("项目资金明细",table(["指标","数值"],[["交易支出",fmt(t.actual_trade_spend_base_units)],["交易回款",fmt(t.actual_trade_receipts_base_units)],["净交易支出",fmt(t.net_trade_cash_spend_base_units)],["资本流入",fmt(t.recorded_capital_in_base_units)],["资本流出",fmt(t.recorded_capital_out_base_units)],["独立费用",fmt(t.recorded_expenses_base_units)],["库存数量（base units）",known(t.closing_token_balance_base_units)]]))+
  panel("数据区间",'<label for="dashboard-import">导入完整的历史报告输入 JSON</label><input type="file" id="dashboard-import" accept=".json"><p id="dashboard-error" class="negative"></p><p class="muted">离线区间数据；名义成交额不代表独立需求。未知值不估算。</p>');
- document.querySelector("#dashboard-reset").onclick=()=>{record("sample.reset",{page});data=structuredClone(original);report=auditedReport(data);render()};
+ document.querySelector("#dashboard-reset").onclick=()=>{importTicket++;record("sample.reset",{page});data=structuredClone(original);report=auditedReport(data);render()};
  document.querySelector("#dashboard-export").onclick=()=>download("historical-dashboard.json",JSON.stringify(d,null,2));
- document.querySelector("#dashboard-import").onchange=async e=>{try{const file=e.target.files[0];if(!file)return;record("report.import.started",{page,file_bytes:file.size});const next=JSON.parse(await file.text());buildHistoricalDashboard(next);const nextReport=auditedReport(next);data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");document.querySelector("#dashboard-error").textContent=err.message}};
+ document.querySelector("#dashboard-import").onchange=async e=>{const ticket=++importTicket,startPage=page;try{const file=e.target.files[0];if(!file)return;if(file.size>16*1024*1024)throw Error("报告文件超过 16 MiB");record("report.import.started",{page,file_bytes:file.size});const next=JSON.parse(await file.text());const nextReport=auditedReport(next);if(!importCurrent(ticket,startPage))return;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#dashboard-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
  }else if(page==="create"){
  main.innerHTML='<h2>发行资料</h2>'+note("仅用于整理测试资料，不创建 Token、不构造或提交交易。")+'<form id="metadata" class="panel"><div class="grid"><div><label>名称</label><input name="name" required maxlength="32" placeholder="Test Token"></div><div><label>Symbol</label><input name="symbol" required maxlength="10" placeholder="TEST"></div><div><label>Decimals</label><input disabled value="由协议配置读取"></div><div><label>Supply</label><input disabled value="由协议配置读取"></div><div><label>描述</label><textarea name="description" maxlength="1000"></textarea></div><div><label>图片（本地预览）</label><input type="file" id="image" accept="image/png,image/jpeg"><img id="preview" class="preview hidden" alt="图片预览"></div></div><div class="grid"><div><label>Website</label><input name="website" type="url"></div><div><label>Telegram</label><input name="telegram" type="url"></div><div><label>Twitter / X</label><input name="twitter" type="url"></div></div><p class="muted">权限、费用、初始交易结果需由测试环境实际数据验证；本页面不支持钱包连接或买入提交。</p><button class="primary" type="submit">导出本地资料 JSON</button></form>';
  document.querySelector("#metadata").onsubmit=e=>{e.preventDefault();download("synthetic-token-metadata.json",JSON.stringify({sourceMode:"SYNTHETIC",...Object.fromEntries(new FormData(e.currentTarget))},null,2))};
  document.querySelector("#image").onchange=e=>{const f=e.target.files[0];if(!f)return;const p=document.querySelector("#preview");const url=URL.createObjectURL(f);p.onload=()=>URL.revokeObjectURL(url);p.src=url;p.classList.remove("hidden")};
  }else if(page=="wallet"){
- const d=buildHistoricalDashboard(data),t=d.treasury;
+ const d=report.terminal_state,t=d.treasury;
  main.innerHTML=screenHeading("Treasury / 资金中心","项目账本 · 报价资产原始单位")+
  metrics([["期末现金",a.closing_cash_base_units],["已实现盈亏",a.realized_project_pnl_base_units],["创作者费",a.creator_cash_income_base_units],["独立费用",t.recorded_expenses_base_units]])+
  splitView(panel("资金收支",compareBars([["交易支出",t.actual_trade_spend_base_units,"red"],["交易回款",t.actual_trade_receipts_base_units,"green"],["创作者收入",a.creator_cash_income_base_units,"green"],["独立费用",t.recorded_expenses_base_units,"red"]],"base units")),panel("财务对账",table(["检查","结果"],[["总账",report.status],["资本流入",t.recorded_capital_in_base_units],["资本流出",t.recorded_capital_out_base_units]]))+emptyState("钱包余额未接入","当前报告仅包含项目级资金证据"))+
@@ -177,10 +178,10 @@ function render(){
 
  }else if(page==="lab"){
  main.innerHTML='<h2>历史成交测试</h2>'+note("读取固定的合成或已归档历史报告数据，仅进行离线核算。")+'<div class="panel"><div class="row"><button id="reset">恢复默认样本</button><button id="bad">测试缺失交易</button><button id="export">导出报告</button></div><label>导入已标准化历史 JSON</label><input id="load" type="file" accept=".json"><p id="error" class="negative"></p></div>'+panel("逐笔成交记录",table(["事件","序号","方向","金额（base units）","状态"],data.market.trades.map(t=>[t.id,t.sequence,t.side,t.quoteNotionalBaseUnits,t.status])))+details("核算结果原始数据",report);
- document.querySelector("#reset").onclick=()=>{record("sample.reset",{page});data=structuredClone(original);report=auditedReport(data);render()};
- document.querySelector("#bad").onclick=()=>{record("sample.incomplete",{page},"WARN");data=structuredClone(original);data.market.historyComplete=false;report=auditedReport(data);render()};
+ document.querySelector("#reset").onclick=()=>{importTicket++;record("sample.reset",{page});data=structuredClone(original);report=auditedReport(data);render()};
+ document.querySelector("#bad").onclick=()=>{importTicket++;record("sample.incomplete",{page},"WARN");data=structuredClone(original);data.market.historyComplete=false;report=auditedReport(data);render()};
  document.querySelector("#export").onclick=()=>download("mvp-historical-report.json",JSON.stringify(report,null,2));
- document.querySelector("#load").onchange=async e=>{try{const file=e.target.files[0];if(!file)return;record("report.import.started",{page,file_bytes:file.size});const next=JSON.parse(await file.text());const nextReport=auditedReport(next);data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");document.querySelector("#error").textContent=err.message}};
+ document.querySelector("#load").onchange=async e=>{const ticket=++importTicket,startPage=page;try{const file=e.target.files[0];if(!file)return;if(file.size>16*1024*1024)throw Error("报告文件超过 16 MiB");record("report.import.started",{page,file_bytes:file.size});const next=JSON.parse(await file.text());const nextReport=auditedReport(next);if(!importCurrent(ticket,startPage))return;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
  }else if(page=="market"){
  const trades=data.market.trades.filter(x=>x.status==="FINALIZED"&&x.reconciliation==="PASS");
  main.innerHTML=screenHeading("Markets / 市场终端",data.scope.projectId+" · "+data.scope.tokenMint)+
