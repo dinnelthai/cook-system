@@ -1,0 +1,8 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/dinnelthai/cook-system/blob/main/schemas/source-evidence.schema.json",
+ "title":"SourceEvidence","type":"object","additionalProperties":false,
+ "required":["schema_version","status","scope","source","capture","issues","source_attestation","signature_verified"],
+ "properties":{"schema_version":{"const":"cook-source-evidence.1"},"status":{"type":"string","enum":["SYNTHETIC_ONLY","REVIEW_REQUIRED","IDENTITY_MATCHED_NOT_AUTHENTICATED","UNVERIFIED"]},
+ "scope":{"type":"object"},"source":{"type":"object"},"capture":{"type":"object"},"issues":{"type":"array","items":{"type":"string"}},
+ "source_attestation":{"type":"string","enum":["UNKNOWN","NOT_APPLICABLE"]},"signature_verified":{"type":"boolean"},"note":{"type":"string"}}
+}

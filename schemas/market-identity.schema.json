@@ -16,7 +16,7 @@
     "chain_id": { "type": "string", "minLength": 1 },
     "network": {
       "type": "string",
-      "enum": ["mainnet", "devnet", "local_sim"]
+      "enum": ["mainnet", "devnet", "local_sim", "synthetic"]
     },
     "token_mint": { "type": "string", "minLength": 1 },
     "quote_mint": { "type": "string", "minLength": 1 },
