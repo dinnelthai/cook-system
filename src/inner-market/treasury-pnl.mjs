@@ -149,6 +149,10 @@ export function replayTreasuryTradePnl({
     confirmed_sell_count: confirmedSellCount,
     ignored_unconfirmed_count: ignoredUnconfirmedCount,
     ignored_non_trade_event_count: ignoredNonTradeCount,
+    ending_token_balance_base_units: tokenBalance.toString(),
+    remaining_cost_basis_quote_base_units: costBasis.toString(),
+    total_buy_cost_quote_base_units: buyCost.toString(),
+    total_net_sell_proceeds_quote_base_units: sellProceeds.toString(),
     position: {
       ending_token_balance_base_units: tokenBalance.toString(),
       remaining_cost_basis_quote_base_units: costBasis.toString(),
