@@ -66,6 +66,12 @@ test("treasury PnL uses confirmed trades only and weighted-average cost", () => 
   assert.equal(result.ending_token_balance_base_units, "100");
   assert.equal(result.remaining_cost_basis_quote_base_units, "1110");
   assert.equal(result.realized_pnl_quote_base_units, "380");
+  assert.equal(result.position.average_cost_quote_per_token, "11.1");
+  assert.equal(result.position.total_bought_token_amount_base_units, "200");
+  assert.equal(result.position.total_sold_token_amount_base_units, "100");
+  assert.equal(result.cash_flow.net_cash_deployed_quote_base_units, "730");
+  assert.equal(result.position_journal.length, 3);
+  assert.equal(result.position_journal[1].average_cost_quote_per_token_after, "11.1");
   assert.equal(result.ignored_unconfirmed_count, 1);
 });
 
