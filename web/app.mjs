@@ -241,7 +241,7 @@ function render(){
  main.insertAdjacentHTML("beforeend",'<div class="row"><button id="quick-log-export">导出诊断日志</button></div>');
  document.querySelector("#quick-log-export").onclick=exportDiagnostics;
  const extras=page==="market"?[["lab","历史回放 / 导入"],["create","发行资料"]]:page==="lab"||page==="create"?[["market","返回市场中心"]]:page==="logs"?[["terminal","返回操作台"]]:[];
- if(extras.length){main.insertAdjacentHTML("afterbegin",links(extras));main.querySelectorAll("[data-subpage]").forEach(b=>b.onclick=()=>{page=b.dataset.subpage;record("page.open",{page});render()});}
+ if(extras.length){main.insertAdjacentHTML("afterbegin",links(extras));main.querySelectorAll("[data-subpage]").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.subpage;record("page.open",{page});render()});}
  main.insertAdjacentHTML("beforeend",'<p class="foot">Cook System · Localnet · 仅 Localnet 测试交易</p>');
 }
 render();

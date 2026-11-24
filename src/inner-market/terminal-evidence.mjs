@@ -16,6 +16,17 @@ export function auditTerminalEvidence(input){
  for(const section of [input.cash,input.inventory,input.creator,input.nav,input.market]){
   if(!["network","genesisHash","wallet","tokenAccount"].every(k=>section.scope?.[k]===s[k]))throw Error("TERMINAL_SECTION_SCOPE_MISMATCH");
  }
+ // Reject contradictions in nested accounting scopes. Older NAV rows do
+ // not carry all scope fields, so absent optional labels remain unauthenticated.
+ const core=["projectId","quoteAsset","tokenMint","openingCutoff","closingCutoff"];
+ const extended=["network","genesisHash","wallet","tokenAccount"];
+ const scopedRows=[input.inventory.opening.scope,input.inventory.closing.scope,input.inventory.tradeSummary.scope,...input.inventory.adjustments.map(x=>x.scope)];
+ for(const row of scopedRows){
+  if(!row||!core.every(k=>row[k]===s[k])||extended.some(k=>Object.hasOwn(row,k)&&row[k]!==s[k]))throw Error("TERMINAL_NESTED_SCOPE_MISMATCH");
+ }
+ for(const row of [...input.cash.entries,...input.creator.entries,...input.nav.snapshots,...input.market.trades]){
+  if(!row||[...core,...extended].some(k=>Object.hasOwn(row,k)&&row[k]!==s[k]))throw Error("TERMINAL_ROW_SCOPE_MISMATCH");
+ }
  const postings=input.cash.entries.map(p=>{
   if(!nonempty(p.signature))throw Error("MISSING_POSTING_SIGNATURE");
   for(const [k,v] of Object.entries({genesisHash:s.genesisHash,wallet:s.wallet,openingSlot:a.openingSlot,closingSlot:a.closingSlot})){

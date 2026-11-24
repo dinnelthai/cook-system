@@ -72,3 +72,16 @@ test("unified report suppresses unverified reserve snapshots",async()=>{
  assert.equal(r.market_history.real_quote_reserves_base_units,null);
  assert.equal(r.market_history.virtual_token_reserves_base_units,null);
 });
+
+test("nested inventory and row scope contradictions are rejected",()=>{
+ for(const mutate of [
+  i=>i.inventory.opening.scope.wallet="other",
+  i=>i.inventory.tradeSummary.scope.genesisHash="other",
+  i=>i.cash.entries[0].tokenMint="other",
+  i=>i.creator.entries[0].wallet="other",
+  i=>i.nav.snapshots[0].network="mainnet",
+  i=>i.market.trades[0].openingCutoff="slot:0"
+ ]){
+  const i=fixture();mutate(i);assert.throws(()=>buildTerminalState(i),/SCOPE_MISMATCH/);
+ }
+});

@@ -5,10 +5,10 @@ import {createLocalTransfer} from "../src/inner-market/local-transfer.mjs";
 import {createLocalFaucet} from "../src/inner-market/local-faucet.mjs";
 import { checkLocalRpcHealth } from "../src/inner-market/local-rpc-health.mjs";
 import { buildTerminalState } from "../src/inner-market/terminal-state.mjs";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { resolve,extname,sep } from "node:path";
-const root=fileURLToPath(new URL("../",import.meta.url));
+import { resolve,extname,sep,relative as relativePath,isAbsolute } from "node:path";
+const root=await realpath(fileURLToPath(new URL("../",import.meta.url)));
 const allowed=["web/","src/inner-market/","src/core/","fixtures/synthetic/"];
 const types={".html":"text/html; charset=utf-8",".mjs":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8"};
 const reportPath=process.env.COOK_TERMINAL_REPORT;
@@ -21,6 +21,8 @@ const transfers=createLocalTransfer({endpoint:process.env.COOK_LOCAL_RPC_URL,exp
 const trading=createLocalTrading({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:process.env.COOK_LOCAL_FAUCET==="1",labUrl:process.env.COOK_PUMP_LAB_URL,wallets});
 createServer(async(req,res)=>{
  try{
+  const requestHost=req.headers.host,requestOrigin=req.headers.origin;
+  if(!["127.0.0.1:"+port,"localhost:"+port].includes(requestHost)||req.headers["sec-fetch-site"]==="cross-site"||(requestOrigin&&requestOrigin!=="http://"+requestHost)){res.writeHead(403,{"Cache-Control":"no-store","Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"FORBIDDEN"}));return;}
   if(["/api/local-wallet/balance","/api/local-wallet/airdrop","/api/local-wallet/list","/api/local-wallet/create","/api/local-wallet/transfer","/api/local-wallet/market","/api/local-wallet/market-data","/api/local-wallet/trade"].includes(req.url)){
    const send=(status,body)=>{res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify(body))};
    const host=req.headers.host,origin=req.headers.origin;
@@ -62,9 +64,14 @@ createServer(async(req,res)=>{
   }
   const path=url.pathname==="/"?"web/index.html":decodeURIComponent(url.pathname).replace(/^\/+/, "");
   const target=resolve(root,path);
-  const relative=target.slice(root.length).split(sep).join("/");
-  if(!target.startsWith(root)||!allowed.some(prefix=>relative.startsWith(prefix))||!types[extname(target)]){res.writeHead(404);res.end("Not found");return}
-  const bytes=await readFile(target);
+  const relative=relativePath(root,target).split(sep).join("/");
+  if(isAbsolute(relative)||relative===".."||relative.startsWith("../")||!allowed.some(prefix=>relative.startsWith(prefix))||!types[extname(target)]){res.writeHead(404);res.end("Not found");return}
+  const resolved=await realpath(target);
+  if(resolved!==target){res.writeHead(404);res.end("Not found");return}
+  const info=await stat(resolved);
+  if(!info.isFile()||info.size>maxReportBytes){res.writeHead(404);res.end("Not found");return}
+  const bytes=await readFile(resolved);
+  if(bytes.length>maxReportBytes){res.writeHead(404);res.end("Not found");return}
   res.writeHead(200,{"Content-Type":types[extname(target)],"Cache-Control":"no-store","X-Content-Type-Options":"nosniff","Content-Security-Policy":"default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});
   res.end(bytes);
  }catch{res.writeHead(404);res.end("Not found")}

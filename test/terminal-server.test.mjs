@@ -4,6 +4,9 @@ import {spawn} from "node:child_process";
 import {createServer} from "node:net";
 import {once} from "node:events";
 import {fileURLToPath} from "node:url";
+import {mkdtemp,writeFile,symlink,rm} from "node:fs/promises";
+import {join} from "node:path";
+import {tmpdir} from "node:os";
 
 test("localhost server serves terminal shell, modules and explicit report bridge",{timeout:15000},async t=>{
  const probe=createServer();probe.listen(0,"127.0.0.1");await once(probe,"listening");
@@ -18,6 +21,18 @@ test("localhost server serves terminal shell, modules and explicit report bridge
   child.once("error",reject);child.once("exit",code=>reject(Error("server exited "+code)));
  });
  const base="http://127.0.0.1:"+port;
+ assert.equal((await fetch(base+"/web/app.mjs",{headers:{origin:"https://example.invalid"}})).status,403);
+ assert.equal((await fetch(base+"/api/terminal/report",{headers:{origin:"https://example.invalid"}})).status,403);
+ assert.equal((await fetch(base+"/.env.example")).status,404);
+ if(process.platform!=="win32"){
+  const outside=await mkdtemp(join(tmpdir(),"cook-static-"));
+  const inside=await mkdtemp(fileURLToPath(new URL("../web/.test-static-",import.meta.url)));
+  t.after(async()=>{await rm(inside,{recursive:true,force:true});await rm(outside,{recursive:true,force:true});});
+  await writeFile(join(outside,"private.json"),'{"fixture":true}');
+  await symlink(join(outside,"private.json"),join(inside,"link.json"));
+  const name=inside.split("/").pop();
+  assert.equal((await fetch(base+"/web/"+name+"/link.json")).status,404);
+ }
  const html=await fetch(base);assert.equal(html.status,200);assert.match(await html.text(),/src="\/web\/app\.mjs"/);
  assert.equal((await fetch(base+"/web/app.mjs")).status,200);
  assert.equal((await fetch(base+"/src/inner-market/terminal-state.mjs")).status,200);
