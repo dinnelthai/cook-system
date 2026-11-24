@@ -1,0 +1,6 @@
+{
+  "mode": "READ_ONLY",
+  "network": "localnet",
+  "expectedGenesisHash": "REPLACE_WITH_LOCAL_GENESIS_HASH",
+  "feePayerPublicKey": "REPLACE_WITH_TEST_PAYER_PUBLIC_KEY"
+}
