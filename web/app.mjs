@@ -1,5 +1,6 @@
 import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-report.mjs";
 import { getParticipantCatalogue, evaluateParticipantStressCases } from "../src/inner-market/participant-stress-lab.mjs";
+import { runParticipantExperiment } from "../src/inner-market/participant-experiment.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 const pages=[["create","01 发行资料"],["wallet","02 钱包账本"],["lab","03 历史成交测试"],["market","04 市场监控"],["profit","05 收益与风险"],["participants","06 竞争环境实验室"]];
 const fixture=await fetch("../fixtures/synthetic/inner-market-mvp.json").then(r=>{if(!r.ok)throw new Error("Fixture unavailable");return r.json()});
@@ -37,7 +38,18 @@ function render(){
  '<div class="stats">'+stat("角色类别",roles.length)+stat("合成场景",results.length)+stat("预期结果匹配",results.filter(r=>r.passed).length+" / "+results.length)+'</div>'+
  panel("角色与风险特征",table(["角色","特征","观测关注","局限"],roles.map(r=>[r.role,r.traits.join(" / "),r.observable,r.limitation])))+
  panel("固定场景验收",table(["场景","风险","预期","实际","结果"],results.map(r=>[r.title,r.risk_category,r.expected_status,r.actual_status,r.passed?"PASS":"FAIL"])))+
+ panel("随机压力实验",'<div class="grid"><div><label for="experiment-seed">随机种子</label><input id="experiment-seed" type="number" min="0" max="4294967295" value="42"></div><div><label for="experiment-runs">每类实验次数</label><input id="experiment-runs" type="number" min="1" max="1000" value="100"></div></div><p class="muted">仅随机抽取预置风险场景，不生成交易；采样权重并非真实行为概率。</p><button id="run-experiment" class="primary">运行随机实验</button> <button id="export-experiment" disabled>导出实验</button><div id="experiment-result"></div>')+
  panel("场景报告",'<button id="export-participants">导出实验结果 JSON</button><pre>'+esc(JSON.stringify(results,null,2))+"</pre>");
+ let experiment=null;
+ document.querySelector("#run-experiment").onclick=()=>{
+  const el=document.querySelector("#experiment-result"),exportButton=document.querySelector("#export-experiment");
+  try{
+   experiment=runParticipantExperiment({base:original,seed:Number(document.querySelector("#experiment-seed").value),runs:Number(document.querySelector("#experiment-runs").value)});
+   el.innerHTML='<div class="stats">'+stat("总实验数",experiment.total_trials)+stat("预期匹配",experiment.total_matches)+'</div>'+table(["角色","实验数","扰动次数","需复核次数","预期匹配"],experiment.summaries.map(s=>[s.role,s.runs,s.stress_trials,s.review_required,s.expected_outcome_matches]));
+   exportButton.disabled=false;
+  }catch(err){experiment=null;exportButton.disabled=true;el.textContent=err.message}
+ };
+ document.querySelector("#export-experiment").onclick=()=>{if(experiment)download("synthetic-participant-experiment.json",JSON.stringify(experiment,null,2))};
  document.querySelector("#export-participants").onclick=()=>download("synthetic-participant-stress-results.json",JSON.stringify(results,null,2));
  }else{
  main.innerHTML='<h2>收益与风险</h2>'+note("仅核算已发生的历史事件；未通过统一审计时，财务输出为未知。")+'<div class="stats">'+stat("已实现项目盈亏（lamports）",a.realized_project_pnl_base_units)+stat("已到账手续费（lamports）",a.creator_cash_income_base_units)+stat("历史观测回撤（bps）",a.max_observed_drawdown_bps)+stat("审计状态",report.status)+'</div>'+panel("异常清单",report.issues.length?table(["异常"],report.issues.map(x=>[x])):"<p class='positive'>输入样本通过当前审计规则。</p>")+panel("详细审计","<pre>"+esc(JSON.stringify(report.audits,null,2))+"</pre>")+"<p class='muted'>合成样本通过不等于本地链数据已验证，也不意味着收益可实现。</p>";
