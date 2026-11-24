@@ -45,11 +45,14 @@ function reportedProgramFees(payload) {
   return total;
 }
 
-function networkFeeForEvent(event, payload, treasuryWallets, processedSignatures) {
+function networkFeeForEvent(event, payload, treasuryWallets, processedSignatures, signatureAllowList = null) {
   const costs = payload.transaction_costs ?? event.transaction_costs ?? null;
   if (!costs) return { amount: 0n, signature: null, feePayer: null };
   const signature = costs.signature ?? event.source?.signature ?? payload.signature ?? null;
   if (signature && processedSignatures.has(signature)) {
+    return { amount: 0n, signature, feePayer: costs.fee_payer_address ?? null };
+  }
+  if (signatureAllowList && !signatureAllowList.has(signature)) {
     return { amount: 0n, signature, feePayer: costs.fee_payer_address ?? null };
   }
   if (signature) processedSignatures.add(signature);
@@ -84,6 +87,7 @@ export function replayTreasuryTradePnl({
   openingCostBasisQuoteBaseUnits = null,
   events,
   treasuryWalletAddresses = [],
+  networkFeeSignatureAllowList = null,
   endingTokenBalanceSnapshotBaseUnits = null,
   currentMarkPriceQuoteScaled = null,
   currentLiquidationQuoteBaseUnits = null,
@@ -107,6 +111,7 @@ export function replayTreasuryTradePnl({
   let realizedPnlComplete = true;
 
   const treasuryWallets = new Set(treasuryWalletAddresses);
+  const allowedNetworkFeeSignatures = networkFeeSignatureAllowList === null ? null : new Set(networkFeeSignatureAllowList);
   const candidateEvents = [];
   let ignoredUnconfirmedCount = 0;
   let ignoredNonTradeCount = 0;
@@ -157,7 +162,7 @@ export function replayTreasuryTradePnl({
       ? 0n
       : parseBaseUnits(payload.fee_quote_base_units || "0", { name: "fee_quote_base_units" });
     const reportedFees = event.provenance === "observed_chain" ? reportedProgramFees(payload) : 0n;
-    const networkFee = networkFeeForEvent(event, payload, treasuryWallets, processedFeeSignatures);
+    const networkFee = networkFeeForEvent(event, payload, treasuryWallets, processedFeeSignatures, allowedNetworkFeeSignatures);
     syntheticTradeFees += tradeFee;
     reportedProgramFeeTotal += reportedFees;
     networkFees += networkFee.amount;
