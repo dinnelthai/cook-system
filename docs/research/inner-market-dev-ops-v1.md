@@ -51,14 +51,28 @@ A target market cap can be translated into an implied price (`target MC / circul
 
 Only confirmed, normalized executions affect trade PnL. Transfers, allocations, burns, fee sweeps, and account snapshots are separate ledger event classes and are never counted as market trades.
 
-For each treasury account, track:
+For each treasury account, track the full position over time, not only the launch-day allocation:
 
-- token and quote balances from reconciled account snapshots;
-- buy acquisition cost, including attributable fees;
-- sell proceeds, net of attributable fees;
-- remaining cost basis;
-- realized PnL and unrealized mark-to-market PnL;
-- transaction signatures and event provenance.
+- opening inventory and its explicitly supplied opening cost basis;
+- every confirmed buy as a separate acquisition tranche, including signature, order, token amount, gross quote, fee, and total cash cost;
+- cumulative gross buy spend and cumulative net sell proceeds;
+- current token balance, remaining cost basis, and weighted-average cost per token after every event;
+- every confirmed sell, its allocated cost basis, net proceeds, and realized PnL;
+- unrealized mark-to-market PnL using the current curve marginal price, clearly separated from realizable proceeds;
+- transaction signatures, treasury account identity, and event provenance;
+- account snapshots and explicit reconciliation for transfers, allocations, burns, and other non-trade inventory changes.
+
+Repeated additions are normal ledger events: the Nth confirmed buy increases cumulative acquisition cost and inventory, then recomputes weighted-average cost. A sell reduces both inventory and remaining cost basis proportionally. A later buy starts a new tranche and recomputes the average over the then-current remaining position. Do not reset the cost basis when adding again.
+
+`CumulativeBuyCash = Σ(grossBuyQuote_i + buyFee_i)`
+
+`RemainingCostBasis = OpeningCostBasis + CumulativeBuyCash - CostBasisAllocatedToConfirmedSells`
+
+`AverageCostPerToken = RemainingCostBasis / CurrentTreasuryTokenBalance`
+
+`NetCashDeployed = CumulativeBuyCash - CumulativeNetSellProceeds`
+
+The opening allocation must not be silently treated as a zero-cost purchase. If its basis is unknown, mark the position basis incomplete rather than presenting a misleading average. Transfers are not buys; they require an explicit basis transfer or a reconciliation exception.
 
 V1 uses weighted-average cost for a deterministic first implementation. Accounting method is not tax advice. If a transfer or external allocation changes inventory, reconcile against an account snapshot before treating the trade-only ledger as complete.
 
