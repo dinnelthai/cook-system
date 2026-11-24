@@ -1,0 +1,13 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {validateLocalWalletConfig,auditLocalNetworkFees} from "../src/inner-market/local-wallet-accounting.mjs";
+const g="11111111111111111111111111111112",p="11111111111111111111111111111113";
+const config={mode:"READ_ONLY",network:"localnet",expectedGenesisHash:g,feePayerPublicKey:p};
+const receipt=(signature,outcome,feeLamports)=>({signature,outcome,feeLamports,genesisHash:g,feePayerPublicKey:p,finality:"FINALIZED",reconciliation:"PASS"});
+const args={config,observedGenesisHash:g,historyComplete:true,receipts:[receipt("a","SUCCESS","5000"),receipt("b","FAILED","6000")]};
+test("validate public-only configuration",()=>assert.equal(validateLocalWalletConfig(config).feePayerPublicKey,p));
+test("reject secrets and nonlocal network",()=>{assert.throws(()=>validateLocalWalletConfig({...config,privateKey:"secret"}));assert.throws(()=>validateLocalWalletConfig({...config,network:"mainnet"}));});
+test("historical fees include failed transaction fees",()=>{const r=auditLocalNetworkFees(args);assert.equal(r.verified_network_fee_lamports,"11000");assert.equal(r.observed_failed_tx_fee_lamports,"6000");});
+test("reject network mismatch and duplicate receipt",()=>{assert.throws(()=>auditLocalNetworkFees({...args,observedGenesisHash:p}));assert.throws(()=>auditLocalNetworkFees({...args,receipts:[args.receipts[0],args.receipts[0]]}));});
+test("incomplete history prevents verified fee total",()=>assert.equal(auditLocalNetworkFees({...args,historyComplete:false}).verified_network_fee_lamports,null));
+test("pending receipt prevents verified fee total",()=>assert.equal(auditLocalNetworkFees({...args,receipts:[{...args.receipts[0],finality:"PENDING"}]}).verified_network_fee_lamports,null));
