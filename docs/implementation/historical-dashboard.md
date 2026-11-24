@@ -1,0 +1,5 @@
+# Historical Market and Treasury Dashboard
+
+Default page 00. Run node scripts/serve-offline-mvp.mjs. Open http://127.0.0.1:4173/ and import a complete historical report input JSON matching the existing MVP schema. Import refreshes shared report state across pages. Reset restores synthetic data. Export produces a descriptive JSON summary.
+
+Market counts refer to the selected closed interval. Optional actorAddress fields must be independently verified. Missing address coverage suppresses unique-address counts. Addresses are not people, and observed gross volume is not independent demand. Cash spending and receipts are verified historical trade postings; capital transfers and other expenses are separate. The opening balance is not proof of lifetime funding. No future exit estimates, counterparty profit rankings, buy signals or trading execution. Real reserve snapshots are not executable quotes. This version is import-driven, not a live stream; the local environment API adapter and browser acceptance remain pending.
