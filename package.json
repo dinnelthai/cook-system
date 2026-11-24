@@ -13,7 +13,9 @@
     "postinstall": "node scripts/patch-pump-sdk-node-interop.mjs",
     "replay:raydium": "node scripts/replay-raydium-mint.mjs",
     "validate:schemas": "node scripts/validate-json-schemas.mjs",
-    "audit:history-index": "node scripts/rebuild-historical-event-index.mjs"
+    "audit:history-index": "node scripts/rebuild-historical-event-index.mjs",
+    "simulate:participants": "node scripts/run-participant-simulation.mjs",
+    "analyze:market-quality": "node scripts/analyze-market-quality.mjs"
   },
   "devDependencies": {
     "@pump-fun/pump-sdk": "4.3.1",
