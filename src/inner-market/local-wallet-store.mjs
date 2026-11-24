@@ -1,4 +1,6 @@
 import {generateKeyPairSync} from "node:crypto";
+import {constants} from "node:fs";
+import {Keypair} from "@solana/web3.js";
 import {mkdir,readdir,lstat,open} from "node:fs/promises";
 import {join} from "node:path";
 import {homedir} from "node:os";
@@ -36,5 +38,16 @@ export function createWalletStore({directory=join(homedir(),".cook-system","loca
    return {address};
   }finally{busy=false}
  }
- return {list,create};
+ async function loadSigner(address){
+  publicKey(address);await ready();
+  const handle=await open(join(directory,address+".json"),constants.O_RDONLY|constants.O_NOFOLLOW);
+  try{
+   const st=await handle.stat();if(!st.isFile()||(process.platform!=="win32"&&(st.mode&0o077)!==0)||st.size>512)throw Error("WALLET_KEY_INVALID");
+   const raw=JSON.parse(await handle.readFile("utf8"));
+   if(!Array.isArray(raw)||raw.length!==64||raw.some(x=>!Number.isInteger(x)||x<0||x>255))throw Error("WALLET_KEY_INVALID");
+   const secret=Uint8Array.from(raw);raw.fill(0);
+   try{const signer=Keypair.fromSeed(secret.subarray(0,32));if(!Buffer.from(signer.secretKey).equals(Buffer.from(secret))||signer.publicKey.toBase58()!==address)throw Error("WALLET_KEY_INVALID");return signer}finally{secret.fill(0)}
+  }finally{await handle.close()}
+ }
+ return {list,create,loadSigner};
 }
