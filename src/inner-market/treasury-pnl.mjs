@@ -194,9 +194,10 @@ export function replayTreasuryTradePnl({
       if (tokenAmount > tokenBalance) throw new RangeError("confirmed sell exceeds treasury token inventory");
       const totalSellFees = tradeFee + networkFee.amount;
       if (totalSellFees > quoteAmount) throw new RangeError("sell fees exceed quote proceeds");
+      const basisWasComplete = costBasisComplete;
       const allocatedKnownCost = tokenAmount === tokenBalance ? costBasis : (costBasis * tokenAmount) / tokenBalance;
       const netProceeds = quoteAmount - totalSellFees;
-      const eventRealizedPnl = costBasisComplete ? netProceeds - allocatedKnownCost : null;
+      const eventRealizedPnl = basisWasComplete ? netProceeds - allocatedKnownCost : null;
       if (eventRealizedPnl === null) realizedPnlComplete = false;
       else realizedPnl += eventRealizedPnl;
       tokenBalance -= tokenAmount;
@@ -218,7 +219,7 @@ export function replayTreasuryTradePnl({
         reported_program_fee_components: payload.fee_components ?? [],
         network_fee_base_units: networkFee.amount.toString(),
         cash_cost_quote_base_units: null,
-        allocated_cost_basis_quote_base_units: costBasisComplete || tokenBalance === 0n ? allocatedKnownCost.toString() : null,
+        allocated_cost_basis_quote_base_units: basisWasComplete ? allocatedKnownCost.toString() : null,
         known_allocated_cost_basis_quote_base_units: allocatedKnownCost.toString(),
         net_quote_proceeds_base_units: netProceeds.toString(),
         realized_pnl_quote_base_units: eventRealizedPnl === null ? null : eventRealizedPnl.toString(),
