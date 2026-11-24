@@ -25,7 +25,7 @@ The report is incomplete if historical coverage is not established, a posting is
 - src/inner-market/project-accounting.mjs: independent cash reconciliation and realized profit report.
 - test/inner-market-project-accounting.test.mjs: conservation, negative profit, duplicates, incomplete data and asset/project isolation.
 
-The caller must supply reconciled postings, a same-cutoff closing balance and a trade PnL figure for the same scope and reporting interval. Automated cross-ledger matching, transfer basis adjustments, posting provenance verification, durable storage and historical snapshot recovery remain outstanding.
+The caller must supply reconciled postings, a same-cutoff closing balance and a trade PnL figure for the same scope and reporting interval. Cross-ledger matching is now implemented in ledger-audit.mjs. Transfer basis adjustments, independent posting provenance verification, durable storage and historical snapshot recovery remain outstanding.
 
 ## Acceptance before integration
 
@@ -35,3 +35,15 @@ The caller must supply reconciled postings, a same-cutoff closing balance and a 
 4. Use explicit missing-data states; never silently substitute zero for unknown profit.
 5. Validate historical NAV and drawdown using contribution-adjusted snapshots, not raw cash balances.
 6. Preserve the inner-curve completion boundary and keep the external local API untouched until the contract is supplied.
+
+## Historical cross-ledger audit
+
+The audit requires identical project ID, quote asset, token mint, opening cutoff and closing cutoff metadata for both ledgers. This metadata is a caller attestation; the function does not independently authenticate the underlying source.
+
+Every positive historical trade cash posting must reference exactly one inventory journal event. Its side and net cash amount must match that event. Duplicate references, unmatched postings, missing postings and mismatched aggregates are reported as exceptions. Zero-net-cash inventory events need no positive cash posting.
+
+The inventory journal totals must match its ledger aggregates and the finalized cash posting totals. Both cash and inventory snapshots must reconcile, history completeness must be established, and cost basis and realized PnL must be known before releasing final project PnL. Matching aggregate balances alone is insufficient.
+
+Tests cover equal totals with swapped event attribution, missing and duplicate references, mixed mint or cutoff, incomplete coverage and tampered totals.
+
+This remains an offline financial audit. It neither selects trades nor generates execution recommendations.
