@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { calculateCurveValuation, impliedPriceForMarketCap } from "../src/inner-market/curve-valuation.mjs";
 import { calculateLaunchBudget, allocateTokenSupply } from "../src/inner-market/launch-budget.mjs";
-import { replayTreasuryTradePnl } from "../src/inner-market/treasury-pnl.mjs";
+import { replayTreasuryTradePnl, replayTreasuryPortfolioPnl } from "../src/inner-market/treasury-pnl.mjs";
 import { reconcileExecutionBatch } from "../src/inner-market/batch-reconciliation.mjs";
 import { evaluateInnerMarketPolicy } from "../src/inner-market/policy-guard.mjs";
 import { buildTreasuryPositionMonitor, quoteNextTreasuryBuyScenario } from "../src/inner-market/treasury-position-monitor.mjs";
@@ -282,4 +282,43 @@ test("Treasury ledger excludes confirmed trades from wallets outside the configu
   assert.equal(result.confirmed_buy_count, 0);
   assert.equal(result.ignored_non_treasury_event_count, 1);
   assert.equal(result.ending_token_balance_base_units, "0");
+});
+
+test("Treasury portfolio accounts each wallet separately before aggregation", () => {
+  const walletA = "treasury-wallet-a";
+  const walletB = "treasury-wallet-b";
+  const events = [
+    { ...syntheticTrade("a-buy", 1, "CURVE_BUY_EXECUTED", "100", "1000"), actor_address: walletA },
+    { ...syntheticTrade("b-buy", 2, "CURVE_BUY_EXECUTED", "50", "600"), actor_address: walletB },
+    { ...syntheticTrade("a-sell", 3, "CURVE_SELL_EXECUTED", "20", "300"), actor_address: walletA },
+  ];
+  const result = replayTreasuryPortfolioPnl({
+    treasuryWalletAddresses: [walletA, walletB],
+    events,
+    endingBalancesByWallet: { [walletA]: "80", [walletB]: "50" },
+  });
+  assert.equal(result.wallet_count, 2);
+  assert.equal(result.position.ending_token_balance_base_units, "130");
+  assert.equal(result.position.total_bought_token_amount_base_units, "150");
+  assert.equal(result.position.total_sold_token_amount_base_units, "20");
+  assert.equal(result.position.remaining_cost_basis_quote_base_units, "1400");
+  assert.equal(result.position.average_cost_quote_per_token, "10.76923076923");
+  assert.equal(result.realized_pnl_quote_base_units, "100");
+  assert.equal(result.inventory_reconciliation, "MATCH");
+  assert.equal(result.wallets[0].ledger.position.ending_token_balance_base_units, "80");
+  assert.equal(result.wallets[1].ledger.position.ending_token_balance_base_units, "50");
+});
+
+test("Treasury portfolio rejects a wallet selling another wallet's inventory", () => {
+  const walletA = "treasury-wallet-a";
+  const walletB = "treasury-wallet-b";
+  const events = [
+    { ...syntheticTrade("a-buy", 1, "CURVE_BUY_EXECUTED", "100", "1000"), actor_address: walletA },
+    { ...syntheticTrade("b-buy", 2, "CURVE_BUY_EXECUTED", "100", "1000"), actor_address: walletB },
+    { ...syntheticTrade("a-over-sell", 3, "CURVE_SELL_EXECUTED", "150", "1500"), actor_address: walletA },
+  ];
+  assert.throws(() => replayTreasuryPortfolioPnl({
+    treasuryWalletAddresses: [walletA, walletB],
+    events,
+  }), /exceeds treasury token inventory/);
 });
