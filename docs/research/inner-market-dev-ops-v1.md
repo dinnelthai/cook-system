@@ -119,7 +119,7 @@ Risk dimensions in V1:
 - fixed-budget reference output deterioration;
 - data integrity, event-order completeness, curve lifecycle, and attribution coverage.
 
-The initial numeric thresholds in `DEFAULT_CURVE_RISK_THRESHOLDS` are provisional alerting defaults only. Calibrate them against historical organic launches, by launch phase and curve depth. The overall level is the maximum configured dimension severity, not a probability of loss. Missing attribution must not be interpreted as low concentration risk.
+The initial numeric thresholds in `DEFAULT_CURVE_RISK_THRESHOLDS` are provisional alerting defaults only. Calibrate them against historical organic launches, by launch phase and curve depth. The overall level is the maximum configured dimension severity, not a probability of loss. Missing attribution must not be interpreted as low concentration risk. Buyer-concentration severity is capped at WATCH until at least three identified buyer wallets and five external buy executions are observed, preventing a single early sniper fill from being treated as conclusive evidence of persistent concentration.
 
 Creator/treasury buys remain part of the curve replay because they changed the actual market state, but they are excluded from external-flow concentration and external sell-share calculations when correctly attributed. This keeps the actual curve state separate from the participant-flow explanation.
 
