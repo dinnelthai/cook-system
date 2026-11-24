@@ -90,7 +90,7 @@ Batch means grouping already-authorized transaction receipts for audit and accou
 
 The V1 monitoring subject is the configured Treasury wallet set, not the full participant population. All confirmed Pump curve trades still update the shared curve state through the canonical replay engine, because an intervening market trade changes the quote available to Treasury. External traders are not classified, profiled, or scored.
 
-For every Treasury buy or sell, retain the wallet address, signature, event ordering, token amount, reconciled quote cash movement, program-fee breakdown, and network transaction fee. A curve trade is admitted to PnL only when the parser's actor token/quote balance reconciliation returns PASS. Pending, failed, partial, or unreconciled events do not alter the Treasury ledger.
+For every Treasury buy or sell, retain the wallet address, signature, event ordering, token amount, reconciled quote cash movement, program-fee breakdown, and network transaction fee. When multiple Treasury wallets are configured, maintain a separate inventory and weighted-average cost ledger for each wallet first, then aggregate portfolio totals; one wallet must never use another wallet's inventory to validate a sell. Deduplicate network transaction fees by signature across the portfolio. A curve trade is admitted to PnL only when the parser's actor token/quote balance reconciliation returns PASS. Pending, failed, partial, or unreconciled events do not alter the Treasury ledger.
 
 Observed-chain `payload.quote_amount_base_units` is the actor's quote cash movement confirmed against transaction balance deltas (excluding the network transaction fee). Program fee components are already reflected in that cash movement; they are reported separately and must not be added or subtracted a second time. Network transaction fees are counted once per signature and only when the fee payer belongs to the configured Treasury wallet set.
 
@@ -168,6 +168,7 @@ Risk outputs are explanations and controls, not trading instructions.
 - [ ] Only Treasury-wallet trades with passing actor balance reconciliation affect Treasury PnL.
 - [ ] Intervening confirmed Pump curve trades are replayed in canonical order before every Treasury quote or position valuation.
 - [ ] Treasury inventory reconciles to owner+mint account snapshots; transfers are not misclassified as buys or sells.
+- [ ] Multiple Treasury wallets have isolated inventory/cost-basis ledgers before portfolio aggregation; a wallet cannot sell another wallet's inventory.
 - [ ] Program fees are not double-counted when already included in reconciled quote cash movement; network fees are counted once per signature.
 - [ ] Full-position liquidation value uses the exact Pump sell quote, separately from marginal-price mark-to-market.
 - [ ] Each later buy updates cumulative inventory, remaining cost basis, average cost, and realized/unrealized PnL without resetting prior history.
