@@ -41,3 +41,16 @@ test("archive requires valid settlement and re-audits imported input",()=>{
  assert.throws(()=>restoreReviewArchive(archive));
  assert.equal(advanceReview("ARCHIVED","reset",s),"REVIEW");
 });
+
+test("unattested historical records cannot be settled even if internally consistent",()=>{
+ const i=fixture();i.sourceMode="ARCHIVED_HISTORICAL";
+ const s=buildTerminalState(i);
+ assert.equal(s.status,"REPORT_READY");
+ assert.equal(s.settlement_scope,"UNATTESTED_HISTORICAL");
+ assert.equal(s.settlement_allowed,false);
+ assert.throws(()=>advanceReview("REVIEW","settle",s));
+ assert.throws(()=>makeReviewArchive(i,null,"ARCHIVED"));
+ const synthetic=buildTerminalState(fixture());
+ assert.equal(synthetic.settlement_scope,"SYNTHETIC_ONLY");
+ assert.equal(synthetic.settlement_allowed,true);
+});

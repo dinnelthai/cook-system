@@ -24,7 +24,7 @@ source = source.replace(pattern, (_, binding) => {
 });
 
 if (replacements === 0) {
-  if (source.includes('from"@coral-xyz/anchor"') || source.includes('from "@coral-xyz/anchor"')) {
+  if (/import\s*\{[^}]*\bBN\b[^}]*\}\s*from\s*["']@coral-xyz\/anchor["']/.test(source)) {
     throw new Error("Pump SDK interop patch found an unknown Anchor import shape; inspect the dependency before changing it");
   }
   console.log("Pump SDK interop patch: no CommonJS BN import found");
