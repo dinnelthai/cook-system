@@ -60,10 +60,10 @@ const thresholds = {
 test("external sniper buy changes the next fixed reference token cost and quote depth", () => {
   const baseline = baselineState();
   const events = [
-    trade("sniper-buy", 1, "CURVE_BUY_EXECUTED", "10", "80", {
-      virtual_token_reserves_base_units: "920",
+    trade("sniper-buy", 1, "CURVE_BUY_EXECUTED", "10", "82", {
+      virtual_token_reserves_base_units: "918",
       virtual_quote_reserves_base_units: "110",
-      real_token_reserves_base_units: "620",
+      real_token_reserves_base_units: "618",
       real_quote_reserves_base_units: "10",
       complete: false,
     }),
@@ -121,10 +121,10 @@ test("unknown wallet attribution is not guessed as a sniper or independent buyer
   const report = assessInnerMarketRisk({
     baselineCurveState: baselineState(),
     interveningEvents: [
-      trade("unknown-buy", 1, "CURVE_BUY_EXECUTED", "10", "80", {
-        virtual_token_reserves_base_units: "920",
+      trade("unknown-buy", 1, "CURVE_BUY_EXECUTED", "10", "82", {
+        virtual_token_reserves_base_units: "918",
         virtual_quote_reserves_base_units: "110",
-        real_token_reserves_base_units: "620",
+        real_token_reserves_base_units: "618",
         real_quote_reserves_base_units: "10",
         complete: false,
       }),
@@ -166,7 +166,7 @@ test("curve phase completion is surfaced as a transition, not a low-risk active 
 });
 
 test("incomplete event ordering fails closed instead of returning a low-risk report", () => {
-  const event = trade("bad-order", 1, "CURVE_BUY_EXECUTED", "10", "80", {
+  const event = trade("bad-order", 1, "CURVE_BUY_EXECUTED", "10", "82", {
     virtual_token_reserves_base_units: "920",
     virtual_quote_reserves_base_units: "110",
     real_token_reserves_base_units: "620",
