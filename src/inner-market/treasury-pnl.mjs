@@ -1,27 +1,12 @@
-import { parseBaseUnits } from "../core/integer.mjs";
+import { parseBaseUnits, U128_MAX } from "../core/integer.mjs";
+import { sortForReplay } from "../core/event-order.mjs";
 
 const BUY_KINDS = new Set(["CURVE_BUY_EXECUTED"]);
 const SELL_KINDS = new Set(["CURVE_SELL_EXECUTED"]);
 
-function compareOptionalInteger(a, b) {
-  if (a === undefined || a === null) return b === undefined || b === null ? 0 : -1;
-  if (b === undefined || b === null) return 1;
-  const left = BigInt(a);
-  const right = BigInt(b);
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function orderEvents(events) {
-  return events.slice().sort((a, b) =>
-    compareOptionalInteger(a.slot, b.slot) ||
-    compareOptionalInteger(a.transaction_index, b.transaction_index) ||
-    compareOptionalInteger(a.instruction_index, b.instruction_index) ||
-    String(a.event_id || "").localeCompare(String(b.event_id || ""))
-  );
-}
-
 /**
  * Replays confirmed bonding-curve trades for one treasury account using weighted-average cost.
+ * Events use the repository's canonical sortForReplay ordering and provenance contract.
  * quote_amount_base_units is gross trade consideration before fee_quote_base_units.
  * Transfers and non-trade events are not PnL events; reconcile them using account snapshots.
  */
@@ -39,6 +24,7 @@ export function replayTreasuryTradePnl({
   if (!Number.isSafeInteger(quoteDecimals) || quoteDecimals < 0 || quoteDecimals > 18) throw new RangeError("quoteDecimals must be from 0 to 18");
   let tokenBalance = parseBaseUnits(openingTokenBalanceBaseUnits, { name: "openingTokenBalanceBaseUnits" });
   let costBasis = parseBaseUnits(openingCostBasisQuoteBaseUnits, { name: "openingCostBasisQuoteBaseUnits" });
+  if (tokenBalance === 0n && costBasis !== 0n) throw new RangeError("opening cost basis cannot exist without opening token inventory");
   let realizedPnl = 0n;
   let buyCost = 0n;
   let sellProceeds = 0n;
@@ -46,13 +32,8 @@ export function replayTreasuryTradePnl({
   let confirmedSellCount = 0;
   let ignoredUnconfirmedCount = 0;
   let ignoredNonTradeCount = 0;
-  const seenEventIds = new Set();
 
-  for (const event of orderEvents(events)) {
-    if (event.event_id) {
-      if (seenEventIds.has(event.event_id)) throw new Error("duplicate event_id: " + event.event_id);
-      seenEventIds.add(event.event_id);
-    }
+  for (const event of sortForReplay(events)) {
     if (event.status !== "CONFIRMED") {
       ignoredUnconfirmedCount += 1;
       continue;
@@ -94,7 +75,7 @@ export function replayTreasuryTradePnl({
   let markToMarketQuoteBaseUnits = null;
   let unrealizedPnlQuoteBaseUnits = null;
   if (currentMarkPriceQuoteScaled !== null) {
-    const markPriceScaled = parseBaseUnits(currentMarkPriceQuoteScaled, { name: "currentMarkPriceQuoteScaled" });
+    const markPriceScaled = parseBaseUnits(currentMarkPriceQuoteScaled, { name: "currentMarkPriceQuoteScaled", max: U128_MAX });
     const tokenScale = 10n ** BigInt(tokenDecimals);
     const quoteScale = 10n ** BigInt(quoteDecimals);
     const displayScale = 10n ** 12n;
