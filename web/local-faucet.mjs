@@ -1,12 +1,12 @@
 let mainAddress="";
 export function mountLocalFaucet(host){
- host.innerHTML='<h3>主钱包 · Localnet 测试 SOL</h3><p class="muted">本地 Validator Faucet；不需要私钥，不使用主网资金。</p><form data-form><label>主钱包公钥<input data-address required maxlength="44" autocomplete="off"></label><label>充值数量（SOL）<input data-amount type="text" inputmode="decimal" required value="1"></label><div class="row"><button type="button" data-balance>查询余额</button><button type="submit" class="primary">获取测试 SOL</button></div></form><pre data-output role="status">等待查询</pre>';
+ host.innerHTML='<h3>主钱包</h3><p class="muted">资金来源：Localnet Faucet · 无需私钥</p><form data-form><label>主钱包公钥<input data-address required maxlength="44" autocomplete="off"></label><label>充值数量（SOL）<input data-amount type="text" inputmode="decimal" required value="1"></label><div class="row"><button type="button" data-balance>查询余额</button><button type="submit" class="primary">获取 SOL</button></div></form><pre data-output role="status">等待查询</pre>';
  const q=s=>host.querySelector(s);q("[data-address]").value=mainAddress;
  let busy=false;
  async function call(fund){
   if(busy)return;const address=q("[data-address]").value.trim();mainAddress=address;
   const amount=q("[data-amount]").value.trim();const out=q("[data-output]");
-  if(fund&&!confirm("仅向本地测试链的钱包申请 "+amount+" SOL？"))return;
+  if(fund&&!confirm("向 Localnet 钱包申请 "+amount+" SOL？"))return;
   busy=true;q("[data-balance]").disabled=true;q("[type=submit]").disabled=true;out.textContent="请求中…";
   try{
    const response=await fetch("/api/local-wallet/"+(fund?"airdrop":"balance"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(fund?{address,amount}:{address}),cache:"no-store"});

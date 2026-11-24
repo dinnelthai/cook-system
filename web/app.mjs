@@ -1,5 +1,4 @@
 import {mountLocalFaucet} from "./local-faucet.mjs";
-import {mountMockLab} from "./mock-wallet-lab.mjs";
 import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-report.mjs";
 import { getParticipantCatalogue, evaluateParticipantStressCases } from "../src/inner-market/participant-stress-lab.mjs";
 import { runParticipantExperiment } from "../src/inner-market/participant-experiment.mjs";
@@ -29,7 +28,7 @@ function auditedReport(input){
   return r;
  }catch(e){record("report.failed",{error_kind:errorKind(e),duration_ms:Math.round(performance.now()-start)},"ERROR");throw e;}
 }
-const pages=[["terminal","01 Terminal / 操作台"],["projects","02 Projects / 项目档案"],["dashboard","03 Analytics / 复盘"],["participants","04 Simulation / 实验"],["logs","05 Settings / 设置"]];
+const pages=[["terminal","01 操作台"],["wallet","02 资金管理"],["projects","03 项目档案"],["dashboard","04 复盘分析"],["participants","05 市场风险实验"],["logs","06 系统设置"]];
 const fixture=await (async()=>{
  const start=performance.now();
  try{const response=await fetch("../fixtures/synthetic/inner-market-mvp.json");if(!response.ok)throw new Error("Fixture unavailable");const value=await response.json();record("fixture.loaded",{duration_ms:Math.round(performance.now()-start)});return value;}
@@ -39,6 +38,8 @@ const original=structuredClone(fixture);
 let data=structuredClone(fixture),report,page="terminal";
 try{report=auditedReport(data)}catch(e){startupFailure(e);throw e;}
 const esc=s=>String(s??"—").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const solAmount=x=>{if(x==null)return "—";const n=BigInt(x),v=n<0n?-n:n;return (n<0n?"-":"")+(v/1000000000n)+"."+String(v%1000000000n).padStart(9,"0").replace(/0+$/,"").padEnd(2,"0")+" SOL"};
+const quoteAmount=(x,asset)=>x==null?"—":asset==="SOL_LAMPORTS"?solAmount(x):x+" base units";
 const stat=(name,value)=>'<div class="stat"><small>'+esc(name)+'</small><strong>'+esc(value)+'</strong></div>';
 const table=(headers,rows)=>'<div class="scroll"><table><thead><tr>'+headers.map(x=>'<th>'+esc(x)+'</th>').join("")+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>';
 const note=s=>'<div class="notice">'+esc(s)+'</div>';
@@ -64,7 +65,7 @@ function compareBars(items,unit){
  return '<div class="comparison">'+items.map(([label,value,color],i)=>'<div class="comparison-row"><div class="row"><span>'+esc(label)+'</span><strong>'+esc(value==null?"未知":value+" "+unit)+'</strong></div><div class="meter"><span class="'+(color==="red"?"sell":color==="green"?"buy":"neutral")+'" style="width:'+((value==null||!Number.isFinite(nums[i])||nums[i]<0)?0:Math.min(100,nums[i]/max*100))+'%"></span></div></div>').join("")+'</div>';
 }
 function splitView(left,right){return '<div class="terminal-grid"><div>'+left+'</div><div>'+right+'</div></div>'}
-function screenHeading(title,sub){return '<div class="terminal-heading"><div><p class="eyebrow">COOK / OPERATIONS</p><h2>'+esc(title)+'</h2><span class="muted">'+esc(sub)+'</span></div><span class="source-chip">'+esc(report.source_mode)+' / OFFLINE</span></div>'}
+function screenHeading(title,sub){return '<div class="terminal-heading"><div><p class="eyebrow">COOK / OPERATIONS</p><h2>'+esc(title)+'</h2><span class="muted">'+esc(sub)+'</span></div><span class="source-chip">'+(page==="wallet"?"SOL":report.source_mode==="SYNTHETIC"?"未载入项目记录":"历史记录")+'</span></div>'}
 let terminalTab="trades",reviewPaused=false,metadata=null,reviewStage="REVIEW",reviewInput=data,candleInterval=60000;
 function candleChart(result){
  if(result.status!=="CONSISTENT")return emptyState(result.status==="EMPTY"?"区间内无成交":"暂无可验证 K 线",result.reason??"无成交事件");
@@ -78,37 +79,33 @@ function candleChart(result){
  for(const f of [0,.5,1]){const y=Y(lo+span*f);svg+='<path d="M36 '+y+' H550" stroke="#263449"/><text x="598" y="'+(y+3)+'" fill="#92a6c0" font-size="9" text-anchor="end">'+esc((lo+span*f).toPrecision(5))+'</text>';}
  points.forEach((c,i)=>{const o=Number(c.open_price),cl=Number(c.close_price),x=X(i),color=cl>=o?"#42dfb1":"#ff8293",y=Math.min(Y(o),Y(cl));svg+='<path d="M'+x+' '+Y(Number(c.high_price))+' V'+Y(Number(c.low_price))+'" stroke="'+color+'"/><rect x="'+(x-width/2)+'" y="'+y+'" width="'+width+'" height="'+Math.max(1,Math.abs(Y(o)-Y(cl)))+'" fill="'+color+'"/><rect x="'+(x-width/2)+'" y="'+(193-vols[i]/maxVol*28)+'" width="'+width+'" height="'+(vols[i]/maxVol*28)+'" fill="'+color+'" opacity=".55"/>';});
  svg+='<text x="36" y="210" font-size="9" fill="#92a6c0">'+esc(new Date(points[0].interval_start_ms).toISOString())+'</text><text x="550" y="210" text-anchor="end" font-size="9" fill="#92a6c0">'+esc(new Date(points.at(-1).interval_start_ms).toISOString())+'</text></svg>';
- return svg+'<p class="muted">历史成交 · UTC · 价格按来源口径 · 成交量为报价资产 base units · 图形为近似显示，原始数值保持精确。</p>';
+ return svg+'<p class="muted">历史成交 · UTC · 价格按来源口径 · 图表原始数值 · 图形为近似显示，原始数值保持精确。</p>';
 }
 function renderTerminal(){
  const d=buildTerminalState(data),a=d.treasury,m=d.market,scope=d.scope;
  const ready=d.status==="REPORT_READY";
  const candleResult=buildTerminalCandles(data,candleInterval);
  const candleControls='<div class="row candle-controls">'+[[60000,"1m"],[300000,"5m"],[900000,"15m"],[3600000,"1h"]].map(([ms,label])=>'<button data-candle-interval="'+ms+'" aria-pressed="'+(candleInterval===ms)+'">'+label+'</button>').join("")+'</div>';
- const unit=scope.quoteAsset==="SOL_LAMPORTS"?"lamports":"base units";
- const money=x=>x==null?"未知":x+" "+unit;
+ const isSample=d.source_mode==="SYNTHETIC";
+ const money=x=>isSample?"—":quoteAmount(x,scope.quoteAsset);
  const tabs=[["trades","成交记录"],["cash","资金流水"],["inventory","库存"],["liquidity","流动性"],["risk","风险与审计"],["logs","运行日志"]];
- const trades=data.market.trades.filter(x=>x.status==="FINALIZED"&&x.reconciliation==="PASS");
- const snapshots=ready?data.nav.snapshots.filter(x=>x.reconciliation==="PASS"&&x.valuationStatus==="VERIFIED"):[];
+ const trades=isSample?[]:data.market.trades.filter(x=>x.status==="FINALIZED"&&x.reconciliation==="PASS");
+ const snapshots=ready&&!isSample?data.nav.snapshots.filter(x=>x.reconciliation==="PASS"&&x.valuationStatus==="VERIFIED"):[];
  const rows={
  trades:()=>table(["事件","序号","方向","名义金额","状态"],data.market.trades.map(x=>[x.id,x.sequence,x.side,money(x.quoteNotionalBaseUnits),x.status])),
  cash:()=>table(["事件","类型","金额","对账"],data.cash.entries.map(x=>[x.id,x.kind,money(x.amountBaseUnits),x.reconciliation])),
- inventory:()=>metrics([["期末库存（base units）",a.closing_token_balance_base_units],["库存成本",money(a.remaining_cost_basis_base_units)]])+table(["事件","方向","数量","成本","净收入"],(ready?data.inventory.ledger.position_journal:[]).map(x=>[x.event_id,x.side,x.token_amount_base_units,x.cash_cost_quote_base_units,x.net_quote_proceeds_base_units]))+emptyState("逐钱包持仓未接入","当前仅有项目级库存证据"),
- liquidity:()=>table(["储备","原始单位"],[["真实报价资产",m.verified_real_reserve_base_units],["虚拟报价资产",report.market_history.virtual_quote_reserves_base_units],["真实 Token",report.market_history.real_token_reserves_base_units],["虚拟 Token",report.market_history.virtual_token_reserves_base_units]]),
+ inventory:()=>metrics([["期末库存（base units）",a.closing_token_balance_base_units],["库存成本",money(a.remaining_cost_basis_base_units)]])+table(["事件","方向","数量","成本","净收入"],(ready?data.inventory.ledger.position_journal:[]).map(x=>[x.event_id,x.side,x.token_amount_base_units,money(x.cash_cost_quote_base_units),money(x.net_quote_proceeds_base_units)]))+emptyState("逐钱包持仓未接入","当前仅有项目级库存证据"),
+ liquidity:()=>table(["储备","原始单位"],[["实际 SOL 储备",money(m.verified_real_reserve_base_units)],["虚拟曲线 SOL 储备",money(report.market_history.virtual_quote_reserves_base_units)],["真实 Token",report.market_history.real_token_reserves_base_units],["虚拟 Token",report.market_history.virtual_token_reserves_base_units]]),
  risk:()=>table(["检查","状态","证据"],d.checks.map(x=>[x.id,x.status,x.evidence.join(" / ")]))+details("审计证据",report.audits),
  logs:()=>table(["UTC","级别","事件"],diagnostics.snapshot().entries.slice(-30).reverse().map(x=>[x.time,x.level,x.event]))
  };
- main.innerHTML=screenHeading("Terminal / 项目操作台",scope.projectId+" · "+scope.tokenMint)+
+ main.innerHTML=screenHeading("项目操作台",isSample?"尚未载入项目行情与资金记录":scope.projectId+" · "+scope.tokenMint)+
  '<div class="lifecycle">'+["准备","发行记录","市场监测","区间结算","归档导出"].map((x,i)=>'<span class="'+(i===(reviewStage==="ARCHIVED"?4:reviewStage==="SETTLED"?3:2)?"current":"")+'">'+(i+1)+' '+x+'</span>').join("")+'</div>'+
- note("离线复盘与测试工作台；结算和归档仅代表本地报告状态，不代表链上发行或退出。")+
- metrics([["期末净值",money(d.performance.closing_nav_base_units)],["期末现金",money(a.closing_cash_base_units)],["已实现收益",money(a.realized_project_pnl_base_units)],["库存成本",money(a.remaining_cost_basis_base_units)],["创作者费",money(a.creator_cash_income_base_units)],["历史回撤",a.max_observed_drawdown_bps==null?"未知":Number(a.max_observed_drawdown_bps)/100+"%"]])+
- splitView(panel("市场行情 / OHLCV",candleControls+candleChart(candleResult))+panel("已确认成交金额",seriesChart(trades.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE")),panel("项目资料与数据",'<form id="terminal-meta"><label>测试项目名称</label><input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"><label>Symbol</label><input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"><button type="submit">保存本次会话资料</button></form><label for="terminal-import">导入测试区间报告</label><input type="file" id="terminal-import" accept=".json"><div class="row"><button id="terminal-local-load">读取本地报告桥</button></div><p id="terminal-error" class="negative"></p>')+panel("监测与结算",table(["项目","状态"],[["审计",d.status],["报告阶段",reviewStage],["数据来源",d.source_mode],["监测视图",reviewPaused?"暂停浏览":"可查看"],["链上执行","未接入"]])+'<div class="row"><button id="terminal-pause">'+(reviewPaused?"恢复浏览":"暂停浏览")+'</button><button id="terminal-export">导出核算报告</button><button id="terminal-settle" '+(reviewStage==="REVIEW"&&d.settlement_allowed?"":"disabled")+'>确认区间结算</button><button id="terminal-archive" '+(reviewStage==="SETTLED"||reviewStage==="ARCHIVED"?"":"disabled")+'>归档并下载</button></div><p class="muted">仅导出历史核算；不执行资产退出或链上交易。</p>'))+
+ (isSample?note("尚未载入项目数据。请读取本地报告或导入区间记录。"):"")+
+ metrics([["期末净值",money(d.performance.closing_nav_base_units)],["期末现金",money(a.closing_cash_base_units)],["已实现收益",money(a.realized_project_pnl_base_units)],["库存成本",money(a.remaining_cost_basis_base_units)],["创作者费",money(a.creator_cash_income_base_units)],["历史回撤",isSample||a.max_observed_drawdown_bps==null?"—":Number(a.max_observed_drawdown_bps)/100+"%"]])+
+ splitView(panel("市场行情 / OHLCV",candleControls+(isSample?emptyState("等待行情","尚无项目成交记录"):candleChart(candleResult)))+panel("已确认成交金额",seriesChart(trades.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE")),panel("项目资料与数据",'<form id="terminal-meta"><label>项目名称</label><input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"><label>Symbol</label><input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"><div class="row"><button type="submit">保存发行资料</button><button type="button" disabled title="发行接口尚未接入">发币</button></div></form><label for="terminal-import">导入区间报告</label><input type="file" id="terminal-import" accept=".json"><div class="row"><button id="terminal-local-load">读取本地记录</button></div><p id="terminal-error" class="negative"></p>')+panel("交易执行",emptyState("买入 / 卖出","交易执行接口尚未接入")+'<div class="row"><button disabled>买入</button><button disabled>卖出</button></div>')+panel("监测与结算",table(["项目","状态"],[["审计",isSample?"待载入":d.status],["报告阶段",isSample?"待载入":reviewStage],["数据来源",isSample?"未载入":"历史记录"],["监测视图",reviewPaused?"暂停浏览":"可查看"],["链上执行","未接入"]])+'<div class="row"><button id="terminal-pause">'+(reviewPaused?"恢复浏览":"暂停浏览")+'</button><button id="terminal-export" '+(isSample?"disabled":"")+'>导出核算报告</button><button id="terminal-settle" '+(!isSample&&reviewStage==="REVIEW"&&d.settlement_allowed?"":"disabled")+'>确认区间结算</button><button id="terminal-archive" '+(reviewStage==="SETTLED"||reviewStage==="ARCHIVED"?"":"disabled")+'>归档并下载</button></div><p class="muted">仅导出历史核算；不执行资产退出或链上交易。</p>'))+
  panel("资产净值历史快照",seriesChart(snapshots.map(x=>({label:x.sequence,value:x.navAfterFlowBaseUnits})),"NAV"))+
- '<section class="panel"><div class="terminal-tabs" role="group" aria-label="操作台明细">'+tabs.map(([id,label])=>'<button data-tab="'+id+'" aria-pressed="'+(terminalTab===id)+'">'+label+'</button>').join("")+'</div><div class="tab-content">'+(reviewPaused?emptyState("浏览已暂停","恢复浏览后查看当前报告明细"):rows[terminalTab]())+'</div></section>';
- const labHost=document.createElement("section");labHost.className="panel";labHost.id="mock-wallet-lab";
- main.querySelector(".lifecycle").after(labHost);
- const faucetHost=document.createElement("section");faucetHost.className="panel";labHost.before(faucetHost);mountLocalFaucet(faucetHost);
- mountMockLab(labHost,{escape:esc,table,metrics,record,download,runStress:(seed,runs)=>runParticipantExperiment({base:original,seed,runs})});
+ '<section class="panel"><div class="terminal-tabs" role="group" aria-label="操作台明细">'+tabs.map(([id,label])=>'<button data-tab="'+id+'" aria-pressed="'+(terminalTab===id)+'">'+label+'</button>').join("")+'</div><div class="tab-content">'+(reviewPaused?emptyState("浏览已暂停","恢复浏览后查看当前报告明细"):isSample&&terminalTab!=="logs"?emptyState("暂无项目数据","请载入项目记录"):rows[terminalTab]())+'</div></section>';
  main.querySelectorAll("[data-candle-interval]").forEach(b=>b.onclick=()=>{candleInterval=Number(b.dataset.candleInterval);render()});
  main.querySelector("#terminal-local-load").onclick=async()=>{const before=data;try{const response=await fetch("/api/terminal/report",{cache:"no-store"});if(!response.ok)throw Error("本地报告桥未配置或数据无效");const next=await response.json();const nextReport=auditedReport(next);buildTerminalState(next);if(data!==before||page!=="terminal")return;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");const el=document.querySelector("#terminal-error");if(el)el.textContent=err.message}};
  main.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{terminalTab=b.dataset.tab;render()});
@@ -122,20 +119,23 @@ function renderTerminal(){
 function render(){
  if(reviewInput!==data){reviewInput=data;reviewStage="REVIEW";metadata=null;reviewPaused=false;}
  main.dataset.page=page;
- document.querySelector(".tag").textContent="OFFLINE · "+report.source_mode;
+ document.querySelector(".tag").textContent="LOCALNET";
  nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+((page===id||id==="market"&&["lab","create"].includes(page))?"active":"")+'"'+(page===id?' aria-current="page"':'')+'><span class="nav-num" aria-hidden="true">'+label.slice(0,2)+'</span><span>'+esc(label.slice(3))+'</span></button>').join("");
  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{page=b.dataset.page;record("page.open",{page});render()});
  const a=report.accounting,m=report.market_history;
  const links=(items)=>'<div class="row subnav">'+items.map(([id,label])=>'<button data-subpage="'+id+'">'+esc(label)+'</button>').join("")+'</div>';
  const context=()=>note("数据来源："+report.source_mode+" · 离线区间报告；Localnet 实时接口尚未接入。未知值不作估算。");
  if(page==="terminal"){renderTerminal();
+ }else if(page==="wallet"){
+ main.innerHTML=screenHeading("资金管理","主钱包 · SOL 余额与充值")+'<section id="funding-panel" class="panel funding-panel"></section>';
+ mountLocalFaucet(main.querySelector("#funding-panel"));
  }else if(page==="projects"){
- main.innerHTML=screenHeading("Projects / 项目档案","当前会话 · 历史区间")+panel("项目记录",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status+" / "+reviewStage]]))+panel("资料",metadata?table(["字段","内容"],Object.entries(metadata)):emptyState("尚未保存项目资料","在 Terminal 中整理资料"))+details("当前报告",report);
+ main.innerHTML=screenHeading("项目档案","当前会话 · 历史区间")+panel("项目记录",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status+" / "+reviewStage]]))+panel("资料",metadata?table(["字段","内容"],Object.entries(metadata)):emptyState("尚未保存项目资料","在操作台中整理资料"))+details("当前报告",report);
  }else if(page==="dashboard"){
  const d=buildHistoricalDashboard(data),t=d.treasury,v=d.market;
  const sol=x=>{if(x==null)return "未知";if(d.scope.quoteAsset!=="SOL_LAMPORTS")return x+" base units";const n=BigInt(x),abs=n<0n?-n:n;return (n<0n?"-":"")+(abs/1000000000n).toString()+"."+(abs%1000000000n).toString().padStart(9,"0")+" SOL"};
  const known=x=>x==null?"未知":x;
- const fmt=x=>x==null?"未知":d.scope.quoteAsset==="SOL_LAMPORTS"&&BigInt(x)<1000000n&&BigInt(x)>-1000000n?x+" lamports":sol(x);
+ const fmt=x=>quoteAmount(x,d.scope.quoteAsset);
  const navPoints=d.status==="REPORT_READY"?data.nav.snapshots.filter(x=>x.reconciliation==="PASS"&&x.valuationStatus==="VERIFIED").map(x=>({label:x.sequence,value:x.navAfterFlowBaseUnits})):[]; 
  const confirmed=data.market.trades.filter(x=>x.status==="FINALIZED"&&x.reconciliation==="PASS");
  main.innerHTML='<div class="terminal-heading"><div><p class="eyebrow">PORTFOLIO / MARKET MONITOR</p><h2>市场与资产总览</h2><span class="muted">'+esc(d.scope.projectId)+' · '+esc(d.source_mode)+' · '+esc(d.scope.openingCutoff)+' → '+esc(d.scope.closingCutoff)+'</span></div><div class="row"><button id="dashboard-reset">重置样本</button><button id="dashboard-export">导出总览</button></div></div>'+
@@ -188,7 +188,7 @@ function render(){
  }else if(page==="participants"){
  const roles=getParticipantCatalogue();
  const results=evaluateParticipantStressCases({base:original,reportBuilder:buildHistoricalMvpReport});
- main.innerHTML=screenHeading("Intelligence / 市场情报","合成风险场景 · 独立于真实历史数据")+note("固定合成压力场景：验证风险提示和数据核算，不模拟攻击执行、不预测真实钱包行为。角色标签只属于实验。")+
+ main.innerHTML=screenHeading("市场风险实验","合成风险场景 · 独立于真实历史数据")+note("固定合成压力场景：验证风险提示和数据核算，不模拟攻击执行、不预测真实钱包行为。角色标签只属于实验。")+
  '<div class="stats">'+stat("角色类别",roles.length)+stat("合成场景",results.length)+stat("预期结果匹配",results.filter(r=>r.passed).length+" / "+results.length)+'</div>'+
  panel("角色与风险特征",table(["角色","特征","观测关注","局限"],roles.map(r=>[r.role,r.traits.join(" / "),r.observable,r.limitation])))+
  panel("固定场景验收",table(["场景","风险","预期","实际","结果"],results.map(r=>[r.title,r.risk_category,r.expected_status,r.actual_status,r.passed?"PASS":"FAIL"])))+
@@ -210,7 +210,7 @@ function render(){
  document.querySelector("#export-participants").onclick=()=>download("synthetic-participant-stress-results.json",JSON.stringify(results,null,2));
  }else if(page==="logs"){
  const logs=diagnostics.snapshot();
- main.innerHTML=screenHeading("System / 系统中心","连接状态 · 诊断事件 · 数据导入")+panel("服务状态",table(["服务","状态"],[["浏览器应用","已初始化"],["报告引擎",report.status],["Localnet RPC","待检查"],["交易执行","禁用"]])+'<div class="row"><button id="rpc-health">检查本地连接</button></div><div id="rpc-health-result" role="status"></div>')+note("仅保存当前页面会话的最近 1000 条结构化诊断事件，刷新页面会重置。不会记录原始输入、钱包地址、私钥、RPC URL 或原始错误信息。")+
+ main.innerHTML=screenHeading("系统设置","连接状态 · 诊断事件 · 数据导入")+panel("服务状态",table(["服务","状态"],[["浏览器应用","已初始化"],["报告引擎",report.status],["Localnet RPC","待检查"],["交易执行","禁用"]])+'<div class="row"><button id="rpc-health">检查本地连接</button></div><div id="rpc-health-result" role="status"></div>')+note("仅保存当前页面会话的最近 1000 条结构化诊断事件，刷新页面会重置。不会记录原始输入、钱包地址、私钥、RPC URL 或原始错误信息。")+
  '<div class="stats">'+stat("日志条数",logs.entries.length)+stat("警告",logs.entries.filter(x=>x.level==="WARN").length)+stat("错误",logs.entries.filter(x=>x.level==="ERROR").length)+stat("已滚动丢弃",logs.dropped_count)+'</div>'+
  panel("日志工具",'<div class="row"><button id="log-download" class="primary">导出诊断日志 JSON</button><button id="log-refresh">刷新</button><button id="log-clear">清空日志</button></div>')+
  panel("最近事件",table(["时间 (UTC)","级别","事件","详情"],logs.entries.slice().reverse().map(x=>[x.time,x.level,x.event,JSON.stringify(x.detail)])));
@@ -225,6 +225,6 @@ function render(){
  document.querySelector("#quick-log-export").onclick=exportDiagnostics;
  const extras=page==="market"?[["lab","历史回放 / 导入"],["create","发行资料"]]:page==="lab"||page==="create"?[["market","返回市场中心"]]:page==="logs"?[["terminal","返回操作台"]]:[];
  if(extras.length){main.insertAdjacentHTML("afterbegin",links(extras));main.querySelectorAll("[data-subpage]").forEach(b=>b.onclick=()=>{page=b.dataset.subpage;record("page.open",{page});render()});}
- main.insertAdjacentHTML("beforeend",'<p class="foot">Cook System · Offline MVP · '+esc(report.source_mode)+' · Execution disabled</p>');
+ main.insertAdjacentHTML("beforeend",'<p class="foot">Cook System · Localnet · 交易执行未接入</p>');
 }
 render();

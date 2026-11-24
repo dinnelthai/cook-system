@@ -1,11 +1,11 @@
 // Local, bounded diagnostics. Never store raw input, exception messages, URLs or wallet data.
-const EVENTS=new Set(["app.start","fixture.loaded","fixture.failed","report.built","report.failed","page.open","report.import.started","report.import.failed","report.import.completed","sample.reset","sample.incomplete","experiment.started","experiment.completed","experiment.failed","file.export","log.export","log.cleared","runtime.error","runtime.rejection","metadata.saved","review.settled","review.archived","review.restored","review.reset","mock.wallet.added","mock.exercise.completed","mock.stress.completed"]);
+const EVENTS=new Set(["app.start","fixture.loaded","fixture.failed","report.built","report.failed","page.open","report.import.started","report.import.failed","report.import.completed","sample.reset","sample.incomplete","experiment.started","experiment.completed","experiment.failed","file.export","log.export","log.cleared","runtime.error","runtime.rejection","metadata.saved","review.settled","review.archived","review.restored","review.reset"]);
 const PAGES=new Set(["dashboard","create","wallet","lab","market","profit","participants","logs","terminal","projects","inventory","liquidity"]);
 const MODES=new Set(["SYNTHETIC","ARCHIVED_HISTORICAL"]);
 const STATUSES=new Set(["REPORT_READY","REVIEW_REQUIRED"]);
 const ERRORS=new Set(["Error","TypeError","RangeError","SyntaxError","ReferenceError","AbortError","NetworkError","UnknownError"]);
 const ISSUE_CODES=new Set(["CASH_TRADE_AUDIT_FAILED","CREATOR_FEE_AUDIT_FAILED","INVENTORY_ADJUSTMENT_AUDIT_FAILED","HISTORICAL_NAV_INCOMPLETE","INVENTORY_LEDGER_CLOSING_MISMATCH","ACQUISITION_COST_MISMATCH","REALIZED_PNL_MISMATCH","INVENTORY_TRADE_SUMMARY_MISMATCH","UNVERIFIED_MARKET_TRADE","MARKET_HISTORY_OR_SNAPSHOT_INCOMPLETE","OUTSIDE_INNER_MARKET","REAL_RESERVE_UNKNOWN","MISSING_CURVE_FIELD"]);
-const numeric=["duration_ms","file_bytes","issue_count","buy_count","sell_count","trial_count","match_count","seed","runs","count","event_count"];
+const numeric=["duration_ms","file_bytes","issue_count","buy_count","sell_count","trial_count","match_count","seed","runs"];
 export function errorKind(error){return ERRORS.has(error?.name)?error.name:"UnknownError"}
 export function createDiagnosticLog({limit=1000,clock=()=>new Date()}={}){
  if(!Number.isSafeInteger(limit)||limit<1||limit>10000)throw new RangeError("invalid log limit");
