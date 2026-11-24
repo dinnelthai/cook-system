@@ -196,7 +196,8 @@ test("Treasury monitor values the whole position with an exact curve sell quote"
   assert.equal(report.position.token_balance_base_units, "1000");
   assert.ok(BigInt(report.pnl.estimated_full_position_liquidation_quote_base_units) > 0n);
   assert.ok(BigInt(report.curve_risk.estimated_liquidation_quote_base_units) < BigInt(report.curve_risk.marginal_mark_value_quote_base_units));
-  assert.equal(report.risk_level, "LOW");
+  assert.equal(report.risk_level, "HIGH");
+  assert.ok(report.risk_flags.some((flag) => flag.code === "POSITION_BELOW_COST_ON_CURVE_EXIT"));
 });
 
 test("next-buy scenario reports post-buy average cost and incremental liquidation PnL", () => {
