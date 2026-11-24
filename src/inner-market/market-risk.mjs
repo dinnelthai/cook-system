@@ -91,10 +91,10 @@ function participantClassFor(eventId, attributionByEventId) {
 
 function aggregateParticipantFlow(events, attributionByEventId = {}) {
   const classes = {
-    TREASURY: { buyQuote: 0n, sellQuote: 0n, buyTokens: 0n, sellTokens: 0n, executions: 0 },
-    SNIPER: { buyQuote: 0n, sellQuote: 0n, buyTokens: 0n, sellTokens: 0n, executions: 0 },
-    OTHER: { buyQuote: 0n, sellQuote: 0n, buyTokens: 0n, sellTokens: 0n, executions: 0 },
-    UNKNOWN: { buyQuote: 0n, sellQuote: 0n, buyTokens: 0n, sellTokens: 0n, executions: 0 },
+    TREASURY: { buyQuote: 0n, sellQuote: 0n, buyTokens: 0n, sellTokens: 0n, buyExecutions: 0, sellExecutions: 0, executions: 0 },
+    SNIPER: { buyQuote: 0n, sellQuote: 0n, buyTokens: 0n, sellTokens: 0n, buyExecutions: 0, sellExecutions: 0, executions: 0 },
+    OTHER: { buyQuote: 0n, sellQuote: 0n, buyTokens: 0n, sellTokens: 0n, buyExecutions: 0, sellExecutions: 0, executions: 0 },
+    UNKNOWN: { buyQuote: 0n, sellQuote: 0n, buyTokens: 0n, sellTokens: 0n, buyExecutions: 0, sellExecutions: 0, executions: 0 },
   };
   const walletBuyQuote = new Map();
   let unattributedExternalQuote = 0n;
@@ -121,6 +121,7 @@ function aggregateParticipantFlow(events, attributionByEventId = {}) {
     if (event.event_kind === BUY) {
       bucket.buyQuote += quote;
       bucket.buyTokens += tokens;
+      bucket.buyExecutions += 1;
       if (participantClass !== "TREASURY") {
         externalBuyQuote += quote;
         if (walletAddress) walletBuyQuote.set(walletAddress, (walletBuyQuote.get(walletAddress) ?? 0n) + quote);
@@ -129,6 +130,7 @@ function aggregateParticipantFlow(events, attributionByEventId = {}) {
     } else {
       bucket.sellQuote += quote;
       bucket.sellTokens += tokens;
+      bucket.sellExecutions += 1;
       if (participantClass !== "TREASURY") externalSellQuote += quote;
     }
   }
@@ -150,8 +152,12 @@ function aggregateParticipantFlow(events, attributionByEventId = {}) {
       confirmed_buy_token_base_units: value.buyTokens.toString(),
       confirmed_sell_token_base_units: value.sellTokens.toString(),
       confirmed_execution_count: value.executions,
+      confirmed_buy_execution_count: value.buyExecutions,
+      confirmed_sell_execution_count: value.sellExecutions,
     }])),
     external_buy_quote_base_units: externalBuyQuote.toString(),
+    external_buy_execution_count: Object.entries(classes).filter(([name]) => name !== "TREASURY").reduce((sum, [, value]) => sum + value.buyExecutions, 0),
+    external_buy_wallet_count: walletBuyQuote.size,
     external_sell_quote_base_units: externalSellQuote.toString(),
     external_sell_share_bps: totalExternalTurnover === 0n ? null : (externalSellQuote * BPS / totalExternalTurnover).toString(),
     external_buy_wallet_hhi_bps: hhiLowerBoundBps === null ? null : hhiLowerBoundBps.toString(),
@@ -168,6 +174,15 @@ function aggregateParticipantFlow(events, attributionByEventId = {}) {
 function riskDimension(value, threshold, metric) {
   const result = classifyThreshold(value, threshold);
   return { metric, value_bps: value, ...result };
+}
+
+function concentrationRiskDimension(value, threshold, { walletCount, buyCount }) {
+  const result = riskDimension(value, threshold, "EXTERNAL_BUYER_WALLET_CONCENTRATION_LOWER_BOUND");
+  if (value === null || result.severity === 0) return { ...result, sample_status: "LIMITED_OR_NO_CONCENTRATION_SIGNAL" };
+  if (walletCount < 3 || buyCount < 5) {
+    return { ...result, level: "WATCH_SAMPLE_LIMITED", severity: 1, sample_status: "LIMITED" };
+  }
+  return { ...result, sample_status: "ADEQUATE" };
 }
 
 /**
@@ -249,7 +264,10 @@ export function assessInnerMarketRisk({
     riskDimension(absolutePriceMove, thresholds.absolutePriceMoveBps, "ABSOLUTE_MARGINAL_PRICE_MOVE"),
     riskDimension(positiveInventoryDepletion, thresholds.curveInventoryDepletionBps, "CURVE_REAL_INVENTORY_DEPLETION"),
     riskDimension(participantFlow.external_sell_share_bps, thresholds.externalSellShareBps, "EXTERNAL_SELL_SHARE"),
-    riskDimension(participantFlow.external_buy_wallet_hhi_lower_bound_bps, thresholds.buyerConcentrationHhiBps, "EXTERNAL_BUYER_WALLET_CONCENTRATION_LOWER_BOUND"),
+    concentrationRiskDimension(participantFlow.external_buy_wallet_hhi_lower_bound_bps, thresholds.buyerConcentrationHhiBps, {
+      walletCount: participantFlow.external_buy_wallet_count,
+      buyCount: participantFlow.external_buy_execution_count,
+    }),
     riskDimension(participantFlow.wallet_attribution_coverage_bps === null ? null : (BPS - BigInt(participantFlow.wallet_attribution_coverage_bps)).toString(), thresholds.unknownAttributionShareBps, "UNKNOWN_EXTERNAL_BUYER_ATTRIBUTION_SHARE"),
   ];
 
@@ -351,6 +369,7 @@ export function assessInnerMarketRisk({
     warnings: [
       "Risk thresholds are provisional and must be calibrated on historical organic launches.",
       "Wallet HHI is reported as lower/upper bounds over all external buy notional; unknown attribution is not silently dropped from the denominator.",
+      "Concentration severity is capped at WATCH until at least three identified buyer wallets and five external buy executions are observed; early-curve small samples are not treated as conclusive concentration evidence.",
       "A participant class such as SNIPER is supplied by an attribution layer; it is not inferred from trade size or timing alone.",
       "Reference depth probes are fixed diagnostic measurements, not trade recommendations or execution instructions.",
       "A market-state replay failure or ordering gap must be treated as a data-integrity stop, not as a low-risk result.",
