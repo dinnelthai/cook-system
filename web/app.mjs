@@ -1,4 +1,4 @@
-import {mountLocalFaucet} from "./local-faucet.mjs";
+import {mountLocalFaucet,mountWalletSelector} from "./local-faucet.mjs";
 import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-report.mjs";
 import { getParticipantCatalogue, evaluateParticipantStressCases } from "../src/inner-market/participant-stress-lab.mjs";
 import { runParticipantExperiment } from "../src/inner-market/participant-experiment.mjs";
@@ -28,7 +28,7 @@ function auditedReport(input){
   return r;
  }catch(e){record("report.failed",{error_kind:errorKind(e),duration_ms:Math.round(performance.now()-start)},"ERROR");throw e;}
 }
-const pages=[["terminal","01 操作台"],["wallet","02 资金管理"],["projects","03 项目档案"],["dashboard","04 复盘分析"],["participants","05 市场风险实验"],["logs","06 系统设置"]];
+const pages=[["terminal","01 操作台"],["wallet","02 钱包管理"],["projects","03 项目档案"],["dashboard","04 复盘分析"],["participants","05 市场风险实验"],["logs","06 系统设置"]];
 const fixture=await (async()=>{
  const start=performance.now();
  try{const response=await fetch("../fixtures/synthetic/inner-market-mvp.json");if(!response.ok)throw new Error("Fixture unavailable");const value=await response.json();record("fixture.loaded",{duration_ms:Math.round(performance.now()-start)});return value;}
@@ -106,6 +106,7 @@ function renderTerminal(){
  splitView(panel("市场行情 / OHLCV",candleControls+(isSample?emptyState("等待行情","尚无项目成交记录"):candleChart(candleResult)))+panel("已确认成交金额",seriesChart(trades.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE")),panel("项目资料与数据",'<form id="terminal-meta"><label>项目名称</label><input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"><label>Symbol</label><input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"><div class="row"><button type="submit">保存发行资料</button><button type="button" disabled title="发行接口尚未接入">发币</button></div></form><label for="terminal-import">导入区间报告</label><input type="file" id="terminal-import" accept=".json"><div class="row"><button id="terminal-local-load">读取本地记录</button></div><p id="terminal-error" class="negative"></p>')+panel("交易执行",emptyState("买入 / 卖出","交易执行接口尚未接入")+'<div class="row"><button disabled>买入</button><button disabled>卖出</button></div>')+panel("监测与结算",table(["项目","状态"],[["审计",isSample?"待载入":d.status],["报告阶段",isSample?"待载入":reviewStage],["数据来源",isSample?"未载入":"历史记录"],["监测视图",reviewPaused?"暂停浏览":"可查看"],["链上执行","未接入"]])+'<div class="row"><button id="terminal-pause">'+(reviewPaused?"恢复浏览":"暂停浏览")+'</button><button id="terminal-export" '+(isSample?"disabled":"")+'>导出核算报告</button><button id="terminal-settle" '+(!isSample&&reviewStage==="REVIEW"&&d.settlement_allowed?"":"disabled")+'>确认区间结算</button><button id="terminal-archive" '+(reviewStage==="SETTLED"||reviewStage==="ARCHIVED"?"":"disabled")+'>归档并下载</button></div><p class="muted">仅导出历史核算；不执行资产退出或链上交易。</p>'))+
  panel("资产净值历史快照",seriesChart(snapshots.map(x=>({label:x.sequence,value:x.navAfterFlowBaseUnits})),"NAV"))+
  '<section class="panel"><div class="terminal-tabs" role="group" aria-label="操作台明细">'+tabs.map(([id,label])=>'<button data-tab="'+id+'" aria-pressed="'+(terminalTab===id)+'">'+label+'</button>').join("")+'</div><div class="tab-content">'+(reviewPaused?emptyState("浏览已暂停","恢复浏览后查看当前报告明细"):isSample&&terminalTab!=="logs"?emptyState("暂无项目数据","请载入项目记录"):rows[terminalTab]())+'</div></section>';
+ const picker=document.createElement("div");picker.className="panel wallet-selector";main.querySelector(".terminal-heading").after(picker);mountWalletSelector(picker,()=>{page="wallet";record("page.open",{page});render()});
  main.querySelectorAll("[data-candle-interval]").forEach(b=>b.onclick=()=>{candleInterval=Number(b.dataset.candleInterval);render()});
  main.querySelector("#terminal-local-load").onclick=async()=>{const before=data;try{const response=await fetch("/api/terminal/report",{cache:"no-store"});if(!response.ok)throw Error("本地报告桥未配置或数据无效");const next=await response.json();const nextReport=auditedReport(next);buildTerminalState(next);if(data!==before||page!=="terminal")return;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");const el=document.querySelector("#terminal-error");if(el)el.textContent=err.message}};
  main.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{terminalTab=b.dataset.tab;render()});
@@ -127,7 +128,7 @@ function render(){
  const context=()=>note("数据来源："+report.source_mode+" · 离线区间报告；Localnet 实时接口尚未接入。未知值不作估算。");
  if(page==="terminal"){renderTerminal();
  }else if(page==="wallet"){
- main.innerHTML=screenHeading("资金管理","主钱包 · SOL 余额与充值")+'<section id="funding-panel" class="panel funding-panel"></section>';
+ main.innerHTML=screenHeading("钱包管理","创建钱包 · 余额与 SOL 充值")+'<section id="funding-panel" class="panel funding-panel"></section>';
  mountLocalFaucet(main.querySelector("#funding-panel"));
  }else if(page==="projects"){
  main.innerHTML=screenHeading("项目档案","当前会话 · 历史区间")+panel("项目记录",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status+" / "+reviewStage]]))+panel("资料",metadata?table(["字段","内容"],Object.entries(metadata)):emptyState("尚未保存项目资料","在操作台中整理资料"))+details("当前报告",report);
