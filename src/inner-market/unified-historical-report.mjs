@@ -11,5 +11,5 @@ export function buildUnifiedHistoricalReport(input){
  if(!state.market.history_complete){
   for(const k of ["real_quote_reserves_base_units","virtual_quote_reserves_base_units","real_token_reserves_base_units","virtual_token_reserves_base_units"])market_history[k]=null;
  }
- return {...raw,schema_version:"unified-historical-report.1",status:state.status,issues:state.issues,accounting,market_history,terminal_state:state,source_attestation:"UNKNOWN",settlement_allowed:state.settlement_allowed,execution_enabled:false};
+ return {...raw,schema_version:"unified-historical-report.1",status:state.status,issues:state.issues,accounting,market_history,terminal_state:state,trust:state.trust,source_attestation:"UNKNOWN",settlement_allowed:state.settlement_allowed,execution_enabled:false};
 }

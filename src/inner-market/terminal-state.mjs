@@ -3,6 +3,7 @@ import {assessHistoricalRisk} from "./historical-risk.mjs";
 import {buildHistoricalDashboard} from "./historical-dashboard.mjs";
 import {buildTerminalCandles} from "./terminal-candles.mjs";
 import {summarizeHistoricalNav} from "./historical-nav.mjs";
+import {describeHistoricalTrust} from "./historical-trust.mjs";
 
 export const REVIEW_STAGES=Object.freeze(["REVIEW","SETTLED","ARCHIVED"]);
 
@@ -10,16 +11,17 @@ export const REVIEW_STAGES=Object.freeze(["REVIEW","SETTLED","ARCHIVED"]);
 export function buildTerminalState(input){
  const d=buildHistoricalDashboard(input);
  const evidence=auditTerminalEvidence(input);
- const ready=d.status==="REPORT_READY"&&evidence.status!=="REVIEW_REQUIRED";
+ const candles=buildTerminalCandles(input);
+ const issues=[...d.issues,...evidence.issues,...(candles.status==="REVIEW"?["CANDLE_EVIDENCE_CONTRADICTION"]:[])];
+ const ready=d.status==="REPORT_READY"&&evidence.status!=="REVIEW_REQUIRED"&&candles.status!=="REVIEW";
  const n=summarizeHistoricalNav({projectId:input.scope.projectId,quoteAsset:input.scope.quoteAsset,snapshots:input.nav.snapshots,historyComplete:input.nav.historyComplete});
  const navEndpoints=d.nav_evidence;
  const sample=input.sourceMode==="SYNTHETIC";
  const endpointReady=ready&&(sample||navEndpoints.status==="INTERNALLY_CONSISTENT");
  const pathReady=ready&&sample;
  const buy=BigInt(d.market.buy_notional_base_units),sell=BigInt(d.market.sell_notional_base_units);
- const candles=buildTerminalCandles(input);
  const checks=[ 
-  {id:"accounting",status:ready?"PASS":"REVIEW",evidence:[...d.issues,...evidence.issues]},
+  {id:"accounting",status:ready?"PASS":"REVIEW",evidence:issues},
   {id:"archived_evidence",status:evidence.status==="UNAVAILABLE"?"UNKNOWN":evidence.status==="REVIEW_REQUIRED"?"REVIEW":"PASS",evidence:evidence.issues},
   {id:"cost_basis",status:d.cost_basis_evidence.status==="REVIEW_REQUIRED"?"REVIEW":"UNKNOWN",evidence:d.cost_basis_evidence.issues},
   {id:"economic_classification",status:evidence.classification.status==="REVIEW_REQUIRED"?"REVIEW":"UNKNOWN",evidence:evidence.classification.issues},
@@ -31,7 +33,8 @@ export function buildTerminalState(input){
   {id:"wallet_attribution",status:"UNKNOWN",evidence:[]},
   {id:"live_execution",status:"UNAVAILABLE",evidence:[]}
  ];
- return {...d,schema_version:"terminal-state.1",status:ready?"REPORT_READY":"REVIEW_REQUIRED",issues:[...d.issues,...evidence.issues],
+ const trust=describeHistoricalTrust({sourceMode:input.sourceMode,ready,checks,navEndpoints,tradeEvidence:d.trade_evidence,costBasisEvidence:d.cost_basis_evidence,archivedEvidence:evidence});
+ return {...d,schema_version:"terminal-state.1",status:ready?"REPORT_READY":"REVIEW_REQUIRED",issues,trust,
   treasury:ready?d.treasury:Object.fromEntries(Object.keys(d.treasury).map(k=>[k,null])),
   market:{...d.market,gross_turnover_base_units:(buy+sell).toString(),buy_minus_sell_notional_base_units:(buy-sell).toString()},
   performance:{closing_nav_base_units:endpointReady?n.closing_nav_base_units:null,capital_adjusted_nav_change_base_units:endpointReady?n.capital_adjusted_nav_change_base_units:null,time_weighted_return_bps:pathReady?n.time_weighted_return_bps:null,observations:pathReady?n.observations:[],valuation_attestation:"UNKNOWN",endpoint_status:navEndpoints.status},

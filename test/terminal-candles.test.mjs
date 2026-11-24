@@ -53,3 +53,15 @@ test("candle event quantity must agree with the corresponding project journal",(
  assert.equal(s.treasury.realized_project_pnl_base_units,null);
  assert.equal(s.settlement_allowed,false);
 });
+
+test("contradictory candle evidence cannot coexist with a ready unified report",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const i=withEvidence();i.market.candleEvidence.events[0].quality.validation_status="warning";
+ const r=buildUnifiedHistoricalReport(i);
+ assert.equal(r.status,"REVIEW_REQUIRED");
+ assert.equal(r.trust.grade,"D2");
+ assert.ok(r.issues.includes("CANDLE_EVIDENCE_CONTRADICTION"));
+ assert.equal(r.terminal_state.risk.status,"REVIEW_REQUIRED");
+ assert.ok(Object.values(r.accounting).every(v=>v===null));
+ assert.equal(r.settlement_allowed,false);
+});

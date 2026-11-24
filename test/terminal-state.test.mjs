@@ -106,3 +106,30 @@ test("endpoint scope and position must match report interval",()=>{
  const j=historicalWithEndpoints();j.nav.endpointEvidence.closing.sequence=4;
  assert.ok(buildTerminalState(j).issues.includes("NAV_ENDPOINT_POSITION_MISMATCH:CLOSING"));
 });
+
+test("unified trust separates synthetic test results from provisional historical results",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const sample=buildUnifiedHistoricalReport(fixture());
+ assert.deepEqual(sample.trust,sample.terminal_state.trust);
+ assert.equal(sample.trust.grade,"D3");
+ assert.equal(sample.trust.metrics.realized_pnl.status,"SYNTHETIC_ONLY");
+ const i=fixture();i.sourceMode="ARCHIVED_HISTORICAL";i.trust={grade:"D5",independent_attestation:"PASS"};
+ const r=buildUnifiedHistoricalReport(i);
+ assert.equal(r.trust.grade,"D3");
+ assert.equal(r.trust.independent_attestation,"UNKNOWN");
+ assert.equal(r.trust.metrics.realized_pnl.status,"PROVISIONAL");
+ assert.equal(r.trust.metrics.nav_endpoints.status,"UNAVAILABLE");
+ assert.equal(r.trust.metrics.historical_performance.status,"UNAVAILABLE");
+ assert.equal(r.trust.historical_settlement_certified,false);
+ assert.equal(r.settlement_allowed,false);
+});
+test("financial contradiction has one review grade across unified output",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const i=fixture();i.cash.historyComplete=false;
+ const r=buildUnifiedHistoricalReport(i);
+ assert.equal(r.trust.grade,"D2");
+ assert.equal(r.trust.status,"REVIEW_REQUIRED");
+ assert.ok(Object.values(r.trust.metrics).every(x=>x.status==="REVIEW_REQUIRED"));
+ assert.ok(r.trust.review_checks.includes("accounting"));
+ assert.ok(Object.values(r.accounting).every(v=>v===null));
+});
