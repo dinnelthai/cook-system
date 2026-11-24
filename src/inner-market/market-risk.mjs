@@ -216,6 +216,7 @@ export function assessInnerMarketRisk({
       curve_complete_after: current.complete,
       reference_token_cost_after_base_units: null,
       reference_token_cost_change_from_previous_base_units: null,
+      reference_token_probe_status: referenceTokenProbeBaseUnits === null ? "NOT_CONFIGURED" : current.complete ? "CURVE_COMPLETED" : "PENDING",
     };
     if (referenceTokenProbeBaseUnits !== null && !current.complete) {
       try {
@@ -322,7 +323,7 @@ export function assessInnerMarketRisk({
     current_as_of_event_id: current.as_of_event_id ?? null,
     current_curve_lifecycle: current.lifecycle,
     curve_complete: current.complete,
-    state_reconciliation_status: reconciliationFailed ? "FAIL_OR_UNKNOWN" : "NO_MISMATCH_REPORTED",
+    state_reconciliation_status: reconciliationFailed ? "FAIL_OR_UNKNOWN" : replayReconciliations.length === 0 ? "NOT_CHECKED" : "PASS",
     confirmed_event_count: confirmedEvents.length,
     ignored_unconfirmed_event_count: ignoredUnconfirmedEventCount,
     replay_reconciliations: replayReconciliations,
