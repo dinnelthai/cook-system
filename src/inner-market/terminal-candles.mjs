@@ -19,7 +19,7 @@ export function buildTerminalCandles(input,intervalMs=60000){
   if(!scopeKeys.every(k=>typeof input.scope[k]==="string"&&input.scope[k]===evidence.scope?.[k]))return result("REVIEW","SCOPE_MISMATCH");
   const identity=evidence.market;
   if(!marketKeys.every(k=>typeof identity?.[k]==="string"&&identity[k].length>0)||identity.token_mint!==input.scope.tokenMint||identity.market_phase!=="bonding_curve")return result("REVIEW","MARKET_IDENTITY_MISMATCH");
-  if(!Number.isSafeInteger(evidence.startTimeMs)||!Number.isSafeInteger(evidence.endTimeMs)||evidence.startTimeMs<0||evidence.endTimeMs<=evidence.startTimeMs)return result("REVIEW","TIME_RANGE_INVALID");
+  if(!Number.isSafeInteger(evidence.startTimeMs)||!Number.isSafeInteger(evidence.endTimeMs)||evidence.startTimeMs<0||evidence.endTimeMs<=evidence.startTimeMs||evidence.endTimeMs>8640000000000000-3600000)return result("REVIEW","TIME_RANGE_INVALID");
   if(!Array.isArray(evidence.events)||!Array.isArray(input.market.trades))return result("REVIEW","EVENTS_MISSING");
   const provenance=input.sourceMode==="SYNTHETIC"?"synthetic":input.sourceMode==="ARCHIVED_HISTORICAL"?"observed_chain":null;
   if(!provenance)return result("REVIEW","PROVENANCE_MISMATCH");
