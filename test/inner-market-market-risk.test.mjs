@@ -134,8 +134,10 @@ test("unknown wallet attribution is not guessed as a sniper or independent buyer
   });
 
   assert.equal(report.participant_flow.by_class.UNKNOWN.confirmed_execution_count, 1);
-  assert.equal(report.participant_flow.external_buy_wallet_hhi_bps, null);
+  assert.equal(report.participant_flow.external_buy_wallet_hhi_lower_bound_bps, "0");
+  assert.equal(report.participant_flow.external_buy_wallet_hhi_upper_bound_bps, "10000");
   assert.equal(report.participant_flow.wallet_attribution_coverage_bps, "0");
+  assert.equal(report.risk_level, "CRITICAL");
 });
 
 test("curve phase completion is surfaced as a transition, not a low-risk active curve", () => {
@@ -176,4 +178,38 @@ test("incomplete event ordering fails closed instead of returning a low-risk rep
     creatorFeeBps: "0",
     thresholds,
   }), /cannot be replayed in exact order/);
+});
+
+test("curve-state snapshot mismatch forces reconciliation pause", () => {
+  const state = baselineState();
+  const event = {
+    event_id: "bad-snapshot",
+    provenance: "synthetic",
+    event_time_ms: 1000,
+    ordering: { ordering_confidence: "synthetic", event_sequence: 1 },
+    status: "CONFIRMED",
+    event_kind: "CURVE_STATE_SNAPSHOT",
+    market,
+    payload: {
+      state: {
+        virtual_token_reserves_base_units: "999",
+        virtual_quote_reserves_base_units: "100",
+        real_token_reserves_base_units: "700",
+        real_quote_reserves_base_units: "0",
+        token_total_supply_base_units: "1000",
+        protocol_fees_base_units: "0",
+        creator_fees_base_units: "0",
+        complete: false,
+      },
+    },
+  };
+  const report = assessInnerMarketRisk({
+    baselineCurveState: state,
+    interveningEvents: [event],
+    protocolFeeBps: "0",
+    creatorFeeBps: "0",
+    thresholds,
+  });
+  assert.equal(report.state_reconciliation_status, "FAIL_OR_UNKNOWN");
+  assert.equal(report.risk_level, "PAUSE_AND_RECONCILE");
 });
