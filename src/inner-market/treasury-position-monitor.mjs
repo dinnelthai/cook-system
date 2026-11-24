@@ -13,6 +13,14 @@ function amount(value, name) {
   return parseBaseUnits(value, { name });
 }
 
+function signedAmount(value, name) {
+  if (typeof value === "bigint") return value;
+  if (typeof value !== "string" || !/^-?(0|[1-9][0-9]*)$/.test(value)) {
+    throw new TypeError(name + " must be a signed integer base-unit string");
+  }
+  return BigInt(value);
+}
+
 function formatScaled(value) {
   const negative = value < 0n;
   const absolute = negative ? -value : value;
@@ -223,7 +231,7 @@ export function quoteNextTreasuryBuyScenario({
   const currentTokenBalance = amount(currentTokenBalanceBaseUnits, "currentTokenBalanceBaseUnits");
   const currentCostBasis = amount(currentCostBasisQuoteBaseUnits, "currentCostBasisQuoteBaseUnits");
   const networkFee = amount(estimatedNetworkFeeBaseUnits, "estimatedNetworkFeeBaseUnits");
-  const currentRealizedPnl = amount(currentRealizedPnlQuoteBaseUnits, "currentRealizedPnlQuoteBaseUnits");
+  const currentRealizedPnl = signedAmount(currentRealizedPnlQuoteBaseUnits, "currentRealizedPnlQuoteBaseUnits");
   const config = quoteConfig(curveState, protocolFeeBps, creatorFeeBps);
 
   let quote;
