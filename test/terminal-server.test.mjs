@@ -22,6 +22,7 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  assert.equal((await fetch(base+"/web/app.mjs")).status,200);
  assert.equal((await fetch(base+"/src/inner-market/terminal-state.mjs")).status,200);
  assert.equal((await fetch(base+"/src/inner-market/terminal-candles.mjs")).status,200);
+ assert.equal((await fetch(base+"/src/inner-market/historical-risk.mjs")).status,200);
  const response=await fetch(base+"/api/terminal/report");assert.equal(response.status,200);assert.equal((await response.json()).sourceMode,"SYNTHETIC");
  const health=await fetch(base+"/api/terminal/health");assert.equal(health.status,200);assert.deepEqual(await health.json(),{report_bridge:"CONFIGURED",rpc:{status:"NOT_CONFIGURED",network_verified:false},execution_enabled:false});
  const trade=await fetch(base+"/api/local-wallet/trade",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({side:"buy",amount:"1",addresses:[]})});assert.equal(trade.status,400);assert.equal((await trade.json()).code,"TRADE_DISABLED");

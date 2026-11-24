@@ -1,3 +1,4 @@
+import {assessHistoricalRisk} from "./historical-risk.mjs";
 import {buildHistoricalDashboard} from "./historical-dashboard.mjs";
 import {buildTerminalCandles} from "./terminal-candles.mjs";
 import {summarizeHistoricalNav} from "./historical-nav.mjs";
@@ -23,7 +24,7 @@ export function buildTerminalState(input){
  return {...d,schema_version:"terminal-state.1",
   market:{...d.market,gross_turnover_base_units:(buy+sell).toString(),buy_minus_sell_notional_base_units:(buy-sell).toString()},
   performance:{closing_nav_base_units:ready?n.closing_nav_base_units:null,capital_adjusted_nav_change_base_units:ready?n.capital_adjusted_nav_change_base_units:null,time_weighted_return_bps:ready?n.time_weighted_return_bps:null,observations:ready?n.observations:[]},
-  checks,candles,settlement_scope:input.sourceMode==="SYNTHETIC"?"SYNTHETIC_ONLY":"UNATTESTED_HISTORICAL",
+  checks,candles,risk:assessHistoricalRisk({reportChecks:checks,sourceMode:input.sourceMode}),settlement_scope:input.sourceMode==="SYNTHETIC"?"SYNTHETIC_ONLY":"UNATTESTED_HISTORICAL",
   settlement_allowed:input.sourceMode==="SYNTHETIC"&&ready&&candles.status!=="REVIEW",execution_enabled:false};
 }
 export function advanceReview(stage,action,state){

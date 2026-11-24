@@ -54,3 +54,9 @@ test("unattested historical records cannot be settled even if internally consist
  assert.equal(synthetic.settlement_scope,"SYNTHETIC_ONLY");
  assert.equal(synthetic.settlement_allowed,true);
 });
+
+test("terminal exposes read-only historical risk without treating missing evidence as safe",()=>{
+ const i=fixture();i.sourceMode="ARCHIVED_HISTORICAL";const s=buildTerminalState(i);
+ assert.equal(s.risk.status,"EVIDENCE_INCOMPLETE");assert.equal(s.risk.live_risk_assessed,false);assert.ok(s.risk.alerts.some(a=>a.code==="RECEIPT_AUDIT"));
+ i.market.historyComplete=false;assert.equal(buildTerminalState(i).risk.status,"REVIEW_REQUIRED");
+});
