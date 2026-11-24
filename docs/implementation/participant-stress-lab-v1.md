@@ -17,3 +17,7 @@ The cases are accounting and risk-monitoring proxies. They do not generate agent
 `node scripts/serve-offline-mvp.mjs`
 
 Next-stage validation: compare risk-monitoring outputs against independently collected, anonymized closed-interval local test records; report uncertainty and false positives. No execution or issuer trading decision optimizer is included.
+
+## V0.1 runnable randomized experiment
+
+Run `node scripts/run-participant-experiment.mjs 42 100` (seed, trials per role). This evaluates 600 synthetic risk-audit samples. The UI page 06 also accepts the seed and trials per role, and exports results. The seeded generator chooses baseline or a fixed role-associated QA perturbation. Report totals, audit mismatches, issue counts and observed drawdown on valid samples are included. Sampling weights are invented QA coverage values, not calibrated participant behavior or attack probabilities. There is no transaction generation, market replay policy, attacker strategy, or chain connection. Identical input and seed yield identical output. Exit 0 means expected audit results matched, 2 means mismatch, 1 means invalid input. Empirical behavior modeling and localnet source parity are not established.
