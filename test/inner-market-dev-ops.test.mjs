@@ -256,3 +256,29 @@ test("Treasury monitor pauses when wallet inventory does not reconcile", () => {
   assert.equal(report.risk_level, "PAUSE_AND_RECONCILE");
   assert.ok(report.risk_flags.some((flag) => flag.code === "TREASURY_INVENTORY_MISMATCH"));
 });
+
+test("unknown opening inventory basis is never reported as zero-cost profit", () => {
+  const result = replayTreasuryTradePnl({
+    openingTokenBalanceBaseUnits: "100",
+    events: [],
+    currentLiquidationQuoteBaseUnits: "150",
+  });
+  assert.equal(result.cost_basis_complete, false);
+  assert.equal(result.position.average_cost_quote_per_token, null);
+  assert.equal(result.unrealized_pnl_on_liquidation_quote_base_units, null);
+  assert.equal(result.total_pnl_on_liquidation_quote_base_units, null);
+});
+
+test("Treasury ledger excludes confirmed trades from wallets outside the configured Treasury set", () => {
+  const event = {
+    ...syntheticTrade("external-wallet-buy", 1, "CURVE_BUY_EXECUTED", "100", "1000"),
+    actor_address: "not-treasury-wallet",
+  };
+  const result = replayTreasuryTradePnl({
+    events: [event],
+    treasuryWalletAddresses: ["treasury-wallet"],
+  });
+  assert.equal(result.confirmed_buy_count, 0);
+  assert.equal(result.ignored_non_treasury_event_count, 1);
+  assert.equal(result.ending_token_balance_base_units, "0");
+});
