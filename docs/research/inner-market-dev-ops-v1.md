@@ -93,8 +93,8 @@ Hard gates:
 - stale or incomplete market data => pause new transaction approval;
 - curve state / account snapshot mismatch => pause and reconcile;
 - curve completed or migrated => mark phase transition; do not apply inner-curve assumptions;
-- treasury spend beyond the approved budget => reject for manual review;
-- token exposure beyond the approved inventory cap => require manual review;
+- cumulative confirmed buy spend plus the proposed add-on exceeds the approved budget => require manual review; sell proceeds do not silently replenish the buy budget;
+- current inventory plus the proposed acquisition exceeds the approved inventory cap => require manual review;
 - unknown fee configuration or unsupported program version => do not quote.
 
 Risk outputs are explanations and controls, not trading instructions.
@@ -119,6 +119,8 @@ Risk outputs are explanations and controls, not trading instructions.
 - [ ] Virtual and real reserves are never conflated.
 - [ ] Only confirmed curve executions affect realized trade PnL.
 - [ ] Transfers are excluded from trading volume and trigger inventory reconciliation.
+- [ ] Add-on budget checks use cumulative confirmed buy spend plus the proposed tranche; sale proceeds do not automatically reset the budget.
+- [ ] Add-on inventory checks use current reconciled inventory plus the proposed acquisition.
 - [ ] Batch reports deduplicate signatures and distinguish confirmed, pending, failed, and rejected receipts.
 - [ ] No target-market-cap buy budget, deceptive volume, wallet-concealment, or manipulative execution policy is generated.
 - [ ] All money and token quantities use integer base units; formatted decimals are display-only.
