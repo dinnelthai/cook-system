@@ -99,6 +99,9 @@ export function buildTreasuryPositionMonitor({
   const flags = [];
   const active = isActiveCurve(curveState);
 
+  if (ledger.cost_basis_complete === false) {
+    addFlag(flags, "TREASURY_COST_BASIS_INCOMPLETE", "WATCH", "Opening inventory cost basis is unknown; average cost and affected PnL cannot be fully assessed");
+  }
   if (ledger.inventory_reconciliation === "MISMATCH") {
     addFlag(flags, "TREASURY_INVENTORY_MISMATCH", "CRITICAL", "Treasury ledger inventory differs from the authoritative wallet snapshot");
   } else if (ledger.inventory_reconciliation === "NOT_PROVIDED") {
@@ -187,7 +190,7 @@ export function buildTreasuryPositionMonitor({
       unrealized_pnl_at_marginal_price_quote_base_units: ledger.unrealized_pnl_quote_base_units,
       estimated_full_position_liquidation_quote_base_units: liquidationQuote === null ? null : liquidationQuote.toString(),
       unrealized_pnl_at_estimated_liquidation_quote_base_units: liquidationPnl === null ? null : liquidationPnl.toString(),
-      total_pnl_at_estimated_liquidation_quote_base_units: liquidationPnl === null ? null : (BigInt(ledger.realized_pnl_quote_base_units) + liquidationPnl).toString(),
+      total_pnl_at_estimated_liquidation_quote_base_units: liquidationPnl === null || ledger.realized_pnl_quote_base_units === null ? null : (BigInt(ledger.realized_pnl_quote_base_units) + liquidationPnl).toString(),
     },
     curve_risk: {
       lifecycle: curveState.lifecycle,
@@ -214,6 +217,7 @@ export function quoteNextTreasuryBuyScenario({
   currentTokenBalanceBaseUnits,
   currentCostBasisQuoteBaseUnits,
   currentRealizedPnlQuoteBaseUnits = "0",
+  currentCostBasisComplete = true,
   protocolFeeBps,
   creatorFeeBps,
   tokenDecimals,
@@ -263,7 +267,7 @@ export function quoteNextTreasuryBuyScenario({
   const totalCashCost = quoteSpent + networkFee;
   const postTokenBalance = currentTokenBalance + tokenOut;
   const postCostBasis = currentCostBasis + totalCashCost;
-  const postAverageCost = averageCost(postCostBasis, postTokenBalance, tokenDecimals, quoteDecimals);
+  const postAverageCost = currentCostBasisComplete ? averageCost(postCostBasis, postTokenBalance, tokenDecimals, quoteDecimals) : null;
   const realBefore = BigInt(curveState.real_token_reserves_base_units);
   const curveWouldComplete = tokenOut >= realBefore || quote.status === "WOULD_COMPLETE_CURVE";
 
@@ -281,6 +285,7 @@ export function quoteNextTreasuryBuyScenario({
     current_remaining_cost_basis_quote_base_units: currentCostBasis.toString(),
     post_buy_remaining_cost_basis_quote_base_units: postCostBasis.toString(),
     post_buy_average_cost_quote_per_token: postAverageCost,
+    post_buy_cost_basis_complete: currentCostBasisComplete,
     protocol_fee_base_units: quote.protocol_fee_base_units,
     creator_fee_base_units: quote.creator_fee_base_units,
     unspent_quote_budget_base_units: quote.unspent_input_base_units,
@@ -328,8 +333,8 @@ export function quoteNextTreasuryBuyScenario({
   return {
     ...result,
     post_buy_estimated_full_position_liquidation_quote_base_units: postLiquidation.toString(),
-    post_buy_unrealized_pnl_quote_base_units: (postLiquidation - postCostBasis).toString(),
-    post_buy_total_pnl_at_liquidation_quote_base_units: (currentRealizedPnl + postLiquidation - postCostBasis).toString(),
+    post_buy_unrealized_pnl_quote_base_units: currentCostBasisComplete ? (postLiquidation - postCostBasis).toString() : null,
+    post_buy_total_pnl_at_liquidation_quote_base_units: currentCostBasisComplete ? (currentRealizedPnl + postLiquidation - postCostBasis).toString() : null,
     current_estimated_full_position_liquidation_quote_base_units: currentLiquidation.toString(),
     incremental_liquidation_value_quote_base_units: incrementalLiquidationValue.toString(),
     incremental_estimated_pnl_quote_base_units: incrementalEstimatedPnl.toString(),
