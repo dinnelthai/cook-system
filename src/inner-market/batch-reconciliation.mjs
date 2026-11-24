@@ -30,10 +30,17 @@ export function reconcileExecutionBatch(receipts) {
     const quote = parseBaseUnits(receipt.quote_amount_base_units, { name: "quote_amount_base_units" });
     const tokens = parseBaseUnits(receipt.token_amount_base_units, { name: "token_amount_base_units" });
     const fee = parseBaseUnits(receipt.fee_quote_base_units || "0", { name: "fee_quote_base_units" });
+    if (quote === 0n || tokens === 0n) throw new RangeError("confirmed receipt amounts must be positive");
+    if (receipt.side === "SELL" && fee > quote) throw new RangeError("sell fee exceeds gross quote proceeds");
     batch.confirmed += 1;
     batch.fees += fee;
-    if (receipt.side === "BUY") { batch.buy_quote += quote + fee; batch.buy_tokens += tokens; }
-    else { batch.sell_quote += quote - (quote >= fee ? fee : quote); batch.sell_tokens += tokens; }
+    if (receipt.side === "BUY") {
+      batch.buy_quote += quote + fee;
+      batch.buy_tokens += tokens;
+    } else {
+      batch.sell_quote += quote - fee;
+      batch.sell_tokens += tokens;
+    }
   }
 
   return [...batches.values()].map((batch) => ({
