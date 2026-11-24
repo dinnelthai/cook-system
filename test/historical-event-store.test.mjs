@@ -75,3 +75,4 @@ test("archive scan preserves immutable batches and detects corrupt files",async(
   await assert.rejects(()=>reopened.audit());
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+

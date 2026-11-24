@@ -121,7 +121,7 @@ export function createHistoricalEventStore(directory){
  async function audit(){
   // Scan a bounded, explicitly chosen archive directory. Never delete or
   // rewrite a batch and never claim a transactional inventory of concurrent writes.
-  const names=(await readdir(directory)).filter(n=>/^[0-9a-f]{64}\\.json$/.test(n)).sort();
+  const names=(await readdir(directory)).filter(n=>/^[0-9a-f]{64}\.json$/.test(n)).sort();
   if(names.length>256)throw Error("ARCHIVE_BATCH_LIMIT");
   const batches=[];
   let bytes=0;
@@ -131,7 +131,7 @@ export function createHistoricalEventStore(directory){
    bytes+=info.size;if(bytes>128*1024*1024)throw Error("ARCHIVE_SCAN_BYTE_LIMIT");
    batches.push(await get(name.slice(0,-5)));
   }
-  const after=(await readdir(directory)).filter(n=>/^[0-9a-f]{64}\\.json$/.test(n)).sort();
+  const after=(await readdir(directory)).filter(n=>/^[0-9a-f]{64}\.json$/.test(n)).sort();
   if(canonical(names)!==canonical(after))throw Error("ARCHIVE_CHANGED_DURING_SCAN");
   return auditHistoricalEventBatches(batches);
  }
