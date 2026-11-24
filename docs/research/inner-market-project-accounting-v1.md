@@ -47,3 +47,13 @@ The inventory journal totals must match its ledger aggregates and the finalized 
 Tests cover equal totals with swapped event attribution, missing and duplicate references, mixed mint or cutoff, incomplete coverage and tampered totals.
 
 This remains an offline financial audit. It neither selects trades nor generates execution recommendations.
+
+## Creator receivable audit
+
+creator-fee-accounting.mjs reconciles historical creator receivables and cash receipts for a common project, quote asset, token mint and reporting interval. Inputs are independently verified entitlement and cash records, not inferred protocol fees. ClosingReceivable = OpeningReceivable + Accrued - Received - WrittenOff. Each received-fee event must match one finalized cash posting by event ID and amount. Missing or duplicate receipts, unverified events and missing or inconsistent snapshots block verified income. Protocol fees do not qualify as creator entitlements. Receipt amounts are gross cash credits; separately verified network expenses are recorded once in the expense ledger.
+
+## Historical NAV and performance
+
+historical-nav.mjs accepts ordered historical NAV observations with verified valuations and explicit capital flows. At every flow, record immediately preceding and following valuations and verify NAV_after = NAV_before + CapitalIn - CapitalOut. The time-weighted index starts at 1 and chains NAV_before(t) / NAV_after(t-1). Maximum observed drawdown is the largest peak-to-current index decline among the supplied samples. The implementation uses integer fixed-point arithmetic, reports basis points, and suppresses final performance if history is incomplete, valuations are unverified, or flow conservation fails. A total loss requires explicit rebasing. Sampled drawdown is not guaranteed to capture intraperiod extremes.
+
+These independent reports do not yet automatically enforce fee-audit success inside the project PnL aggregator or derive NAV from source ledgers. Both integration checks remain required before production reporting. No API integration or transaction execution is added.
