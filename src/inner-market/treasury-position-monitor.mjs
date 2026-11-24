@@ -124,8 +124,10 @@ export function buildTreasuryPositionMonitor({
   let liquidationQuote = null;
   let liquidationDiscountBps = null;
   let liquidationPnl = null;
+  let marginalPnl = null;
   if (active) {
     marginalMarkValue = marginalValueQuoteBaseUnits({ tokenBalance, curveState, tokenDecimals, quoteDecimals });
+    marginalPnl = ledger.cost_basis_complete === false ? null : marginalMarkValue - costBasis;
     if (tokenBalance > 0n) {
       const quote = quoteExactTokenInSell({
         tokenAmountIn: tokenBalance.toString(),
@@ -187,7 +189,7 @@ export function buildTreasuryPositionMonitor({
     },
     pnl: {
       realized_pnl_quote_base_units: ledger.realized_pnl_quote_base_units,
-      unrealized_pnl_at_marginal_price_quote_base_units: ledger.unrealized_pnl_quote_base_units,
+      unrealized_pnl_at_marginal_price_quote_base_units: marginalPnl === null ? ledger.unrealized_pnl_quote_base_units : marginalPnl.toString(),
       estimated_full_position_liquidation_quote_base_units: liquidationQuote === null ? null : liquidationQuote.toString(),
       unrealized_pnl_at_estimated_liquidation_quote_base_units: liquidationPnl === null ? null : liquidationPnl.toString(),
       total_pnl_at_estimated_liquidation_quote_base_units: liquidationPnl === null || ledger.realized_pnl_quote_base_units === null ? null : (BigInt(ledger.realized_pnl_quote_base_units) + liquidationPnl).toString(),
