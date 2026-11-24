@@ -21,6 +21,7 @@ export function buildTerminalState(input){
  const checks=[ 
   {id:"accounting",status:ready?"PASS":"REVIEW",evidence:[...d.issues,...evidence.issues]},
   {id:"archived_evidence",status:evidence.status==="UNAVAILABLE"?"UNKNOWN":evidence.status==="REVIEW_REQUIRED"?"REVIEW":"PASS",evidence:evidence.issues},
+  {id:"economic_classification",status:evidence.classification.status==="REVIEW_REQUIRED"?"REVIEW":"UNKNOWN",evidence:evidence.classification.issues},
   {id:"trade_evidence",status:d.trade_evidence.status==="REVIEW_REQUIRED"?"REVIEW":d.trade_evidence.status==="INTERNALLY_CONSISTENT"?"PASS":"UNKNOWN",evidence:[...d.trade_evidence.issues,...d.trade_evidence.missing]},
   {id:"market_coverage",status:d.market.history_complete?"PASS":"REVIEW",evidence:[]},
   {id:"valuation",status:n.status!=="COMPLETE"||navEndpoints.status==="REVIEW_REQUIRED"?"REVIEW":"UNKNOWN",evidence:[...n.issues,...navEndpoints.issues,"INDEPENDENT_VALUATION_UNAVAILABLE"]},

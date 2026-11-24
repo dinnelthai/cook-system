@@ -41,7 +41,7 @@ test("missing candle evidence or inconsistent report refuses archival associatio
  await withStore(async(store)=>{
   await assert.rejects(()=>archiveReportEventLink(bytes(fixture()),store),/CANDLE_EVIDENCE_REQUIRED/);
   const i=withEvidence();i.market.candleEvidence.events[0].payload.quote_amount_base_units="999";
-  await assert.rejects(()=>archiveReportEventLink(bytes(i),store),/CANDLE_EVIDENCE_REQUIRED/);
+  await assert.rejects(()=>archiveReportEventLink(bytes(i),store),/REPORT_REVIEW_REQUIRED/);
   const j=withEvidence();j.cash.historyComplete=false;
   await assert.rejects(()=>archiveReportEventLink(bytes(j),store),/REPORT_REVIEW_REQUIRED/);
  });

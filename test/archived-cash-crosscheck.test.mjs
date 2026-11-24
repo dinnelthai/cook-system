@@ -37,3 +37,13 @@ test("reject duplicate posting IDs and mismatched account scope; flag incomplete
 test("failed fee misclassification is rejected even if amount matches",()=>{
  const i=fixture();i.postings[1].kind="OPERATING_EXPENSE";assert.ok(codes(i).includes("FAILED_FEE_POSTING_MISMATCH"));
 });
+
+test("successful cash posting purpose stays unattested while failed fee is structurally checked",()=>{
+ const r=auditArchivedCashPostings(fixture());
+ assert.deepEqual(r.classification.map(x=>x.status),["UNATTESTED","FAILED_FEE_STRUCTURALLY_CONSISTENT"]);
+ const i=fixture();i.postings[0].kind="CAPITAL_OUT";
+ const changed=auditArchivedCashPostings(i);
+ assert.equal(changed.status,"AMOUNTS_INTERNALLY_CONSISTENT");
+ assert.equal(changed.classification[0].status,"UNATTESTED");
+ assert.equal(changed.economic_classification_attestation,"UNKNOWN");
+});

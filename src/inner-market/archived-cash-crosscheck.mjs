@@ -37,6 +37,7 @@ export function auditArchivedCashPostings({accountInterval,projectId,postings,ca
   grouped.get(p.signature).push({p,n,signed:CREDIT.has(p.kind)?n:-n});
  }
  let matched=0;
+ const classification=[];
  for(const r of normalized){
   const n=r.native.find(x=>x.address===scope.wallet);
   const observed=n?n.after-n.before:0n;
@@ -59,6 +60,9 @@ export function auditArchivedCashPostings({accountInterval,projectId,postings,ca
    if(rows.length>1)issue("MULTIPLE_COMPONENTS_REQUIRE_INDEPENDENT_EVIDENCE");
   }
   if(r.issues.length)issue("RECEIPT_REVIEW_REQUIRED");
+  // A native balance delta cannot attest economic purpose. Failed fees are
+  // structurally checkable; successful postings still require attribution.
+  for(const {p} of rows)classification.push({posting_id:p.id,kind:p.kind,status:r.outcome==="FAILED"&&issues.length===start?"FAILED_FEE_STRUCTURALLY_CONSISTENT":"UNATTESTED"});
   if(issues.length===start)matched++;
  }
  const cash=reconcileProjectCash({projectId,quoteAsset,openingCashBaseUnits:account.native.opening_lamports,observedClosingCashBaseUnits:account.native.observed_closing_lamports,entries:postings,historyComplete:cashHistoryComplete});
@@ -66,5 +70,5 @@ export function auditArchivedCashPostings({accountInterval,projectId,postings,ca
  return {schema_version:"cook-archived-cash-crosscheck.1",status:issues.length?"REVIEW_REQUIRED":"AMOUNTS_INTERNALLY_CONSISTENT",
   project_id:projectId,quote_asset:quoteAsset,receipt_count:normalized.length,matched_receipt_count:matched,posting_count:postings.length,
   account_audit:account,cash_audit:{status:cash.status,expected_closing_cash_base_units:cash.expected_closing_cash_base_units,observed_closing_cash_base_units:cash.observed_closing_cash_base_units,cash_difference_base_units:cash.cash_difference_base_units,flags:cash.flags},
-  issues,source_attestation:"UNKNOWN",economic_classification_attestation:"UNKNOWN",history_complete_attested:false,settlement_allowed:false,execution_enabled:false};
+  issues,classification,source_attestation:"UNKNOWN",economic_classification_attestation:"UNKNOWN",history_complete_attested:false,settlement_allowed:false,execution_enabled:false};
 }

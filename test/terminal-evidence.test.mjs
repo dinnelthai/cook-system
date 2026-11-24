@@ -85,3 +85,24 @@ test("nested inventory and row scope contradictions are rejected",()=>{
   const i=fixture();mutate(i);assert.throws(()=>buildTerminalState(i),/SCOPE_MISMATCH/);
  }
 });
+
+test("trade receipt token deltas agree with the scoped historical journal",()=>{
+ const s=buildTerminalState(fixture());
+ assert.equal(s.archived_evidence.classification.status,"PARTIAL");
+ assert.equal(s.archived_evidence.classification.trade_token_deltas_matched,2);
+ assert.equal(s.checks.find(x=>x.id==="economic_classification").status,"UNKNOWN");
+ assert.equal(s.archived_evidence.classification.economic_classification_attestation,"UNKNOWN");
+});
+test("matching aggregate token and cash balances do not hide per-receipt trade quantity contradictions",()=>{
+ const i=fixture(),[buy,sell]=i.archivedEvidence.accountInterval.receipts;
+ buy.transaction.meta.postTokenBalances[0].uiTokenAmount.amount="110";
+ sell.transaction.meta.preTokenBalances[0].uiTokenAmount.amount="110";
+ const s=buildTerminalState(i);
+ assert.equal(s.archived_evidence.account_audit.status,"INTERNALLY_CONSISTENT");
+ assert.equal(s.archived_evidence.cash_audit.status,"AMOUNTS_INTERNALLY_CONSISTENT");
+ assert.equal(s.archived_evidence.classification.status,"REVIEW_REQUIRED");
+ assert.ok(s.issues.includes("TRADE_RECEIPT_TOKEN_DELTA_MISMATCH:buy-cash"));
+ assert.ok(s.issues.includes("TRADE_RECEIPT_TOKEN_DELTA_MISMATCH:sell-cash"));
+ assert.equal(s.treasury.realized_project_pnl_base_units,null);
+ assert.equal(s.settlement_allowed,false);
+});

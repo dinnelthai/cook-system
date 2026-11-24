@@ -1,4 +1,5 @@
 import {auditArchivedCashPostings} from "./archived-cash-crosscheck.mjs";
+import {normalizeArchivedReceipt} from "./archived-account-audit.mjs";
 import {parseBaseUnits,U128_MAX} from "../core/integer.mjs";
 const amount=v=>parseBaseUnits(v,{name:"report snapshot",max:U128_MAX});
 const nonempty=v=>typeof v==="string"&&v.length>0&&v.length<=256&&v.trim()===v;
@@ -8,7 +9,7 @@ const nonempty=v=>typeof v==="string"&&v.length>0&&v.length<=256&&v.trim()===v;
  */
 export function auditTerminalEvidence(input){
  const e=input?.archivedEvidence;
- if(e==null)return {status:"UNAVAILABLE",account_audit:null,cash_audit:null,issues:[],source_attestation:"UNKNOWN"};
+ if(e==null)return {status:"UNAVAILABLE",account_audit:null,cash_audit:null,classification:{status:"UNAVAILABLE",issues:[],economic_classification_attestation:"UNKNOWN"},issues:[],source_attestation:"UNKNOWN"};
  if(input.sourceMode!=="ARCHIVED_HISTORICAL"||e.schema_version!=="cook-terminal-evidence.1")throw Error("UNSUPPORTED_TERMINAL_EVIDENCE");
  if(Object.keys(e).some(k=>!["schema_version","accountInterval"].includes(k)))throw Error("UNEXPECTED_EVIDENCE_FIELD");
  const s=input.scope,a=e.accountInterval?.scope;
@@ -37,6 +38,25 @@ export function auditTerminalEvidence(input){
  const cash=auditArchivedCashPostings({accountInterval:e.accountInterval,projectId:s.projectId,postings,cashHistoryComplete:input.cash.historyComplete});
  const account=cash.account_audit;
  const issues=[];
+ // Test only declared trade postings against the existing scoped token receipt.
+ // Do not infer income type, ownership, or capital purpose from a balance delta.
+ const journal=new Map(input.inventory.ledger.position_journal.map(j=>[j.event_id,j]));
+ const receipts=new Map(e.accountInterval.receipts.map(raw=>{const r=normalizeArchivedReceipt(raw,s.genesisHash);return [r.signature,r]}));
+ const classificationIssues=[];
+ let checked=0;
+ for(const p of postings){
+  if(!["TRADE_CASH_COST","TRADE_NET_RECEIPT"].includes(p.kind)||p.status!=="FINALIZED"||p.reconciliation!=="PASS")continue;
+  const j=journal.get(p.tradeEventId),r=receipts.get(p.signature);
+  if(!j||!r||r.outcome!=="SUCCESS"){classificationIssues.push("TRADE_RECEIPT_CLASSIFICATION_MISMATCH:"+p.id);continue;}
+  const t=r.tokens.find(x=>x.address===s.tokenAccount&&x.owner===s.wallet&&x.mint===s.tokenMint);
+  if(!t){classificationIssues.push("TRADE_RECEIPT_TOKEN_EVIDENCE_MISSING:"+p.id);continue;}
+  const expected=amount(j.token_amount_base_units);
+  const buy=p.kind==="TRADE_CASH_COST";
+  if(j.side!==(buy?"BUY":"SELL")||expected===0n||t.after-t.before!==(buy?expected:-expected))classificationIssues.push("TRADE_RECEIPT_TOKEN_DELTA_MISMATCH:"+p.id);
+  else checked++;
+ }
+ const classification={status:classificationIssues.length?"REVIEW_REQUIRED":"PARTIAL",issues:classificationIssues,trade_token_deltas_matched:checked,economic_classification_attestation:"UNKNOWN"};
+ issues.push(...classificationIssues);
  if(cash.status!=="AMOUNTS_INTERNALLY_CONSISTENT")issues.push("RECEIPT_CASH_REVIEW");
  for(const [code,expected,observed] of [
   ["REPORT_OPENING_CASH_MISMATCH",input.cash.openingCashBaseUnits,account.native.opening_lamports],
@@ -46,5 +66,5 @@ export function auditTerminalEvidence(input){
  ]){
   if(expected==null||amount(expected)!==amount(observed))issues.push(code);
  }
- return {status:issues.length?"REVIEW_REQUIRED":"INTERNALLY_CONSISTENT",account_audit:account,cash_audit:cash,issues,source_attestation:"UNKNOWN"};
+ return {status:issues.length?"REVIEW_REQUIRED":"INTERNALLY_CONSISTENT",account_audit:account,cash_audit:cash,classification,issues,source_attestation:"UNKNOWN"};
 }
