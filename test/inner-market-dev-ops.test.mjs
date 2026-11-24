@@ -91,7 +91,7 @@ test("batch reconciliation deduplicates signatures and separates receipt states"
 
 test("policy guard pauses on stale or unreconciled market state", () => {
   const result = evaluateInnerMarketPolicy({
-    market: { reconciled: false, complete: true, lifecycle: "bonding_curve", observedAtMs: 0 },
+    market: { reconciled: false, dataComplete: true, complete: false, lifecycle: "bonding_curve", observedAtMs: 0 },
     treasury: { quoteSpentBaseUnits: "50", tokenBalanceBaseUnits: "10" },
     limits: { maxDataAgeMs: 1000, maxQuoteBudgetBaseUnits: "100", maxTokenInventoryBaseUnits: "100" },
     nowMs: 2000,
@@ -99,4 +99,26 @@ test("policy guard pauses on stale or unreconciled market state", () => {
   assert.equal(result.status, "PAUSE_AND_RECONCILE");
   assert.ok(result.reasons.includes("CURVE_STATE_NOT_RECONCILED"));
   assert.ok(result.reasons.includes("STALE_OR_FUTURE_MARKET_DATA"));
+});
+test("policy guard permits only a fresh, reconciled, complete-data active curve within configured limits", () => {
+  const result = evaluateInnerMarketPolicy({
+    market: { reconciled: true, dataComplete: true, complete: false, lifecycle: "bonding_curve", observedAtMs: 1500 },
+    treasury: { quoteSpentBaseUnits: "50", tokenBalanceBaseUnits: "10" },
+    limits: { maxDataAgeMs: 1000, maxQuoteBudgetBaseUnits: "100", maxTokenInventoryBaseUnits: "100" },
+    nowMs: 2000,
+  });
+  assert.equal(result.status, "WITHIN_CONFIGURED_LIMITS");
+  assert.deepEqual(result.reasons, []);
+  assert.equal(result.execution_enabled, false);
+});
+
+test("policy guard pauses when the curve has completed even if data is fresh", () => {
+  const result = evaluateInnerMarketPolicy({
+    market: { reconciled: true, dataComplete: true, complete: true, lifecycle: "complete_pending_migration", observedAtMs: 1900 },
+    treasury: { quoteSpentBaseUnits: "50", tokenBalanceBaseUnits: "10" },
+    limits: { maxDataAgeMs: 1000, maxQuoteBudgetBaseUnits: "100", maxTokenInventoryBaseUnits: "100" },
+    nowMs: 2000,
+  });
+  assert.equal(result.status, "PAUSE_AND_RECONCILE");
+  assert.ok(result.reasons.includes("NOT_IN_BONDING_CURVE_PHASE"));
 });
