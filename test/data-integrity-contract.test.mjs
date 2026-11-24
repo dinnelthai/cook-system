@@ -67,3 +67,10 @@ test("source provenance separates observed identity metadata from independent au
  const bad=assessSourceProvenance({scope,source:{...source,observed_genesis_hash:"other"},capture,rawPayload:{}});
  assert.equal(bad.status,"REVIEW_REQUIRED");
 });
+
+test("timeline treats bonding-curve and post-graduation phases as one token lifecycle",()=>{
+ const a=event(1),b=event(2);a.ordering.instruction_index=0;b.ordering.instruction_index=1;
+ b.market={...b.market,market_phase:"post_graduation"};
+ const r=auditObservedEventTimeline({events:[a,b]});
+ assert.notEqual(r.status,"REVIEW_REQUIRED");assert.deepEqual(r.ordered_event_ids,["e1","e2"]);
+});

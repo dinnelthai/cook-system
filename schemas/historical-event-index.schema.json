@@ -1,8 +1,9 @@
 {
  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/dinnelthai/cook-system/blob/main/schemas/historical-event-index.schema.json",
  "title":"HistoricalEventIndex","type":"object","additionalProperties":false,
- "required":["schema_version","batch_ids","batch_count","event_occurrence_count","duplicate_count","unique_event_count","entries","source_attestation","history_complete_attested","index_sha256"],
+ "required":["schema_version","batch_ids","batch_manifest","batch_count","event_occurrence_count","duplicate_count","unique_event_count","entries","source_attestation","history_complete_attested","index_sha256"],
  "properties":{"schema_version":{"const":"cook-historical-event-index.1"},"batch_ids":{"type":"array","items":{"type":"string","pattern":"^[0-9a-f]{64}$"}},
+ "batch_manifest":{"type":"array","items":{"type":"object","required":["batch_id","sha256","size_bytes"],"properties":{"batch_id":{"type":"string","pattern":"^[0-9a-f]{64}$"},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},"size_bytes":{"type":"integer","minimum":0}}}},
  "batch_count":{"type":"integer","minimum":0},"event_occurrence_count":{"type":"integer","minimum":0},"duplicate_count":{"type":"integer","minimum":0},
  "unique_event_count":{"type":"integer","minimum":0},"entries":{"type":"array","items":{"type":"object"}},"source_attestation":{"const":"UNKNOWN"},
  "history_complete_attested":{"const":false},"index_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}

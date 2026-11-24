@@ -10,9 +10,9 @@ const event=i=>({schema_version:"1.0.0",event_id:"e"+i,event_kind:"CURVE_BUY_EXE
 test("index rebuilds atomically and queries a deduplicated event view",async()=>{
  const dir=await mkdtemp(join(tmpdir(),"cook-index-"));
  try{const store=createHistoricalEventStore(dir);await store.put({scope,events:[event(1),event(2)]});await store.put({scope:{...scope,interval_id:"next"},events:[event(2),event(3)]});
-  const idx=await rebuildHistoricalEventIndex(dir);assert.equal(idx.batch_count,2);assert.equal(idx.event_occurrence_count,4);assert.equal(idx.duplicate_count,1);assert.equal(idx.unique_event_count,3);
+  const idx=await store.rebuildIndex();assert.equal(idx.batch_count,2);assert.equal(idx.event_occurrence_count,4);assert.equal(idx.duplicate_count,1);assert.equal(idx.unique_event_count,3);
   assert.equal((await loadHistoricalEventIndex(dir)).index_sha256,idx.index_sha256);
-  const q=await queryHistoricalEventIndex({directory:dir,filter:{event_id:"e2"}});assert.equal(q.result_count,1);assert.equal(q.results[0].event.event_id,"e2");
+  const q=await store.query({event_id:"e2"});assert.equal(q.result_count,1);assert.equal(q.results[0].event.event_id,"e2");
  }finally{await rm(dir,{recursive:true,force:true});}
 });
 test("index detects stale archive membership and tampered checksum",async()=>{
@@ -21,5 +21,17 @@ test("index detects stale archive membership and tampered checksum",async()=>{
   await store.put({scope:{...scope,interval_id:"new"},events:[event(2)]});await assert.rejects(()=>loadHistoricalEventIndex(dir),/HISTORICAL_INDEX_STALE/);
   const idx=await rebuildHistoricalEventIndex(dir);await writeFile(join(dir,"index.json"),JSON.stringify({...idx,unique_event_count:99}));
   await assert.rejects(()=>loadHistoricalEventIndex(dir),/HISTORICAL_INDEX_CHECKSUM_MISMATCH/);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test("index detects tampering of any indexed batch, not only the queried batch",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-index-batch-tamper-"));
+ try{
+  const store=createHistoricalEventStore(dir);
+  await store.put({scope,events:[event(1)]});
+  await store.put({scope:{...scope,interval_id:"second"},events:[event(2)]});
+  const idx=await store.rebuildIndex(),unqueried=idx.batch_manifest[1].batch_id;
+  await writeFile(join(dir,unqueried+".json"),"corrupt");
+  await assert.rejects(()=>loadHistoricalEventIndex(dir),/HISTORICAL_INDEX_BATCH_CHECKSUM_MISMATCH/);
  }finally{await rm(dir,{recursive:true,force:true});}
 });

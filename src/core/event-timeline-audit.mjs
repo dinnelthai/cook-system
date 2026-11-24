@@ -1,5 +1,6 @@
 import {deduplicateEvents,sortForReplay} from "./event-order.mjs";
 const stable=value=>value===null||typeof value!=="object"?JSON.stringify(value):Array.isArray(value)?"["+value.map(stable).join(",")+"]":"{"+Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+stable(value[k])).join(",")+"}";
+const marketScope=m=>stable({chain_id:m?.chain_id,network:m?.network,token_mint:m?.token_mint,quote_mint:m?.quote_mint,curve_program_id:m?.curve_program_id});
 const issue=(list,code,severity="REVIEW")=>{if(!list.some(x=>x.code===code))list.push({code,severity});};
 /** Chain coordinates determine order. Block time is only a clock annotation. */
 export function auditObservedEventTimeline({events,slotTimes=[],maxClockSkewMs=120000}={}){
@@ -8,7 +9,7 @@ export function auditObservedEventTimeline({events,slotTimes=[],maxClockSkewMs=1
  let unique,ordered;
  try{
   unique=deduplicateEvents(events);
-  if(new Set(unique.map(e=>stable(e.market))).size>1)issue(issues,"MIXED_MARKET_IDENTITY");
+  if(new Set(unique.map(e=>marketScope(e.market))).size>1)issue(issues,"MIXED_MARKET_IDENTITY");
   ordered=sortForReplay(unique);
  }catch(error){
   issue(issues,error?.name==="ConflictingDuplicateEventError"?"CONFLICTING_EVENT_ID":"INCOMPLETE_OR_AMBIGUOUS_EVENT_ORDER");

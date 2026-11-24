@@ -11,12 +11,15 @@ export async function rebuildHistoricalEventIndex(directory){
  if(typeof directory!=="string"||!directory.trim())throw Error("INDEX_DIRECTORY_REQUIRED");
  await mkdir(directory,{recursive:true,mode:0o700});
  const before=await namesIn(directory);if(before.length>MAX_BATCHES)throw Error("HISTORICAL_INDEX_BATCH_LIMIT");
- const batches=[];let totalBytes=0;
+ const batches=[],batchManifest=[];let totalBytes=0;
  for(const name of before){
   const info=await lstat(join(directory,name));if(!info.isFile()||info.size>32*1024*1024)throw Error("INVALID_ARCHIVE_FILE");
   totalBytes+=info.size;if(totalBytes>MAX_BYTES)throw Error("HISTORICAL_INDEX_BYTE_LIMIT");
-  const batch=verifyHistoricalEventBatch(JSON.parse(await readFile(join(directory,name),"utf8")));
-  if(batch.batch_id!==name.slice(0,-5))throw Error("HISTORICAL_INDEX_FILENAME_MISMATCH");batches.push(batch);
+  const bytes=await readFile(join(directory,name));
+  const batch=verifyHistoricalEventBatch(JSON.parse(bytes.toString("utf8")));
+  if(batch.batch_id!==name.slice(0,-5))throw Error("HISTORICAL_INDEX_FILENAME_MISMATCH");
+  batchManifest.push({batch_id:batch.batch_id,sha256:createHash("sha256").update(bytes).digest("hex"),size_bytes:bytes.length});
+  batches.push(batch);
  }
  const audit=auditHistoricalEventBatches(batches);
  if(audit.status==="REVIEW_REQUIRED")throw Error("HISTORICAL_INDEX_REVIEW_REQUIRED:"+audit.issues.map(x=>x.code).join(","));
@@ -31,7 +34,7 @@ export async function rebuildHistoricalEventIndex(directory){
  }
  const after=await namesIn(directory);if(stable(before)!==stable(after))throw Error("HISTORICAL_INDEX_ARCHIVE_CHANGED_DURING_SCAN");
  const entries=[...unique.values()].sort((a,b)=>(a.slot??a.event_time_ms)-(b.slot??b.event_time_ms)||a.event_id.localeCompare(b.event_id));
- const body={schema_version:"cook-historical-event-index.1",batch_ids:before.map(n=>n.slice(0,-5)),batch_count:batches.length,
+ const body={schema_version:"cook-historical-event-index.1",batch_ids:before.map(n=>n.slice(0,-5)),batch_manifest:batchManifest,batch_count:batches.length,
   event_occurrence_count:audit.event_occurrence_count,duplicate_count:audit.identical_duplicate_count,unique_event_count:entries.length,
   entries,source_attestation:"UNKNOWN",history_complete_attested:false};
  const index={...body,index_sha256:digest(body)},temp=join(directory,"."+randomUUID()+".index.tmp"),path=join(directory,INDEX_FILE),handle=await open(temp,"wx",0o600);
@@ -43,6 +46,8 @@ export async function loadHistoricalEventIndex(directory){
  const index=JSON.parse(await readFile(join(directory,INDEX_FILE),"utf8")),{index_sha256,...body}=index;
  if(index.schema_version!=="cook-historical-event-index.1"||digest(body)!==index_sha256)throw Error("HISTORICAL_INDEX_CHECKSUM_MISMATCH");
  const current=(await namesIn(directory)).map(n=>n.slice(0,-5));if(stable(current)!==stable(index.batch_ids))throw Error("HISTORICAL_INDEX_STALE");
+ for(const item of index.batch_manifest??[]){const bytes=await readFile(join(directory,item.batch_id+".json"));
+  if(bytes.length!==item.size_bytes||createHash("sha256").update(bytes).digest("hex")!==item.sha256)throw Error("HISTORICAL_INDEX_BATCH_CHECKSUM_MISMATCH");}
  return index;
 }
 export async function queryHistoricalEventIndex({directory,filter={},limit=1000}={}){
