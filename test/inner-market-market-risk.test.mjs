@@ -87,8 +87,9 @@ test("external sniper buy changes the next fixed reference token cost and quote 
   assert.equal(report.reference_token_depth_probe.status, "AVAILABLE");
   assert.ok(BigInt(report.reference_token_depth_probe.additional_quote_cost_base_units) > 0n);
   assert.ok(BigInt(report.reference_quote_depth_probe.token_output_reduction_bps) > 0n);
-  assert.equal(report.risk_level, "CRITICAL");
+  assert.equal(report.risk_level, "HIGH");
   assert.ok(report.risk_dimensions.some((item) => item.metric === "REFERENCE_TOKEN_COST_INCREASE"));
+  assert.equal(report.risk_dimensions.find((item) => item.metric === "EXTERNAL_BUYER_WALLET_CONCENTRATION_LOWER_BOUND").level, "WATCH_SAMPLE_LIMITED");
 });
 
 test("unconfirmed trades do not alter curve state or participant risk flow", () => {
