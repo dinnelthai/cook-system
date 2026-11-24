@@ -73,7 +73,7 @@ test("external sniper buy changes the next fixed reference token cost and quote 
     interveningEvents: events,
     protocolFeeBps: "0",
     creatorFeeBps: "0",
-    referenceTokenProbeBaseUnits: "10",
+    referenceTokenProbeBaseUnits: "100",
     referenceQuoteProbeBaseUnits: "5",
     attributionByEventId: {
       "sniper-buy": { participantClass: "SNIPER", walletAddress: "sniper-wallet" },
@@ -156,6 +156,7 @@ test("curve phase completion is surfaced as a transition, not a low-risk active 
     ],
     protocolFeeBps: "0",
     creatorFeeBps: "0",
+    referenceTokenProbeBaseUnits: "10",
     thresholds,
   });
 
