@@ -115,7 +115,8 @@ Risk dimensions in V1:
 - increase in the fixed reference-token quote cost;
 - depletion of real curve token inventory;
 - external sell share of attributed external turnover;
-- external buyer wallet concentration (HHI and effective wallet count);
+- external buyer wallet concentration (HHI lower/upper bounds and effective wallet-count lower bound);
+- fixed-budget reference output deterioration;
 - data integrity, event-order completeness, curve lifecycle, and attribution coverage.
 
 The initial numeric thresholds in `DEFAULT_CURVE_RISK_THRESHOLDS` are provisional alerting defaults only. Calibrate them against historical organic launches, by launch phase and curve depth. The overall level is the maximum configured dimension severity, not a probability of loss. Missing attribution must not be interpreted as low concentration risk.
@@ -173,4 +174,5 @@ Risk outputs are explanations and controls, not trading instructions.
 4. Batch receipt reconciliation.
 5. Data-quality and treasury policy guard.
 6. Integrate with existing event replay and add fixtures.
+7. Add external-flow risk replay, per-event impact journal, and provisional risk thresholds.
 7. Add offline scenario reports using recorded / synthetic data with provenance labels.
