@@ -1,3 +1,4 @@
+import {mountLocalFaucet} from "./local-faucet.mjs";
 import {mountMockLab} from "./mock-wallet-lab.mjs";
 import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-report.mjs";
 import { getParticipantCatalogue, evaluateParticipantStressCases } from "../src/inner-market/participant-stress-lab.mjs";
@@ -106,6 +107,7 @@ function renderTerminal(){
  '<section class="panel"><div class="terminal-tabs" role="group" aria-label="操作台明细">'+tabs.map(([id,label])=>'<button data-tab="'+id+'" aria-pressed="'+(terminalTab===id)+'">'+label+'</button>').join("")+'</div><div class="tab-content">'+(reviewPaused?emptyState("浏览已暂停","恢复浏览后查看当前报告明细"):rows[terminalTab]())+'</div></section>';
  const labHost=document.createElement("section");labHost.className="panel";labHost.id="mock-wallet-lab";
  main.querySelector(".lifecycle").after(labHost);
+ const faucetHost=document.createElement("section");faucetHost.className="panel";labHost.before(faucetHost);mountLocalFaucet(faucetHost);
  mountMockLab(labHost,{escape:esc,table,metrics,record,download,runStress:(seed,runs)=>runParticipantExperiment({base:original,seed,runs})});
  main.querySelectorAll("[data-candle-interval]").forEach(b=>b.onclick=()=>{candleInterval=Number(b.dataset.candleInterval);render()});
  main.querySelector("#terminal-local-load").onclick=async()=>{const before=data;try{const response=await fetch("/api/terminal/report",{cache:"no-store"});if(!response.ok)throw Error("本地报告桥未配置或数据无效");const next=await response.json();const nextReport=auditedReport(next);buildTerminalState(next);if(data!==before||page!=="terminal")return;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");const el=document.querySelector("#terminal-error");if(el)el.textContent=err.message}};
