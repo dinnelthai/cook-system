@@ -53,6 +53,8 @@ const thresholds = {
   curveInventoryDepletionBps: { watch: "1000", high: "3000", critical: "6000" },
   externalSellShareBps: { watch: "2500", high: "5000", critical: "7500" },
   buyerConcentrationHhiBps: { watch: "2500", high: "5000", critical: "7500" },
+  unknownAttributionShareBps: { watch: "2000", high: "5000", critical: "8000" },
+  referenceQuoteOutputReductionBps: { watch: "500", high: "1000", critical: "2000" },
 };
 
 test("external sniper buy changes the next fixed reference token cost and quote depth", () => {
