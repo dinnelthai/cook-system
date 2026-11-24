@@ -1,6 +1,7 @@
 import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-report.mjs";
 import { getParticipantCatalogue, evaluateParticipantStressCases } from "../src/inner-market/participant-stress-lab.mjs";
 import { runParticipantExperiment } from "../src/inner-market/participant-experiment.mjs";
+import {buildTerminalCandles} from "../src/inner-market/terminal-candles.mjs";
 import {buildTerminalState,advanceReview,makeReviewArchive,restoreReviewArchive} from "../src/inner-market/terminal-state.mjs";
 import { buildHistoricalDashboard } from "../src/inner-market/historical-dashboard.mjs";
 import {createDiagnosticLog,errorKind} from "./diagnostic-log.mjs";
@@ -62,10 +63,26 @@ function compareBars(items,unit){
 }
 function splitView(left,right){return '<div class="terminal-grid"><div>'+left+'</div><div>'+right+'</div></div>'}
 function screenHeading(title,sub){return '<div class="terminal-heading"><div><p class="eyebrow">COOK / OPERATIONS</p><h2>'+esc(title)+'</h2><span class="muted">'+esc(sub)+'</span></div><span class="source-chip">'+esc(report.source_mode)+' / OFFLINE</span></div>'}
-let terminalTab="trades",reviewPaused=false,metadata=null,reviewStage="REVIEW",reviewInput=data;
+let terminalTab="trades",reviewPaused=false,metadata=null,reviewStage="REVIEW",reviewInput=data,candleInterval=60000;
+function candleChart(result){
+ if(result.status!=="CONSISTENT")return emptyState(result.status==="EMPTY"?"区间内无成交":"暂无可验证 K 线",result.reason??"无成交事件");
+ const points=result.candles.slice(-80),vals=points.flatMap(c=>[Number(c.low_price),Number(c.high_price)]);
+ if(vals.some(n=>!Number.isFinite(n)||n<=0))return emptyState("图表超出显示精度","原始价格保留在数据中");
+ const lo=Math.min(...vals),hi=Math.max(...vals),span=hi-lo||hi*.01||1;
+ const vols=points.map(c=>Number(c.quote_volume_base_units)),maxVol=Math.max(1,...vols);
+ const X=i=>48+i*500/Math.max(1,points.length-1),Y=n=>155-(n-lo)/span*120;
+ const width=Math.max(2,Math.min(12,480/points.length));
+ let svg='<svg class="ohlcv-chart" viewBox="0 0 600 215" role="img" aria-label="历史成交 K 线和成交量">';
+ for(const f of [0,.5,1]){const y=Y(lo+span*f);svg+='<path d="M36 '+y+' H550" stroke="#263449"/><text x="598" y="'+(y+3)+'" fill="#92a6c0" font-size="9" text-anchor="end">'+esc((lo+span*f).toPrecision(5))+'</text>';}
+ points.forEach((c,i)=>{const o=Number(c.open_price),cl=Number(c.close_price),x=X(i),color=cl>=o?"#42dfb1":"#ff8293",y=Math.min(Y(o),Y(cl));svg+='<path d="M'+x+' '+Y(Number(c.high_price))+' V'+Y(Number(c.low_price))+'" stroke="'+color+'"/><rect x="'+(x-width/2)+'" y="'+y+'" width="'+width+'" height="'+Math.max(1,Math.abs(Y(o)-Y(cl)))+'" fill="'+color+'"/><rect x="'+(x-width/2)+'" y="'+(193-vols[i]/maxVol*28)+'" width="'+width+'" height="'+(vols[i]/maxVol*28)+'" fill="'+color+'" opacity=".55"/>';});
+ svg+='<text x="36" y="210" font-size="9" fill="#92a6c0">'+esc(new Date(points[0].interval_start_ms).toISOString())+'</text><text x="550" y="210" text-anchor="end" font-size="9" fill="#92a6c0">'+esc(new Date(points.at(-1).interval_start_ms).toISOString())+'</text></svg>';
+ return svg+'<p class="muted">历史成交 · UTC · 价格按来源口径 · 成交量为报价资产 base units · 图形为近似显示，原始数值保持精确。</p>';
+}
 function renderTerminal(){
  const d=buildTerminalState(data),a=d.treasury,m=d.market,scope=d.scope;
  const ready=d.status==="REPORT_READY";
+ const candleResult=buildTerminalCandles(data,candleInterval);
+ const candleControls='<div class="row candle-controls">'+[[60000,"1m"],[300000,"5m"],[900000,"15m"],[3600000,"1h"]].map(([ms,label])=>'<button data-candle-interval="'+ms+'" aria-pressed="'+(candleInterval===ms)+'">'+label+'</button>').join("")+'</div>';
  const unit=scope.quoteAsset==="SOL_LAMPORTS"?"lamports":"base units";
  const money=x=>x==null?"未知":x+" "+unit;
  const tabs=[["trades","成交记录"],["cash","资金流水"],["inventory","库存"],["liquidity","流动性"],["risk","风险与审计"],["logs","运行日志"]];
@@ -83,9 +100,11 @@ function renderTerminal(){
  '<div class="lifecycle">'+["准备","发行记录","市场监测","区间结算","归档导出"].map((x,i)=>'<span class="'+(i===(reviewStage==="ARCHIVED"?4:reviewStage==="SETTLED"?3:2)?"current":"")+'">'+(i+1)+' '+x+'</span>').join("")+'</div>'+
  note("离线复盘与测试工作台；结算和归档仅代表本地报告状态，不代表链上发行或退出。")+
  metrics([["期末净值",money(d.performance.closing_nav_base_units)],["期末现金",money(a.closing_cash_base_units)],["已实现收益",money(a.realized_project_pnl_base_units)],["库存成本",money(a.remaining_cost_basis_base_units)],["创作者费",money(a.creator_cash_income_base_units)],["历史回撤",a.max_observed_drawdown_bps==null?"未知":Number(a.max_observed_drawdown_bps)/100+"%"]])+
- splitView(panel("市场行情 / OHLCV",emptyState("价格数据未接入","当前报告无可核验的时间戳与成交价格"))+panel("已确认成交金额",seriesChart(trades.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE")),panel("项目资料与数据",'<form id="terminal-meta"><label>测试项目名称</label><input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"><label>Symbol</label><input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"><button type="submit">保存本次会话资料</button></form><label for="terminal-import">导入测试区间报告</label><input type="file" id="terminal-import" accept=".json"><p id="terminal-error" class="negative"></p>')+panel("监测与结算",table(["项目","状态"],[["审计",d.status],["报告阶段",reviewStage],["数据来源",d.source_mode],["监测视图",reviewPaused?"暂停浏览":"可查看"],["链上执行","未接入"]])+'<div class="row"><button id="terminal-pause">'+(reviewPaused?"恢复浏览":"暂停浏览")+'</button><button id="terminal-export">导出核算报告</button><button id="terminal-settle" '+(reviewStage==="REVIEW"&&d.settlement_allowed?"":"disabled")+'>确认区间结算</button><button id="terminal-archive" '+(reviewStage==="SETTLED"||reviewStage==="ARCHIVED"?"":"disabled")+'>归档并下载</button></div><p class="muted">仅导出历史核算；不执行资产退出或链上交易。</p>'))+
+ splitView(panel("市场行情 / OHLCV",candleControls+candleChart(candleResult))+panel("已确认成交金额",seriesChart(trades.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE")),panel("项目资料与数据",'<form id="terminal-meta"><label>测试项目名称</label><input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"><label>Symbol</label><input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"><button type="submit">保存本次会话资料</button></form><label for="terminal-import">导入测试区间报告</label><input type="file" id="terminal-import" accept=".json"><div class="row"><button id="terminal-local-load">读取本地报告桥</button></div><p id="terminal-error" class="negative"></p>')+panel("监测与结算",table(["项目","状态"],[["审计",d.status],["报告阶段",reviewStage],["数据来源",d.source_mode],["监测视图",reviewPaused?"暂停浏览":"可查看"],["链上执行","未接入"]])+'<div class="row"><button id="terminal-pause">'+(reviewPaused?"恢复浏览":"暂停浏览")+'</button><button id="terminal-export">导出核算报告</button><button id="terminal-settle" '+(reviewStage==="REVIEW"&&d.settlement_allowed?"":"disabled")+'>确认区间结算</button><button id="terminal-archive" '+(reviewStage==="SETTLED"||reviewStage==="ARCHIVED"?"":"disabled")+'>归档并下载</button></div><p class="muted">仅导出历史核算；不执行资产退出或链上交易。</p>'))+
  panel("资产净值历史快照",seriesChart(snapshots.map(x=>({label:x.sequence,value:x.navAfterFlowBaseUnits})),"NAV"))+
  '<section class="panel"><div class="terminal-tabs" role="group" aria-label="操作台明细">'+tabs.map(([id,label])=>'<button data-tab="'+id+'" aria-pressed="'+(terminalTab===id)+'">'+label+'</button>').join("")+'</div><div class="tab-content">'+(reviewPaused?emptyState("浏览已暂停","恢复浏览后查看当前报告明细"):rows[terminalTab]())+'</div></section>';
+ main.querySelectorAll("[data-candle-interval]").forEach(b=>b.onclick=()=>{candleInterval=Number(b.dataset.candleInterval);render()});
+ main.querySelector("#terminal-local-load").onclick=async()=>{const before=data;try{const response=await fetch("/api/terminal/report",{cache:"no-store"});if(!response.ok)throw Error("本地报告桥未配置或数据无效");const next=await response.json();const nextReport=auditedReport(next);buildTerminalState(next);if(data!==before||page!=="terminal")return;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");const el=document.querySelector("#terminal-error");if(el)el.textContent=err.message}};
  main.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{terminalTab=b.dataset.tab;render()});
  main.querySelector("#terminal-meta").onsubmit=e=>{e.preventDefault();metadata=Object.fromEntries(new FormData(e.currentTarget));record("metadata.saved");render()};
  main.querySelector("#terminal-pause").onclick=()=>{reviewPaused=!reviewPaused;render()};
