@@ -116,3 +116,19 @@ test("conflicting transaction identity blocks financial readiness",()=>{
  assert.ok(r.issues.includes("PROJECT_TRADE_SIGNATURE_MISMATCH:b"));
  assert.equal(r.status,"REVIEW_REQUIRED");
 });
+
+test("historical cost basis cannot rely solely on matching final inventory",()=>{
+ const f=fixture();
+ const [buy,sell]=f.market.trades;
+ sell.sequence=1;buy.sequence=2;f.market.trades=[sell,buy];
+ const r=buildHistoricalMvpReport(f);
+ assert.equal(r.status,"REVIEW_REQUIRED");
+ assert.ok(r.issues.includes("COST_BASIS_NEGATIVE_INTERMEDIATE_INVENTORY:s"));
+ assert.equal(r.accounting.realized_project_pnl_base_units,null);
+});
+test("historical cost basis replay does not claim independent allocation verification",()=>{
+ const r=buildHistoricalMvpReport(fixture());
+ assert.equal(r.cost_basis_evidence.status,"INTERNALLY_CONSISTENT");
+ assert.equal(r.cost_basis_evidence.checked_trade_count,2);
+ assert.equal(r.cost_basis_evidence.allocation_method_attestation,"UNKNOWN");
+});

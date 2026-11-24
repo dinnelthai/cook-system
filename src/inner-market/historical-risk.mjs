@@ -5,6 +5,7 @@ const checks=[
  ["accounting","FINANCIAL_AUDIT","财务对账","CRITICAL"],
  ["market_coverage","MARKET_HISTORY","市场历史覆盖","CRITICAL"],
  ["economic_classification","ECONOMIC_CLASSIFICATION","经济分类认证","CRITICAL"],
+ ["cost_basis","COST_BASIS","库存成本认证","CRITICAL"],
  ["valuation","VALUATION","资产估值","WARNING"],
  ["candle_evidence","CANDLE_EVIDENCE","K 线证据","WARNING"],
  ["source_attestation","SOURCE_ATTESTATION","来源认证","CRITICAL"],

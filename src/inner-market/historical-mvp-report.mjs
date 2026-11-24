@@ -4,6 +4,7 @@ import { auditInventoryAdjustments } from "./historical-inventory-audit.mjs";
 import { summarizeHistoricalNav } from "./historical-nav.mjs";
 import { auditHistoricalNavEndpoints } from "./historical-nav-evidence.mjs";
 import { auditHistoricalTradeEvidence } from "./historical-trade-evidence.mjs";
+import { auditHistoricalCostBasis } from "./historical-cost-basis-audit.mjs";
 import { parseBaseUnits,U128_MAX } from "../core/integer.mjs";
 const amount=(v,n)=>parseBaseUnits(v,{name:n,max:U128_MAX});
 const keys=["projectId","quoteAsset","tokenMint","openingCutoff","closingCutoff"];
@@ -65,10 +66,12 @@ export function buildHistoricalMvpReport(input){
   for(const k of ["virtualQuoteReservesBaseUnits","virtualTokenReservesBaseUnits","realTokenReservesBaseUnits"]){if(market.snapshot?.[k]==null)issues.push("MISSING_CURVE_FIELD:"+k);else amount(market.snapshot[k],k);}
   const tradeEvidence=auditHistoricalTradeEvidence({market,journal,cashEntries:cash.entries});
   issues.push(...tradeEvidence.issues);
+  const costBasisEvidence=auditHistoricalCostBasis({inventory,market});
+  if(costBasisEvidence.status==="REVIEW_REQUIRED")issues.push(...costBasisEvidence.issues);
   const complete=issues.length===0;
   return {schema_version:"mvp.1",scope,source_mode:sourceMode,status:complete?"REPORT_READY":"REVIEW_REQUIRED",issues,
     market_history:{confirmed_buy_count:buyCount,confirmed_sell_count:sellCount,gross_buy_notional_base_units:buyVolume.toString(),gross_sell_notional_base_units:sellVolume.toString(),real_quote_reserves_base_units:reserve??null,virtual_quote_reserves_base_units:market.snapshot?.virtualQuoteReservesBaseUnits??null,virtual_token_reserves_base_units:market.snapshot?.virtualTokenReservesBaseUnits??null,real_token_reserves_base_units:market.snapshot?.realTokenReservesBaseUnits??null},
     accounting:{closing_cash_base_units:complete?dual.cash_report.observed_closing_cash_base_units:null,closing_token_balance_base_units:complete?inv.expected_token_balance:null,remaining_cost_basis_base_units:complete?inv.verified_cost_basis:null,realized_project_pnl_base_units:complete?dual.project_pnl.project_realized_net_pnl_base_units:null,creator_cash_income_base_units:complete?fees.verified_cash_income_base_units:null,max_observed_drawdown_bps:complete&&sourceMode==="SYNTHETIC"?perf.max_observed_drawdown_bps:null},
-    trade_evidence:tradeEvidence,nav_evidence:navEvidence,audits:{dual:dual.issues,creator:fees.issues,inventory:inv.issues,nav:perf.issues,nav_endpoints:navEvidence.issues,trade_evidence:[...tradeEvidence.issues,...tradeEvidence.missing]},execution_enabled:false,
+    cost_basis_evidence:costBasisEvidence,trade_evidence:tradeEvidence,nav_evidence:navEvidence,audits:{dual:dual.issues,creator:fees.issues,inventory:inv.issues,nav:perf.issues,nav_endpoints:navEvidence.issues,trade_evidence:[...tradeEvidence.issues,...tradeEvidence.missing],cost_basis:costBasisEvidence.issues},execution_enabled:false,
     note:"Retrospective report only. Synthetic records are not chain evidence. Source completeness and NAV valuations require external verification; trade notionals are not reserve deltas."};
 }
