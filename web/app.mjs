@@ -11,6 +11,7 @@ const note=s=>'<div class="notice">'+esc(s)+'</div>';
 const panel=(title,body)=>'<section class="panel"><h3>'+esc(title)+'</h3>'+body+'</section>';
 function download(name,text){const a=document.createElement("a");const url=URL.createObjectURL(new Blob([text],{type:"application/json"}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 function render(){
+ document.querySelector(".tag").textContent="OFFLINE · "+report.source_mode;
  nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+(page===id?"active":"")+'">'+label+'</button>').join("");
  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{page=b.dataset.page;render()});
  const a=report.accounting,m=report.market_history;
