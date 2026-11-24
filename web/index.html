@@ -11,7 +11,16 @@ main[data-page=dashboard]{display:grid;grid-template-columns:minmax(0,5fr) minma
 body::before{display:none}header{height:54px;padding:0 18px}.layout{grid-template-columns:224px minmax(0,1fr);min-height:calc(100vh - 54px)}nav{top:54px;height:calc(100vh - 54px);padding:14px 9px}nav button{padding:9px 8px;margin-bottom:3px;font-size:12px}nav button.active{background:#142e39;border-color:#28536b}main{padding:18px}h2{font-size:21px;margin-bottom:10px}.panel{background:var(--surface);border-radius:5px;padding:12px;box-shadow:none;margin-bottom:12px}.stat{background:var(--surface2);padding:10px;border-radius:4px}.stat:after{display:none}.stat strong{font-size:19px;margin-top:5px}h3{margin-bottom:10px}.stats{gap:8px}td,th{padding:7px 9px}.subnav{margin-bottom:12px}.subnav button{font-size:11px;padding:5px 9px}.notice{margin-bottom:12px}.foot{margin-top:12px}
 @media(max-width:1100px){.layout{grid-template-columns:190px minmax(0,1fr)}main{padding:14px}}
 @media(max-width:700px){header{height:auto;min-height:54px}.layout{display:block}nav{height:auto;position:static;padding:8px}main{padding:12px}}
+
+/* Portfolio terminal: compact single-column shell with purposeful inner grids. */
+:root{--bg:#0a0e15;--surface:#111822;--surface2:#0c131d;--line:#25303d;--cyan:#42c7d8}
+main[data-page=dashboard]{display:block;max-width:none}main[data-page=dashboard]>.panel{margin:0 0 12px}
+.terminal-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.terminal-heading h2{margin:0 0 3px}.terminal-heading .eyebrow{margin-bottom:5px}
+.terminal-kpis{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.terminal-kpis .stat{min-height:72px}
+.terminal-grid{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(260px,1fr);gap:12px;align-items:start}
+.terminal-grid .panel{margin-bottom:12px}.series-chart{width:100%;height:150px;display:block}.chart-empty{height:170px;display:grid;place-items:center;border:1px dashed var(--line);color:var(--muted);font-size:12px;background:var(--surface2)}
+@media(max-width:1000px){.terminal-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.terminal-grid{grid-template-columns:1fr}}@media(max-width:600px){.terminal-heading{align-items:flex-start;flex-direction:column}.terminal-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style></head>
-<body><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET QUALITY / OPERATIONS</div></div></div><div class="header-meta"><span class="build">MVP / V0.2</span><span class="tag">OFFLINE · SYNTHETIC</span></div></header>
+<body><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET QUALITY / OPERATIONS</div></div></div><div class="header-meta"><span class="build">MVP / V0.3</span><span class="tag">OFFLINE · SYNTHETIC</span></div></header>
 <div class="layout"><nav aria-label="页面导航" id="nav"></nav><main id="main"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
 <script type="module" src="/web/app.mjs"></script></body></html>
