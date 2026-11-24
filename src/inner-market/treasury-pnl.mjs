@@ -81,7 +81,7 @@ function networkFeeForEvent(event, payload, treasuryWallets, processedSignatures
  */
 export function replayTreasuryTradePnl({
   openingTokenBalanceBaseUnits = "0",
-  openingCostBasisQuoteBaseUnits = "0",
+  openingCostBasisQuoteBaseUnits = null,
   events,
   treasuryWalletAddresses = [],
   endingTokenBalanceSnapshotBaseUnits = null,
@@ -98,8 +98,13 @@ export function replayTreasuryTradePnl({
   if (!Number.isSafeInteger(quoteDecimals) || quoteDecimals < 0 || quoteDecimals > 18) throw new RangeError("quoteDecimals must be from 0 to 18");
 
   let tokenBalance = parseBaseUnits(openingTokenBalanceBaseUnits, { name: "openingTokenBalanceBaseUnits" });
-  let costBasis = parseBaseUnits(openingCostBasisQuoteBaseUnits, { name: "openingCostBasisQuoteBaseUnits", max: U128_MAX });
+  const openingBasisKnown = openingCostBasisQuoteBaseUnits !== null;
+  let costBasis = openingBasisKnown
+    ? parseBaseUnits(openingCostBasisQuoteBaseUnits, { name: "openingCostBasisQuoteBaseUnits", max: U128_MAX })
+    : 0n;
   if (tokenBalance === 0n && costBasis !== 0n) throw new RangeError("opening cost basis cannot exist without opening token inventory");
+  let costBasisComplete = tokenBalance === 0n || openingBasisKnown;
+  let realizedPnlComplete = true;
 
   const treasuryWallets = new Set(treasuryWalletAddresses);
   const candidateEvents = [];
@@ -182,18 +187,21 @@ export function replayTreasuryTradePnl({
         realized_pnl_quote_base_units: null,
         position_token_balance_after_base_units: tokenBalance.toString(),
         remaining_cost_basis_after_quote_base_units: costBasis.toString(),
-        average_cost_quote_per_token_after: formatScaled(averageCostPriceScaled(costBasis, tokenBalance, tokenDecimals, quoteDecimals)),
+        average_cost_quote_per_token_after: costBasisComplete ? formatScaled(averageCostPriceScaled(costBasis, tokenBalance, tokenDecimals, quoteDecimals)) : null,
+        cost_basis_complete_after: costBasisComplete,
       });
     } else {
       if (tokenAmount > tokenBalance) throw new RangeError("confirmed sell exceeds treasury token inventory");
       const totalSellFees = tradeFee + networkFee.amount;
       if (totalSellFees > quoteAmount) throw new RangeError("sell fees exceed quote proceeds");
-      const allocatedCost = tokenAmount === tokenBalance ? costBasis : (costBasis * tokenAmount) / tokenBalance;
+      const allocatedKnownCost = tokenAmount === tokenBalance ? costBasis : (costBasis * tokenAmount) / tokenBalance;
       const netProceeds = quoteAmount - totalSellFees;
-      const eventRealizedPnl = netProceeds - allocatedCost;
-      realizedPnl += eventRealizedPnl;
+      const eventRealizedPnl = costBasisComplete ? netProceeds - allocatedKnownCost : null;
+      if (eventRealizedPnl === null) realizedPnlComplete = false;
+      else realizedPnl += eventRealizedPnl;
       tokenBalance -= tokenAmount;
-      costBasis -= allocatedCost;
+      costBasis -= allocatedKnownCost;
+      if (tokenBalance === 0n) costBasisComplete = true;
       sellProceeds += netProceeds;
       grossSellQuote += quoteAmount;
       soldTokens += tokenAmount;
@@ -210,12 +218,14 @@ export function replayTreasuryTradePnl({
         reported_program_fee_components: payload.fee_components ?? [],
         network_fee_base_units: networkFee.amount.toString(),
         cash_cost_quote_base_units: null,
-        allocated_cost_basis_quote_base_units: allocatedCost.toString(),
+        allocated_cost_basis_quote_base_units: costBasisComplete || tokenBalance === 0n ? allocatedKnownCost.toString() : null,
+        known_allocated_cost_basis_quote_base_units: allocatedKnownCost.toString(),
         net_quote_proceeds_base_units: netProceeds.toString(),
-        realized_pnl_quote_base_units: eventRealizedPnl.toString(),
+        realized_pnl_quote_base_units: eventRealizedPnl === null ? null : eventRealizedPnl.toString(),
         position_token_balance_after_base_units: tokenBalance.toString(),
         remaining_cost_basis_after_quote_base_units: costBasis.toString(),
-        average_cost_quote_per_token_after: tokenBalance === 0n ? null : formatScaled(averageCostPriceScaled(costBasis, tokenBalance, tokenDecimals, quoteDecimals)),
+        average_cost_quote_per_token_after: tokenBalance === 0n || !costBasisComplete ? null : formatScaled(averageCostPriceScaled(costBasis, tokenBalance, tokenDecimals, quoteDecimals)),
+        cost_basis_complete_after: costBasisComplete,
       });
     }
   }
@@ -233,14 +243,14 @@ export function replayTreasuryTradePnl({
     const tokenScale = 10n ** BigInt(tokenDecimals);
     const quoteScale = 10n ** BigInt(quoteDecimals);
     markToMarketQuoteBaseUnits = (tokenBalance * markPriceScaled * quoteScale) / (tokenScale * DISPLAY_SCALE);
-    unrealizedPnlQuoteBaseUnits = markToMarketQuoteBaseUnits - costBasis;
+    unrealizedPnlQuoteBaseUnits = costBasisComplete ? markToMarketQuoteBaseUnits - costBasis : null;
   }
 
   const liquidationValue = currentLiquidationQuoteBaseUnits === null
     ? null
     : parseBaseUnits(currentLiquidationQuoteBaseUnits, { name: "currentLiquidationQuoteBaseUnits" });
-  const unrealizedPnlOnLiquidation = liquidationValue === null ? null : liquidationValue - costBasis;
-  const averageCostScaled = averageCostPriceScaled(costBasis, tokenBalance, tokenDecimals, quoteDecimals);
+  const unrealizedPnlOnLiquidation = liquidationValue === null || !costBasisComplete ? null : liquidationValue - costBasis;
+  const averageCostScaled = costBasisComplete ? averageCostPriceScaled(costBasis, tokenBalance, tokenDecimals, quoteDecimals) : null;
   const netCashDeployed = buyCost - sellProceeds;
 
   return {
@@ -253,11 +263,14 @@ export function replayTreasuryTradePnl({
     ignored_non_treasury_event_count: ignoredNonTreasuryCount,
     ending_token_balance_base_units: tokenBalance.toString(),
     remaining_cost_basis_quote_base_units: costBasis.toString(),
+    cost_basis_complete: costBasisComplete,
+    realized_pnl_complete: realizedPnlComplete,
     total_buy_cost_quote_base_units: buyCost.toString(),
     total_net_sell_proceeds_quote_base_units: sellProceeds.toString(),
     position: {
       ending_token_balance_base_units: tokenBalance.toString(),
       remaining_cost_basis_quote_base_units: costBasis.toString(),
+      cost_basis_complete: costBasisComplete,
       average_cost_quote_per_token: averageCostScaled === null ? null : formatScaled(averageCostScaled),
       total_bought_token_amount_base_units: boughtTokens.toString(),
       total_sold_token_amount_base_units: soldTokens.toString(),
@@ -272,14 +285,16 @@ export function replayTreasuryTradePnl({
       total_network_transaction_fees_quote_base_units: networkFees.toString(),
       net_cash_deployed_quote_base_units: netCashDeployed.toString(),
     },
-    realized_pnl_quote_base_units: realizedPnl.toString(),
+    realized_pnl_quote_base_units: realizedPnlComplete ? realizedPnl.toString() : null,
+    realized_pnl_known_partial_base_units: realizedPnl.toString(),
+    realized_pnl_complete: realizedPnlComplete,
     mark_to_market_quote_base_units: markToMarketQuoteBaseUnits === null ? null : markToMarketQuoteBaseUnits.toString(),
     unrealized_pnl_quote_base_units: unrealizedPnlQuoteBaseUnits === null ? null : unrealizedPnlQuoteBaseUnits.toString(),
     estimated_liquidation_proceeds_quote_base_units: liquidationValue === null ? null : liquidationValue.toString(),
     unrealized_pnl_on_liquidation_quote_base_units: unrealizedPnlOnLiquidation === null ? null : unrealizedPnlOnLiquidation.toString(),
-    total_pnl_on_liquidation_quote_base_units: unrealizedPnlOnLiquidation === null ? null : (realizedPnl + unrealizedPnlOnLiquidation).toString(),
+    total_pnl_on_liquidation_quote_base_units: unrealizedPnlOnLiquidation === null || !realizedPnlComplete ? null : (realizedPnl + unrealizedPnlOnLiquidation).toString(),
     inventory_reconciliation: inventoryReconciliation,
     position_journal: positionJournal,
-    warning: "Transfers, allocations, burns, and fee sweeps are not trades. Reconcile ending inventory against an authoritative account snapshot. Marginal mark-to-market is not realizable proceeds; liquidation quote is an estimate and not an execution guarantee.",
+    warning: "Transfers, allocations, burns, and fee sweeps are not trades. Reconcile ending inventory against an authoritative account snapshot. If opening inventory has no supplied cost basis, average cost and affected PnL remain incomplete rather than being reported as zero-cost profit. Marginal mark-to-market is not realizable proceeds; liquidation quote is an estimate and not an execution guarantee.",
   };
 }
