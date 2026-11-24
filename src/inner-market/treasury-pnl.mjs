@@ -21,27 +21,110 @@ function averageCostPriceScaled(costBasis, tokenBalance, tokenDecimals, quoteDec
   return (costBasis * tokenScale * DISPLAY_SCALE) / (tokenBalance * quoteScale);
 }
 
+function payloadOf(event) {
+  return event.payload && typeof event.payload === "object" ? event.payload : event;
+}
+
+function isConfirmedTrade(event) {
+  if (event.provenance === "observed_chain") {
+    return event.status === "CONFIRMED" &&
+      event.quality?.transaction_reconciliation?.status === "PASS";
+  }
+  return event.status === "CONFIRMED";
+}
+
+function reportedProgramFees(payload) {
+  let total = 0n;
+  for (const item of payload.fee_components ?? []) {
+    // protocol_retained and buyback_paid_immediately are breakdowns of protocol_charged;
+    // do not add them a second time.
+    if (item.fee_type === "protocol_charged" || item.fee_type === "creator") {
+      total += parseBaseUnits(item.amount_base_units, { name: "fee_components.amount_base_units" });
+    }
+  }
+  return total;
+}
+
+function networkFeeForEvent(event, payload, treasuryWallets, processedSignatures) {
+  const costs = payload.transaction_costs ?? event.transaction_costs ?? null;
+  if (!costs) return { amount: 0n, signature: null, feePayer: null };
+  const signature = costs.signature ?? event.source?.signature ?? payload.signature ?? null;
+  if (signature && processedSignatures.has(signature)) {
+    return { amount: 0n, signature, feePayer: costs.fee_payer_address ?? null };
+  }
+  if (signature) processedSignatures.add(signature);
+  const actor = payload.actor_address ?? event.actor_address ?? null;
+  const feePayer = costs.fee_payer_address ?? null;
+  const isTreasuryFeePayer = feePayer && (
+    treasuryWallets.size > 0 ? treasuryWallets.has(feePayer) : feePayer === actor
+  );
+  return {
+    amount: isTreasuryFeePayer
+      ? parseBaseUnits(costs.fee_lamports ?? "0", { name: "transaction_costs.fee_lamports" })
+      : 0n,
+    signature,
+    feePayer,
+  };
+}
+
 /**
- * Replays confirmed bonding-curve trades for one treasury account using weighted-average cost.
- * Every confirmed buy is an additional acquisition tranche; every sell removes proportional cost basis.
- * quote_amount_base_units is gross trade consideration before fee_quote_base_units.
- * Transfers and non-trade events are not PnL events; reconcile them using account snapshots and explicit basis adjustments.
+ * Replays confirmed Pump bonding-curve trades for Treasury wallets using weighted-average cost.
+ *
+ * Observed-chain events are counted only after transaction balance reconciliation passes.
+ * Their quote_amount_base_units is the actor's reconciled quote cash movement (program fees are
+ * already reflected in that amount), so fee_components are reported for transparency but are
+ * not added to or subtracted from cash flow a second time. Network transaction fees are separate
+ * and are charged once per signature when a Treasury wallet paid them.
+ *
+ * Synthetic fixtures may continue to express quote as gross consideration plus a separate
+ * fee_quote_base_units. Transfers and non-trade events are not PnL events.
  */
 export function replayTreasuryTradePnl({
   openingTokenBalanceBaseUnits = "0",
   openingCostBasisQuoteBaseUnits = "0",
   events,
+  treasuryWalletAddresses = [],
   endingTokenBalanceSnapshotBaseUnits = null,
   currentMarkPriceQuoteScaled = null,
+  currentLiquidationQuoteBaseUnits = null,
   tokenDecimals = 0,
   quoteDecimals = 0,
 }) {
   if (!Array.isArray(events)) throw new TypeError("events must be an array");
+  if (!Array.isArray(treasuryWalletAddresses) && !(treasuryWalletAddresses instanceof Set)) {
+    throw new TypeError("treasuryWalletAddresses must be an array or Set");
+  }
   if (!Number.isSafeInteger(tokenDecimals) || tokenDecimals < 0 || tokenDecimals > 18) throw new RangeError("tokenDecimals must be from 0 to 18");
   if (!Number.isSafeInteger(quoteDecimals) || quoteDecimals < 0 || quoteDecimals > 18) throw new RangeError("quoteDecimals must be from 0 to 18");
+
   let tokenBalance = parseBaseUnits(openingTokenBalanceBaseUnits, { name: "openingTokenBalanceBaseUnits" });
   let costBasis = parseBaseUnits(openingCostBasisQuoteBaseUnits, { name: "openingCostBasisQuoteBaseUnits", max: U128_MAX });
   if (tokenBalance === 0n && costBasis !== 0n) throw new RangeError("opening cost basis cannot exist without opening token inventory");
+
+  const treasuryWallets = new Set(treasuryWalletAddresses);
+  const candidateEvents = [];
+  let ignoredUnconfirmedCount = 0;
+  let ignoredNonTradeCount = 0;
+  let ignoredNonTreasuryCount = 0;
+
+  for (const event of events) {
+    if (!BUY_KINDS.has(event.event_kind) && !SELL_KINDS.has(event.event_kind)) {
+      ignoredNonTradeCount += 1;
+      continue;
+    }
+    if (!isConfirmedTrade(event)) {
+      ignoredUnconfirmedCount += 1;
+      continue;
+    }
+    const payload = payloadOf(event);
+    const actor = payload.actor_address ?? event.actor_address ?? null;
+    if (treasuryWallets.size > 0 && (!actor || !treasuryWallets.has(actor))) {
+      ignoredNonTreasuryCount += 1;
+      continue;
+    }
+    candidateEvents.push(event);
+  }
+
   let realizedPnl = 0n;
   let buyCost = 0n;
   let grossBuyQuote = 0n;
@@ -49,30 +132,33 @@ export function replayTreasuryTradePnl({
   let sellProceeds = 0n;
   let boughtTokens = 0n;
   let soldTokens = 0n;
-  let totalFees = 0n;
+  let syntheticTradeFees = 0n;
+  let reportedProgramFeeTotal = 0n;
+  let networkFees = 0n;
   let confirmedBuyCount = 0;
   let confirmedSellCount = 0;
-  let ignoredUnconfirmedCount = 0;
-  let ignoredNonTradeCount = 0;
+  const processedFeeSignatures = new Set();
   const positionJournal = [];
 
-  for (const event of sortForReplay(events)) {
-    if (event.status !== "CONFIRMED") {
-      ignoredUnconfirmedCount += 1;
-      continue;
-    }
-    if (!BUY_KINDS.has(event.event_kind) && !SELL_KINDS.has(event.event_kind)) {
-      ignoredNonTradeCount += 1;
-      continue;
-    }
-    const tokenAmount = parseBaseUnits(event.token_amount_base_units, { name: "token_amount_base_units" });
-    const quoteAmount = parseBaseUnits(event.quote_amount_base_units, { name: "quote_amount_base_units" });
-    const fee = parseBaseUnits(event.fee_quote_base_units || "0", { name: "fee_quote_base_units" });
+  for (const event of sortForReplay(candidateEvents)) {
+    const payload = payloadOf(event);
+    const tokenAmount = parseBaseUnits(payload.token_amount_base_units, { name: "token_amount_base_units" });
+    const quoteAmount = parseBaseUnits(payload.quote_amount_base_units, { name: "quote_amount_base_units" });
     if (tokenAmount === 0n || quoteAmount === 0n) throw new RangeError("confirmed trade amounts must be positive");
-    totalFees += fee;
+
+    // Normalized observed-chain quote amounts are reconciled against wallet cash deltas and
+    // already include Pump protocol/creator fees. Synthetic events use an explicit fee field.
+    const tradeFee = event.provenance === "observed_chain"
+      ? 0n
+      : parseBaseUnits(payload.fee_quote_base_units || "0", { name: "fee_quote_base_units" });
+    const reportedFees = event.provenance === "observed_chain" ? reportedProgramFees(payload) : 0n;
+    const networkFee = networkFeeForEvent(event, payload, treasuryWallets, processedFeeSignatures);
+    syntheticTradeFees += tradeFee;
+    reportedProgramFeeTotal += reportedFees;
+    networkFees += networkFee.amount;
 
     if (BUY_KINDS.has(event.event_kind)) {
-      const totalCost = quoteAmount + fee;
+      const totalCost = quoteAmount + tradeFee + networkFee.amount;
       tokenBalance += tokenAmount;
       costBasis += totalCost;
       buyCost += totalCost;
@@ -81,11 +167,15 @@ export function replayTreasuryTradePnl({
       confirmedBuyCount += 1;
       positionJournal.push({
         event_id: event.event_id,
+        signature: event.source?.signature ?? payload.signature ?? null,
+        actor_address: payload.actor_address ?? event.actor_address ?? null,
         event_time_ms: event.event_time_ms ?? null,
         side: "BUY",
         token_amount_base_units: tokenAmount.toString(),
-        gross_quote_amount_base_units: quoteAmount.toString(),
-        fee_quote_base_units: fee.toString(),
+        quote_cash_movement_base_units: quoteAmount.toString(),
+        trade_fee_cash_add_on_base_units: tradeFee.toString(),
+        reported_program_fee_components: payload.fee_components ?? [],
+        network_fee_base_units: networkFee.amount.toString(),
         cash_cost_quote_base_units: totalCost.toString(),
         allocated_cost_basis_quote_base_units: null,
         net_quote_proceeds_base_units: null,
@@ -96,9 +186,10 @@ export function replayTreasuryTradePnl({
       });
     } else {
       if (tokenAmount > tokenBalance) throw new RangeError("confirmed sell exceeds treasury token inventory");
-      if (fee > quoteAmount) throw new RangeError("sell fee exceeds gross quote proceeds");
+      const totalSellFees = tradeFee + networkFee.amount;
+      if (totalSellFees > quoteAmount) throw new RangeError("sell fees exceed quote proceeds");
       const allocatedCost = tokenAmount === tokenBalance ? costBasis : (costBasis * tokenAmount) / tokenBalance;
-      const netProceeds = quoteAmount - fee;
+      const netProceeds = quoteAmount - totalSellFees;
       const eventRealizedPnl = netProceeds - allocatedCost;
       realizedPnl += eventRealizedPnl;
       tokenBalance -= tokenAmount;
@@ -109,11 +200,15 @@ export function replayTreasuryTradePnl({
       confirmedSellCount += 1;
       positionJournal.push({
         event_id: event.event_id,
+        signature: event.source?.signature ?? payload.signature ?? null,
+        actor_address: payload.actor_address ?? event.actor_address ?? null,
         event_time_ms: event.event_time_ms ?? null,
         side: "SELL",
         token_amount_base_units: tokenAmount.toString(),
-        gross_quote_amount_base_units: quoteAmount.toString(),
-        fee_quote_base_units: fee.toString(),
+        quote_cash_movement_base_units: quoteAmount.toString(),
+        trade_fee_cash_add_on_base_units: tradeFee.toString(),
+        reported_program_fee_components: payload.fee_components ?? [],
+        network_fee_base_units: networkFee.amount.toString(),
         cash_cost_quote_base_units: null,
         allocated_cost_basis_quote_base_units: allocatedCost.toString(),
         net_quote_proceeds_base_units: netProceeds.toString(),
@@ -141,14 +236,21 @@ export function replayTreasuryTradePnl({
     unrealizedPnlQuoteBaseUnits = markToMarketQuoteBaseUnits - costBasis;
   }
 
+  const liquidationValue = currentLiquidationQuoteBaseUnits === null
+    ? null
+    : parseBaseUnits(currentLiquidationQuoteBaseUnits, { name: "currentLiquidationQuoteBaseUnits" });
+  const unrealizedPnlOnLiquidation = liquidationValue === null ? null : liquidationValue - costBasis;
   const averageCostScaled = averageCostPriceScaled(costBasis, tokenBalance, tokenDecimals, quoteDecimals);
   const netCashDeployed = buyCost - sellProceeds;
+
   return {
     accounting_method: "WEIGHTED_AVERAGE_COST",
+    quote_cash_basis: "OBSERVED_CHAIN_QUOTE_AMOUNT_IS_RECONCILED_ACTOR_CASH_MOVEMENT",
     confirmed_buy_count: confirmedBuyCount,
     confirmed_sell_count: confirmedSellCount,
     ignored_unconfirmed_count: ignoredUnconfirmedCount,
     ignored_non_trade_event_count: ignoredNonTradeCount,
+    ignored_non_treasury_event_count: ignoredNonTreasuryCount,
     ending_token_balance_base_units: tokenBalance.toString(),
     remaining_cost_basis_quote_base_units: costBasis.toString(),
     total_buy_cost_quote_base_units: buyCost.toString(),
@@ -165,15 +267,19 @@ export function replayTreasuryTradePnl({
       total_buy_cost_including_fees_quote_base_units: buyCost.toString(),
       total_gross_sell_quote_base_units: grossSellQuote.toString(),
       total_net_sell_proceeds_quote_base_units: sellProceeds.toString(),
-      total_trade_fees_quote_base_units: totalFees.toString(),
+      total_synthetic_trade_fee_cash_add_on_quote_base_units: syntheticTradeFees.toString(),
+      total_reported_program_fees_already_in_quote_cash_movement_base_units: reportedProgramFeeTotal.toString(),
+      total_network_transaction_fees_quote_base_units: networkFees.toString(),
       net_cash_deployed_quote_base_units: netCashDeployed.toString(),
     },
     realized_pnl_quote_base_units: realizedPnl.toString(),
     mark_to_market_quote_base_units: markToMarketQuoteBaseUnits === null ? null : markToMarketQuoteBaseUnits.toString(),
     unrealized_pnl_quote_base_units: unrealizedPnlQuoteBaseUnits === null ? null : unrealizedPnlQuoteBaseUnits.toString(),
-    total_pnl_quote_base_units: markToMarketQuoteBaseUnits === null ? null : (realizedPnl + unrealizedPnlQuoteBaseUnits).toString(),
+    estimated_liquidation_proceeds_quote_base_units: liquidationValue === null ? null : liquidationValue.toString(),
+    unrealized_pnl_on_liquidation_quote_base_units: unrealizedPnlOnLiquidation === null ? null : unrealizedPnlOnLiquidation.toString(),
+    total_pnl_on_liquidation_quote_base_units: unrealizedPnlOnLiquidation === null ? null : (realizedPnl + unrealizedPnlOnLiquidation).toString(),
     inventory_reconciliation: inventoryReconciliation,
     position_journal: positionJournal,
-    warning: "Transfers, allocations, burns, and fee sweeps are not trades. Reconcile ending inventory against an authoritative account snapshot; mark-to-market is not realizable sale proceeds.",
+    warning: "Transfers, allocations, burns, and fee sweeps are not trades. Reconcile ending inventory against an authoritative account snapshot. Marginal mark-to-market is not realizable proceeds; liquidation quote is an estimate and not an execution guarantee.",
   };
 }
