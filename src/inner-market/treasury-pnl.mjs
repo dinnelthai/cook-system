@@ -304,3 +304,155 @@ export function replayTreasuryTradePnl({
     warning: "Transfers, allocations, burns, and fee sweeps are not trades. Reconcile ending inventory against an authoritative account snapshot. If opening inventory has no supplied cost basis, average cost and affected PnL remain incomplete rather than being reported as zero-cost profit. Marginal mark-to-market is not realizable proceeds; liquidation quote is an estimate and not an execution guarantee.",
   };
 }
+
+
+function readMapValue(source, key, fallback = null) {
+  if (source instanceof Map) return source.has(key) ? source.get(key) : fallback;
+  if (source && typeof source === "object" && Object.hasOwn(source, key)) return source[key];
+  return fallback;
+}
+
+/**
+ * Replays a Treasury portfolio wallet-by-wallet, then aggregates the reconciled positions.
+ * This prevents one wallet's inventory from being used to validate another wallet's sell.
+ * A transaction fee signature is assigned once across the portfolio, even if one transaction
+ * contains multiple Treasury actors.
+ */
+export function replayTreasuryPortfolioPnl({
+  treasuryWalletAddresses,
+  events,
+  openingBalancesByWallet = {},
+  openingCostBasisByWallet = {},
+  endingBalancesByWallet = {},
+  tokenDecimals = 0,
+  quoteDecimals = 0,
+}) {
+  if (!Array.isArray(treasuryWalletAddresses) || treasuryWalletAddresses.length === 0) {
+    throw new TypeError("treasuryWalletAddresses must contain at least one wallet");
+  }
+  if (new Set(treasuryWalletAddresses).size !== treasuryWalletAddresses.length) {
+    throw new RangeError("treasuryWalletAddresses must not contain duplicates");
+  }
+  if (!Array.isArray(events)) throw new TypeError("events must be an array");
+  const walletSet = new Set(treasuryWalletAddresses);
+  const tradeEvents = events.filter((event) => BUY_KINDS.has(event.event_kind) || SELL_KINDS.has(event.event_kind));
+  const confirmedTreasuryEvents = tradeEvents.filter((event) => {
+    const payload = payloadOf(event);
+    const actor = payload.actor_address ?? event.actor_address ?? null;
+    return walletSet.has(actor) && isConfirmedTrade(event);
+  });
+  const orderedConfirmedTreasuryEvents = sortForReplay(confirmedTreasuryEvents);
+
+  const networkFeeOwnerBySignature = new Map();
+  for (const event of orderedConfirmedTreasuryEvents) {
+    const payload = payloadOf(event);
+    const costs = payload.transaction_costs ?? event.transaction_costs ?? null;
+    const signature = costs?.signature ?? event.source?.signature ?? payload.signature ?? null;
+    const feePayer = costs?.fee_payer_address ?? null;
+    const actor = payload.actor_address ?? event.actor_address ?? null;
+    if (signature && feePayer && walletSet.has(feePayer) && !networkFeeOwnerBySignature.has(signature)) {
+      networkFeeOwnerBySignature.set(signature, actor);
+    }
+  }
+
+  const wallets = treasuryWalletAddresses.map((walletAddress) => {
+    const walletEvents = events.filter((event) => {
+      const payload = payloadOf(event);
+      return (payload.actor_address ?? event.actor_address ?? null) === walletAddress;
+    });
+    const allowedFees = [...networkFeeOwnerBySignature.entries()]
+      .filter(([, assignedWallet]) => assignedWallet === walletAddress)
+      .map(([signature]) => signature);
+    const ledger = replayTreasuryTradePnl({
+      openingTokenBalanceBaseUnits: readMapValue(openingBalancesByWallet, walletAddress, "0"),
+      openingCostBasisQuoteBaseUnits: readMapValue(openingCostBasisByWallet, walletAddress, null),
+      events: walletEvents,
+      treasuryWalletAddresses,
+      networkFeeSignatureAllowList: allowedFees,
+      endingTokenBalanceSnapshotBaseUnits: readMapValue(endingBalancesByWallet, walletAddress, null),
+      tokenDecimals,
+      quoteDecimals,
+    });
+    return { wallet_address: walletAddress, ledger };
+  });
+
+  const sumField = (selector) => wallets.reduce((sum, item) => sum + BigInt(selector(item.ledger) ?? "0"), 0n);
+  const tokenBalance = sumField((ledger) => ledger.position.ending_token_balance_base_units);
+  const costBasis = sumField((ledger) => ledger.position.remaining_cost_basis_quote_base_units);
+  const boughtTokens = sumField((ledger) => ledger.position.total_bought_token_amount_base_units);
+  const soldTokens = sumField((ledger) => ledger.position.total_sold_token_amount_base_units);
+  const buyCost = sumField((ledger) => ledger.cash_flow.total_buy_cost_including_fees_quote_base_units);
+  const sellProceeds = sumField((ledger) => ledger.cash_flow.total_net_sell_proceeds_quote_base_units);
+  const grossBuyQuote = sumField((ledger) => ledger.cash_flow.total_gross_buy_quote_base_units);
+  const grossSellQuote = sumField((ledger) => ledger.cash_flow.total_gross_sell_quote_base_units);
+  const syntheticFees = sumField((ledger) => ledger.cash_flow.total_synthetic_trade_fee_cash_add_on_quote_base_units);
+  const programFees = sumField((ledger) => ledger.cash_flow.total_reported_program_fees_already_in_quote_cash_movement_base_units);
+  const networkFees = sumField((ledger) => ledger.cash_flow.total_network_transaction_fees_quote_base_units);
+  const realizedKnownPartial = sumField((ledger) => ledger.realized_pnl_known_partial_base_units);
+  const costBasisComplete = wallets.every((item) => item.ledger.cost_basis_complete);
+  const realizedPnlComplete = wallets.every((item) => item.ledger.realized_pnl_complete);
+  const realizedPnl = realizedPnlComplete ? realizedKnownPartial.toString() : null;
+  const averageCostScaled = costBasisComplete
+    ? averageCostPriceScaled(costBasis, tokenBalance, tokenDecimals, quoteDecimals)
+    : null;
+
+  const reconciliationStatuses = wallets.map((item) => item.ledger.inventory_reconciliation);
+  const inventoryReconciliation = reconciliationStatuses.includes("MISMATCH")
+    ? "MISMATCH"
+    : reconciliationStatuses.every((status) => status === "MATCH")
+      ? "MATCH"
+      : "NOT_PROVIDED";
+
+  const orderIndex = new Map(orderedConfirmedTreasuryEvents.map((event, index) => [event.event_id, index]));
+  const positionJournal = wallets.flatMap((item) =>
+    item.ledger.position_journal.map((entry) => ({ ...entry, wallet_address: item.wallet_address }))
+  ).sort((a, b) => (orderIndex.get(a.event_id) ?? Number.MAX_SAFE_INTEGER) - (orderIndex.get(b.event_id) ?? Number.MAX_SAFE_INTEGER));
+
+  const ignoredNonTreasuryCount = tradeEvents.filter((event) => {
+    const payload = payloadOf(event);
+    const actor = payload.actor_address ?? event.actor_address ?? null;
+    return !walletSet.has(actor);
+  }).length;
+  const ignoredUnconfirmedCount = wallets.reduce((sum, item) => sum + item.ledger.ignored_unconfirmed_count, 0);
+  const ignoredNonTradeCount = wallets.reduce((sum, item) => sum + item.ledger.ignored_non_trade_event_count, 0);
+
+  return {
+    accounting_method: "WEIGHTED_AVERAGE_COST_PER_WALLET",
+    wallet_count: wallets.length,
+    wallets,
+    confirmed_buy_count: wallets.reduce((sum, item) => sum + item.ledger.confirmed_buy_count, 0),
+    confirmed_sell_count: wallets.reduce((sum, item) => sum + item.ledger.confirmed_sell_count, 0),
+    ignored_unconfirmed_count: ignoredUnconfirmedCount,
+    ignored_non_trade_event_count: ignoredNonTradeCount,
+    ignored_non_treasury_event_count: ignoredNonTreasuryCount,
+    ending_token_balance_base_units: tokenBalance.toString(),
+    remaining_cost_basis_quote_base_units: costBasis.toString(),
+    cost_basis_complete: costBasisComplete,
+    total_buy_cost_quote_base_units: buyCost.toString(),
+    total_net_sell_proceeds_quote_base_units: sellProceeds.toString(),
+    position: {
+      ending_token_balance_base_units: tokenBalance.toString(),
+      remaining_cost_basis_quote_base_units: costBasis.toString(),
+      cost_basis_complete: costBasisComplete,
+      average_cost_quote_per_token: averageCostScaled === null ? null : formatScaled(averageCostScaled),
+      total_bought_token_amount_base_units: boughtTokens.toString(),
+      total_sold_token_amount_base_units: soldTokens.toString(),
+    },
+    cash_flow: {
+      total_gross_buy_quote_base_units: grossBuyQuote.toString(),
+      total_buy_cost_including_fees_quote_base_units: buyCost.toString(),
+      total_gross_sell_quote_base_units: grossSellQuote.toString(),
+      total_net_sell_proceeds_quote_base_units: sellProceeds.toString(),
+      total_synthetic_trade_fee_cash_add_on_quote_base_units: syntheticFees.toString(),
+      total_reported_program_fees_already_in_quote_cash_movement_base_units: programFees.toString(),
+      total_network_transaction_fees_quote_base_units: networkFees.toString(),
+      net_cash_deployed_quote_base_units: (buyCost - sellProceeds).toString(),
+    },
+    realized_pnl_quote_base_units: realizedPnl,
+    realized_pnl_known_partial_base_units: realizedKnownPartial.toString(),
+    realized_pnl_complete: realizedPnlComplete,
+    inventory_reconciliation: inventoryReconciliation,
+    position_journal: positionJournal,
+    warning: "Each Treasury wallet is accounted for independently before portfolio totals are aggregated. Transaction fees are assigned once per signature; external transfers and other non-trade inventory movements require separate reconciliation.",
+  };
+}
