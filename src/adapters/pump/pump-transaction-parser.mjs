@@ -17,7 +17,7 @@ import {
   normalizePumpFeeSweepEvent,
   normalizePumpFeeConfigChangeEvent,
 } from "./pump-lifecycle-normalizer.mjs";
-import { extractTransactionBalanceDeltas } from "./transaction-reconciler.mjs";
+import { extractTransactionBalanceDeltas, reconcilePumpTradesWithTransaction } from "./transaction-reconciler.mjs";
 import {
   normalizePumpSwapTradeEvent,
   normalizePumpSwapLiquidityEvent,
@@ -486,6 +486,64 @@ export function decodePumpTransaction({
     }
   }
 
+  const balanceDeltas = extractTransactionBalanceDeltas(transaction);
+  const treasuryTradeGroups = new Map();
+  for (const event of events) {
+    if (event.event_kind !== "CURVE_BUY_EXECUTED" && event.event_kind !== "CURVE_SELL_EXECUTED") continue;
+    const actor = event.payload?.actor_address;
+    const mint = event.market?.token_mint;
+    const key = `${actor ?? "unknown"}:${mint ?? "unknown"}`;
+    if (!treasuryTradeGroups.has(key)) treasuryTradeGroups.set(key, []);
+    treasuryTradeGroups.get(key).push(event);
+  }
+
+  for (const group of treasuryTradeGroups.values()) {
+    const sides = new Set(group.map((event) => event.event_kind));
+    let reconciliation;
+    if (sides.size !== 1 || !group[0].payload?.actor_address) {
+      reconciliation = {
+        status: "UNKNOWN",
+        reason: "mixed_sides_or_missing_actor_in_transaction",
+        checks: [],
+      };
+    } else {
+      reconciliation = reconcilePumpTradesWithTransaction({ transaction, tradeEvents: group });
+    }
+
+    for (const event of group) {
+      event.status = reconciliation.status === "PASS" ? "CONFIRMED" : "UNVERIFIED";
+      event.quality = {
+        ...event.quality,
+        transaction_reconciliation: {
+          status: reconciliation.status,
+          reason: reconciliation.reason,
+          checks: reconciliation.checks,
+        },
+        reconciliation_ref: resolvedSignature,
+      };
+      event.payload.transaction_costs = {
+        signature: resolvedSignature,
+        fee_payer_address: balanceDeltas.fee_payer_address,
+        fee_lamports: balanceDeltas.fee_lamports,
+      };
+      if (reconciliation.status === "PASS") {
+        const warnings = (event.quality.warnings ?? []).filter((warning) =>
+          warning !== "TradeEvent has not yet been reconciled with authoritative transaction account deltas"
+        );
+        event.quality.warnings = warnings;
+        event.quality.is_complete = warnings.length === 0;
+        event.quality.validation_status = warnings.length === 0 ? "valid" : "warning";
+      } else {
+        event.quality.warnings = [
+          ...(event.quality.warnings ?? []),
+          "Treasury PnL must ignore this event until transaction balance reconciliation passes",
+        ];
+        event.quality.is_complete = false;
+        event.quality.validation_status = "warning";
+      }
+    }
+  }
+
   return {
     status: unresolvedEvents.length > 0 ? "PARTIAL" : events.length > 0 ? "DECODED" : "NO_PUMP_EVENTS",
     signature: resolvedSignature,
@@ -496,7 +554,7 @@ export function decodePumpTransaction({
     decoded_events: decodedEvents,
     events,
     unresolved_events: unresolvedEvents,
-    balance_deltas: extractTransactionBalanceDeltas(transaction),
+    balance_deltas: balanceDeltas,
   };
 }
 

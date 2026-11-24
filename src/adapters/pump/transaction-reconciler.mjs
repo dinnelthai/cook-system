@@ -121,6 +121,7 @@ export function extractTransactionBalanceDeltas(transaction) {
   }
 
   return {
+    fee_payer_address: keys[0] ?? null,
     fee_lamports: String(meta.fee ?? 0),
     lamports,
     tokens,

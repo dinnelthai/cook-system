@@ -12,6 +12,7 @@ import {
   extractTransactionBalanceDeltas,
 } from "../src/adapters/pump/transaction-reconciler.mjs";
 import { createInitialCurveStateFromMarketCreated, replayCurveEvents } from "../src/core/market-state.mjs";
+import { replayTreasuryTradePnl } from "../src/inner-market/treasury-pnl.mjs";
 
 const ZERO_KEY = "11111111111111111111111111111111";
 const MINT = "So11111111111111111111111111111111111111112";
@@ -260,6 +261,14 @@ test("transaction parser maps Pump TradeEvent to a canonical observed-chain even
   assert.equal(event.market.curve_account, CURVE);
   assert.equal(event.payload.token_amount_base_units, "900");
   assert.equal(event.payload.quote_amount_base_units, "500");
+  assert.equal(event.status, "CONFIRMED");
+  assert.equal(event.quality.transaction_reconciliation.status, "PASS");
+  assert.equal(event.payload.transaction_costs.fee_payer_address, USER);
+  assert.equal(event.payload.transaction_costs.fee_lamports, "5000");
+  const ledger = replayTreasuryTradePnl({ events: [event], treasuryWalletAddresses: [USER] });
+  assert.equal(ledger.confirmed_buy_count, 1);
+  assert.equal(ledger.total_buy_cost_quote_base_units, "5500");
+  assert.equal(ledger.cash_flow.total_network_transaction_fees_quote_base_units, "5000");
   const reconciliation = reconcilePumpTradesWithTransaction({ transaction, tradeEvents: [event] });
   assert.equal(reconciliation.status, "PASS");
   assert.equal(reconciliation.checks[0].status, "PASS");
