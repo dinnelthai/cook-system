@@ -111,6 +111,7 @@ test("unconfirmed trades do not alter curve state or participant risk flow", () 
   assert.equal(report.ignored_unconfirmed_event_count, 1);
   assert.equal(report.current_as_of_event_id, "dev-first-buy");
   assert.equal(report.participant_flow.external_buy_quote_base_units, "0");
+  assert.equal(report.event_impact_journal.length, 0);
   assert.equal(report.risk_level, "LOW");
 });
 
