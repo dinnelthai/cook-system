@@ -20,7 +20,18 @@ main[data-page=dashboard]{display:block;max-width:none}main[data-page=dashboard]
 .terminal-grid{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(260px,1fr);gap:12px;align-items:start}
 .terminal-grid .panel{margin-bottom:12px}.series-chart{width:100%;height:150px;display:block}.chart-empty{height:170px;display:grid;place-items:center;border:1px dashed var(--line);color:var(--muted);font-size:12px;background:var(--surface2)}
 @media(max-width:1000px){.terminal-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.terminal-grid{grid-template-columns:1fr}}@media(max-width:600px){.terminal-heading{align-items:flex-start;flex-direction:column}.terminal-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* V0.4 workspaces */
+:root{--bg:#0b1017;--surface:#121b26;--surface2:#0e1620;--line:#293747;--text:#dce6f1;--muted:#91a4b9}
+.layout{grid-template-columns:196px minmax(0,1fr)}.brand-mark{clip-path:none;border-radius:5px;background:#142635}h1{letter-spacing:.09em}
+nav button{min-height:36px;font-size:12px}nav button.active{box-shadow:inset 2px 0 var(--cyan);background:#142832}
+main{max-width:none}.terminal-heading{min-height:48px}.source-chip{color:var(--amber);font:10px var(--mono);border:1px solid #685433;padding:5px 8px;border-radius:3px;white-space:nowrap}
+.comparison{padding:8px 0}.comparison-row{margin:0 0 17px}.comparison-row:last-child{margin-bottom:0}.comparison-row>.row{justify-content:space-between;margin-bottom:6px;color:var(--muted)}.comparison-row strong{font:12px var(--mono);color:var(--text)}
+.meter{height:9px;border-radius:2px;background:#263340;overflow:hidden}.meter>span{display:block;height:100%;background:#7492aa}.meter>span.buy{background:var(--green)}.meter>span.sell{background:var(--red)}
+.empty-state{min-height:128px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;text-align:center;padding:18px;border:1px dashed var(--line);background:var(--surface2);color:var(--muted);border-radius:4px}.empty-state strong{color:var(--text);font-weight:550}.empty-state span{font-size:11px}
+.raw-details{border:1px solid var(--line);border-radius:4px;background:var(--surface);padding:10px 12px;margin-bottom:12px}.raw-details summary{cursor:pointer;color:var(--muted);font-size:12px}.raw-details pre{margin-bottom:0}
+@media(max-width:700px){.layout{display:block}}
 </style></head>
-<body><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET QUALITY / OPERATIONS</div></div></div><div class="header-meta"><span class="build">MVP / V0.3</span><span class="tag">OFFLINE · SYNTHETIC</span></div></header>
+<body><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET QUALITY / OPERATIONS</div></div></div><div class="header-meta"><span class="build">MVP / V0.4</span><span class="tag">OFFLINE · SYNTHETIC</span></div></header>
 <div class="layout"><nav aria-label="页面导航" id="nav"></nav><main id="main"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
 <script type="module" src="/web/app.mjs"></script></body></html>
