@@ -86,7 +86,43 @@ Do not mix quote assets or silently convert between SOL and USD. FX conversion m
 
 Batch means grouping already-authorized transaction receipts for audit and accounting. The module deduplicates signatures, separates confirmed / pending / failed results, and aggregates actual fills and fees. It does not construct coordinated multi-wallet buy/sell sequences, split orders to influence price, or automate market-moving behavior.
 
-### 3.5 Risk and data-quality guard
+### 3.6 External-flow and curve-risk analytics
+
+A treasury position cannot be evaluated from Dev fills alone. Every confirmed curve execution between two treasury decisions changes the shared curve state, regardless of who submitted it. The next decision must be based on the latest replayed state, never on the reserve snapshot from the prior Dev fill.
+
+For a baseline snapshot immediately after a known Dev event, replay all subsequent confirmed market events in canonical chain order. Each event must carry its authoritative `post_curve_state`. Pending, failed, and unconfirmed events do not change the curve state. An ordering gap, market-identity mismatch, or replay failure is a data-integrity stop.
+
+For every confirmed buy or sell, record:
+- event id, side, participant class (if evidence-backed), quote notional, and token amount;
+- marginal price change across that one event;
+- remaining real curve token inventory;
+- the change in a fixed reference-depth probe, if configured.
+
+The participant attribution layer may label an event `TREASURY`, `SNIPER`, `OTHER`, or `UNKNOWN`. These labels are enrichment, not native facts. Do not infer that a wallet is a sniper solely from its size, speed, or position in the launch sequence. Keep unknown wallets unknown and report attribution coverage.
+
+For a fixed diagnostic token quantity (Q_r), compare the exact fee-aware Pump quote at the baseline and current states:
+
+`ReferenceCostDelta = QuoteExactTokenOut(CurrentState, Q_r) - QuoteExactTokenOut(BaselineState, Q_r)`
+
+For a fixed diagnostic quote budget (B_r), compare token outputs:
+
+`ReferenceOutputDelta = QuoteExactQuoteIn(CurrentState, B_r) - QuoteExactQuoteIn(BaselineState, B_r)`
+
+These are read-only depth measurements. They quantify how intervening market activity changed the cost of a fixed reference quantity (or the output of a fixed reference budget); they are not suggested order sizes, target-market-cap budgets, or instructions to transact.
+
+Risk dimensions in V1:
+- absolute marginal-price movement from the baseline;
+- increase in the fixed reference-token quote cost;
+- depletion of real curve token inventory;
+- external sell share of attributed external turnover;
+- external buyer wallet concentration (HHI and effective wallet count);
+- data integrity, event-order completeness, curve lifecycle, and attribution coverage.
+
+The initial numeric thresholds in `DEFAULT_CURVE_RISK_THRESHOLDS` are provisional alerting defaults only. Calibrate them against historical organic launches, by launch phase and curve depth. The overall level is the maximum configured dimension severity, not a probability of loss. Missing attribution must not be interpreted as low concentration risk.
+
+Creator/treasury buys remain part of the curve replay because they changed the actual market state, but they are excluded from external-flow concentration and external sell-share calculations when correctly attributed. This keeps the actual curve state separate from the participant-flow explanation.
+
+### 3.7 Risk and data-quality guard
 
 Hard gates:
 
@@ -122,6 +158,10 @@ Risk outputs are explanations and controls, not trading instructions.
 - [ ] Add-on budget checks use cumulative confirmed buy spend plus the proposed tranche; sale proceeds do not automatically reset the budget.
 - [ ] Add-on inventory checks use current reconciled inventory plus the proposed acquisition.
 - [ ] Batch reports deduplicate signatures and distinguish confirmed, pending, failed, and rejected receipts.
+- [ ] Intervening confirmed market trades are replayed in canonical order before any later treasury assessment.
+- [ ] External participant attribution is evidence-backed; unknown wallets remain unknown.
+- [ ] Per-event price impact and fixed reference-depth changes are recorded for audit.
+- [ ] Risk dimensions show their evidence and provisional thresholds; no missing data is silently scored as low risk.
 - [ ] No target-market-cap buy budget, deceptive volume, wallet-concealment, or manipulative execution policy is generated.
 - [ ] All money and token quantities use integer base units; formatted decimals are display-only.
 
