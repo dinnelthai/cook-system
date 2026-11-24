@@ -25,6 +25,13 @@ export function buildHistoricalMvpReport(input){
   if(fees.status!=="RECONCILED")issues.push("CREATOR_FEE_AUDIT_FAILED");
   if(inv.status!=="RECONCILED")issues.push("INVENTORY_ADJUSTMENT_AUDIT_FAILED");
   if(perf.status!=="COMPLETE")issues.push("HISTORICAL_NAV_INCOMPLETE");
+  // Compare gross capital flows, not only the net: offsetting discrepancies
+  // can otherwise cancel out while distorting historical performance.
+  const navCapitalIn=nav.snapshots.reduce((sum,s)=>sum+amount(s.capitalInBaseUnits,"NAV capital in"),0n);
+  const navCapitalOut=nav.snapshots.reduce((sum,s)=>sum+amount(s.capitalOutBaseUnits,"NAV capital out"),0n);
+  const cashTotals=dual.cash_report.confirmed_postings_by_kind;
+  if(navCapitalIn!==amount(cashTotals.CAPITAL_IN,"cash capital in")||
+     navCapitalOut!==amount(cashTotals.CAPITAL_OUT,"cash capital out"))issues.push("NAV_CASH_CAPITAL_FLOW_MISMATCH");
   if(inv.expected_token_balance!==inventory.ledger.ending_token_balance_base_units||inv.expected_cost_basis!==inventory.ledger.remaining_cost_basis_quote_base_units)issues.push("INVENTORY_LEDGER_CLOSING_MISMATCH");
   if(inventory.tradeSummary.acquisitionCost!==inventory.ledger.total_buy_cost_quote_base_units)issues.push("ACQUISITION_COST_MISMATCH");
   const journal=inventory.ledger.position_journal;

@@ -50,3 +50,35 @@ test("CLI emits synthetic JSON report",()=>{
  const s=execFileSync(process.execPath,["scripts/report-inner-market-mvp.mjs"],{encoding:"utf8"});
  assert.equal(JSON.parse(s).status,"REPORT_READY");
 });
+
+test("NAV capital flows must agree with confirmed historical cash postings",()=>{
+  const f=fixture();
+  const last=f.nav.snapshots.at(-1);
+  last.capitalInBaseUnits="100";
+  last.navAfterFlowBaseUnits="1080";
+  const r=buildHistoricalMvpReport(f);
+  assert.equal(r.status,"REVIEW_REQUIRED");
+  assert.ok(r.issues.includes("NAV_CASH_CAPITAL_FLOW_MISMATCH"));
+  assert.equal(r.accounting.realized_project_pnl_base_units,null);
+});
+test("offsetting gross NAV capital flows cannot hide a mismatch",()=>{
+  const f=fixture();
+  const last=f.nav.snapshots.at(-1);
+  last.capitalInBaseUnits="100";
+  last.capitalOutBaseUnits="100";
+  const r=buildHistoricalMvpReport(f);
+  assert.equal(r.status,"REVIEW_REQUIRED");
+  assert.ok(r.issues.includes("NAV_CASH_CAPITAL_FLOW_MISMATCH"));
+});
+test("matching historical gross capital totals remain internally consistent",()=>{
+  const f=fixture();
+  for(const [id,kind] of [["capital-in","CAPITAL_IN"],["capital-out","CAPITAL_OUT"]]){
+    f.cash.entries.push({...f.scope,id,kind,amountBaseUnits:"100",status:"FINALIZED",reconciliation:"PASS"});
+  }
+  const last=f.nav.snapshots.at(-1);
+  last.capitalInBaseUnits="100";
+  last.capitalOutBaseUnits="100";
+  const r=buildHistoricalMvpReport(f);
+  assert.equal(r.status,"REPORT_READY");
+  assert.ok(!r.issues.includes("NAV_CASH_CAPITAL_FLOW_MISMATCH"));
+});
