@@ -145,6 +145,7 @@ Risk outputs are explanations and controls, not trading instructions.
 | `src/core/pool-state.mjs` | Post-graduation pool state only; not used as inner-curve LP |
 | `src/core/candle-builder.mjs` | Raw OHLCV from confirmed executions |
 | `src/core/integer.mjs` | Canonical base-unit arithmetic |
+| `src/inner-market/market-risk.mjs` | Confirmed market-event replay, per-event price/depth impact, external participant-flow metrics, and explainable risk dimensions |
 | inventory / demand research docs | Holder, cohort, net-flow, and overhang analytics |
 
 ## 5. V1 acceptance criteria
