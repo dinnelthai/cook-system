@@ -14,15 +14,16 @@ const note=s=>'<div class="notice">'+esc(s)+'</div>';
 const panel=(title,body)=>'<section class="panel"><h3>'+esc(title)+'</h3>'+body+'</section>';
 function download(name,text){const a=document.createElement("a");const url=URL.createObjectURL(new Blob([text],{type:"application/json"}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 function render(){
+ main.dataset.page=page;
  document.querySelector(".tag").textContent="OFFLINE · "+report.source_mode;
- nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+(page===id?"active":"")+'">'+label+'</button>').join("");
+ nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+(page===id?"active":"")+'"'+(page===id?' aria-current="page"':'')+'><span class="nav-num" aria-hidden="true">'+label.slice(0,2)+'</span><span>'+esc(label.slice(3))+'</span></button>').join("");
  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{page=b.dataset.page;render()});
  const a=report.accounting,m=report.market_history;
  if(page==="dashboard"){
  const d=buildHistoricalDashboard(data),t=d.treasury,v=d.market;
  const sol=x=>{if(x==null)return "未知";if(d.scope.quoteAsset!=="SOL_LAMPORTS")return x+" base units";const n=BigInt(x),abs=n<0n?-n:n;return (n<0n?"-":"")+(abs/1000000000n).toString()+"."+(abs%1000000000n).toString().padStart(9,"0")+" SOL"};
  const known=x=>x==null?"未知":x;
- main.innerHTML='<h2>市场与资产总览</h2>'+note("离线历史区间 · "+d.source_mode+" · "+d.scope.openingCutoff+" — "+d.scope.closingCutoff+"。导入新报告后刷新全部指标，不连接实时交易。")+
+ main.innerHTML='<p class="eyebrow">OVERVIEW / MARKET & TREASURY</p><h2>市场与资产总览</h2>'+note("离线历史区间 · "+d.source_mode+" · "+d.scope.openingCutoff+" — "+d.scope.closingCutoff+"。导入新报告后刷新全部指标，不连接实时交易。")+
  panel("数据区间",'<div class="row"><button id="dashboard-reset">恢复合成样本</button><button id="dashboard-export">导出总览</button></div><label for="dashboard-import">导入完整的历史报告输入 JSON</label><input type="file" id="dashboard-import" accept=".json"><p id="dashboard-error" class="negative"></p>')+
  panel("历史市场活动",'<div class="stats">'+stat("买入地址数",known(v.buy_address_count))+stat("卖出地址数",known(v.sell_address_count))+stat("买入笔数",v.buy_trade_count)+stat("卖出笔数",v.sell_trade_count)+'</div>'+table(["指标","实际值"],[["历史买入名义额",sol(v.buy_notional_base_units)],["历史卖出名义额",sol(v.sell_notional_base_units)],["历史真实 SOL 储备",sol(v.verified_real_reserve_base_units)]])+'<p class="muted">地址数不是人数；成交总额不等于独立资金流入。缺失地址则显示未知。</p>')+
  panel("Dev 项目资金",'<div class="stats">'+stat("实际买入支出",sol(t.actual_trade_spend_base_units))+stat("实际卖出回款",sol(t.actual_trade_receipts_base_units))+stat("净交易支出",sol(t.net_trade_cash_spend_base_units))+stat("剩余现金",sol(t.closing_cash_base_units))+'</div>'+table(["指标","实际值"],[["区间新增资本",sol(t.recorded_capital_in_base_units)],["区间资本撤回",sol(t.recorded_capital_out_base_units)],["独立记账费用",sol(t.recorded_expenses_base_units)],["剩余库存（base units）",known(t.closing_token_balance_base_units)],["库存成本",sol(t.remaining_cost_basis_base_units)],["已实现项目盈亏",sol(t.realized_project_pnl_base_units)],["已到账创作者费",sol(t.creator_cash_income_base_units)]])+'<p class="muted">实际买卖资金与资本注入、运营费用分开核算；区间数值不等同于全生命周期。</p>')+
