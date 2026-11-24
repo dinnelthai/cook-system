@@ -15,5 +15,6 @@ test("interop patch is idempotent with other Anchor imports present",()=>{
  const first=run();assert.equal(first.status,0,first.stderr);const patched=readFileSync(file,"utf8");assert.match(patched,/const \{ BN: J \}/);
  const second=run();assert.equal(second.status,0,second.stderr);assert.equal(readFileSync(file,"utf8"),patched);
  writeFileSync(file,'import{BN,Program}from"@coral-xyz/anchor";');assert.notEqual(run().status,0);
+ writeFileSync(file,'import{BN as J}from"@coral-xyz/anchor";import{BN,Program}from"@coral-xyz/anchor";');assert.notEqual(run().status,0);
  } finally {rmSync(cwd,{recursive:true,force:true});}
 });

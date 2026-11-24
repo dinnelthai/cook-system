@@ -23,10 +23,11 @@ source = source.replace(pattern, (_, binding) => {
   return `import anchorCjs from "@coral-xyz/anchor"; const { BN: ${binding} } = anchorCjs;`;
 });
 
-if (replacements === 0) {
-  if (/import\s*\{[^}]*\bBN\b[^}]*\}\s*from\s*["']@coral-xyz\/anchor["']/.test(source)) {
+if (/import\s*\{[^}]*\bBN\b[^}]*\}\s*from\s*["']@coral-xyz\/anchor["']/.test(source)) {
     throw new Error("Pump SDK interop patch found an unknown Anchor import shape; inspect the dependency before changing it");
   }
+
+if (replacements === 0) {
   console.log("Pump SDK interop patch: no CommonJS BN import found");
 } else {
   await writeFile(target, source, "utf8");
