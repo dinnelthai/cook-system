@@ -86,42 +86,47 @@ Do not mix quote assets or silently convert between SOL and USD. FX conversion m
 
 Batch means grouping already-authorized transaction receipts for audit and accounting. The module deduplicates signatures, separates confirmed / pending / failed results, and aggregates actual fills and fees. It does not construct coordinated multi-wallet buy/sell sequences, split orders to influence price, or automate market-moving behavior.
 
-### 3.5 External-flow and curve-risk analytics
+### 3.5 Treasury position, liquidation value, and next-buy monitoring
 
-A treasury position cannot be evaluated from Dev fills alone. Every confirmed curve execution between two treasury decisions changes the shared curve state, regardless of who submitted it. The next decision must be based on the latest replayed state, never on the reserve snapshot from the prior Dev fill.
+The V1 monitoring subject is the configured Treasury wallet set, not the full participant population. All confirmed Pump curve trades still update the shared curve state through the canonical replay engine, because an intervening market trade changes the quote available to Treasury. External traders are not classified, profiled, or scored.
 
-For a baseline snapshot immediately after a known Dev event, replay all subsequent confirmed market events in canonical chain order. Each event must carry its authoritative `post_curve_state`. Pending, failed, and unconfirmed events do not change the curve state. An ordering gap, market-identity mismatch, or replay failure is a data-integrity stop.
+For every Treasury buy or sell, retain the wallet address, signature, event ordering, token amount, reconciled quote cash movement, program-fee breakdown, and network transaction fee. A curve trade is admitted to PnL only when the parser's actor token/quote balance reconciliation returns PASS. Pending, failed, partial, or unreconciled events do not alter the Treasury ledger.
 
-For every confirmed buy or sell, record:
-- event id, side, participant class (if evidence-backed), quote notional, and token amount;
-- marginal price change across that one event;
-- remaining real curve token inventory;
-- the change in a fixed reference-depth probe, if configured.
+Observed-chain `payload.quote_amount_base_units` is the actor's quote cash movement confirmed against transaction balance deltas (excluding the network transaction fee). Program fee components are already reflected in that cash movement; they are reported separately and must not be added or subtracted a second time. Network transaction fees are counted once per signature and only when the fee payer belongs to the configured Treasury wallet set.
 
-The participant attribution layer may label an event `TREASURY`, `SNIPER`, `OTHER`, or `UNKNOWN`. These labels are enrichment, not native facts. Do not infer that a wallet is a sniper solely from its size, speed, or position in the launch sequence. Keep unknown wallets unknown and report attribution coverage.
+Treasury inventory is computed from confirmed buys and sells, then reconciled against an authoritative owner+mint token balance snapshot. Transfers between Treasury wallets are internal movements, not buys or sells; external transfers, allocations, burns, and other inventory changes require separate basis adjustments and a new account reconciliation. A balance mismatch is a hard pause.
 
-For a fixed diagnostic token quantity (Q_r), compare the exact fee-aware Pump quote at the baseline and current states:
+V1 uses weighted-average cost:
+- each additional buy increases current inventory and remaining cost basis;
+- each sell removes its proportional share of remaining cost basis;
+- each later buy recomputes average cost over the remaining position;
+- a sale does not reset cumulative buy spend or erase prior realized PnL.
 
-`ReferenceCostDelta = QuoteExactTokenOut(CurrentState, Q_r) - QuoteExactTokenOut(BaselineState, Q_r)`
+`RemainingCostBasis = OpeningCostBasis + ConfirmedBuyCashCosts - CostBasisAllocatedToConfirmedSells`
 
-For a fixed diagnostic quote budget (B_r), compare token outputs:
+`AverageCostPerToken = RemainingCostBasis / CurrentTreasuryTokenBalance`
 
-`ReferenceOutputDelta = QuoteExactQuoteIn(CurrentState, B_r) - QuoteExactQuoteIn(BaselineState, B_r)`
+`RealizedPnL = ConfirmedNetSellProceeds - AllocatedCostBasis`
 
-These are read-only depth measurements. They quantify how intervening market activity changed the cost of a fixed reference quantity (or the output of a fixed reference budget); they are not suggested order sizes, target-market-cap budgets, or instructions to transact.
+For risk monitoring, show two different valuations:
+- marginal-price mark-to-market, which is a reference mark only;
+- exact fee-aware Pump sell quote for the entire current Treasury inventory, which estimates proceeds after the position's own curve impact.
 
-Risk dimensions in V1:
-- absolute marginal-price movement from the baseline;
-- increase in the fixed reference-token quote cost;
-- depletion of real curve token inventory;
-- external sell share of attributed external turnover;
-- external buyer wallet concentration (HHI lower/upper bounds and effective wallet-count lower bound);
-- fixed-budget reference output deterioration;
-- data integrity, event-order completeness, curve lifecycle, and attribution coverage.
+The full-position quote is an estimate, not a guaranteed execution result. The dashboard must not describe marginal mark value as realizable proceeds.
 
-The initial numeric thresholds in `DEFAULT_CURVE_RISK_THRESHOLDS` are provisional alerting defaults only. Calibrate them against historical organic launches, by launch phase and curve depth. The overall level is the maximum configured dimension severity, not a probability of loss. Missing attribution must not be interpreted as low concentration risk. Buyer-concentration severity is capped at WATCH until at least three identified buyer wallets and five external buy executions are observed, preventing a single early sniper fill from being treated as conclusive evidence of persistent concentration.
+A hypothetical next-buy scenario accepts exactly one input: a fixed quote budget or a fixed token quantity. It reports the Pump quote, program fees, estimated network fee, incremental token amount, post-buy total inventory, post-buy remaining cost basis, post-buy average cost, estimated full-position liquidation proceeds, post-buy unrealized PnL, and incremental estimated liquidation PnL. It also reports if the hypothetical purchase would complete the bonding curve. It never builds or submits a transaction.
 
-Creator/treasury buys remain part of the curve replay because they changed the actual market state, but they are excluded from external-flow concentration and external sell-share calculations when correctly attributed. This keeps the actual curve state separate from the participant-flow explanation.
+Risk alerts are Treasury-specific and evidence-backed:
+- wallet inventory or curve state does not reconcile;
+- chain data is stale, incomplete, or out of order;
+- curve is complete or has left the bonding-curve lifecycle;
+- full-position liquidation quote is below remaining cost basis;
+- liquidation discount exceeds a configured threshold;
+- remaining real curve inventory is below a configured graduation-proximity threshold;
+- Treasury token inventory share exceeds a configured cap;
+- cumulative spend or inventory would exceed approved policy limits.
+
+Thresholds are configuration, not universal constants. Unknown values remain unassessed; no missing data is silently scored as low risk.
 
 ### 3.6 Risk and data-quality guard
 
@@ -145,7 +150,7 @@ Risk outputs are explanations and controls, not trading instructions.
 | `src/core/pool-state.mjs` | Post-graduation pool state only; not used as inner-curve LP |
 | `src/core/candle-builder.mjs` | Raw OHLCV from confirmed executions |
 | `src/core/integer.mjs` | Canonical base-unit arithmetic |
-| `src/inner-market/market-risk.mjs` | Confirmed market-event replay, per-event price/depth impact, external participant-flow metrics, and explainable risk dimensions |
+| `src/inner-market/treasury-position-monitor.mjs` | Exact full-position curve exit quote, Treasury-specific risk alerts, and hypothetical next-buy cost/PnL scenario |
 | inventory / demand research docs | Holder, cohort, net-flow, and overhang analytics |
 
 ## 5. V1 acceptance criteria
@@ -160,10 +165,14 @@ Risk outputs are explanations and controls, not trading instructions.
 - [ ] Add-on budget checks use cumulative confirmed buy spend plus the proposed tranche; sale proceeds do not automatically reset the budget.
 - [ ] Add-on inventory checks use current reconciled inventory plus the proposed acquisition.
 - [ ] Batch reports deduplicate signatures and distinguish confirmed, pending, failed, and rejected receipts.
-- [ ] Intervening confirmed market trades are replayed in canonical order before any later treasury assessment.
-- [ ] External participant attribution is evidence-backed; unknown wallets remain unknown.
-- [ ] Per-event price impact and fixed reference-depth changes are recorded for audit.
-- [ ] Risk dimensions show their evidence and provisional thresholds; no missing data is silently scored as low risk.
+- [ ] Only Treasury-wallet trades with passing actor balance reconciliation affect Treasury PnL.
+- [ ] Intervening confirmed Pump curve trades are replayed in canonical order before every Treasury quote or position valuation.
+- [ ] Treasury inventory reconciles to owner+mint account snapshots; transfers are not misclassified as buys or sells.
+- [ ] Program fees are not double-counted when already included in reconciled quote cash movement; network fees are counted once per signature.
+- [ ] Full-position liquidation value uses the exact Pump sell quote, separately from marginal-price mark-to-market.
+- [ ] Each later buy updates cumulative inventory, remaining cost basis, average cost, and realized/unrealized PnL without resetting prior history.
+- [ ] A next-buy scenario reports post-buy inventory, average cost, estimated liquidation value, and incremental PnL without constructing or submitting a transaction.
+- [ ] Risk alerts are Treasury-specific, evidence-backed, and driven by configured limits; missing data is never scored as low risk.
 - [ ] No target-market-cap buy budget, deceptive volume, wallet-concealment, or manipulative execution policy is generated.
 - [ ] All money and token quantities use integer base units; formatted decimals are display-only.
 
@@ -175,5 +184,6 @@ Risk outputs are explanations and controls, not trading instructions.
 4. Batch receipt reconciliation.
 5. Data-quality and treasury policy guard.
 6. Integrate with existing event replay and add fixtures.
-7. Add external-flow risk replay, per-event impact journal, and provisional risk thresholds.
-7. Add offline scenario reports using recorded / synthetic data with provenance labels.
+7. Add Treasury-only position and liquidation monitoring.
+8. Add hypothetical next-buy quote, post-buy average cost, and incremental liquidation PnL scenario.
+9. Add offline scenario reports using recorded / synthetic data with provenance labels.
