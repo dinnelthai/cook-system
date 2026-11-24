@@ -128,3 +128,19 @@ test("policy guard pauses when the curve has completed even if data is fresh", (
   assert.equal(result.status, "PAUSE_AND_RECONCILE");
   assert.ok(result.reasons.includes("NOT_IN_BONDING_CURVE_PHASE"));
 });
+test("policy guard checks each proposed add-on against cumulative remaining budgets", () => {
+  const base = {
+    market: { reconciled: true, dataComplete: true, complete: false, lifecycle: "bonding_curve", observedAtMs: 1900 },
+    treasury: { quoteSpentBaseUnits: "80", tokenBalanceBaseUnits: "90" },
+    limits: { maxDataAgeMs: 1000, maxQuoteBudgetBaseUnits: "100", maxTokenInventoryBaseUnits: "100" },
+    nowMs: 2000,
+  };
+  const accepted = evaluateInnerMarketPolicy({ ...base, proposed: { quoteSpendBaseUnits: "20", tokenAcquisitionBaseUnits: "10" } });
+  assert.equal(accepted.status, "WITHIN_CONFIGURED_LIMITS");
+  assert.equal(accepted.remaining_quote_budget_base_units, "20");
+  const rejected = evaluateInnerMarketPolicy({ ...base, proposed: { quoteSpendBaseUnits: "21", tokenAcquisitionBaseUnits: "11" } });
+  assert.equal(rejected.status, "MANUAL_REVIEW_REQUIRED");
+  assert.ok(rejected.reasons.includes("PROPOSED_ADD_ON_EXCEEDS_REMAINING_QUOTE_BUDGET"));
+  assert.ok(rejected.reasons.includes("PROPOSED_ADD_ON_EXCEEDS_REMAINING_TOKEN_CAP"));
+  assert.equal(rejected.execution_enabled, false);
+});
