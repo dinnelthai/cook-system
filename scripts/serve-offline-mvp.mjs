@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { checkLocalRpcHealth } from "../src/inner-market/local-rpc-health.mjs";
 import { buildTerminalState } from "../src/inner-market/terminal-state.mjs";
 import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -14,10 +15,11 @@ createServer(async(req,res)=>{
  try{
   if(req.method!=="GET"){res.writeHead(405);res.end();return}
   const url=new URL(req.url,"http://127.0.0.1");
-  if(url.pathname==="/api/terminal/report"){
+  if(["/api/terminal/report","/api/terminal/health"].includes(url.pathname)){
    const host=req.headers.host;
    if(!["127.0.0.1:"+port,"localhost:"+port].includes(host)||req.headers["sec-fetch-site"]==="cross-site"){res.writeHead(403);res.end();return}
    const json=(status,payload)=>{res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify(payload));};
+   if(url.pathname==="/api/terminal/health"){json(200,{report_bridge:reportPath?"CONFIGURED":"NOT_CONFIGURED",rpc:await checkLocalRpcHealth(process.env.COOK_LOCAL_RPC_URL),execution_enabled:false});return}
    if(!reportPath){json(503,{code:"REPORT_BRIDGE_NOT_CONFIGURED"});return}
    try{
     const info=await stat(reportPath);
