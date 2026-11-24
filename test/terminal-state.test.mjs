@@ -60,3 +60,49 @@ test("terminal exposes read-only historical risk without treating missing eviden
  assert.equal(s.risk.status,"EVIDENCE_INCOMPLETE");assert.equal(s.risk.live_risk_assessed,false);assert.ok(s.risk.alerts.some(a=>a.code==="RECEIPT_AUDIT"));
  i.market.historyComplete=false;assert.equal(buildTerminalState(i).risk.status,"REVIEW_REQUIRED");
 });
+
+function historicalWithEndpoints(){
+ const i=fixture();i.sourceMode="ARCHIVED_HISTORICAL";
+ i.nav.endpointEvidence={schema_version:"cook-nav-endpoints.1",scope:{...i.scope},
+  opening:{cutoff:i.scope.openingCutoff,sequence:0,cashBaseUnits:"1000",tokenAmountBaseUnits:"0",inventoryValueBaseUnits:"0",receivableBaseUnits:"0",liabilitiesBaseUnits:"0",otherAssetsBaseUnits:"0"},
+  closing:{cutoff:i.scope.closingCutoff,sequence:3,cashBaseUnits:"887",tokenAmountBaseUnits:"50",inventoryValueBaseUnits:"90",receivableBaseUnits:"3",liabilitiesBaseUnits:"0",otherAssetsBaseUnits:"0"}};
+ return i;
+}
+test("legacy historical NAV claims are not exposed as supported performance",()=>{
+ const i=fixture();i.sourceMode="ARCHIVED_HISTORICAL";
+ const s=buildTerminalState(i);
+ assert.equal(s.status,"REPORT_READY");
+ assert.equal(s.performance.closing_nav_base_units,null);
+ assert.equal(s.treasury.max_observed_drawdown_bps,null);
+ assert.equal(s.performance.time_weighted_return_bps,null);
+ assert.deepEqual(s.performance.observations,[]);
+ assert.equal(s.checks.find(x=>x.id==="valuation").status,"UNKNOWN");
+});
+test("matching historical endpoints expose only internally consistent endpoint arithmetic",()=>{
+ const s=buildTerminalState(historicalWithEndpoints());
+ assert.equal(s.status,"REPORT_READY");
+ assert.equal(s.nav_evidence.status,"INTERNALLY_CONSISTENT");
+ assert.equal(s.performance.closing_nav_base_units,"980");
+ assert.equal(s.performance.capital_adjusted_nav_change_base_units,"-20");
+ assert.equal(s.performance.valuation_attestation,"UNKNOWN");
+ assert.equal(s.performance.time_weighted_return_bps,null);
+ assert.deepEqual(s.performance.observations,[]);
+ assert.equal(s.treasury.max_observed_drawdown_bps,null);
+ assert.equal(s.settlement_allowed,false);
+});
+test("contradictory historical endpoints suppress all derived financial output",()=>{
+ for(const [key,value,issue] of [["cashBaseUnits","888","CASH"],["tokenAmountBaseUnits","51","TOKEN"],["receivableBaseUnits","4","RECEIVABLE"],["inventoryValueBaseUnits","91","IDENTITY"]]){
+  const i=historicalWithEndpoints();i.nav.endpointEvidence.closing[key]=value;
+  const s=buildTerminalState(i);
+  assert.equal(s.status,"REVIEW_REQUIRED");
+  assert.ok(s.issues.includes("NAV_ENDPOINT_"+issue+"_MISMATCH:CLOSING"));
+  assert.equal(s.performance.closing_nav_base_units,null);
+  assert.equal(s.treasury.closing_cash_base_units,null);
+ }
+});
+test("endpoint scope and position must match report interval",()=>{
+ const i=historicalWithEndpoints();i.nav.endpointEvidence.scope.tokenMint="other";
+ assert.throws(()=>buildTerminalState(i),/NAV_ENDPOINT_SCOPE_MISMATCH/);
+ const j=historicalWithEndpoints();j.nav.endpointEvidence.closing.sequence=4;
+ assert.ok(buildTerminalState(j).issues.includes("NAV_ENDPOINT_POSITION_MISMATCH:CLOSING"));
+});

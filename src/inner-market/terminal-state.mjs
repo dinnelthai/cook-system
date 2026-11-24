@@ -12,13 +12,17 @@ export function buildTerminalState(input){
  const evidence=auditTerminalEvidence(input);
  const ready=d.status==="REPORT_READY"&&evidence.status!=="REVIEW_REQUIRED";
  const n=summarizeHistoricalNav({projectId:input.scope.projectId,quoteAsset:input.scope.quoteAsset,snapshots:input.nav.snapshots,historyComplete:input.nav.historyComplete});
+ const navEndpoints=d.nav_evidence;
+ const sample=input.sourceMode==="SYNTHETIC";
+ const endpointReady=ready&&(sample||navEndpoints.status==="INTERNALLY_CONSISTENT");
+ const pathReady=ready&&sample;
  const buy=BigInt(d.market.buy_notional_base_units),sell=BigInt(d.market.sell_notional_base_units);
  const candles=buildTerminalCandles(input);
  const checks=[ 
   {id:"accounting",status:ready?"PASS":"REVIEW",evidence:[...d.issues,...evidence.issues]},
   {id:"archived_evidence",status:evidence.status==="UNAVAILABLE"?"UNKNOWN":evidence.status==="REVIEW_REQUIRED"?"REVIEW":"PASS",evidence:evidence.issues},
   {id:"market_coverage",status:d.market.history_complete?"PASS":"REVIEW",evidence:[]},
-  {id:"valuation",status:n.status==="COMPLETE"?"PASS":"REVIEW",evidence:n.issues},
+  {id:"valuation",status:n.status!=="COMPLETE"||navEndpoints.status==="REVIEW_REQUIRED"?"REVIEW":"UNKNOWN",evidence:[...n.issues,...navEndpoints.issues,"INDEPENDENT_VALUATION_UNAVAILABLE"]},
   {id:"candle_evidence",status:candles.status==="REVIEW"?"REVIEW":candles.status==="CONSISTENT"||candles.status==="EMPTY"?"PASS":"UNKNOWN",evidence:candles.reason?[candles.reason]:[]},
   {id:"source_attestation",status:"UNKNOWN",evidence:[]},
   {id:"wallet_attribution",status:"UNKNOWN",evidence:[]},
@@ -27,7 +31,7 @@ export function buildTerminalState(input){
  return {...d,schema_version:"terminal-state.1",status:ready?"REPORT_READY":"REVIEW_REQUIRED",issues:[...d.issues,...evidence.issues],
   treasury:ready?d.treasury:Object.fromEntries(Object.keys(d.treasury).map(k=>[k,null])),
   market:{...d.market,gross_turnover_base_units:(buy+sell).toString(),buy_minus_sell_notional_base_units:(buy-sell).toString()},
-  performance:{closing_nav_base_units:ready?n.closing_nav_base_units:null,capital_adjusted_nav_change_base_units:ready?n.capital_adjusted_nav_change_base_units:null,time_weighted_return_bps:ready?n.time_weighted_return_bps:null,observations:ready?n.observations:[]},
+  performance:{closing_nav_base_units:endpointReady?n.closing_nav_base_units:null,capital_adjusted_nav_change_base_units:endpointReady?n.capital_adjusted_nav_change_base_units:null,time_weighted_return_bps:pathReady?n.time_weighted_return_bps:null,observations:pathReady?n.observations:[],valuation_attestation:"UNKNOWN",endpoint_status:navEndpoints.status},
   checks,candles,archived_evidence:evidence,risk:assessHistoricalRisk({reportChecks:checks,sourceMode:input.sourceMode,accountAudit:evidence.account_audit,cashAudit:evidence.cash_audit}),settlement_scope:input.sourceMode==="SYNTHETIC"?"SYNTHETIC_ONLY":"UNATTESTED_HISTORICAL",
   settlement_allowed:input.sourceMode==="SYNTHETIC"&&ready&&candles.status!=="REVIEW",execution_enabled:false};
 }

@@ -93,7 +93,7 @@ function renderTerminal(){
  const money=x=>isSample?"—":quoteAmount(x,scope.quoteAsset);
  const tabs=[["trades","成交记录"],["cash","资金流水"],["inventory","库存"],["liquidity","流动性"],["risk","风险与审计"],["logs","运行日志"]];
  const trades=isSample?[]:data.market.trades.filter(x=>x.status==="FINALIZED"&&x.reconciliation==="PASS");
- const snapshots=ready&&!isSample?data.nav.snapshots.filter(x=>x.reconciliation==="PASS"&&x.valuationStatus==="VERIFIED"):[];
+ const snapshots=ready&&!isSample?d.performance.observations:[];
  const rows={
  trades:()=>table(["事件","序号","方向","名义金额","状态"],data.market.trades.map(x=>[x.id,x.sequence,x.side,money(x.quoteNotionalBaseUnits),x.status])),
  cash:()=>table(["事件","类型","金额","对账"],data.cash.entries.map(x=>[x.id,x.kind,money(x.amountBaseUnits),x.reconciliation])),
@@ -103,7 +103,7 @@ function renderTerminal(){
  logs:()=>table(["UTC","级别","事件"],diagnostics.snapshot().entries.slice(-30).reverse().map(x=>[x.time,x.level,x.event]))
  };
  const sourceLabel=isSample?"行情待检查":"历史报告 · 来源未经独立认证";
- const navContent=seriesChart(snapshots.map(x=>({label:x.sequence,value:x.navAfterFlowBaseUnits})),"NAV");
+ const navContent=seriesChart(snapshots.map(x=>({label:x.sequence,value:x.nav_base_units})),"NAV");
  const participantRows=[["买入地址",isSample?"—":report.market_history.buy_address_count??"—"],["卖出地址",isSample?"—":report.market_history.sell_address_count??"—"],["实际 SOL 储备",money(m.verified_real_reserve_base_units)],["历史回撤",isSample||a.max_observed_drawdown_bps==null?"—":Number(a.max_observed_drawdown_bps)/100+"%"]];
  const actionForm='<form id="terminal-meta"><div class="field-pair"><label>名称<input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"></label><label>Symbol<input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"></label></div><div class="row"><button type="submit" class="primary">保存发行资料</button><button type="button" disabled>提交发行</button></div><p class="muted">发行接口未接入</p></form>';
  main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>'+esc(metadata?.symbol||(!isSample?scope.projectId:"未选择 Token"))+' <span class="pair-unit">/ SOL</span></h2><small>'+esc(metadata?.name||(!isSample?scope.tokenMint:"新建项目或载入记录"))+'</small></div></div><div class="pro-top-right"><div id="pro-wallet"></div><button id="open-launch" class="primary">＋ 发币</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
@@ -153,7 +153,7 @@ function render(){
  const sol=x=>{if(x==null)return "未知";if(d.scope.quoteAsset!=="SOL_LAMPORTS")return x+" base units";const n=BigInt(x),abs=n<0n?-n:n;return (n<0n?"-":"")+(abs/1000000000n).toString()+"."+(abs%1000000000n).toString().padStart(9,"0")+" SOL"};
  const known=x=>x==null?"未知":x;
  const fmt=x=>quoteAmount(x,d.scope.quoteAsset);
- const navPoints=d.status==="REPORT_READY"?data.nav.snapshots.filter(x=>x.reconciliation==="PASS"&&x.valuationStatus==="VERIFIED").map(x=>({label:x.sequence,value:x.navAfterFlowBaseUnits})):[]; 
+ const navPoints=d.status==="REPORT_READY"?d.performance.observations.map(x=>({label:x.sequence,value:x.nav_base_units})):[]; 
  const confirmed=data.market.trades.filter(x=>x.status==="FINALIZED"&&x.reconciliation==="PASS");
  main.innerHTML='<div class="terminal-heading"><div><p class="eyebrow">PORTFOLIO / MARKET MONITOR</p><h2>市场与资产总览</h2><span class="muted">'+esc(d.scope.projectId)+' · '+esc(d.source_mode)+' · '+esc(d.scope.openingCutoff)+' → '+esc(d.scope.closingCutoff)+'</span></div><div class="row"><button id="dashboard-reset">重置样本</button><button id="dashboard-export">导出总览</button></div></div>'+
  '<div class="terminal-kpis stats">'+stat("期末现金",fmt(t.closing_cash_base_units))+stat("已实现净收益",fmt(t.realized_project_pnl_base_units))+stat("库存成本",fmt(t.remaining_cost_basis_base_units))+stat("创作者费",fmt(t.creator_cash_income_base_units))+stat("历史回撤",t.max_observed_drawdown_bps==null?"未知":Number(t.max_observed_drawdown_bps)/100+"%")+'</div>'+

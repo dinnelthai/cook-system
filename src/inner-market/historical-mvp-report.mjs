@@ -2,6 +2,7 @@ import { auditProjectLedgers } from "./ledger-audit.mjs";
 import { reconcileCreatorReceivables } from "./creator-fee-accounting.mjs";
 import { auditInventoryAdjustments } from "./historical-inventory-audit.mjs";
 import { summarizeHistoricalNav } from "./historical-nav.mjs";
+import { auditHistoricalNavEndpoints } from "./historical-nav-evidence.mjs";
 import { parseBaseUnits,U128_MAX } from "../core/integer.mjs";
 const amount=(v,n)=>parseBaseUnits(v,{name:n,max:U128_MAX});
 const keys=["projectId","quoteAsset","tokenMint","openingCutoff","closingCutoff"];
@@ -20,7 +21,9 @@ export function buildHistoricalMvpReport(input){
   const fees=reconcileCreatorReceivables({...scope,openingReceivableBaseUnits:creator.openingReceivableBaseUnits,observedClosingReceivableBaseUnits:creator.observedClosingReceivableBaseUnits,feeEntries:creator.entries,cashEntries:cash.entries,historyComplete:creator.historyComplete});
   const inv=auditInventoryAdjustments({scope,opening:inventory.opening,closing:inventory.closing,tradeSummary:inventory.tradeSummary,adjustments:inventory.adjustments,historyComplete:inventory.historyComplete});
   const perf=summarizeHistoricalNav({projectId:scope.projectId,quoteAsset:scope.quoteAsset,snapshots:nav.snapshots,historyComplete:nav.historyComplete});
+  const navEvidence=auditHistoricalNavEndpoints({scope,nav,cash,inventory,creator});
   const issues=[];
+  if(navEvidence.status==="REVIEW_REQUIRED")issues.push(...navEvidence.issues);
   if(dual.status!=="RECONCILED")issues.push("CASH_TRADE_AUDIT_FAILED");
   if(fees.status!=="RECONCILED")issues.push("CREATOR_FEE_AUDIT_FAILED");
   if(inv.status!=="RECONCILED")issues.push("INVENTORY_ADJUSTMENT_AUDIT_FAILED");
@@ -62,7 +65,7 @@ export function buildHistoricalMvpReport(input){
   const complete=issues.length===0;
   return {schema_version:"mvp.1",scope,source_mode:sourceMode,status:complete?"REPORT_READY":"REVIEW_REQUIRED",issues,
     market_history:{confirmed_buy_count:buyCount,confirmed_sell_count:sellCount,gross_buy_notional_base_units:buyVolume.toString(),gross_sell_notional_base_units:sellVolume.toString(),real_quote_reserves_base_units:reserve??null,virtual_quote_reserves_base_units:market.snapshot?.virtualQuoteReservesBaseUnits??null,virtual_token_reserves_base_units:market.snapshot?.virtualTokenReservesBaseUnits??null,real_token_reserves_base_units:market.snapshot?.realTokenReservesBaseUnits??null},
-    accounting:{closing_cash_base_units:complete?dual.cash_report.observed_closing_cash_base_units:null,closing_token_balance_base_units:complete?inv.expected_token_balance:null,remaining_cost_basis_base_units:complete?inv.verified_cost_basis:null,realized_project_pnl_base_units:complete?dual.project_pnl.project_realized_net_pnl_base_units:null,creator_cash_income_base_units:complete?fees.verified_cash_income_base_units:null,max_observed_drawdown_bps:complete?perf.max_observed_drawdown_bps:null},
-    audits:{dual:dual.issues,creator:fees.issues,inventory:inv.issues,nav:perf.issues},execution_enabled:false,
+    accounting:{closing_cash_base_units:complete?dual.cash_report.observed_closing_cash_base_units:null,closing_token_balance_base_units:complete?inv.expected_token_balance:null,remaining_cost_basis_base_units:complete?inv.verified_cost_basis:null,realized_project_pnl_base_units:complete?dual.project_pnl.project_realized_net_pnl_base_units:null,creator_cash_income_base_units:complete?fees.verified_cash_income_base_units:null,max_observed_drawdown_bps:complete&&sourceMode==="SYNTHETIC"?perf.max_observed_drawdown_bps:null},
+    nav_evidence:navEvidence,audits:{dual:dual.issues,creator:fees.issues,inventory:inv.issues,nav:perf.issues,nav_endpoints:navEvidence.issues},execution_enabled:false,
     note:"Retrospective report only. Synthetic records are not chain evidence. Source completeness and NAV valuations require external verification; trade notionals are not reserve deltas."};
 }
