@@ -1,0 +1,5 @@
+# DATA-02: Offline cross-batch event integrity
+
+The read-only archive audit verifies immutable batches and counts identical records once across overlapping report intervals. Scope namespaces separate chain, network, genesis, market mint pair, provenance and synthetic scenario. Same-identity different content or distinct IDs occupying the same total-order position require review; the unique count is withheld. Raw batches are preserved. Exact equality is conservative; different provider metadata may require manual reconciliation.
+
+Run node scripts/audit-historical-event-store.mjs <private-store-directory>. Exit 0: internally consistent scanned archive, 2: empty, 3: review required, 1: rejected. Scan bounds: 256 batch files, 128 MiB aggregate file size, 100000 event occurrences. A changed filename set is rejected; this is not transactional under concurrent modification and not a durable global index. Only canonical batch filenames are scanned. No mutation, source authentication, completeness attestation, trading functionality or aggregation into financial reports is performed.

@@ -1,5 +1,5 @@
 import {createHash,randomUUID} from "node:crypto";
-import {mkdir,open,link,unlink,readFile,stat} from "node:fs/promises";
+import {mkdir,open,link,unlink,readFile,stat,readdir,lstat} from "node:fs/promises";
 import {join} from "node:path";
 import {sortForReplay} from "./event-order.mjs";
 
@@ -55,6 +55,45 @@ export function verifyHistoricalEventBatch(batch){
  if(canonical(batch)!==canonical(rebuilt))throw Error("event batch integrity mismatch");
  return rebuilt;
 }
+/** Read-only cross-batch integrity audit. A report interval is not part of
+ * event identity. Distinct chains, genesis identities, markets and synthetic
+ * scenarios are separated. No source authentication or completeness inference. */
+export function auditHistoricalEventBatches(batches){
+ if(!Array.isArray(batches)||batches.length>256)throw Error("ARCHIVE_BATCH_LIMIT");
+ const unique=new Map(),positions=new Map(),seenBatches=new Set(),issues=[];
+ let occurrences=0,duplicates=0,conflicts=0;
+ const addIssue=(code,batchId,eventId)=>{conflicts++;if(issues.length<100)issues.push({code,batch_id:batchId,event_id:eventId});};
+ for(const raw of batches){
+  const batch=verifyHistoricalEventBatch(raw);
+  if(seenBatches.has(batch.batch_id))continue;
+  seenBatches.add(batch.batch_id);
+  const s=batch.scope;
+  if(batch.issues.length&&issues.length<100)issues.push({code:"BATCH_REVIEW_REQUIRED",batch_id:batch.batch_id});
+  for(const e of batch.events){
+   if(++occurrences>100000)throw Error("ARCHIVE_EVENT_LIMIT");
+   const namespace=[s.chain_id,s.network,s.genesis_hash,s.token_mint,s.quote_mint,s.provenance,e.synthetic_metadata?.scenario_id??null];
+   const key=canonical([...namespace,e.event_id]),hash=digest(e);
+   const previous=unique.get(key);
+   if(previous!==undefined){
+    if(previous!==hash)addIssue("CROSS_BATCH_EVENT_CONFLICT",batch.batch_id,e.event_id);
+    else duplicates++;
+    continue;
+   }
+   unique.set(key,hash);
+   const o=e.ordering;
+   const position=canonical([...namespace,...(s.provenance==="synthetic"?[e.event_time_ms,o.event_sequence]:[o.slot,o.transaction_index,o.instruction_index,o.inner_instruction_index??-1,o.event_sequence])]);
+   const prior=positions.get(position);
+   if(prior!==undefined&&prior!==e.event_id)addIssue("CROSS_BATCH_ORDER_CONFLICT",batch.batch_id,e.event_id);
+   else positions.set(position,e.event_id);
+  }
+ }
+ const review=conflicts>0||issues.length>0;
+ return {schema_version:"cook-historical-archive-audit.1",status:review?"REVIEW_REQUIRED":seenBatches.size?"INTERNALLY_CONSISTENT":"EMPTY",
+  batch_count:seenBatches.size,event_occurrence_count:occurrences,identical_duplicate_count:duplicates,
+  unique_event_count:review?null:unique.size,conflict_count:conflicts,issues,
+  source_attestation:"UNKNOWN",history_complete_attested:false,execution_enabled:false};
+}
+
 /** Private, content-addressed immutable snapshots; atomic no-overwrite publish. */
 export function createHistoricalEventStore(directory){
  if(typeof directory!=="string"||!directory.trim())throw Error("store directory required");
@@ -79,5 +118,22 @@ export function createHistoricalEventStore(directory){
    return batch;
   }finally{await unlink(tmp).catch(e=>{if(e.code!=="ENOENT")throw e;});}
  }
- return {get,put};
+ async function audit(){
+  // Scan a bounded, explicitly chosen archive directory. Never delete or
+  // rewrite a batch and never claim a transactional inventory of concurrent writes.
+  const names=(await readdir(directory)).filter(n=>/^[0-9a-f]{64}\\.json$/.test(n)).sort();
+  if(names.length>256)throw Error("ARCHIVE_BATCH_LIMIT");
+  const batches=[];
+  let bytes=0;
+  for(const name of names){
+   const info=await lstat(join(directory,name));
+   if(!info.isFile()||info.size>MAX_BYTES)throw Error("INVALID_ARCHIVE_FILE");
+   bytes+=info.size;if(bytes>128*1024*1024)throw Error("ARCHIVE_SCAN_BYTE_LIMIT");
+   batches.push(await get(name.slice(0,-5)));
+  }
+  const after=(await readdir(directory)).filter(n=>/^[0-9a-f]{64}\\.json$/.test(n)).sort();
+  if(canonical(names)!==canonical(after))throw Error("ARCHIVE_CHANGED_DURING_SCAN");
+  return auditHistoricalEventBatches(batches);
+ }
+ return {get,put,audit};
 }
