@@ -144,3 +144,20 @@ test("policy guard checks each proposed add-on against cumulative remaining budg
   assert.ok(rejected.reasons.includes("PROPOSED_ADD_ON_EXCEEDS_REMAINING_TOKEN_CAP"));
   assert.equal(rejected.execution_enabled, false);
 });
+test("a later add-on buy recomputes average cost on the remaining position", () => {
+  const result = replayTreasuryTradePnl({
+    events: [
+      syntheticTrade("a1", 1, "CURVE_BUY_EXECUTED", "100", "1000", "10"),
+      syntheticTrade("a2", 2, "CURVE_BUY_EXECUTED", "100", "1200", "10"),
+      syntheticTrade("a3", 3, "CURVE_SELL_EXECUTED", "100", "1500", "10"),
+      syntheticTrade("a4", 4, "CURVE_BUY_EXECUTED", "50", "750", "10"),
+    ],
+  });
+  assert.equal(result.position.ending_token_balance_base_units, "150");
+  assert.equal(result.position.remaining_cost_basis_quote_base_units, "1870");
+  assert.equal(result.position.average_cost_quote_per_token, "12.466666666666");
+  assert.equal(result.cash_flow.total_buy_cost_including_fees_quote_base_units, "2980");
+  assert.equal(result.cash_flow.net_cash_deployed_quote_base_units, "1490");
+  assert.equal(result.realized_pnl_quote_base_units, "380");
+  assert.equal(result.position_journal.length, 4);
+});
