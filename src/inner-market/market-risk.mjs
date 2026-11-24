@@ -18,6 +18,7 @@ export const DEFAULT_CURVE_RISK_THRESHOLDS = Object.freeze({
   curveInventoryDepletionBps: Object.freeze({ watch: "1000", high: "3000", critical: "6000" }),
   externalSellShareBps: Object.freeze({ watch: "2500", high: "5000", critical: "7500" }),
   buyerConcentrationHhiBps: Object.freeze({ watch: "2500", high: "5000", critical: "7500" }),
+  unknownAttributionShareBps: Object.freeze({ watch: "2000", high: "5000", critical: "8000" }),
 });
 
 function stateAmount(state, field) {
@@ -132,9 +133,13 @@ function aggregateParticipantFlow(events, attributionByEventId = {}) {
   }
 
   const totalAttributedWalletBuyQuote = [...walletBuyQuote.values()].reduce((sum, amount) => sum + amount, 0n);
-  const hhiBps = totalAttributedWalletBuyQuote === 0n
+  const knownWalletSquareSum = [...walletBuyQuote.values()].reduce((sum, amount) => sum + (amount * amount), 0n);
+  const hhiLowerBoundBps = externalBuyQuote === 0n
     ? null
-    : [...walletBuyQuote.values()].reduce((sum, amount) => sum + (amount * amount), 0n) * BPS / (totalAttributedWalletBuyQuote * totalAttributedWalletBuyQuote);
+    : knownWalletSquareSum * BPS / (externalBuyQuote * externalBuyQuote);
+  const hhiUpperBoundBps = externalBuyQuote === 0n
+    ? null
+    : (knownWalletSquareSum + unattributedExternalQuote * unattributedExternalQuote) * BPS / (externalBuyQuote * externalBuyQuote);
   const totalExternalTurnover = externalBuyQuote + externalSellQuote;
 
   return {
@@ -148,8 +153,10 @@ function aggregateParticipantFlow(events, attributionByEventId = {}) {
     external_buy_quote_base_units: externalBuyQuote.toString(),
     external_sell_quote_base_units: externalSellQuote.toString(),
     external_sell_share_bps: totalExternalTurnover === 0n ? null : (externalSellQuote * BPS / totalExternalTurnover).toString(),
-    external_buy_wallet_hhi_bps: hhiBps === null ? null : hhiBps.toString(),
-    external_buy_effective_wallet_count: hhiBps === null || hhiBps === 0n ? null : (Number(BPS) / Number(hhiBps)).toFixed(4),
+    external_buy_wallet_hhi_bps: hhiLowerBoundBps === null ? null : hhiLowerBoundBps.toString(),
+    external_buy_wallet_hhi_lower_bound_bps: hhiLowerBoundBps === null ? null : hhiLowerBoundBps.toString(),
+    external_buy_wallet_hhi_upper_bound_bps: hhiUpperBoundBps === null ? null : hhiUpperBoundBps.toString(),
+    external_buy_effective_wallet_count_lower_bound: hhiLowerBoundBps === null || hhiLowerBoundBps === 0n ? null : (Number(BPS) / Number(hhiLowerBoundBps)).toFixed(4),
     wallet_attribution_coverage_bps: externalBuyQuote === 0n ? null : (totalAttributedWalletBuyQuote * BPS / externalBuyQuote).toString(),
     unattributed_external_buy_quote_base_units: unattributedExternalQuote.toString(),
     confirmed_curve_execution_count: confirmedCurveExecutionCount,
@@ -239,7 +246,8 @@ export function assessInnerMarketRisk({
     riskDimension(absolutePriceMove, thresholds.absolutePriceMoveBps, "ABSOLUTE_MARGINAL_PRICE_MOVE"),
     riskDimension(positiveInventoryDepletion, thresholds.curveInventoryDepletionBps, "CURVE_REAL_INVENTORY_DEPLETION"),
     riskDimension(participantFlow.external_sell_share_bps, thresholds.externalSellShareBps, "EXTERNAL_SELL_SHARE"),
-    riskDimension(participantFlow.external_buy_wallet_hhi_bps, thresholds.buyerConcentrationHhiBps, "EXTERNAL_BUYER_WALLET_CONCENTRATION"),
+    riskDimension(participantFlow.external_buy_wallet_hhi_lower_bound_bps, thresholds.buyerConcentrationHhiBps, "EXTERNAL_BUYER_WALLET_CONCENTRATION_LOWER_BOUND"),
+    riskDimension(participantFlow.wallet_attribution_coverage_bps === null ? null : (BPS - BigInt(participantFlow.wallet_attribution_coverage_bps)).toString(), thresholds.unknownAttributionShareBps, "UNKNOWN_EXTERNAL_BUYER_ATTRIBUTION_SHARE"),
   ];
 
   let referenceTokenProbe = { status: "NOT_CONFIGURED" };
@@ -299,9 +307,12 @@ export function assessInnerMarketRisk({
   }
 
   const maxSeverity = dimensions.reduce((max, item) => Math.max(max, item.severity), 0);
-  const riskLevel = current.complete || current.lifecycle !== "bonding_curve"
-    ? "CURVE_PHASE_TRANSITION"
-    : ["LOW", "WATCH", "HIGH", "CRITICAL"][maxSeverity];
+  const reconciliationFailed = replayReconciliations.some((item) => item.status !== "PASS");
+  const riskLevel = reconciliationFailed
+    ? "PAUSE_AND_RECONCILE"
+    : current.complete || current.lifecycle !== "bonding_curve"
+      ? "CURVE_PHASE_TRANSITION"
+      : ["LOW", "WATCH", "HIGH", "CRITICAL"][maxSeverity];
   return {
     schema_version: "1.0.0",
     report_kind: "PUMP_INNER_MARKET_RISK",
@@ -311,6 +322,7 @@ export function assessInnerMarketRisk({
     current_as_of_event_id: current.as_of_event_id ?? null,
     current_curve_lifecycle: current.lifecycle,
     curve_complete: current.complete,
+    state_reconciliation_status: reconciliationFailed ? "FAIL_OR_UNKNOWN" : "NO_MISMATCH_REPORTED",
     confirmed_event_count: confirmedEvents.length,
     ignored_unconfirmed_event_count: ignoredUnconfirmedEventCount,
     replay_reconciliations: replayReconciliations,
@@ -333,6 +345,7 @@ export function assessInnerMarketRisk({
     risk_dimensions: dimensions,
     warnings: [
       "Risk thresholds are provisional and must be calibrated on historical organic launches.",
+      "Wallet HHI is reported as lower/upper bounds over all external buy notional; unknown attribution is not silently dropped from the denominator.",
       "A participant class such as SNIPER is supplied by an attribution layer; it is not inferred from trade size or timing alone.",
       "Reference depth probes are fixed diagnostic measurements, not trade recommendations or execution instructions.",
       "A market-state replay failure or ordering gap must be treated as a data-integrity stop, not as a low-risk result.",
