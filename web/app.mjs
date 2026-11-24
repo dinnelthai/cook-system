@@ -1,11 +1,12 @@
 import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-report.mjs";
 import { getParticipantCatalogue, evaluateParticipantStressCases } from "../src/inner-market/participant-stress-lab.mjs";
 import { runParticipantExperiment } from "../src/inner-market/participant-experiment.mjs";
+import { buildHistoricalDashboard } from "../src/inner-market/historical-dashboard.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
-const pages=[["create","01 发行资料"],["wallet","02 钱包账本"],["lab","03 历史成交测试"],["market","04 市场监控"],["profit","05 收益与风险"],["participants","06 竞争环境实验室"]];
+const pages=[["dashboard","00 市场与资产总览"],["create","01 发行资料"],["wallet","02 钱包账本"],["lab","03 历史成交测试"],["market","04 市场监控"],["profit","05 收益与风险"],["participants","06 竞争环境实验室"]];
 const fixture=await fetch("../fixtures/synthetic/inner-market-mvp.json").then(r=>{if(!r.ok)throw new Error("Fixture unavailable");return r.json()});
 const original=structuredClone(fixture);
-let data=structuredClone(fixture),report=buildHistoricalMvpReport(data),page="create";
+let data=structuredClone(fixture),report=buildHistoricalMvpReport(data),page="dashboard";
 const esc=s=>String(s??"—").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const stat=(name,value)=>'<div class="stat"><small>'+esc(name)+'</small><strong>'+esc(value)+'</strong></div>';
 const table=(headers,rows)=>'<div class="scroll"><table><thead><tr>'+headers.map(x=>'<th>'+esc(x)+'</th>').join("")+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>';
@@ -17,7 +18,19 @@ function render(){
  nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+(page===id?"active":"")+'">'+label+'</button>').join("");
  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{page=b.dataset.page;render()});
  const a=report.accounting,m=report.market_history;
- if(page==="create"){
+ if(page==="dashboard"){
+ const d=buildHistoricalDashboard(data),t=d.treasury,v=d.market;
+ const sol=x=>{if(x==null)return "未知";if(d.scope.quoteAsset!=="SOL_LAMPORTS")return x+" base units";const n=BigInt(x),abs=n<0n?-n:n;return (n<0n?"-":"")+(abs/1000000000n).toString()+"."+(abs%1000000000n).toString().padStart(9,"0")+" SOL"};
+ const known=x=>x==null?"未知":x;
+ main.innerHTML='<h2>市场与资产总览</h2>'+note("离线历史区间 · "+d.source_mode+" · "+d.scope.openingCutoff+" — "+d.scope.closingCutoff+"。导入新报告后刷新全部指标，不连接实时交易。")+
+ panel("数据区间",'<div class="row"><button id="dashboard-reset">恢复合成样本</button><button id="dashboard-export">导出总览</button></div><label for="dashboard-import">导入完整的历史报告输入 JSON</label><input type="file" id="dashboard-import" accept=".json"><p id="dashboard-error" class="negative"></p>')+
+ panel("历史市场活动",'<div class="stats">'+stat("买入地址数",known(v.buy_address_count))+stat("卖出地址数",known(v.sell_address_count))+stat("买入笔数",v.buy_trade_count)+stat("卖出笔数",v.sell_trade_count)+'</div>'+table(["指标","实际值"],[["历史买入名义额",sol(v.buy_notional_base_units)],["历史卖出名义额",sol(v.sell_notional_base_units)],["历史真实 SOL 储备",sol(v.verified_real_reserve_base_units)]])+'<p class="muted">地址数不是人数；成交总额不等于独立资金流入。缺失地址则显示未知。</p>')+
+ panel("Dev 项目资金",'<div class="stats">'+stat("实际买入支出",sol(t.actual_trade_spend_base_units))+stat("实际卖出回款",sol(t.actual_trade_receipts_base_units))+stat("净交易支出",sol(t.net_trade_cash_spend_base_units))+stat("剩余现金",sol(t.closing_cash_base_units))+'</div>'+table(["指标","实际值"],[["区间新增资本",sol(t.recorded_capital_in_base_units)],["区间资本撤回",sol(t.recorded_capital_out_base_units)],["独立记账费用",sol(t.recorded_expenses_base_units)],["剩余库存（base units）",known(t.closing_token_balance_base_units)],["库存成本",sol(t.remaining_cost_basis_base_units)],["已实现项目盈亏",sol(t.realized_project_pnl_base_units)],["已到账创作者费",sol(t.creator_cash_income_base_units)]])+'<p class="muted">实际买卖资金与资本注入、运营费用分开核算；区间数值不等同于全生命周期。</p>')+
+ panel("风险与数据可信度",'<div class="stats">'+stat("统一审计",d.status)+stat("历史回撤",t.max_observed_drawdown_bps==null?"未知":Number(t.max_observed_drawdown_bps)/100+"%")+stat("历史数据覆盖",v.history_complete?"已声明完整":"待复核")+'</div>'+(d.issues.length?table(["待复核事项"],d.issues.map(x=>[x])):'<p class="positive">当前输入通过已实现审计规则，不代表未来交易安全。</p>')+'<p class="muted">真实储备不是未来卖出可回收金额；不提供加仓信号或针对其他持有人的交易建议。</p>');
+ document.querySelector("#dashboard-reset").onclick=()=>{data=structuredClone(original);report=buildHistoricalMvpReport(data);render()};
+ document.querySelector("#dashboard-export").onclick=()=>download("historical-dashboard.json",JSON.stringify(d,null,2));
+ document.querySelector("#dashboard-import").onchange=async e=>{try{const next=JSON.parse(await e.target.files[0].text());buildHistoricalDashboard(next);const nextReport=buildHistoricalMvpReport(next);data=next;report=nextReport;render()}catch(err){document.querySelector("#dashboard-error").textContent=err.message}};
+ }else if(page==="create"){
  main.innerHTML='<h2>发行资料</h2>'+note("仅用于整理测试资料，不创建 Token、不构造或提交交易。")+'<form id="metadata" class="panel"><div class="grid"><div><label>名称</label><input name="name" required maxlength="32" placeholder="Test Token"></div><div><label>Symbol</label><input name="symbol" required maxlength="10" placeholder="TEST"></div><div><label>Decimals</label><input disabled value="由协议配置读取"></div><div><label>Supply</label><input disabled value="由协议配置读取"></div><div><label>描述</label><textarea name="description" maxlength="1000"></textarea></div><div><label>图片（本地预览）</label><input type="file" id="image" accept="image/png,image/jpeg"><img id="preview" class="preview hidden" alt="图片预览"></div></div><div class="grid"><div><label>Website</label><input name="website" type="url"></div><div><label>Telegram</label><input name="telegram" type="url"></div><div><label>Twitter / X</label><input name="twitter" type="url"></div></div><p class="muted">权限、费用、初始交易结果需由测试环境实际数据验证；本页面不支持钱包连接或买入提交。</p><button class="primary" type="submit">导出本地资料 JSON</button></form>';
  document.querySelector("#metadata").onsubmit=e=>{e.preventDefault();download("synthetic-token-metadata.json",JSON.stringify({sourceMode:"SYNTHETIC",...Object.fromEntries(new FormData(e.currentTarget))},null,2))};
  document.querySelector("#image").onchange=e=>{const f=e.target.files[0];if(!f)return;const p=document.querySelector("#preview");const url=URL.createObjectURL(f);p.onload=()=>URL.revokeObjectURL(url);p.src=url;p.classList.remove("hidden")};
