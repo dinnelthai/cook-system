@@ -92,7 +92,7 @@ export function normalizePumpTradeEvent({
   if (typeof signature !== "string" || signature.length === 0) {
     throw new TypeError("transaction signature is required");
   }
-  if (!["mainnet", "devnet"].includes(network)) {
+  if (!["mainnet", "devnet", "local_sim"].includes(network)) {
     throw new TypeError("unsupported network");
   }
   if (!["rpc", "indexer", "manual_import"].includes(sourceType)) {

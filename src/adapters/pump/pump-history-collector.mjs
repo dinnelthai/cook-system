@@ -641,7 +641,7 @@ export async function fetchPumpMintHistory({
   );
   const candleOrderComplete = candleEvents.every((event) => event.ordering.ordering_confidence === "complete");
   const candles = candleOrderComplete ? buildRawCandles(candleEvents, 60_000) : [];
-  const candleStatus = candleOrderComplete ? "AVAILABLE" : "INCOMPLETE_CHAIN_ORDER";
+  const candleStatus = !candleOrderComplete ? "INCOMPLETE_CHAIN_ORDER" : candles.length ? "AVAILABLE" : "NO_TRADE_EVENTS";
 
   const hasMigration = allEvents.some((event) => event.event_kind === "CURVE_MIGRATED");
   const allPoolsComplete = hasMigration

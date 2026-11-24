@@ -246,7 +246,9 @@ test("full mint collector follows migration into PumpSwap and reconciles post-gr
       throw new Error("unexpected slot "+slot);
     },
   };
-  const result=await fetchPumpMintHistory({rpc,mint:MINT,network:"mainnet",maxSignatures:20});
+  for (const network of ["mainnet", "local_sim"]) {
+  const result=await fetchPumpMintHistory({rpc,mint:MINT,network,maxSignatures:20});
+  assert.ok(result.events.every(event => event.market.network === network && event.provenance === "observed_chain"));
   assert.equal(result.curve_replay_status,"REPLAYED_FULL_CURVE_HISTORY");
   assert.equal(result.pool_replays.length,1);
   assert.equal(result.pool_replays[0].replay_status,"REPLAYED_FULL_POOL_HISTORY");
@@ -260,4 +262,5 @@ test("full mint collector follows migration into PumpSwap and reconciles post-gr
   assert.equal(result.events.filter(x=>x.event_kind==="POOL_BUY_EXECUTED").length,1);
   assert.equal(result.raw_candles_status,"AVAILABLE");
   assert.equal(result.raw_candles_1m.length,2);
+  }
 });

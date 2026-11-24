@@ -112,7 +112,7 @@ export function normalizeBondingCurveMarket({
   idlRevision,
 }) {
   if (typeof mint !== "string" || mint.length === 0) throw new TypeError("mint is required");
-  if (network !== "mainnet" && network !== "devnet") throw new TypeError("network must be mainnet or devnet");
+  if (!["mainnet", "devnet", "local_sim"].includes(network)) throw new TypeError("network must be mainnet, devnet or local_sim");
   return {
     chain_id: "solana",
     network,

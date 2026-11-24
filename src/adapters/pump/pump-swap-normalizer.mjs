@@ -78,7 +78,7 @@ function feeComponents(data, quoteMint) {
 }
 
 function baseMarket({ baseMint, quoteMint, poolMetadata, network }) {
-  if (network !== "mainnet" && network !== "devnet") throw new TypeError("unsupported network");
+  if (!["mainnet", "devnet", "local_sim"].includes(network)) throw new TypeError("unsupported network");
   if (typeof baseMint !== "string" || typeof quoteMint !== "string") {
     throw new TypeError("PumpSwap pool metadata must include base and quote mints");
   }

@@ -46,7 +46,7 @@ function baseEvent({
   curveAccount = null,
   allowNonSolQuoteMint = false,
 }) {
-  if (!["mainnet", "devnet"].includes(network)) throw new TypeError("network must be mainnet or devnet");
+  if (!["mainnet", "devnet", "local_sim"].includes(network)) throw new TypeError("network must be mainnet, devnet or local_sim");
   const eventSequence = Number.isSafeInteger(ordering?.eventSequence) && ordering.eventSequence >= 0 ? ordering.eventSequence : 0;
   const completeOrder = ["slot", "transactionIndex", "instructionIndex"].every((field) =>
     Number.isSafeInteger(ordering?.[field]) && ordering[field] >= 0

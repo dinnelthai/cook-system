@@ -125,3 +125,33 @@ test("mint history collector replays a complete confirmed fixture and reconciles
   assert.equal(result.raw_candles_1m.length,1);
   assert.equal(result.raw_candles_1m[0].quote_volume_base_units,"500");
 });
+
+test("local validator history preserves local_sim identity and observed provenance", async () => {
+  const curveAddress = derivePumpBondingCurveAddress(MINT);
+  const tx = transactionFixture();
+  const rpc = {
+    async getAccountInfo(address) { return address === MINT ? mintAccountInfo() : bondingCurveAccountInfo(); },
+    async getSignaturesForAddress(address) { assert.equal(address, curveAddress); return [{signature:SIGNATURE,slot:100,err:null}]; },
+    async getTransaction() { return tx; },
+    async getBlock() { return {transactions:[{transaction:{signatures:[SIGNATURE]}}]}; },
+  };
+  const result = await fetchPumpMintHistory({rpc,mint:MINT,network:"local_sim",maxSignatures:10});
+  assert.equal(result.status, "REPLAYED_FULL_HISTORY");
+  assert.equal(result.market.network, "local_sim");
+  assert.ok(result.events.length > 0);
+  assert.ok(result.events.every(event => event.market.network === "local_sim" && event.provenance === "observed_chain"));
+  assert.equal(result.raw_candles_1m[0].market.network, "local_sim");
+});
+
+test("unavailable history is not labelled as available candles", async () => {
+  const rpc = {
+    async getAccountInfo(address) { return address === MINT ? mintAccountInfo() : bondingCurveAccountInfo(); },
+    async getSignaturesForAddress() { return []; },
+    async getTransaction() { throw new Error("unexpected transaction request"); },
+    async getBlock() { throw new Error("unexpected block request"); },
+  };
+  const result = await fetchPumpMintHistory({rpc,mint:MINT,network:"local_sim"});
+  assert.equal(result.status, "NO_CREATION_EVENT");
+  assert.equal(result.raw_candles_status, "NO_TRADE_EVENTS");
+  assert.deepEqual(result.raw_candles_1m, []);
+});
