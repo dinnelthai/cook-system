@@ -16,7 +16,8 @@
     "audit:history-index": "node scripts/rebuild-historical-event-index.mjs",
     "simulate:participants": "node scripts/run-participant-simulation.mjs",
     "analyze:market-quality": "node scripts/analyze-market-quality.mjs",
-    "audit:alerts": "node scripts/audit-alert-store.mjs"
+    "audit:alerts": "node scripts/audit-alert-store.mjs",
+    "evaluate:defensive": "node scripts/run-heldout-defensive-evaluation.mjs"
   },
   "devDependencies": {
     "@pump-fun/pump-sdk": "4.3.1",
