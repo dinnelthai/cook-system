@@ -5,6 +5,7 @@ import { calculateLaunchBudget, allocateTokenSupply } from "../src/inner-market/
 import { replayTreasuryTradePnl } from "../src/inner-market/treasury-pnl.mjs";
 import { reconcileExecutionBatch } from "../src/inner-market/batch-reconciliation.mjs";
 import { evaluateInnerMarketPolicy } from "../src/inner-market/policy-guard.mjs";
+import { buildTreasuryPositionMonitor, quoteNextTreasuryBuyScenario } from "../src/inner-market/treasury-position-monitor.mjs";
 
 function syntheticTrade(eventId, sequence, eventKind, tokenAmount, quoteAmount, fee = "0", status = "CONFIRMED") {
   return {
@@ -160,4 +161,98 @@ test("a later add-on buy recomputes average cost on the remaining position", () 
   assert.equal(result.cash_flow.net_cash_deployed_quote_base_units, "1490");
   assert.equal(result.realized_pnl_quote_base_units, "380");
   assert.equal(result.position_journal.length, 4);
+});
+
+const activeCurveForTreasury = (realToken = "700000") => ({
+  market: { chain_id: "solana", network: "mainnet-beta", token_mint: "fixture-mint", quote_mint: "sol", curve_program_id: "pump" },
+  lifecycle: "bonding_curve",
+  complete: false,
+  as_of_event_id: "curve-snapshot",
+  virtual_token_reserves_base_units: "1000000",
+  virtual_quote_reserves_base_units: "100000",
+  real_token_reserves_base_units: realToken,
+  real_quote_reserves_base_units: "0",
+  token_total_supply_base_units: "1000000",
+  protocol_fees_base_units: "0",
+  creator_fees_base_units: "0",
+});
+
+test("Treasury monitor values the whole position with an exact curve sell quote", () => {
+  const ledger = replayTreasuryTradePnl({
+    events: [syntheticTrade("monitor-buy", 1, "CURVE_BUY_EXECUTED", "1000", "100")],
+    endingTokenBalanceSnapshotBaseUnits: "1000",
+  });
+  const report = buildTreasuryPositionMonitor({
+    ledger,
+    curveState: activeCurveForTreasury(),
+    protocolFeeBps: "0",
+    creatorFeeBps: "0",
+    tokenDecimals: 0,
+    quoteDecimals: 0,
+    initialRealTokenReservesBaseUnits: "700000",
+    marketReconciliationStatus: "PASS",
+  });
+  assert.equal(report.scope, "PUMP_BONDING_CURVE_ONLY");
+  assert.equal(report.position.token_balance_base_units, "1000");
+  assert.ok(BigInt(report.pnl.estimated_full_position_liquidation_quote_base_units) > 0n);
+  assert.ok(BigInt(report.curve_risk.estimated_liquidation_quote_base_units) < BigInt(report.curve_risk.marginal_mark_value_quote_base_units));
+  assert.equal(report.risk_level, "LOW");
+});
+
+test("next-buy scenario reports post-buy average cost and incremental liquidation PnL", () => {
+  const scenario = quoteNextTreasuryBuyScenario({
+    curveState: activeCurveForTreasury(),
+    currentTokenBalanceBaseUnits: "1000",
+    currentCostBasisQuoteBaseUnits: "100",
+    currentRealizedPnlQuoteBaseUnits: "0",
+    protocolFeeBps: "0",
+    creatorFeeBps: "0",
+    tokenDecimals: 0,
+    quoteDecimals: 0,
+    quoteBudgetBaseUnits: "10",
+    estimatedNetworkFeeBaseUnits: "1",
+  });
+  assert.equal(scenario.status, "QUOTED");
+  assert.ok(BigInt(scenario.token_out_base_units) > 0n);
+  assert.equal(scenario.post_buy_token_balance_base_units, (1000n + BigInt(scenario.token_out_base_units)).toString());
+  assert.equal(scenario.post_buy_remaining_cost_basis_quote_base_units, (111n).toString());
+  assert.ok(scenario.post_buy_average_cost_quote_per_token);
+  assert.ok(scenario.post_buy_estimated_full_position_liquidation_quote_base_units);
+  assert.ok(scenario.incremental_estimated_pnl_quote_base_units !== undefined);
+  assert.equal(scenario.execution_enabled, false);
+});
+
+test("next-buy scenario stops at the inner-market graduation boundary", () => {
+  const scenario = quoteNextTreasuryBuyScenario({
+    curveState: activeCurveForTreasury("50"),
+    currentTokenBalanceBaseUnits: "1000",
+    currentCostBasisQuoteBaseUnits: "100",
+    protocolFeeBps: "0",
+    creatorFeeBps: "0",
+    tokenDecimals: 0,
+    quoteDecimals: 0,
+    quoteBudgetBaseUnits: "10",
+  });
+  assert.equal(scenario.status, "WOULD_COMPLETE_CURVE");
+  assert.equal(scenario.curve_completion, true);
+  assert.equal(scenario.post_buy_unrealized_pnl_quote_base_units, null);
+  assert.equal(scenario.execution_enabled, false);
+});
+
+test("Treasury monitor pauses when wallet inventory does not reconcile", () => {
+  const ledger = replayTreasuryTradePnl({
+    events: [syntheticTrade("monitor-buy", 1, "CURVE_BUY_EXECUTED", "1000", "100")],
+    endingTokenBalanceSnapshotBaseUnits: "999",
+  });
+  const report = buildTreasuryPositionMonitor({
+    ledger,
+    curveState: activeCurveForTreasury(),
+    protocolFeeBps: "0",
+    creatorFeeBps: "0",
+    tokenDecimals: 0,
+    quoteDecimals: 0,
+    marketReconciliationStatus: "PASS",
+  });
+  assert.equal(report.risk_level, "PAUSE_AND_RECONCILE");
+  assert.ok(report.risk_flags.some((flag) => flag.code === "TREASURY_INVENTORY_MISMATCH"));
 });
