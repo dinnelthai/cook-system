@@ -35,3 +35,37 @@ test("LP statement is synthetic-only and cannot establish ownership or valuation
  const v=reconcileLpStatement({source_mode:"SYNTHETIC",position_id:"p",opening_cutoff:"0",closing_cutoff:"1"});
  assert.equal(v.status,"INCOMPLETE");assert.equal(v.position_value,null);
 });
+
+test("runtime cross-checks canonical account totals against project cash and inventory",()=>{
+ const t=treasury("t","887");
+ t.payload.inventory={closing_quantity_base_units:"50",remaining_cost_base_units:"100",supplied_historical_value_base_units:"90"};
+ t.payload.account_set={status:"INTERNALLY_CONSISTENT",totals:{cashBaseUnits:"887",tokenAmountBaseUnits:"50",costBasisBaseUnits:"100",inventoryValueBaseUnits:"90"},coverage:{status:"DECLARED_LABELS_MATCH"}};
+ const row=buildProjectBusinessReview(p,[link(),t]).runtime.asset_intervals[0];
+ assert.equal(row.assets.cash,"887");assert.equal(row.account_coverage.checks.find(c=>c.field==="cash").status,"DECLARED_MATCH");
+ assert.equal(row.account_coverage.checks.find(c=>c.field==="nav").status,"UNKNOWN");
+ assert.equal(row.account_coverage.ownership_attestation,"UNKNOWN");
+});
+test("wallet aggregate discrepancy suppresses historical interval amounts",()=>{
+ const t=treasury("t","887");
+ t.payload.account_set={status:"INTERNALLY_CONSISTENT",totals:{cashBaseUnits:"886"},coverage:{status:"DECLARED_LABELS_MATCH"}};
+ const v=buildProjectBusinessReview(p,[link(),t]),row=v.runtime.asset_intervals[0];
+ assert.equal(v.status,"REVIEW_REQUIRED");assert.equal(row.status,"REVIEW_REQUIRED");
+ assert.ok(Object.values(row.assets).every(x=>x===null));
+ assert.ok(v.findings.some(f=>f.code==="ACCOUNT_PROJECT_TOTAL_CONFLICT:cash"));
+ assert.ok(row.account_coverage.checks.every(c=>c.project_value===null&&c.account_total===null));
+});
+test("unknown account coverage cannot certify ownership even with matching amounts",()=>{
+ const t=treasury("t","0");
+ t.payload.account_set={status:"PARTIAL",totals:{cashBaseUnits:"0"},coverage:{status:"LABEL_SET_DIFFERS"}};
+ const row=buildProjectBusinessReview(p,[link(),t]).runtime.asset_intervals[0];
+ assert.equal(row.assets.cash,"0");assert.equal(row.account_coverage.checks.find(c=>c.field==="cash").status,"UNKNOWN");
+ assert.equal(row.account_coverage.registered_label_coverage,"LABEL_SET_DIFFERS");assert.equal(row.account_coverage.live_wallet_balance,null);
+});
+test("malformed or conflicting canonical account totals require review",()=>{
+ const t=treasury("t","0");
+ t.payload.account_set={status:"INTERNALLY_CONSISTENT",totals:{cashBaseUnits:"-1"}};
+ assert.equal(buildProjectBusinessReview(p,[link(),t]).runtime.asset_intervals[0].status,"REVIEW_REQUIRED");
+ const x=treasury("x","0");x.payload.account_set={status:"INTERNALLY_CONSISTENT",totals:{cashBaseUnits:"1"}};
+ t.payload.account_set.totals.cashBaseUnits="0";
+ assert.equal(buildProjectBusinessReview(p,[link(),t,x]).runtime.asset_intervals[0].status,"REVIEW_REQUIRED");
+});

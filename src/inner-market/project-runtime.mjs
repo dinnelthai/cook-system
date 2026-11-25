@@ -1,3 +1,4 @@
+import {reconcileRuntimeAccountCoverage} from "./runtime-account-coverage.mjs";
 import {archiveApplicable} from "./project-evidence-scope.mjs";
 const signed=v=>typeof v==="string"&&v.length<=160&&/^(0|-?[1-9][0-9]*)$/.test(v);
 const unsigned=v=>signed(v)&&!v.startsWith("-");
@@ -32,11 +33,15 @@ export function buildProjectRuntime(project,{archives,intervals,lifecycle,config
    if(known.some(x=>!valid(x))||new Set(known).size>1){conflict=true;issues.push({code:"RUNTIME_ASSET_CONFLICT:"+k,reference:i.archive_id});}
    else if(linked.length&&known.length===linked.length&&linked.every(a=>a.payload.status==="PARTIAL"))assets[k]=known[0];
   }
-  if(conflict){for(const k of Object.keys(assets))assets[k]=null;issues.push({code:"RUNTIME_INTERVAL_CONFLICT",reference:i.archive_id});}
+  const account_coverage=reconcileRuntimeAccountCoverage(assets,linked);
+  for(const code of account_coverage.issues)issues.push({code,reference:i.archive_id});
+  for(const code of account_coverage.unknown)unknown.push({code,reference:i.archive_id});
+  conflict=conflict||account_coverage.status==="REVIEW_REQUIRED";
+  if(conflict){for(const c of account_coverage.checks){c.project_value=null;c.account_total=null;}for(const k of Object.keys(assets))assets[k]=null;issues.push({code:"RUNTIME_INTERVAL_CONFLICT",reference:i.archive_id});}
   const status=conflict?"REVIEW_REQUIRED":Object.values(assets).every(x=>x!==null)?"DECLARED_ENDPOINT_PRESENT":"INCOMPLETE";
   if(status==="INCOMPLETE")unknown.push({code:"RUNTIME_ASSET_COVERAGE_INCOMPLETE",reference:i.archive_id});
   return {report_link_archive_id:i.archive_id,report_digest:i.report_digest,opening_cutoff:i.opening_cutoff,closing_cutoff:i.closing_cutoff,
-   status,assets,lp_assets:null,asset_unit_contract:"TOKEN_BASE_UNITS_FOR_TOKEN_QUANTITY; SOL_LAMPORTS_FOR_OTHER_FIELDS",archive_ids:linked.map(a=>a.archive_id)};
+   status,assets,account_coverage,lp_assets:null,asset_unit_contract:"TOKEN_BASE_UNITS_FOR_TOKEN_QUANTITY; SOL_LAMPORTS_FOR_OTHER_FIELDS",archive_ids:linked.map(a=>a.archive_id)};
  });
  const blocked=issues.length>0||findings.length>0||configuration.issues.length>0||risk.status==="REVIEW_REQUIRED";
  const work=[

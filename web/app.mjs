@@ -208,7 +208,7 @@ function renderTerminal(){
            const ctx=await selectProjectRuntimeInterval(selected.project_id,selected.revision,v.runtime_context_id,archiveId);
            if(!businessCurrent()||ticket!==businessTicket||seq!==intervalTicket||!detail.isConnected)return;
            const row=ctx.selected_interval;
-           detail.innerHTML=note(row.status+" · "+row.opening_cutoff+" → "+row.closing_cutoff)+table(["区间资产项","基础单位"],Object.entries(row.assets).map(([key,value])=>[key,value??"—"]));
+           detail.innerHTML=note(row.status+" · "+row.opening_cutoff+" → "+row.closing_cutoff)+table(["区间资产项","基础单位"],Object.entries(row.assets).map(([key,value])=>[key,value??"—"]))+(row.account_coverage?note("钱包标签覆盖："+row.account_coverage.registered_label_coverage+" · 归属未独立验证")+table(["项目 / 账户合计核对","状态"],row.account_coverage.checks.map(c=>[c.field,c.status])):"");
           }catch(err){if(businessCurrent()&&ticket===businessTicket&&seq===intervalTicket&&detail.isConnected)detail.textContent="区间不可用，请刷新运行概览："+errorKind(err);}
          };
         }
