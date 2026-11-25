@@ -141,11 +141,13 @@ function mapLogOrdering(logs) {
 
 function relatedProgramInstruction(instructions, logOrder, programId) {
   if (!logOrder || !Number.isSafeInteger(logOrder.outerIndex)) return null;
-  return instructions.find((instruction) =>
-    instruction.program_id === programId &&
-    instruction.outer_instruction_index === logOrder.outerIndex &&
-    instruction.status.startsWith("DECODED")
-  ) ?? null;
+  const candidates=instructions.filter(instruction=>instruction.program_id===programId &&
+    instruction.outer_instruction_index===logOrder.outerIndex &&
+    instruction.status.startsWith("DECODED"));
+  // Do not attribute a log to an arbitrary instruction when the invocation is ambiguous.
+  if(candidates.length!==1)return null;
+  const item=candidates[0];
+  return (item.inner_instruction_index??null)===(logOrder.innerIndex??null)?item:null;
 }
 
 function poolMetadataForEvent({
@@ -227,17 +229,8 @@ function makeOrdering({ slot, transactionIndex, logOrder, eventSequence }) {
 }
 
 function relatedInstruction(instructions, logOrder, mint) {
-  if (!logOrder || !Number.isSafeInteger(logOrder.outerIndex)) return null;
-  return instructions.find((instruction) =>
-    instruction.program_id === PUMP_PROGRAM_ID &&
-    instruction.outer_instruction_index === logOrder.outerIndex &&
-    instruction.mint === mint &&
-    instruction.status.startsWith("DECODED")
-  ) ?? instructions.find((instruction) =>
-    instruction.program_id === PUMP_PROGRAM_ID &&
-    instruction.outer_instruction_index === logOrder.outerIndex &&
-    instruction.status.startsWith("DECODED")
-  ) ?? null;
+  const item=relatedProgramInstruction(instructions,logOrder,PUMP_PROGRAM_ID);
+  return item&&(!item.mint||item.mint===mint)?item:null;
 }
 
 /** Validate the identity and recorded outcome of an archived receipt.
@@ -250,6 +243,14 @@ export function archivedPumpReceiptIssue(transaction, expectedSignature, expecte
   const meta=transaction.meta;
   if(!meta||typeof meta!=="object"||Array.isArray(meta)||!Object.hasOwn(meta,"err")||meta.err===undefined)
     return "RECEIPT_OUTCOME_UNKNOWN";
+  const decimalsByMint=new Map();
+  for(const row of [...(meta.preTokenBalances??[]),...(meta.postTokenBalances??[])]){
+    if(typeof row?.mint!=="string")continue;
+    const d=row.uiTokenAmount?.decimals;
+    if(!Number.isInteger(d)||d<0||d>255||(decimalsByMint.has(row.mint)&&decimalsByMint.get(row.mint)!==d))
+      return "RECEIPT_TOKEN_DECIMALS_CONFLICT";
+    decimalsByMint.set(row.mint,d);
+  }
   return null;
 }
 export function decodePumpTransaction({
@@ -274,6 +275,22 @@ export function decodePumpTransaction({
     unresolved_events:[{status:receiptIssue,log_index:null}],balance_deltas:null
   };
   const meta = transaction.meta;
+  const decimalsByMint=new Map();
+  const conflictingMints=new Set();
+  for(const row of [...(meta.preTokenBalances??[]),...(meta.postTokenBalances??[])]){
+    if(typeof row?.mint!=="string")continue;
+    const decimals=row.uiTokenAmount?.decimals;
+    if(!Number.isInteger(decimals)||decimals<0||decimals>255){conflictingMints.add(row.mint);continue;}
+    if(decimalsByMint.has(row.mint)&&decimalsByMint.get(row.mint)!==decimals)conflictingMints.add(row.mint);
+    decimalsByMint.set(row.mint,decimals);
+    if(tokenDecimalsByMint[row.mint]!=null&&tokenDecimalsByMint[row.mint]!==decimals)conflictingMints.add(row.mint);
+    if(quoteDecimalsByMint[row.mint]!=null&&quoteDecimalsByMint[row.mint]!==decimals)conflictingMints.add(row.mint);
+  }
+  if(meta.err===null&&conflictingMints.size)return {
+    status:"PARTIAL",signature:resolvedSignature,slot:transaction.slot,transaction_index:transactionIndex,
+    decoded_instructions:[],decoded_events:[],events:[],balance_deltas:null,
+    unresolved_events:[{status:"RECEIPT_TOKEN_DECIMALS_CONFLICT",log_index:null,mints:[...conflictingMints].sort()}]
+  };
   const logs = meta.logMessages ?? [];
   const decodedInstructions = decodeTransactionInstructions(transaction);
   const logOrdering = mapLogOrdering(logs);

@@ -432,3 +432,11 @@ test("archived parser refuses mislabeled or incomplete receipts without emitting
   assert.equal(r.unresolved_events[0].status,code);
  }
 });
+
+test("contradictory token decimals in archived receipts are isolated",()=>{
+ const row=d=>({accountIndex:2,mint:MINT,owner:USER,uiTokenAmount:{amount:"10",decimals:d}});
+ const transaction=makeTransaction({logs:[],preTokenBalances:[row(6)],postTokenBalances:[row(9)]});
+ const r=decodePumpTransaction({transaction});
+ assert.equal(r.status,"PARTIAL");assert.equal(r.events.length,0);
+ assert.equal(r.unresolved_events[0].status,"RECEIPT_TOKEN_DECIMALS_CONFLICT");
+});

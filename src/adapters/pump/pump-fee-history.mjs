@@ -18,32 +18,10 @@ async function mapLimit(items, limit, mapper) {
   return output;
 }
 
-async function collectSignatures(rpc, address, { maxSignatures, pageSize, commitment }) {
-  if (!Number.isSafeInteger(maxSignatures) || maxSignatures < 1) throw new RangeError("maxSignatures must be positive");
-  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) throw new RangeError("pageSize must be between 1 and 1000");
-  const signatures = [];
-  let before;
-  let exhausted = false;
-  while (signatures.length < maxSignatures) {
-    const requested = Math.min(pageSize, maxSignatures - signatures.length);
-    const page = await rpc.getSignaturesForAddress(address, {
-      commitment,
-      before,
-      limit: requested,
-    });
-    if (!page.length) {
-      exhausted = true;
-      break;
-    }
-    signatures.push(...page);
-    before = page.at(-1).signature;
-    if (page.length < requested) {
-      exhausted = true;
-      break;
-    }
-    if (signatures.length >= maxSignatures) break;
-  }
-  return { signatures, exhausted, stopped_at_limit: signatures.length >= maxSignatures && !exhausted };
+import {collectHistoricalSignaturePages} from "../../core/historical-signature-pages.mjs";
+async function collectSignatures(rpc,address,{maxSignatures,pageSize,commitment}){
+ const result=await collectHistoricalSignaturePages({rpc,address,maxSignatures,pageSize,commitment});
+ return {...result,stopped_at_limit:result.truncated_at_limit};
 }
 
 export async function fetchPumpFeeConfigHistory({
@@ -56,6 +34,7 @@ export async function fetchPumpFeeConfigHistory({
   network = "mainnet",
 } = {}) {
   if (!rpc) throw new TypeError("Solana RPC client is required");
+  if(!Number.isSafeInteger(concurrency)||concurrency<1||concurrency>64)throw new RangeError("INVALID_FEE_HISTORY_CONCURRENCY");
   const [accountInfo, collection] = await Promise.all([
     rpc.getAccountInfo(PUMP_FEE_CONFIG_PDA, { commitment }),
     collectSignatures(rpc, PUMP_FEE_CONFIG_PDA, { maxSignatures, pageSize, commitment }),
@@ -163,6 +142,7 @@ export async function fetchPumpFeeConfigHistory({
       stopped_at_limit: collection.stopped_at_limit,
       transactions_fetched: fetched.filter((item) => item.transaction).length,
       data_gaps: gaps.length,
+      pagination_evidence:collection.pagination_evidence,
     },
     decoded_update_events: decodedUpdateEvents,
     timeline,
