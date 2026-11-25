@@ -9,6 +9,7 @@ import {advanceReview,makeReviewArchive,restoreReviewArchive} from "../src/inner
 import { buildUnifiedHistoricalReport } from "../src/inner-market/unified-historical-report.mjs";
 import {createDiagnosticLog,errorKind} from "./diagnostic-log.mjs";
 import {historicalReviewRows} from "./historical-review-view.mjs";
+import {reviewSyntheticLedgerInput} from "./synthetic-ledger-view.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 // Session storage retains diagnostics across refreshes in the same tab, without cross-tab writers.
 const diagnostics=createDiagnosticLog({storage:(()=>{try{return window.sessionStorage;}catch{return null;}})()});
@@ -215,7 +216,8 @@ function render(){
  panel("角色与风险特征",table(["角色","特征","观测关注","局限"],roles.map(r=>[r.role,r.traits.join(" / "),r.observable,r.limitation])))+
  panel("固定场景验收",table(["场景","风险","预期","实际","结果"],results.map(r=>[r.title,r.risk_category,r.expected_status,r.actual_status,r.passed?"PASS":"FAIL"])))+
  panel("随机压力实验",'<div class="grid"><div><label for="experiment-seed">随机种子</label><input id="experiment-seed" type="number" min="0" max="4294967295" value="42"></div><div><label for="experiment-runs">每类实验次数</label><input id="experiment-runs" type="number" min="1" max="1000" value="100"></div></div><p class="muted">仅随机抽取预置风险场景，不生成交易；采样权重并非真实行为概率。</p><button id="run-experiment" class="primary">运行随机实验</button> <button id="export-experiment" disabled>导出实验</button><div id="experiment-result"></div>')+
- panel("场景报告",'<button id="export-participants">导出实验结果 JSON</button>'+details("实验原始数据",results));
+ panel("场景报告",'<button id="export-participants">导出实验结果 JSON</button>'+details("实验原始数据",results))+
+ panel("离线账簿复核",'<p class="muted">仅导入已记录的合成账簿；不生成交易，不认证市场行为。</p><label for="synthetic-ledger-file">账簿输入 JSON</label><input type="file" id="synthetic-ledger-file" accept=".json"><button id="synthetic-ledger-sample">载入固定测试样本</button> <button id="synthetic-ledger-export" disabled>导出核验结果</button><div id="synthetic-ledger-result" role="status"></div>');
  let experiment=null;
  document.querySelector("#run-experiment").onclick=()=>{
   const el=document.querySelector("#experiment-result"),exportButton=document.querySelector("#export-experiment");
@@ -230,6 +232,26 @@ function render(){
  };
  document.querySelector("#export-experiment").onclick=()=>{if(experiment)download("synthetic-participant-experiment.json",JSON.stringify(experiment,null,2))};
  document.querySelector("#export-participants").onclick=()=>download("synthetic-participant-stress-results.json",JSON.stringify(results,null,2));
+ const ledgerResult=document.querySelector("#synthetic-ledger-result"),ledgerExport=document.querySelector("#synthetic-ledger-export");
+ let ledgerAudit=null,ledgerTicket=0;
+ const showLedger=raw=>{
+  const view=reviewSyntheticLedgerInput(raw);ledgerAudit=view.audit;
+  ledgerResult.innerHTML=note("合成账簿 · "+view.audit.status)+metrics(view.metrics)+table(["账户","报价资产差额（base units）","Token 差额（base units）"],view.rows)+table(["异常"],view.issues.map(x=>[x]));
+  ledgerExport.disabled=false;
+ };
+ const loadLedger=async read=>{
+  const ticket=++ledgerTicket;ledgerAudit=null;ledgerExport.disabled=true;ledgerResult.textContent="读取账簿";
+  try{const raw=await read();if(ticket!==ledgerTicket||!ledgerResult.isConnected)return;showLedger(raw)}
+  catch(e){if(ticket===ledgerTicket&&ledgerResult.isConnected){ledgerResult.textContent="账簿未通过输入校验";ledgerAudit=null;ledgerExport.disabled=true}}
+ };
+ document.querySelector("#synthetic-ledger-file").onchange=e=>{
+  const file=e.target.files[0];if(!file)return;
+  loadLedger(async()=>{if(file.size>4*1024*1024)throw Error("FILE_TOO_LARGE");return JSON.parse(await file.text())});
+ };
+ document.querySelector("#synthetic-ledger-sample").onclick=()=>loadLedger(async()=>{
+  const response=await fetch("/fixtures/synthetic/closed-ledger-review.json",{cache:"no-store"});if(!response.ok)throw Error("FIXTURE_UNAVAILABLE");return response.json();
+ });
+ ledgerExport.onclick=()=>{if(ledgerAudit)download("synthetic-ledger-audit.json",JSON.stringify(ledgerAudit,null,2))};
  }else if(page==="logs"){
  const logs=diagnostics.snapshot();
  main.innerHTML=screenHeading("系统设置","连接状态 · 诊断事件 · 数据导入")+panel("服务状态",table(["服务","状态"],[["浏览器应用","已初始化"],["报告引擎",report.status],["Localnet RPC","待检查"],["交易执行","测试链按配置启用"]])+'<div class="row"><button id="rpc-health">检查本地连接</button></div><div id="rpc-health-result" role="status"></div>')+note("仅保存当前页面会话的最近 1000 条结构化诊断事件，同一标签页刷新时保留（浏览器存储不可用时除外）。不会记录原始输入、钱包地址、私钥、RPC URL 或原始错误信息。")+

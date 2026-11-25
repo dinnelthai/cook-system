@@ -63,3 +63,7 @@ Token receipt rows now explicitly distinguish two recorded balances from provisi
 ## C02–C05 follow-up — offline accounting QA only
 
 Added a standalone synthetic closed-ledger auditor for already recorded postings and separately supplied opening/closing balances. It checks per-account exact differences, rejects cross-scenario rows and duplicate IDs, and diagnoses missing endpoints and unbalanced aggregate postings. It does not generate postings, infer economic ownership, or validate actual execution. Batch launch QA now reports deduplicated trial totals and explicitly distinguishes scenario labels from the single reused QA fixture. The auditor is not yet wired to simulator exports or a browser. No participant policy, live discovery, market competition or transaction execution is added.
+
+## C06 — offline ledger review UI
+
+The market-risk experiment page now accepts a bounded synthetic closed-ledger input JSON or loads a fixed sample, recomputes the per-account audit using the shared pure module, displays differences and issues, and exports the audit result. A derived result cannot be reimported as input. Asynchronous stale reads are discarded. The prior Node import path remains a compatibility re-export; the pure implementation resides in the existing browser-served core directory. This is an accounting QA panel, not autonomous competitor simulation, token discovery, live trading, or a browser-verified release. Simulator-generated ledger export integration and real browser checks remain open.

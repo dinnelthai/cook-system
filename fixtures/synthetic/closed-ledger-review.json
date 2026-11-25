@@ -1,0 +1,48 @@
+{
+  "sourceMode": "SYNTHETIC",
+  "scenarioId": "closed-ledger-fixture",
+  "opening": [
+    {
+      "scenario_id": "closed-ledger-fixture",
+      "account_id": "sample-a",
+      "quote_base_units": "100",
+      "token_base_units": "5"
+    },
+    {
+      "scenario_id": "closed-ledger-fixture",
+      "account_id": "sample-b",
+      "quote_base_units": "100",
+      "token_base_units": "5"
+    }
+  ],
+  "closing": [
+    {
+      "scenario_id": "closed-ledger-fixture",
+      "account_id": "sample-a",
+      "quote_base_units": "90",
+      "token_base_units": "6"
+    },
+    {
+      "scenario_id": "closed-ledger-fixture",
+      "account_id": "sample-b",
+      "quote_base_units": "110",
+      "token_base_units": "4"
+    }
+  ],
+  "entries": [
+    {
+      "scenario_id": "closed-ledger-fixture",
+      "entry_id": "sample-1",
+      "account_id": "sample-a",
+      "quote_delta_base_units": "-10",
+      "token_delta_base_units": "1"
+    },
+    {
+      "scenario_id": "closed-ledger-fixture",
+      "entry_id": "sample-2",
+      "account_id": "sample-b",
+      "quote_delta_base_units": "10",
+      "token_delta_base_units": "-1"
+    }
+  ]
+}
