@@ -81,10 +81,10 @@ async function collectSignatures(rpc, address, {maxSignatures=10_000,pageSize=10
  return {...result,coverage_complete:result.exhausted||result.reached_until,stopped_at_limit:result.truncated_at_limit};
 }
 
-async function getTransactions(rpc, signatures, concurrency = 5) {
+async function getTransactions(rpc, signatures, concurrency, commitment) {
   return mapLimit(signatures, concurrency, async (item) => {
     try {
-      const transaction = await rpc.getTransaction(item.signature);
+      const transaction = await rpc.getTransaction(item.signature, { commitment });
       return {
         signature: item.signature,
         transaction,
@@ -96,12 +96,12 @@ async function getTransactions(rpc, signatures, concurrency = 5) {
   });
 }
 
-async function addTransactionIndexes(rpc, fetched) {
+async function addTransactionIndexes(rpc, fetched, commitment) {
   const slots = [...new Set(fetched.map((item) => item.transaction?.slot).filter(Number.isSafeInteger))];
   const blocks = new Map();
   await mapLimit(slots, 3, async (slot) => {
     try {
-      blocks.set(slot, await rpc.getBlock(slot));
+      blocks.set(slot, await rpc.getBlock(slot, { commitment }));
     } catch {
       blocks.set(slot, null);
     }
@@ -330,6 +330,7 @@ export async function fetchPumpMintHistory({
   }
   if (typeof mint !== "string" || mint.length === 0) throw new TypeError("mint is required");
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("concurrency must be positive");
+  if (!["confirmed", "finalized"].includes(commitment)) throw new TypeError("INVALID_HISTORICAL_COMMITMENT");
   const observedGenesisHash = await observeHistoricalGenesis(rpc, expectedGenesisHash);
   const curveAddress = derivePumpBondingCurveAddress(mint);
 
@@ -364,8 +365,8 @@ export async function fetchPumpMintHistory({
     throw error;
   }
 
-  const initialFetched = await getTransactions(rpc, curveSignatureCollection.signatures, concurrency);
-  const initialIndexed = await addTransactionIndexes(rpc, initialFetched);
+  const initialFetched = await getTransactions(rpc, curveSignatureCollection.signatures, concurrency, commitment);
+  const initialIndexed = await addTransactionIndexes(rpc, initialFetched, commitment);
   const initialEvents = [];
   for (const item of initialIndexed) {
     if (!item.transaction) continue;
@@ -425,14 +426,14 @@ export async function fetchPumpMintHistory({
   const mergedSignatureRecords = mergeSignatureCollections(signatureCollections);
   const initialFetchedBySignature = new Map(initialFetched.map((item) => [item.signature, item]));
   const additionalRecords = mergedSignatureRecords.filter((record) => !initialFetchedBySignature.has(record.signature));
-  const additionalFetched = await getTransactions(rpc, additionalRecords, concurrency);
+  const additionalFetched = await getTransactions(rpc, additionalRecords, concurrency, commitment);
   const fetchedBySignature = new Map(initialFetched.map((item) => [item.signature, item]));
   for (const item of additionalFetched) fetchedBySignature.set(item.signature, item);
   const allFetched = mergedSignatureRecords.map((record) => {
     const fetched = fetchedBySignature.get(record.signature);
     return { ...fetched, source_addresses: record.source_addresses };
   });
-  const indexed = await addTransactionIndexes(rpc, allFetched);
+  const indexed = await addTransactionIndexes(rpc, allFetched, commitment);
   const ordered = indexed.sort((a, b) => {
     const slotA = a.transaction?.slot ?? Number.MAX_SAFE_INTEGER;
     const slotB = b.transaction?.slot ?? Number.MAX_SAFE_INTEGER;

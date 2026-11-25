@@ -384,7 +384,7 @@ export function reconcilePumpSwapPoolSnapshot({
   const knownSlots=slots.filter(v=>v!=null);
   const slotConflict=invalidSlot||new Set(knownSlots).size>1;
   const slotStatus=slotConflict?"NOT_COMPARABLE":knownSlots.length===3?"SAME_REPORTED_SLOT":"UNKNOWN";
-  const effectiveQuote=slotConflict||quoteVault?.amount_base_units==null||data.virtual_quote_reserves_base_units==null?null:
+  const effectiveQuote=slotStatus!=="SAME_REPORTED_SLOT"||quoteVault?.amount_base_units==null||data.virtual_quote_reserves_base_units==null?null:
     nonNegative(quoteVault.amount_base_units,"quote vault amount")+toBigInt(data.virtual_quote_reserves_base_units,"virtual quote reserves");
   if (effectiveQuote!==null&&(effectiveQuote < 0n || effectiveQuote > ((1n << 64n) - 1n))) {
     mismatches.push({
@@ -394,7 +394,8 @@ export function reconcilePumpSwapPoolSnapshot({
     });
   }
   return {
-    status: slotConflict ? "UNKNOWN" : mismatches.length ? "FAIL" : missing.length ? "UNKNOWN" : "PASS",
+    status: slotStatus!=="SAME_REPORTED_SLOT" ? "UNKNOWN" : mismatches.length ? "FAIL" : missing.length ? "UNKNOWN" : "PASS",
+    recorded_amount_comparison: mismatches.length ? "MISMATCH" : missing.length ? "UNKNOWN" : "MATCH",
     mismatches,
     missing_fields: missing,
     snapshot_slot: slotStatus==="SAME_REPORTED_SLOT"?knownSlots[0]:null,

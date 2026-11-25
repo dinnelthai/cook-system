@@ -155,3 +155,17 @@ test("unavailable history is not labelled as available candles", async () => {
   assert.equal(result.raw_candles_status, "NO_TRADE_EVENTS");
   assert.deepEqual(result.raw_candles_1m, []);
 });
+
+test("historical RPC requests preserve the explicitly declared commitment",async()=>{
+ const calls=[],curve=derivePumpBondingCurveAddress(MINT),tx=transactionFixture();
+ const check=(method,options)=>{calls.push(method);assert.equal(options?.commitment,"finalized");};
+ const rpc={
+  async getAccountInfo(address,options){check("account",options);return address===MINT?mintAccountInfo():bondingCurveAccountInfo();},
+  async getSignaturesForAddress(address,options){check("signatures",options);assert.equal(address,curve);return [{signature:SIGNATURE,slot:100,err:null}];},
+  async getTransaction(signature,options){check("transaction",options);assert.equal(signature,SIGNATURE);return tx;},
+  async getBlock(slot,options){check("block",options);assert.equal(slot,100);return {transactions:[{transaction:{signatures:[SIGNATURE]}}]};}
+ };
+ await fetchPumpMintHistory({rpc,mint:MINT,commitment:"finalized",maxSignatures:10});
+ for(const method of ["account","signatures","transaction","block"])assert.ok(calls.includes(method));
+ await assert.rejects(()=>fetchPumpMintHistory({rpc,mint:MINT,commitment:"processed"}),/INVALID_HISTORICAL_COMMITMENT/);
+});
