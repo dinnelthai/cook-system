@@ -109,3 +109,9 @@ export async function exportProjectAuditBundle(projectId,revision){
  if(b?.schema_version!=="cook-project-audit-bundle.1"||b.project_id!==projectId||b.project_revision!==revision||b.execution_enabled!==false||b.settlement_allowed!==false||b.lifecycle_mutated!==false||typeof b.content_sha256!=="string")throw Error("PROJECT_AUDIT_BUNDLE_SCOPE_MISMATCH");
  return b;
 }
+
+export async function reviewProjectTreasury(projectId,revision,archiveId){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/treasury-review",{method:"POST",body:{expected_revision:revision,archive_id:archiveId}});
+ if(r.review?.project_id!==projectId||r.review.project_revision!==revision||r.review.report_link_archive_id!==archiveId||r.review.execution_enabled!==false||r.review.settlement_allowed!==false||r.review.live_balance!==null)throw Error("PROJECT_TREASURY_SCOPE_MISMATCH");
+ return r;
+}

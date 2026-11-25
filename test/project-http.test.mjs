@@ -215,3 +215,12 @@ test("audit bundle endpoint is a revision-pinned export, not a closure command",
  const {bundle}=await r.json();assert.equal(bundle.project_id,"audit-http");assert.equal(bundle.execution_enabled,false);assert.equal(bundle.settlement_allowed,false);
  assert.equal((await (await fetch(root+"/audit-http")).json()).project.revision,1);
 });
+
+test("treasury review accepts only an existing project report archive reference",async t=>{
+ const base=await setup(t,{reviewProjectTreasury:()=>assert.fail("unexpected review")}),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"treasury-http",profile:{name:"Treasury",symbol:"TRSY"}})).status,201);
+ const url=root+"/treasury-http/treasury-review";
+ assert.equal((await json(url,"POST",{expected_revision:1,archive_id:"missing",balance:"0"})).status,400);
+ assert.equal((await json(url,"POST",{expected_revision:2,archive_id:"missing"})).status,409);
+ assert.equal((await json(url,"POST",{expected_revision:1,archive_id:"missing"})).status,404);
+});

@@ -144,3 +144,17 @@ test("close evidence discloses residual assets and never authorizes settlement",
  const r=reviewProjectCloseEvidence(p,i);
  assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.blockers.includes("TOKEN_INVENTORY_OUTSTANDING"));assert.ok(r.unknown.includes("PROJECT_WIDE_ACCOUNT_COVERAGE_UNATTESTED"));assert.equal(r.settlement_allowed,false);assert.equal(r.lifecycle_mutated,false);
 });
+
+test("Project treasury retains one interval, suppresses contradictory values and never claims live balances",async()=>{
+ const {buildProjectTreasuryReview}=await import("../src/inner-market/project-treasury-review.mjs");
+ const {createProjectAggregate}=await import("../src/inner-market/project-aggregate.mjs");
+ const i=fixture(),pin="11111111111111111111111111111111",mint="11111111111111111111111111111112";
+ function relabel(x){if(Array.isArray(x)){x.forEach(relabel);return;}if(!x||typeof x!=="object")return;for(const k of Object.keys(x)){if(x[k]==="local-fixture")x[k]=pin;else if(x[k]==="synthetic-mint")x[k]=mint;else relabel(x[k]);}}
+ relabel(i);
+ const p=createProjectAggregate({project_id:i.scope.projectId,profile:{name:"Treasury",symbol:"TRSY"},network:{cluster:"localnet",genesis_hash:pin},token:{mint,issuance_signature:"1".repeat(64)}});
+ const r=buildProjectTreasuryReview(p,i);
+ assert.equal(r.status,"PARTIAL");assert.equal(r.cash_flow.observed_closing_cash_base_units,"887");assert.equal(r.inventory.closing_quantity_base_units,"50");
+ assert.equal(r.project_wide_total,null);assert.equal(r.live_balance,null);assert.equal(r.available_to_trade,null);assert.equal(r.execution_enabled,false);
+ i.archivedEvidence.accountInterval.closing.tokenAmount="49";
+ const bad=buildProjectTreasuryReview(p,i);assert.equal(bad.status,"REVIEW_REQUIRED");assert.equal(bad.inventory,null);assert.equal(bad.cash_flow,null);
+});
