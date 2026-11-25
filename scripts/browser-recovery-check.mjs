@@ -120,7 +120,17 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   console.error("BROWSER_QA_DIAGNOSTICS "+JSON.stringify({state,observations}));
   throw error;
  }finally{
+  const running=()=>child.exitCode===null&&child.signalCode===null;
+  if(running()){
+   const exited=once(child,"exit").catch(()=>{});
+   // Give Chromium a chance to flush its disposable profile and close its
+   // subprocesses before the parent deletes the temporary directory.
+   if(cdp)try{await cdp.call("Browser.close");}catch{}
+   await Promise.race([exited,sleep(2000)]);
+   if(running()){child.kill();await Promise.race([exited,sleep(2000)]);}
+   if(running()){child.kill("SIGKILL");await Promise.race([exited,sleep(2000)]);}
+   if(running())throw Error("BROWSER_SHUTDOWN_TIMEOUT");
+  }
   cdp?.close();
-  if(child.exitCode===null){const closed=once(child,"exit").catch(()=>{});child.kill();await Promise.race([closed,sleep(2000)]);if(child.exitCode===null)child.kill("SIGKILL");}
  }
 }

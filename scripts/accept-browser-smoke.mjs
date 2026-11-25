@@ -13,7 +13,7 @@ const browser=process.env.COOK_BROWSER_BINARY;
 if(!browser)throw Error("COOK_BROWSER_BINARY_REQUIRED");
 if(process.getuid?.()===0)throw Error("BROWSER_SMOKE_REQUIRES_NON_ROOT_SANDBOX");
 const dir=await mkdtemp(join(tmpdir(),"cook-browser-qa-"));
-let child;
+let child,result;
 try{
  const socket=createServer();socket.listen(0,"127.0.0.1");await once(socket,"listening");
  const port=socket.address().port;await new Promise(resolve=>socket.close(resolve));
@@ -31,15 +31,24 @@ try{
  }
  if(!ready)throw Error("BROWSER_SMOKE_SERVER_NOT_READY");
  if(process.argv.includes("--interactions")){
-  console.log(JSON.stringify(await checkBrowserRecovery({browser,dir,env,url})));
+  result=await checkBrowserRecovery({browser,dir,env,url});
  }else{
  const {stdout}=await run(browser,["--headless","--disable-background-networking","--disable-sync","--no-first-run","--user-data-dir="+join(dir,"browser"),"--virtual-time-budget=5000","--dump-dom",url],{env,timeout:30000,maxBuffer:8*1024*1024});
  // These are rendered DOM markers, not static source-code regular expressions.
  if(!/id="terminal-project-select"/.test(stdout)||!stdout.includes("Execution: DISABLED")||!stdout.includes('data-page="terminal"'))
   throw Error("BROWSER_SMOKE_RENDER_MISMATCH");
- console.log(JSON.stringify({status:"BROWSER_SMOKE_PASS",scope:"EMPTY_OFFLINE_TERMINAL",execution_enabled:false,full_browser_e2e_validated:false}));
+ result={status:"BROWSER_SMOKE_PASS",scope:"EMPTY_OFFLINE_TERMINAL",execution_enabled:false,full_browser_e2e_validated:false};
  }
 }finally{
- if(child&&child.exitCode===null){const closed=once(child,"exit").catch(()=>{});child.kill();await Promise.race([closed,new Promise(resolve=>setTimeout(resolve,2000))]);if(child.exitCode===null)child.kill("SIGKILL");}
- await rm(dir,{recursive:true,force:true});
+ const running=()=>child&&child.exitCode===null&&child.signalCode===null;
+ if(running()){
+  const closed=once(child,"exit").catch(()=>{});
+  child.kill();await Promise.race([closed,new Promise(resolve=>setTimeout(resolve,2000))]);
+  if(running()){child.kill("SIGKILL");await Promise.race([closed,new Promise(resolve=>setTimeout(resolve,2000))]);}
+  if(running())throw Error("BROWSER_QA_SERVER_SHUTDOWN_TIMEOUT");
+ }
+ // Chromium helper processes can finish profile writes shortly after exit.
+ // Retry only the bounded temporary-directory cleanup, not a failed test.
+ await rm(dir,{recursive:true,force:true,maxRetries:8,retryDelay:200});
 }
+console.log(JSON.stringify({...result,temporary_cleanup:"PASS"}));
