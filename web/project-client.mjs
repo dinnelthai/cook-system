@@ -84,3 +84,9 @@ export async function importProjectOrderReceipts(projectId,revision,archiveId){
  if(r.project_id!==projectId||r.project_revision!==revision||r.execution_enabled!==false||r.settlement_allowed!==false)throw Error("PROJECT_ORDER_SCOPE_MISMATCH");
  return r;
 }
+
+export async function getProjectLifecycleEvidence(projectId,revision){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/lifecycle-evidence");
+ if(r.project_id!==projectId||r.project_revision!==revision||r.execution_enabled!==false||r.lifecycle_mutated!==false||r.settlement_allowed!==false||!Array.isArray(r.steps)||!Array.isArray(r.blockers))throw Error("PROJECT_LIFECYCLE_SCOPE_MISMATCH");
+ return r;
+}

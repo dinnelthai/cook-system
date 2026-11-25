@@ -51,7 +51,7 @@ test("historical receipt import is atomic, scoped and idempotent",t=>{
  const path=setup(t),s=openProjectStore(path,{now:()=>1000});
  const mint="11111111111111111111111111111112",pin="11111111111111111111111111111111";
  try{
-  s.create({...input,network:{cluster:"localnet",genesis_hash:pin},token:{mint}});
+  s.create({...input,network:{cluster:"localnet",genesis_hash:pin},token:{mint,issuance_signature:sig}});
   const a="a".repeat(64),b="b".repeat(64),sample={signature:sig,slot:10,outcome:"SUCCESS"};
   const j=s.orderReview;
   assert.equal(j.importReceipts("p",1,a,[sample]).imported,1);

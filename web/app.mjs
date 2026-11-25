@@ -22,7 +22,7 @@ import {mountProjectLifecycleReview} from "./project-lifecycle-review-view.mjs";
 import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-workflow.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
-import {listProjects} from "./project-client.mjs";
+import {listProjects,getProjectLifecycleEvidence} from "./project-client.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
@@ -138,6 +138,7 @@ function renderTerminal(){
  main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>项目操作台</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
  '<div id="terminal-project-context" class="pro-statebar">正在读取 Project 数据…</div>'+
  '<div id="terminal-context-notice" role="status"></div>'+ 
+ '<section id="terminal-lifecycle-evidence" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-order-review" class="pro-pane" hidden></section>'+
  '<div id="terminal-report-area"'+(activeProjectId?' hidden inert style="display:none"':'')+'>'+
  '<section class="pro-pane"><h3>独立离线报告</h3><p class="muted">报告项目：'+esc(scope.projectId)+' · Mint：'+esc(scope.tokenMint)+' · '+esc(sourceLabel)+'</p></section>'+
@@ -164,7 +165,17 @@ function renderTerminal(){
     '<span>Execution: DISABLED</span></div>';
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
-    if(selected){const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download});}
+    if(selected){
+      const lifecycleArea=main.querySelector("#terminal-lifecycle-evidence");
+      lifecycleArea.hidden=false;lifecycleArea.textContent="读取生命周期证据覆盖…";
+      const stillCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&lifecycleArea.isConnected;
+      getProjectLifecycleEvidence(selected.project_id,selected.revision).then(v=>{
+       if(!stillCurrent())return;
+       lifecycleArea.innerHTML="<h3>Project 生命周期证据覆盖</h3>"+note("登记阶段："+v.recorded_stage+" · 观察结果不代表正式阶段推进。")+
+        table(["业务阶段","登记状态","证据状态"],v.steps.map(s=>[s.stage,s.recorded,s.evidence_status]))+
+        table(["待复核事项"],v.blockers.map(s=>[s]))+note("旧版本档案 "+v.stale_archive_count+" · 当前关联报告 "+v.report_link_count+" · 当前订单记录 "+v.order_review_count);
+      }).catch(e=>{if(stillCurrent())lifecycleArea.textContent="生命周期证据不可用："+errorKind(e);});
+      const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download});}
     const match=matchProjectReport(selected,data);
     notice.innerHTML=note(match.status==="DECLARED_MATCH"?"当前报告与 Project 的声明身份一致（Project ID、Mint、网络、Genesis、SOL）。仅为历史复盘；未独立认证，不是实时余额或结算证据。":"历史报告保持隔离："+match.reasons.join(" / ")+"。清除项目选择后可继续独立复盘。");
     if(match.status==="DECLARED_MATCH"){
