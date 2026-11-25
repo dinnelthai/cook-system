@@ -42,8 +42,8 @@ export function buildProjectRuntime(project,{archives,intervals,lifecycle,config
  const work=[
   {id:"configuration",status:configuration.status},
   {id:"issuance_evidence",status:lifecycle.issuance.status},
-  {id:"historical_market",status:lifecycle.markets.length?"REGISTERED_EVIDENCE_PRESENT":"MISSING"},
-  {id:"financial_interval",status:rows.length?rows.some(r=>r.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":"DECLARED_ROWS_PRESENT":"MISSING"},
+  {id:"historical_market",status:lifecycle.markets.some(m=>m.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":!lifecycle.markets.length?"MISSING":lifecycle.markets.every(m=>m.status==="OBSERVED_NOT_ATTESTED")?"OBSERVED_NOT_ATTESTED":"REGISTRATION_OR_EVIDENCE_INCOMPLETE"},
+  {id:"financial_interval",status:rows.length?rows.some(r=>r.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":rows.every(r=>r.status==="DECLARED_ENDPOINT_PRESENT")?"DECLARED_ENDPOINTS_PRESENT":"INCOMPLETE":"MISSING"},
   {id:"order_exceptions",status:receipts.some(r=>r.status!=="DECLARED_SAMPLE_MATCH")?"REVIEW_REQUIRED":receipts.length?"DECLARED_MATCH":"UNKNOWN"},
   {id:"independent_source",status:"NOT_RUN"}
  ];

@@ -341,9 +341,27 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         db.exec("COMMIT");return bundle;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
+    // Include close-review archives, unlike the close-review guard digest.
+    // Selection is read-only and pinned to all evidence, not just project revision.
+    function runtimeContextId(snapshot){
+      return hash(canonicalJson({project:snapshot.project,
+        archives:snapshot.archives.map(a=>a.record_hash).sort(),
+        orders:snapshot.orders.map(o=>[o.order_id,o.revision,o.head_hash]).sort((a,b)=>a[0].localeCompare(b[0],"en"))}));
+    }
     function getBusinessReview(projectId){
       const snapshot=getEvidenceSnapshot(projectId);
-      return buildProjectBusinessReview(snapshot.project,snapshot.archives,snapshot.orders);
+      return {...buildProjectBusinessReview(snapshot.project,snapshot.archives,snapshot.orders),runtime_context_id:runtimeContextId(snapshot)};
+    }
+    function getRuntimeContext(projectId,selection=null){
+      const snapshot=getEvidenceSnapshot(projectId),context=runtimeContextId(snapshot);
+      if(selection){
+        if(snapshot.project.revision!==selection.expected_revision)throw Error("PROJECT_REVISION_CONFLICT");
+        if(context!==selection.expected_context_id)throw Error("PROJECT_EVIDENCE_SNAPSHOT_CONFLICT");
+      }
+      const review=buildProjectBusinessReview(snapshot.project,snapshot.archives,snapshot.orders);
+      const interval=selection?review.runtime.asset_intervals.find(r=>r.report_link_archive_id===selection.report_link_archive_id):null;
+      if(selection&&!interval)throw Error("PROJECT_ARCHIVE_NOT_FOUND");
+      return {...review.runtime,runtime_context_id:context,selected_interval:interval??null};
     }
     function getLifecycleReview(projectId){
       return readSnapshot(()=>{
@@ -409,7 +427,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
           original_database_replaced:false,source_attestation:"UNKNOWN",execution_enabled:false};
       }finally{copy.close();}
     }
-    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, getBusinessReview, getEvidenceSnapshot, close: () => db.close() };
+    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, getBusinessReview, getRuntimeContext, getEvidenceSnapshot, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

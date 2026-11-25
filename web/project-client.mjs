@@ -139,3 +139,10 @@ export async function getProjectBusinessReview(projectId,revision){
  r.settlement_allowed!==false||r.lifecycle_mutated!==false||r.source_attestation!=="UNKNOWN"||!Array.isArray(r.intervals)||!Array.isArray(r.findings)||!Array.isArray(r.data_integration?.gates))throw Error("PROJECT_BUSINESS_REVIEW_SCOPE_MISMATCH");
  return r;
 }
+
+export async function selectProjectRuntimeInterval(projectId,revision,contextId,archiveId){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/runtime",{method:"POST",body:{expected_revision:revision,expected_context_id:contextId,report_link_archive_id:archiveId}});
+ if(r.schema_version!=="cook-project-runtime.1"||r.project_id!==projectId||r.project_revision!==revision||r.runtime_context_id!==contextId||
+  r.selected_interval?.report_link_archive_id!==archiveId||r.execution_enabled!==false||r.settlement_allowed!==false||r.lifecycle_mutated!==false||r.live_assets!==null)throw Error("PROJECT_RUNTIME_SCOPE_MISMATCH");
+ return r;
+}

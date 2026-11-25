@@ -23,7 +23,7 @@ import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-
 import {summarizeImportedParticipantValidation,compareImportedParticipantValidation} from "./participant-validation-view.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
-import {getProjectDirectory,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview,reviewProjectMarketEvidence,getProjectBusinessReview} from "./project-client.mjs";
+import {getProjectDirectory,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview,reviewProjectMarketEvidence,getProjectBusinessReview,selectProjectRuntimeInterval} from "./project-client.mjs";
 import {treasuryReviewSections} from "./treasury-review-view.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
@@ -182,6 +182,7 @@ function renderTerminal(){
         businessArea.innerHTML="<h3>项目运行概览 · v"+esc(v.project_revision)+"</h3>"+note(v.status+" · 区间历史证据 · 实时资产与执行不可用")+
          table(["项目阶段","严重异常","警告","未知项"],[[v.recorded_stage,v.risk.critical,v.risk.warning,v.risk.unknown]])+
          (v.runtime?table(["项目工作项","状态"],v.runtime.work.map(x=>[x.id,x.status]))+table(["历史区间","现金","库存数量","库存成本","Creator 应收","已实现损益","NAV"],v.runtime.asset_intervals.map(x=>[x.opening_cutoff+" → "+x.closing_cutoff,x.assets.cash??"—",x.assets.token_quantity??"—",x.assets.inventory_cost??"—",x.assets.creator_receivable??"—",x.assets.realized_pnl??"—",x.assets.nav??"—"]))+note("历史区间资产，原始基础单位；不代表当前可用余额或估值"):"")+
+         (v.runtime_context_id&&v.runtime?.asset_intervals.length?'<label>选择历史资产区间 <select id="runtime-interval"><option value="">请选择区间</option>'+v.runtime.asset_intervals.map(x=>'<option value="'+esc(x.report_link_archive_id)+'">'+esc(x.opening_cutoff+" → "+x.closing_cutoff)+'</option>').join("")+'</select></label><div id="runtime-interval-detail" role="status"></div>':"")+
          note("历史归档容量："+(v.capacity?.archive_count??"—")+"/"+(v.capacity?.archive_limit??"—")+" · 订单记录："+(v.capacity?.order_count??"—")+"/"+(v.capacity?.order_limit??"—")+" · "+(v.capacity?.status??"UNKNOWN"))+
          table(["模块","状态","记录数"],[["资金与库存",v.treasury.status,v.treasury.review_count],["市场证据",v.market.status,v.market.review_count],["财务关闭",v.close.status,v.close.review_count],["订单复核","未充分复核 "+v.orders.unresolved_count,v.orders.record_count]])+
          (v.configuration?'<details><summary>项目准备与配置审计</summary>'+table(["状态","已登记钱包","缺少额度"],[[v.configuration.status,v.configuration.wallets.registered_count,v.configuration.budget.members_missing_cap]])+table(["配置异常 / 缺项 / 警告"],[...v.configuration.issues,...v.configuration.missing,...v.configuration.warnings].map(x=>[x]))+'</details>':"")+
@@ -196,6 +197,21 @@ function renderTerminal(){
          table(["证据未知","引用"],(v.unknown??[]).map(x=>[x.code,x.reference??"—"]))+
          '<details><summary>真实数据接入与环境验收（未完成）</summary>'+table(["接入验收条件","状态"],v.data_integration.gates.map(g=>[g.id,g.status]))+'</details>'+
          '<button id="business-refresh">刷新统一复核</button><button id="business-export">导出复核 JSON</button>';
+        const intervalSelect=businessArea.querySelector("#runtime-interval");
+        if(intervalSelect){
+         let intervalTicket=0;
+         intervalSelect.onchange=async()=>{
+          const seq=++intervalTicket,archiveId=intervalSelect.value,detail=businessArea.querySelector("#runtime-interval-detail");
+          if(!archiveId){detail.textContent="";return;}
+          detail.textContent="读取区间资产…";
+          try{
+           const ctx=await selectProjectRuntimeInterval(selected.project_id,selected.revision,v.runtime_context_id,archiveId);
+           if(!businessCurrent()||ticket!==businessTicket||seq!==intervalTicket||!detail.isConnected)return;
+           const row=ctx.selected_interval;
+           detail.innerHTML=note(row.status+" · "+row.opening_cutoff+" → "+row.closing_cutoff)+table(["区间资产项","基础单位"],Object.entries(row.assets).map(([key,value])=>[key,value??"—"]));
+          }catch(err){if(businessCurrent()&&ticket===businessTicket&&seq===intervalTicket&&detail.isConnected)detail.textContent="区间不可用，请刷新运行概览："+errorKind(err);}
+         };
+        }
         businessArea.querySelector("#business-refresh").onclick=refreshBusiness;
         businessArea.querySelector("#business-export").onclick=()=>download("project-business-review.json",JSON.stringify(v,null,2));
        }catch(err){if(businessCurrent()&&ticket===businessTicket){businessArea.textContent="统一复核不可用："+errorKind(err);const retry=document.createElement("button");retry.textContent="重新读取";retry.onclick=refreshBusiness;businessArea.append(retry);}}

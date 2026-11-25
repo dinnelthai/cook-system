@@ -270,3 +270,19 @@ test("unified business review is read-only and explicitly distinguishes pending 
  assert.equal((await json(url,"POST",{})).status,405);
  assert.equal((await (await fetch(root+"/business-http")).json()).project.revision,1);
 });
+
+test("runtime endpoint requires an exact revision and context for interval selection",async t=>{
+ const base=await setup(t),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"runtime-http",profile:{name:"Runtime",symbol:"RUN"}})).status,201);
+ const url=root+"/runtime-http/runtime",r=await fetch(url);assert.equal(r.status,200);
+ const v=await r.json();assert.equal(v.project_revision,1);assert.match(v.runtime_context_id,/^[a-f0-9]{64}$/);
+ assert.equal(v.selected_interval,null);assert.equal(v.execution_enabled,false);
+ const b=await (await fetch(root+"/runtime-http/business-review")).json();assert.equal(b.runtime_context_id,v.runtime_context_id);
+ const body={expected_revision:1,expected_context_id:v.runtime_context_id,report_link_archive_id:"a".repeat(64)};
+ assert.equal((await json(url,"POST",body)).status,404);
+ assert.equal((await json(url,"POST",{...body,expected_context_id:"b".repeat(64)})).status,409);
+ assert.equal((await json(url,"POST",{...body,expected_revision:2})).status,409);
+ assert.equal((await json(url,"POST",{...body,extra:true})).status,400);
+ assert.equal((await fetch(url,{method:"DELETE"})).status,405);
+ assert.equal((await (await fetch(root+"/runtime-http")).json()).project.revision,1);
+});

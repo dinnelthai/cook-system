@@ -144,6 +144,16 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(typeof listReportCandidates!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         send(res,200,listReportCandidates(store.get(projectId)));return true;
       }
+      if(action==="runtime"){
+        if(req.method==="GET"){send(res,200,store.getRuntimeContext(projectId));return true;}
+        if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        const input=await bodyJson(req,readRequestJson,maxBodyBytes);
+        if(Object.keys(input).length!==3||Object.keys(input).some(k=>!["expected_revision","expected_context_id","report_link_archive_id"].includes(k))||
+          !Number.isSafeInteger(input.expected_revision)||input.expected_revision<1||
+          typeof input.expected_context_id!=="string"||!/^[a-f0-9]{64}$/.test(input.expected_context_id)||
+          typeof input.report_link_archive_id!=="string"||!/^[a-f0-9]{64}$/.test(input.report_link_archive_id))throw Error("INVALID_RUNTIME_SELECTION");
+        send(res,200,store.getRuntimeContext(projectId,input));return true;
+      }
       if(action==="business-review"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         send(res,200,store.getBusinessReview(projectId));return true;
