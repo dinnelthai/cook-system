@@ -21,6 +21,22 @@ function checkMap(rows){
  for(const r of rows){if(!ident(r?.id)||typeof r.passed!=="boolean"||map.has(r.id))throw Error("INVALID_VALIDATION_SUBCHECKS");map.set(r.id,r.passed);}
  return map;
 }
+const requiredPathChecks=["all_fixed_cohorts_present","mixed_observation_accounting","no_future_observation","delayed_first_observation","independent_cohort_recovery","passive_fixture_roles_unchanged","canonical_fixture_unmodified","observation_not_behavior_feedback"].map(x=>"mixed_conditions/"+x).concat(["passive_asset_coverage","per_account_ledger","record_numeric_consistency","generator_contract_consistency","asset_state_replay","checkpoint_recomputation","observer_accounting","detector_non_execution","compound_record_and_balance_conflict","compound_numeric_conflict","reproducible_fixture"]);
+const requiredAssetChecks=["account_count","exact_asset_amounts","asset_shape_classification","no_activity_inferred","ledger_and_checkpoint","no_numeric_pass_for_empty_market"];
+const requiredEnvironmentChecks={
+ BASELINE_ACCOUNTING:["historical_report_ready","execution_disabled"],
+ RESERVE_EVIDENCE_MISSING:["review_required","accounting_suppressed","real_reserve_unknown","live_liquidity_not_assessed"],
+ HISTORICAL_VALUATION_IMPAIRMENT:["valid_accounting","cash_unchanged","drawdown_increased","execution_disabled"],
+ COMPOUND_ACCOUNTING_AND_COVERAGE_STRESS:["review_required","risk_review_required","no_settlement","no_financial_metrics"],
+ NO_EXECUTION_EVIDENCE:["no_executions","metrics_unavailable","no_fabricated_candles","not_a_signal"],
+ QUIET_OR_STALE_FEED:["last_record_stale","missing_timestamp_unknown"],
+ DELAYED_FEED_RECOVERY:["pending_at_close","caught_up","no_future_feedback"],
+ TOTAL_OBSERVATION_OUTAGE:["not_confused_with_no_market_activity","age_unknown"],
+ CONFLICT_ON_RECOVERY:["conflicting_replay_rejected"]
+};
+function requireManifest(checks,required){
+ if(!required||checks.size!==required.length||required.some(id=>!checks.has(id)))throw Error("VALIDATION_SUBCHECK_MANIFEST_MISMATCH");
+}
 function declaredChecks(r){
  const m=checkMap(r.checks);
  if(typeof r.passed!=="boolean"||r.passed!==[...m.values()].every(Boolean))throw Error("VALIDATION_SUBCHECK_RESULT_MISMATCH");
@@ -46,7 +62,7 @@ function inspect(input){
    if(!r||typeof r!=="object")throw Error("INVALID_VALIDATION_CASE");
    const key=ids[i](r);if(!wanted.has(key)||m.has(key))throw Error("INVALID_VALIDATION_CASE_ID");
    let pass,checks=new Map();
-   if(i===0||i===2){checks=declaredChecks(r);pass=r.passed;}
+   if(i===0||i===2){checks=declaredChecks(r);requireManifest(checks,i===0?requiredPathChecks:requiredEnvironmentChecks[key.split(':')[0]]);pass=r.passed;}
    else if(i===1){
     const expectedStatus=profiles.slice(0,3).includes(r.profile)?"RECOVERED_INTERNAL_MATCH":"REVIEW_REQUIRED";
     if(!["RECOVERED_INTERNAL_MATCH","REVIEW_REQUIRED"].includes(r.status)||r.expected_status!==expectedStatus||r.passed!==(r.status===expectedStatus))throw Error("INVALID_OBSERVATION_RESULT");
@@ -60,13 +76,14 @@ function inspect(input){
     if(r.detected!==found||r.result!==expectedResult)throw Error("INVALID_DETECTOR_RESULT");
     pass=expectedResult==="TRUE_POSITIVE"||expectedResult==="TRUE_NEGATIVE";
    }
-   if(i===0&&r.asset_coverage!==undefined){
+   if(i===0){
     const a=r.asset_coverage;
     const names=["EMPTY_ACCOUNTS","MIXED_ASSET_SHAPES","LARGE_INTEGER_BALANCES","MAX_ACCOUNT_COUNT"];
     if(!a||!Array.isArray(a.cases)||a.cases.length!==4||a.case_count!==4||a.seed!==r.seed)throw Error("INVALID_ASSET_COVERAGE_RESULT");
     const seen=new Set();
     for(const c of a.cases){if(!names.includes(c?.case_id)||seen.has(c.case_id))throw Error("INVALID_ASSET_COVERAGE_RESULT");seen.add(c.case_id);
-     for(const [k,v] of declaredChecks(c))checks.set("asset/"+c.case_id+"/"+k,v);
+     const assetChecks=declaredChecks(c);requireManifest(assetChecks,requiredAssetChecks);
+      for(const [k,v] of assetChecks)checks.set("asset/"+c.case_id+"/"+k,v);
     }
     const passed=a.cases.filter(c=>c.passed).length;
     if(a.passed_count!==passed||a.status!==(passed===4?"SYNTHETIC_REGRESSION_PASS":"REVIEW_REQUIRED")||checks.get("passive_asset_coverage")!==(passed===4))throw Error("INVALID_ASSET_COVERAGE_RESULT");

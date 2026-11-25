@@ -1,4 +1,4 @@
-const units=(v,n)=>{if(typeof v!=="string"||!/^(0|[1-9][0-9]*)$/.test(v))throw Error("invalid "+n);return BigInt(v);};
+const units=(v,n)=>{if(typeof v!=="string"||v.length>78||!/^(0|[1-9][0-9]*)$/.test(v))throw Error("invalid "+n);return BigInt(v);};
 const ratio=(n,d)=>d===0n?null:Number(n*1000000n/d)/1000000;
 /** Evidence-aware portfolio guard. It reports configured exposure checks, not safety
  * certification or a permission to trade. Unknown inputs remain UNKNOWN. */
@@ -21,9 +21,10 @@ export function assessPortfolioRisk({positions,account,marketSnapshots,limits,no
  const drawdown=account.drawdown_bps;
  if(!Number.isSafeInteger(drawdown)||drawdown<0)findings.push({code:"DRAWDOWN_UNKNOWN",severity:"UNKNOWN"});
  else if(drawdown>limits.max_drawdown_bps)findings.push({code:"DRAWDOWN_LIMIT",severity:"BLOCK",actual:drawdown,limit:limits.max_drawdown_bps});
- const dailyLoss=units(account.daily_loss_quote_base_units,"daily loss");
+ const dailyLoss=account.daily_loss_quote_base_units==null?null:units(account.daily_loss_quote_base_units,"daily loss");
+  if(dailyLoss===null)findings.push({code:"DAILY_LOSS_UNKNOWN",severity:"UNKNOWN"});
  const maxLoss=units(limits.max_daily_loss_quote_base_units,"max daily loss");
- if(dailyLoss>maxLoss)findings.push({code:"DAILY_LOSS_LIMIT",severity:"BLOCK",actual:dailyLoss.toString(),limit:maxLoss.toString()});
+ if(dailyLoss!==null&&dailyLoss>maxLoss)findings.push({code:"DAILY_LOSS_LIMIT",severity:"BLOCK",actual:dailyLoss.toString(),limit:maxLoss.toString()});
  if(unknownPositionCount>0)findings.push({code:"POSITION_OWNERSHIP_OR_VALUATION_UNKNOWN",severity:"UNKNOWN",exposure_quote_base_units:unknownExposure.toString(),position_count:unknownPositionCount});
  const snapshots=new Map();
  for(const snapshot of marketSnapshots){if(!snapshot?.market_id||snapshots.has(snapshot.market_id))throw Error("DUPLICATE_OR_INVALID_MARKET_SNAPSHOT");snapshots.set(snapshot.market_id,snapshot);}
@@ -39,7 +40,7 @@ export function assessPortfolioRisk({positions,account,marketSnapshots,limits,no
   if(snapshot.data_completeness!=="complete"||!["IDENTITY_MATCHED_NOT_AUTHENTICATED","SYNTHETIC_ONLY"].includes(snapshot.source_status))
    findings.push({code:"MARKET_EVIDENCE_INCOMPLETE",severity:"UNKNOWN",market_id:marketId});
   const depth=snapshot.liquidation_depth_quote_base_units;
-  if(typeof depth!=="string"||!/^(0|[1-9][0-9]*)$/.test(depth)||BigInt(depth)===0n)
+  if(typeof depth!=="string"||depth.length>78||!/^(0|[1-9][0-9]*)$/.test(depth)||BigInt(depth)===0n)
    findings.push({code:"LIQUIDATION_DEPTH_UNKNOWN",severity:"UNKNOWN",market_id:marketId});
   else{
    const utilization=ratio(exposure*10000n,BigInt(depth));
@@ -51,6 +52,6 @@ export function assessPortfolioRisk({positions,account,marketSnapshots,limits,no
  const blocked=findings.some(x=>x.severity==="BLOCK"),unknown=findings.some(x=>x.severity==="UNKNOWN");
  return {schema_version:"cook-portfolio-risk.1",status:blocked?"BLOCKED":unknown?"UNKNOWN":"WITHIN_CONFIGURED_LIMITS",
   metrics:{total_exposure_quote_base_units:totalExposure.toString(),unknown_exposure_quote_base_units:unknownExposure.toString(),
-   market_count:byMarket.size,unknown_position_count:unknownPositionCount,drawdown_bps:Number.isSafeInteger(drawdown)?drawdown:null,daily_loss_quote_base_units:dailyLoss.toString()},
+   market_count:byMarket.size,unknown_position_count:unknownPositionCount,drawdown_bps:Number.isSafeInteger(drawdown)?drawdown:null,daily_loss_quote_base_units:dailyLoss?.toString()??null},
   findings,source_attestation:"UNKNOWN",production_ready:false,execution_enabled:false};
 }

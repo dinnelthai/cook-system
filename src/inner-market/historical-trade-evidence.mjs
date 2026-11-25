@@ -22,10 +22,10 @@ export function auditHistoricalTradeEvidence({market,journal,cashEntries}){
   events.set(e?.event_id,e);
  }
  const issues=[],missing=[];
- let matched=0,quantityMatched=0,signatureMatched=0;
+ let matched=0,fullyMatched=0,quantityMatched=0,signatureMatched=0;
  for(const j of journal){
   const id=j.event_id,t=byId.get(id),p=posts.get(id)??[],e=events.get(id);
-  const before=issues.length,issue=code=>issues.push(code+":"+id);
+  const before=issues.length,missingBefore=missing.length,issue=code=>issues.push(code+":"+id);
   if(!t){issue("PROJECT_TRADE_MARKET_EVENT_MISSING");continue;}
   if(t.side!==j.side)issue("PROJECT_TRADE_SIDE_MISMATCH");
   if(t.status!=="FINALIZED"||t.reconciliation!=="PASS")issue("PROJECT_TRADE_MARKET_UNVERIFIED");
@@ -46,9 +46,9 @@ export function auditHistoricalTradeEvidence({market,journal,cashEntries}){
   if(signatures.some(v=>!valid(v))||new Set(signatures).size>1)issue("PROJECT_TRADE_SIGNATURE_MISMATCH");
   else if(signatures.length>=2)signatureMatched++;
   else missing.push("PROJECT_TRADE_SIGNATURE_UNAVAILABLE:"+id);
-  if(issues.length===before)matched++;
+  if(issues.length===before){matched++;if(missing.length===missingBefore)fullyMatched++;}
  }
  return {status:issues.length?"REVIEW_REQUIRED":missing.length?"PARTIAL":"INTERNALLY_CONSISTENT",
-  issues,missing,project_trade_count:journal.length,matched_trade_count:matched,quantity_matched_count:quantityMatched,
+  issues,missing,project_trade_count:journal.length,matched_trade_count:matched,fully_evidenced_trade_count:fullyMatched,quantity_matched_count:quantityMatched,
   signature_matched_count:signatureMatched,source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",economic_classification_attestation:"UNKNOWN"};
 }

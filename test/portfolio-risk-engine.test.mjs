@@ -45,3 +45,10 @@ test("missing market snapshots do not suppress known concentration violations",(
  assert.ok(r.findings.some(f=>f.code==="MARKET_SNAPSHOT_MISSING"&&f.severity==="UNKNOWN"));
  assert.equal(r.execution_enabled,false);
 });
+
+test("unknown daily loss remains unknown without suppressing a known risk breach",()=>{
+ const i=base();i.account.daily_loss_quote_base_units=null;
+ const r=assessPortfolioRisk(i);assert.equal(r.status,"UNKNOWN");assert.equal(r.metrics.daily_loss_quote_base_units,null);
+ i.account.drawdown_bps=900;assert.equal(assessPortfolioRisk(i).status,"BLOCKED");
+ i.positions[0].exposure_quote_base_units="9".repeat(1000);assert.throws(()=>assessPortfolioRisk(i),/invalid position exposure/);
+});

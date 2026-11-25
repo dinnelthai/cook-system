@@ -28,5 +28,12 @@ test("a new failing subcheck is visible even when the parent case was already fa
  b.paths[0].checks.find(c=>c.id==="record_numeric_consistency").passed=false;
  const v=compareImportedParticipantValidation(a,b);
  assert.equal(v.status,"DECLARED_REGRESSION");assert.equal(v.changed_cases.length,0);assert.equal(v.changed_subchecks.length,1);
- b.paths[0].checks.pop();assert.equal(compareImportedParticipantValidation(a,b).status,"NOT_COMPARABLE");
+ b.paths[0].checks.pop();assert.throws(()=>compareImportedParticipantValidation(a,b),/VALIDATION_SUBCHECK_MANIFEST_MISMATCH/);
+});
+
+test("required path, environment and asset subchecks cannot be omitted",()=>{
+ const x=fixture();x.paths[0].checks.pop();assert.throws(()=>summarizeImportedParticipantValidation(x),/MANIFEST_MISMATCH/);
+ const y=fixture();delete y.paths[0].asset_coverage;assert.throws(()=>summarizeImportedParticipantValidation(y),/INVALID_ASSET_COVERAGE_RESULT/);
+ const z=fixture();z.environment_cases[0].checks.pop();assert.throws(()=>summarizeImportedParticipantValidation(z),/MANIFEST_MISMATCH/);
+ const w=fixture();w.paths[0].asset_coverage.cases[0].checks.pop();assert.throws(()=>summarizeImportedParticipantValidation(w),/MANIFEST_MISMATCH/);
 });

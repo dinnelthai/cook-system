@@ -4,7 +4,7 @@ import { sortForReplay } from "./event-order.mjs";
 const EXECUTION_KINDS = new Set(["CURVE_BUY_EXECUTED", "CURVE_SELL_EXECUTED", "POOL_BUY_EXECUTED", "POOL_SELL_EXECUTED"]);
 
 function parseDecimal(value, name = "price") {
-  if (typeof value !== "string" || !/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value)) {
+  if (typeof value !== "string" || value.length > 160 || !/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value)) {
     throw new TypeError(`${name} must be a non-negative plain decimal string`);
   }
   const [whole, fraction = ""] = value.split(".");
@@ -82,6 +82,7 @@ export function buildRawCandles(events, intervalMs) {
     const poolAddress = event.event_kind.startsWith("POOL_") ? payload.pool_address ?? null : null;
     if (poolAddress !== null && (typeof poolAddress !== "string" || !poolAddress.trim())) throw new TypeError("invalid pool address");
     const start = bucketStart(event.event_time_ms, intervalMs);
+    if (!Number.isSafeInteger(start + intervalMs)) throw new RangeError("candle interval end exceeds safe integer range");
     const key = `${marketKey(event.market, event.provenance, scenarioId, poolAddress)}:${start}`;
     const side = event.event_kind === "CURVE_BUY_EXECUTED" || event.event_kind === "POOL_BUY_EXECUTED" ? "buy" : "sell";
     let candle = candles.get(key);

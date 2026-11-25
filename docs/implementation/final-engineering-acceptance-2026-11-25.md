@@ -24,11 +24,13 @@
 
 ## Reproduce the automated checks
 
+> Historical handoff baseline above is retained for audit. The current default branch is `main`; use its current CI report rather than assuming the historical test count still applies.
+
 Use Node.js 22 or 24:
 
 ```bash
-git checkout master
-git pull --ff-only origin master
+git checkout main
+git pull --ff-only origin main
 node --version
 npm ci
 npm run accept:all
