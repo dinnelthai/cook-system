@@ -7,6 +7,7 @@ import {createRequire} from "node:module";
 import {readBoundedRegularFile} from "../src/core/bounded-private-file.mjs";
 import {auditLocalReadAcceptance} from "../src/inner-market/local-read-acceptance.mjs";
 import {resolveLocalFeatureFlags} from "../src/core/local-feature-flags.mjs";
+import {parseAcceptanceTap,validateSqliteBenchmark} from "../src/core/acceptance-result-contract.mjs";
 const root=resolve(fileURLToPath(new URL("../",import.meta.url)));
 const require=createRequire(import.meta.url);
 const checks=[],operatorGates=[];
@@ -28,8 +29,7 @@ function command(id,args,{timeout=300000}={}){
 async function walk(dir){
  let result=[];for(const e of await readdir(dir,{withFileTypes:true})){const p=join(dir,e.name);if(e.isDirectory())result=result.concat(await walk(p));else if(e.isFile()&&p.endsWith(".mjs"))result.push(p);}return result;
 }
-function parseCount(out,key){const m=out.match(new RegExp("# "+key+" (\\d+)"));return m?Number(m[1]):null;}
-async function main(){
+ async function main(){
  const started=new Date().toISOString(),nodeMajor=Number(process.versions.node.split(".")[0]);
  add("node_runtime",nodeMajor>=22?"PASS":"FAIL",nodeMajor>=22?"Node.js 22+ detected":"Node.js 22+ is required",{node_version:process.versions.node});
  const pkg=JSON.parse(await (await import("node:fs/promises")).readFile(join(root,"package.json"),"utf8"));
@@ -48,10 +48,11 @@ async function main(){
  add("module_syntax",syntaxFailures.length?"FAIL":"PASS",syntaxFailures.length?"One or more JavaScript modules failed node --check":"All tracked source-area .mjs files parsed",{module_count:files.length,failures:syntaxFailures.slice(0,20)});
  const hygiene=command("repository_hygiene",["scripts/audit-repository-hygiene.mjs"]);
  let hygieneResult=null;try{hygieneResult=JSON.parse(hygiene.out)}catch{}
- if(hygieneResult)add("repository_hygiene_detail",hygieneResult.findings.length?"FAIL":"PASS","High-confidence current-tree secret scan",{tracked_file_count:hygieneResult.tracked_file_count,scanned_text_file_count:hygieneResult.scanned_text_file_count,findings:hygieneResult.findings});
+ const hygieneValid=hygieneResult?.schema_version==="cook-repository-hygiene.1"&&hygieneResult.status==="PASS_CURRENT_TRACKED_TREE_ONLY"&&Array.isArray(hygieneResult.findings)&&hygieneResult.findings.length===0&&Number.isSafeInteger(hygieneResult.scanned_text_file_count)&&hygieneResult.scanned_text_file_count>0;
+ add("repository_hygiene_detail",hygiene.ok&&hygieneValid?"PASS":"FAIL","High-confidence current-tree secret scan; require a valid report",{tracked_file_count:hygieneResult?.tracked_file_count??null,scanned_text_file_count:hygieneResult?.scanned_text_file_count??null,findings:Array.isArray(hygieneResult?.findings)?hygieneResult.findings:[]});
  const test=command("unit_and_integration_tests",["--test","--test-reporter=tap"]);
-  const counts={tests:parseCount(test.out,"tests"),passed:parseCount(test.out,"pass"),failed:parseCount(test.out,"fail"),skipped:parseCount(test.out,"skipped")};
-  const countsValid=test.ok&&counts.tests!==null&&counts.passed===counts.tests&&counts.failed===0&&counts.skipped===0;
+  const counts=parseAcceptanceTap(test.out);
+  const countsValid=test.ok&&counts.valid;
   add("test_count",countsValid?"PASS":"FAIL",countsValid?"All tests passed with no skips":"Test summary missing or contains failures/skips",counts);
  command("json_schema_registry",["scripts/validate-json-schemas.mjs"]);
  const benchmark=command("bounded_project_replay_benchmark",["scripts/benchmark-project-replay.mjs","1000","3"],{timeout:30000});
@@ -62,9 +63,12 @@ async function main(){
    add("bounded_replay_resource_evidence",valid?"PASS":"FAIL","Observed replay resource samples; not a production capacity or memory leak claim",{resources:b.resources,runs:b.runs});
   }catch{add("bounded_replay_resource_evidence","FAIL","Replay resource report unavailable");}
  }
+ const sqlite=command("bounded_sqlite_store_benchmark",["scripts/benchmark-project-replay.mjs","--sqlite","50","3"],{timeout:60000});
+ let sqliteReport=null;try{sqliteReport=JSON.parse(sqlite.out);}catch{}
+ add("bounded_sqlite_resource_evidence",sqlite.ok&&validateSqliteBenchmark(sqliteReport,{revisions:50,repeats:3})?"PASS":"FAIL","Private temporary SQLite fixture; bounded IO observations, not production capacity",{benchmark:sqliteReport});
  const businessRegression=command("project_business_regression",["--test","--test-reporter=tap","test/project-store.test.mjs","test/project-business-review.test.mjs","test/project-runtime.test.mjs","test/project-runtime-context.test.mjs","test/project-overview-view.test.mjs","test/project-risk-review.test.mjs","test/project-http.test.mjs","test/terminal-evidence.test.mjs","test/project-storage-regression.test.mjs","test/synthetic-reserve-product-diagnostic.test.mjs","test/project-financial-close-review.test.mjs","test/market-quality-engine.test.mjs","test/synthetic-batch-audit.test.mjs","test/integer-boundaries.test.mjs","test/financial-identity-domain.test.mjs","test/historical-cost-basis-audit.test.mjs","test/inner-market-project-accounting.test.mjs","test/inner-market-ledger-audit.test.mjs","test/creator-fee-ledger-report.test.mjs","test/historical-trust-evidence.test.mjs","test/math-review-report.test.mjs","test/terminal-state.test.mjs","test/lp-statement-valuation.test.mjs"]);
- const businessCounts={tests:parseCount(businessRegression.out,"tests"),passed:parseCount(businessRegression.out,"pass"),failed:parseCount(businessRegression.out,"fail"),skipped:parseCount(businessRegression.out,"skipped")};
- add("business_regression_count",businessRegression.ok&&businessCounts.tests!==null&&businessCounts.tests===businessCounts.passed&&businessCounts.failed===0&&businessCounts.skipped===0?"PASS":"FAIL","Project storage, evidence, API and synthetic numerical diagnostic regression; not external acceptance",businessCounts);
+ const businessCounts=parseAcceptanceTap(businessRegression.out);
+ add("business_regression_count",businessRegression.ok&&businessCounts.valid?"PASS":"FAIL","Project storage, evidence, API and synthetic numerical diagnostic regression; not external acceptance",businessCounts);
  const temp=await mkdtemp(join(tmpdir(),"cook-unified-acceptance-"));
  try{
   const participant=command("participant_validation_suite",["scripts/run-participant-validation-suite.mjs",join(temp,"participant-validation.json")]);
@@ -109,7 +113,7 @@ async function main(){
  const failed=checks.filter(c=>c.status==="FAIL"||c.status==="REVIEW_REQUIRED");
  const pass=checks.filter(c=>c.status==="PASS").length;
  const report={schema_version:"cook-unified-acceptance.1",started_at:started,completed_at:new Date().toISOString(),
-  repository:{commit:git(["rev-parse","HEAD"]),branch:git(["branch","--show-current"]),working_tree_dirty:git(["status","--porcelain"])?.length>0??null},
+  repository:{commit:git(["rev-parse","HEAD"]),branch:git(["branch","--show-current"]),working_tree_dirty:((status)=>status===null?null:status.length>0)(git(["status","--porcelain"]))},
   environment:{node:process.versions.node,platform:process.platform,arch:process.arch},
   overall_status:failed.length?"FAILED":"CODE_CHECKS_PASS_OPERATOR_ACCEPTANCE_PENDING",
   summary:{passed:pass,failed:failed.length,not_run:checks.filter(c=>c.status==="NOT_RUN").length,operator_gates_pending:operatorGates.filter(g=>g.status!=="PASS").length},

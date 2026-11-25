@@ -1,0 +1,7 @@
+# R18 — engineering acceptance closure
+
+Baseline 604c5e23252cae299d7ef591d166f0f686d5c3cf. UI frozen. R12–R17 targeted implementation complete; check their CI before accepting the final baseline.
+
+The unified runner now requires a positive, unambiguous TAP summary with no skipped, cancelled or todo cases. Repository hygiene must produce a valid current-tree report; missing or malformed output cannot silently bypass its detail check. Reuse the existing bounded SQLite benchmark (50 metadata revisions, three reads, two independent connections) in addition to the pure replay benchmark. Validate timing samples, parity, stale-revision rejection and explicit non-production flags. Correct unknown Git dirty state handling. Tests cover malformed summary and SQLite evidence. All fixture IO is in a disposable directory; no real database, RPC or keys are required for these additions.
+
+This is bounded engineering evidence, not a soak test, production capacity measurement, real market parity, independent ownership/source/valuation attestation or execution approval. The eight operator gates remain pending as described in TERMINAL-V1-RC-PRODUCT-ACCEPTANCE.md. No UI redesign, mathematical parameter calibration or live data integration. New CI required. Stop structural implementation after verified regression closure; proceed with separately scoped read-only local verification rather than inventing further feature work.
