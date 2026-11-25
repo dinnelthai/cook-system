@@ -125,13 +125,30 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   await evaluate('(()=>{const s=document.querySelector("#risk-severity");s.value="UNKNOWN";s.dispatchEvent(new Event("change"));})()');
   assert.equal(await evaluate('document.querySelector("#risk-evidence-rows").textContent.includes("UNKNOWN")'),true);
   assert.equal(await evaluate('document.querySelector("#open-data").disabled'),true);
+  // Test actual narrow viewport with a deliberately unavailable saved selection.
+  await cdp.call("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:false});
+  await wait("narrow-viewport",'innerWidth===390&&document.querySelector(".operator-task-grid")');
+  assert.equal(await evaluate('document.querySelector("#main").getBoundingClientRect().width<=innerWidth+1'),true);
+  await cdp.call("Emulation.clearDeviceMetricsOverride");
+  await evaluate('sessionStorage.setItem("cook.project.selection.v1","missing-qa-project");window.__cookMissingReload=true');
+  await cdp.call("Page.reload");
+  await wait("missing-selection",'window.__cookMissingReload!==true&&document.querySelector("#clear-missing-project")');
+  assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert&&document.querySelector("#open-data").disabled'),true);
+  await evaluate('document.querySelector(\'[data-page="create"]\').click()');
+  await wait("missing-selection-setup",'document.querySelector("#project-draft-form")');
+  assert.equal(await evaluate('document.querySelector(\'#project-draft-form button[type="submit"]\').disabled'),true);
+  await evaluate('document.querySelector(\'[data-page="terminal"]\').click()');
+  await wait("missing-selection-return",'document.querySelector("#clear-missing-project")');
+  await evaluate('document.querySelector("#clear-missing-project").click()');
+  await wait("explicit-clear",'document.querySelector("#terminal-project-select")?.value===""&&!document.querySelector("#terminal-report-area").hidden');
+  assert.equal(await evaluate('sessionStorage.getItem("cook.project.selection.v1")'),null);
   assert.equal(observations.filter(x=>x.kind==="exception").length,0);
   const events=await (await fetch(url+"/api/projects/"+encodeURIComponent(project.project_id)+"/events",{signal:AbortSignal.timeout(3000)})).json();
   assert.equal(events.events.length,1);
   const directory=await (await fetch(url+"/api/projects",{signal:AbortSignal.timeout(3000)})).json();
   assert.equal(directory.projects.length,1);
   assert.equal(directory.projects[0].execution_policy.enabled,false);
-  return {status:"BROWSER_RECOVERY_PASS",scope:"DISPOSABLE_METADATA_RECOVERY_AND_PRIMARY_NAVIGATION",execution_enabled:false,full_browser_e2e_validated:false};
+  return {status:"BROWSER_RECOVERY_PASS",scope:"DISPOSABLE_METADATA_RECOVERY_NAVIGATION_AND_MISSING_SELECTION",execution_enabled:false,full_browser_e2e_validated:false};
  }catch(error){
   let state=null;
   if(cdp)try{

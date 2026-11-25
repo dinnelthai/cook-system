@@ -1,3 +1,10 @@
+// Fail closed on malformed or execution-enabled project metadata from the API.
+function safeProject(p){
+ return p&&typeof p.project_id==="string"&&p.project_id.length>0&&Number.isSafeInteger(p.revision)&&p.revision>=1&&p.execution_policy?.enabled===false&&p.execution_policy.mode==="DISABLED"&&p.source_attestation==="UNKNOWN";
+}
+function safeProjectList(rows){
+ return Array.isArray(rows)&&rows.every(safeProject)&&new Set(rows.map(p=>p.project_id)).size===rows.length;
+}
 async function request(path, { method = "GET", body } = {}) {
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),15000);
@@ -19,28 +26,28 @@ async function request(path, { method = "GET", body } = {}) {
 }
 export async function getProjectDirectory() {
  const result=await request("/api/projects");
- if(!Array.isArray(result.projects)||result.directory?.schema_version!=="cook-project-directory.1"||result.directory.execution_enabled!==false||result.directory.project_count!==result.projects.length)throw Error("PROJECT_API_INVALID_RESPONSE");
+ if(!safeProjectList(result.projects)||result.directory?.schema_version!=="cook-project-directory.1"||result.directory.execution_enabled!==false||result.directory.project_count!==result.projects.length)throw Error("PROJECT_API_INVALID_RESPONSE");
  return result;
 }
 export async function listProjects() {
   const result = await request("/api/projects");
-  if (!Array.isArray(result.projects)) throw Error("PROJECT_API_INVALID_RESPONSE");
+  if (!safeProjectList(result.projects)) throw Error("PROJECT_API_INVALID_RESPONSE");
   return result.projects;
 }
 export async function getProject(projectId) {
   const result = await request("/api/projects/" + encodeURIComponent(projectId));
-  if (!result.project || result.project.project_id !== projectId) throw Error("PROJECT_API_INVALID_RESPONSE");
+  if (!safeProject(result.project) || result.project.project_id !== projectId) throw Error("PROJECT_API_INVALID_RESPONSE");
   return result.project;
 }
 export async function createProject(input) {
   const result = await request("/api/projects", { method: "POST", body: input });
-  if (!result.project?.project_id) throw Error("PROJECT_API_INVALID_RESPONSE");
+  if (!safeProject(result.project)) throw Error("PROJECT_API_INVALID_RESPONSE");
   return result.project;
 }
 export async function lookupCreateRequest(id){
  const r=await request("/api/projects/request-recovery/create",{method:"POST",body:{create_request_id:id}});
  if(r.execution_enabled!==false||!["RECORDED","NOT_OBSERVED"].includes(r.status)||
-    (r.status==="RECORDED"?(!r.project?.project_id||r.project.execution_policy?.enabled!==false):r.project!==null))throw Error("PROJECT_API_INVALID_RESPONSE");
+    (r.status==="RECORDED"?(!safeProject(r.project)):r.project!==null))throw Error("PROJECT_API_INVALID_RESPONSE");
  return r;
 }
 export async function appendProjectCommand(projectId, command, expectedRevision) {
@@ -51,7 +58,7 @@ export async function appendProjectCommand(projectId, command, expectedRevision)
       payload: command.payload, expected_revision: expectedRevision
     }
   });
-  if (result.aggregate?.project_id!==projectId || !Number.isSafeInteger(result.aggregate?.revision) || result.aggregate.revision<=expectedRevision || !["APPLIED", "ALREADY_APPLIED"].includes(result.status)) throw Error("PROJECT_API_INVALID_RESPONSE");
+  if (!safeProject(result.aggregate)||result.aggregate.project_id!==projectId || !Number.isSafeInteger(result.aggregate?.revision) || result.aggregate.revision<=expectedRevision || !["APPLIED", "ALREADY_APPLIED"].includes(result.status)) throw Error("PROJECT_API_INVALID_RESPONSE");
   return result;
 }
 export async function getProjectConfig() {
@@ -67,7 +74,7 @@ export async function inspectProjectEvidence(projectId) {
 }
 export async function listProjectArchive(projectId){
   const result=await request("/api/projects/"+encodeURIComponent(projectId)+"/archive");
-  if(!Array.isArray(result.records)||result.execution_enabled!==false)throw Error("PROJECT_API_INVALID_RESPONSE");
+  if(!Array.isArray(result.records)||result.execution_enabled!==false||result.records.some(a=>a.project_id!==projectId))throw Error("PROJECT_API_INVALID_RESPONSE");
   return result.records;
 }
 export async function linkProjectReport(projectId,workspaceRevision,recordKey,expectedRevision){

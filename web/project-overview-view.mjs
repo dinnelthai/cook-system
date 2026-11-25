@@ -15,9 +15,9 @@ export function projectOverviewModel(review){
  live_assets:"未接入",execution:"已禁用"};
 }
 export function projectIntervalMetrics(row){
- const blocked=!row||row.status==="REVIEW_REQUIRED";
+ const blocked=!row||!["INCOMPLETE","DECLARED_ENDPOINT_PRESENT"].includes(row.status);
  return names.map(([id,label,unit])=>{
   const value=blocked?"—":raw(row.assets?.[id]);
-  return {id,label,unit,value,display_value:unit==="lamports"?formatHistoricalSol(value):value,display_unit:unit==="lamports"?"SOL":unit,evidence_label:row?.status==="REVIEW_REQUIRED"?"证据冲突 · 金额隐藏":value==="—"?"未取得声明值":"历史声明值 · 未独立认证"};
+  return {id,label,unit,value,display_value:unit==="lamports"?formatHistoricalSol(value):value,display_unit:unit==="lamports"?"SOL":unit,evidence_label:row?.status==="REVIEW_REQUIRED"?"证据冲突 · 金额隐藏":row&&blocked?"证据状态无效 · 金额隐藏":value==="—"?"未取得声明值":"历史声明值 · 未独立认证"};
  });
 }

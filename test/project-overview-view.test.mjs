@@ -36,3 +36,7 @@ test("display values convert SOL exactly but retain original audit values and un
  assert.equal(m.find(x=>x.id==="cash").display_unit,"SOL");
  assert.ok(projectIntervalMetrics(null).every(x=>x.display_value==="—"));
 });
+
+test("unrecognized historical asset status never displays supplied numeric values",()=>{
+ for(const status of ["UNKNOWN","UNVERIFIED",undefined])assert.ok(projectIntervalMetrics({status,assets:{cash:"10",nav:"1"}}).every(x=>x.display_value==="—"&&x.evidence_label==="证据状态无效 · 金额隐藏"));
+});
