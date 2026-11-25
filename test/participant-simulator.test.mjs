@@ -55,3 +55,21 @@ test("legacy missing openings and duplicated or cross-scenario recorded events a
   const r=runParticipantSimulation({scenarioId:"ledger-review",seed:7,steps:120});mutate(r);assert.throws(()=>reviewRecordedSyntheticSimulation(r));
  }
 });
+
+test("offline simulation discloses uncalibrated model and unused parameters outside detector input",()=>{
+ const r=runParticipantSimulation({scenarioId:"contract",seed:7,steps:30});
+ assert.equal(r.model_contract.status,"UNCALIBRATED_SYNTHETIC_FIXTURE");
+ assert.equal(r.model_contract.historical_calibration_status,"NOT_PERFORMED");
+ assert.equal(r.model_contract.real_market_accuracy,"UNKNOWN");
+ assert.equal(r.model_contract.actual_arbitrage_verified,false);
+ assert.equal(r.model_contract.actual_mev_verified,false);
+ assert.ok(r.model_contract.parameters.declared_but_unused.includes("holding_horizon_ms"));
+ assert.deepEqual(r.model_contract.parameters.timestamp_only,["execution_latency_ms"]);
+ assert.equal(Object.hasOwn(r.detector_input,"model_contract"),false);
+});
+test("model contract is detached and full fixed-input report is reproducible",()=>{
+ const args={scenarioId:"contract-repeat",seed:7,steps:30};
+ const a=runParticipantSimulation(args),b=runParticipantSimulation(args);assert.deepEqual(a,b);
+ a.model_contract.parameters.declared_but_unused.length=0;
+ assert.ok(runParticipantSimulation(args).model_contract.parameters.declared_but_unused.length>0);
+});

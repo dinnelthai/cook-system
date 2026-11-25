@@ -1,4 +1,5 @@
 import {auditSyntheticConservation} from "./synthetic-conservation.mjs";
+import {describeParticipantModel} from "./participant-model-contract.mjs";
 const ROLES=new Set(["issuer_dev","early_holder","fast_entry","independent_trader","retail","kol_broadcaster","arbitrage","mev_ordering","observer"]);
 const asBig=(v,n)=>{if(typeof v!=="string"||!/^(0|[1-9][0-9]*)$/.test(v))throw Error("invalid "+n);return BigInt(v);};
 function rng(seed){let x=(seed>>>0)||0x9e3779b9;return ()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967296;};}
@@ -70,7 +71,7 @@ export function runParticipantSimulation({scenarioId="offline-scenario",seed=42,
  const agentStates=states.map(a=>({agent_id:a.agent_id,role_class:a.role_class,quote_balance_base_units:a.quote.toString(),token_balance_base_units:a.token.toString()}));
  const conservation=auditSyntheticConservation({openingTotals,finalState:detectorInput.final_state,agentStates});
  return {schema_version:"cook-participant-simulation.1",status:"SYNTHETIC_ONLY",detector_input:detectorInput,ground_truth:groundTruth,
-  opening_agent_states:openingAgentStates,agent_states:agentStates,conservation_audit:conservation,
+  opening_agent_states:openingAgentStates,agent_states:agentStates,conservation_audit:conservation,model_contract:describeParticipantModel(),
   summary:{steps,trade_count:tradeCount,event_count:events.length,agent_count:states.length,fee_bps:feeBps},
   execution_enabled:false,live_rpc_enabled:false,transaction_signing_enabled:false};
 }
