@@ -55,6 +55,7 @@ The first core slice currently includes:
 ## Project business core
 
 - [Project Aggregate & Event Store — V1](docs/implementation/project-aggregate-v1.md)
+- [Participant simulation V2A — defensive robustness](docs/implementation/participant-simulation-v2.md)
 
 ## Implementation contracts
 

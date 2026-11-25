@@ -73,3 +73,12 @@ test("model contract is detached and full fixed-input report is reproducible",()
  a.model_contract.parameters.declared_but_unused.length=0;
  assert.ok(runParticipantSimulation(args).model_contract.parameters.declared_but_unused.length>0);
 });
+
+test("v2 separates random domains and records a coherent event sequence",()=>{
+ const r=runParticipantSimulation({seed:0,steps:240});
+ assert.equal(r.model_contract.scheduling,"SEEDED_SHUFFLED_ROUNDS");
+ assert.equal(r.model_contract.domain_separated_random_streams,true);
+ assert.ok(r.detector_input.events.every((e,i)=>e.ordering.event_sequence===i&&(i===0||e.event_time_ms>=r.detector_input.events[i-1].event_time_ms)));
+ assert.equal(reviewRecordedSyntheticSimulation(r).audit.status,"INTERNALLY_CONSISTENT");
+ assert.notDeepEqual(r.detector_input.events,runParticipantSimulation({seed:4294967296,steps:240}).detector_input.events);
+});

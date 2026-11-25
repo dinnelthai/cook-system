@@ -15,6 +15,7 @@
     "validate:schemas": "node scripts/validate-json-schemas.mjs",
     "audit:history-index": "node scripts/rebuild-historical-event-index.mjs",
     "simulate:participants": "node scripts/run-participant-simulation.mjs",
+    "simulate:observation-stress": "node scripts/run-participant-observation-suite.mjs",
     "analyze:market-quality": "node scripts/analyze-market-quality.mjs",
     "audit:alerts": "node scripts/audit-alert-store.mjs",
     "evaluate:defensive": "node scripts/run-heldout-defensive-evaluation.mjs",
