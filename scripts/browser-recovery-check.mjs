@@ -47,21 +47,23 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
  const project=(await seed.json()).project;
  const child=spawn(browser,["--headless","--disable-background-networking","--disable-sync","--no-first-run",
   "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1","--no-proxy-server","--remote-debugging-address=127.0.0.1",
-  "--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],{env,stdio:"ignore"});
- let cdp,spawnError=null;child.on("error",e=>{spawnError=e;});
+  "--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],{env,stdio:["ignore","ignore","pipe"]});
+ let cdp,spawnError=null,stderrTail="";child.on("error",e=>{spawnError=e;});
+ child.stderr.on("data",chunk=>{stderrTail=(stderrTail+String(chunk)).slice(-8192);});
  const observations=[],requests=new Map();
  const add=(kind,detail)=>{if(observations.length<80)observations.push({kind,...detail});};
  const pathOnly=value=>{try{const u=new URL(value);return u.origin===url?u.pathname:"OTHER_ORIGIN";}catch{return "UNKNOWN";}};
  const brief=value=>String(value??"").replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,240);
  try{
   const port=await eventually(async()=>{
-   if(spawnError||child.exitCode!==null)throw Error("BROWSER_START_FAILED");
+   if(spawnError||child.exitCode!==null||child.signalCode!==null)throw Error("BROWSER_START_FAILED");
    try{const n=Number((await readFile(join(profile,"DevToolsActivePort"),"utf8")).split("\n")[0]);return Number.isInteger(n)&&n>0&&n<=65535?n:null;}catch{return null;}
-  });
+  },12000,"debug-port-file");
   const target=await eventually(async()=>{
+   if(spawnError||child.exitCode!==null||child.signalCode!==null)throw Error("BROWSER_TARGET_PROCESS_EXITED");
    try{const rows=await (await fetch("http://127.0.0.1:"+port+"/json/list",{signal:AbortSignal.timeout(1000)})).json();
     return rows.find(x=>x.type==="page");}catch{return null;}
-  });
+  },12000,"debug-page-target");
   const socket=new URL(target.webSocketDebuggerUrl);
   if(socket.protocol!=="ws:"||socket.hostname!=="127.0.0.1"||Number(socket.port)!==port)throw Error("BROWSER_DEBUG_SCOPE_INVALID");
   cdp=await connect(socket.href);
@@ -117,7 +119,11 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
    state=r.result?.value??null;
   }catch{}
   // All browser data is from disposable QA fixtures, never a user's session.
-  console.error("BROWSER_QA_DIAGNOSTICS "+JSON.stringify({state,observations}));
+  // Report only fixed startup categories, not arbitrary stderr or paths.
+  const startup={exit_code:child.exitCode,signal:child.signalCode,spawn_error:spawnError?.code??null,
+   stderr_observed:stderrTail.length>0,
+   categories:[["sandbox",/sandbox|apparmor/i],["profile_lock",/singleton|profile.*lock/i],["shared_memory",/shared.memory|\/dev\/shm/i],["debug_listener",/DevTools listening/i],["resource_limit",/resource temporarily unavailable|out of memory|too many open files/i],["display",/missing X server|no display/i]].filter(([,pattern])=>pattern.test(stderrTail)).map(([label])=>label)};
+  console.error("BROWSER_QA_DIAGNOSTICS "+JSON.stringify({state,observations,startup}));
   throw error;
  }finally{
   const running=()=>child.exitCode===null&&child.signalCode===null;

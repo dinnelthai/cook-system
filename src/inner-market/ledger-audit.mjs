@@ -3,6 +3,10 @@ import { reconcileProjectCash, summarizeProjectRealizedPnl } from "./project-acc
 
 const amount = (v,n) => parseBaseUnits(v,{name:n,max:U128_MAX});
 const tradeKinds = new Set(["TRADE_CASH_COST","TRADE_NET_RECEIPT"]);
+const scopeKeys=["projectId","quoteAsset","tokenMint","openingCutoff","closingCutoff"];
+// Older row formats omit scope labels. Explicit conflicting labels are not
+// permitted even when the surrounding report and aggregate totals match.
+const scopeConflict=(row,s)=>scopeKeys.some(k=>Object.hasOwn(row,k)&&row[k]!==s[k]);
 function scope(s) {
   if (!s || !["projectId","quoteAsset","tokenMint","openingCutoff","closingCutoff"].every(k=>typeof s[k]==="string"&&s[k].trim())) throw new TypeError("explicit project, asset, mint and cutoffs required");
   return JSON.stringify([s.projectId,s.quoteAsset,s.tokenMint,s.openingCutoff,s.closingCutoff]);
@@ -16,6 +20,7 @@ function scope(s) {
 export function auditProjectLedgers({reportScope, inventoryScope, cashScope, cashEntries, inventoryLedger, openingCashBaseUnits="0", observedClosingCashBaseUnits=null, cashHistoryComplete=false, inventoryHistoryComplete=false}) {
   if(scope(reportScope)!==scope(inventoryScope)||scope(reportScope)!==scope(cashScope)) throw new Error("ledger scope or cutoff mismatch");
   if(!Array.isArray(cashEntries)||!Array.isArray(inventoryLedger?.position_journal)) throw new TypeError("cash entries and inventory journal required");
+  if(cashEntries.some(p=>p&&scopeConflict(p,reportScope))||inventoryLedger.position_journal.some(j=>j&&scopeConflict(j,reportScope)))throw Error("ledger row scope or cutoff mismatch");
   const cash = reconcileProjectCash({
     projectId:reportScope.projectId,quoteAsset:reportScope.quoteAsset,openingCashBaseUnits,entries:cashEntries,
     observedClosingCashBaseUnits,historyComplete:cashHistoryComplete

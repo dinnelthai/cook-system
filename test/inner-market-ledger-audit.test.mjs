@@ -44,3 +44,13 @@ test("tampered ledger aggregates are detected",()=>{
  const r=auditProjectLedgers({...args,inventoryLedger:{...ledger,total_buy_cost_quote_base_units:"201"}});
  assert.ok(r.issues.some(x=>x.code==="INVENTORY_JOURNAL_TOTAL_MISMATCH"));
 });
+
+test("explicit foreign mint or cutoff on an individual posting cannot hide behind matching ledger scopes",()=>{
+ for(const patch of [{tokenMint:"foreign"},{closingCutoff:"slot:21"},{openingCutoff:null}]){
+  const cashEntries=args.cashEntries.map((p,i)=>i===1?{...p,...patch}:p);
+  assert.throws(()=>auditProjectLedgers({...args,cashEntries}),/ledger row scope or cutoff mismatch/);
+ }
+ const inventoryLedger={...ledger,position_journal:ledger.position_journal.map((j,i)=>i===0?{...j,tokenMint:"foreign"}:j)};
+ assert.throws(()=>auditProjectLedgers({...args,inventoryLedger}),/ledger row scope or cutoff mismatch/);
+ assert.equal(auditProjectLedgers(args).status,"RECONCILED");
+});
