@@ -1,5 +1,5 @@
 import {mkdir,open,rename,unlink} from "node:fs/promises";
-import {constants} from "node:fs";
+import {readBoundedRegularFile} from "../core/bounded-private-file.mjs";
 import {dirname,join} from "node:path";
 import {randomUUID} from "node:crypto";
 const SCALE=1000000000000n;
@@ -57,7 +57,7 @@ export function createEmergencyHaltController({readState,writeState}={}){
 export function createFileHaltStorage(path){
  if(typeof path!=="string"||!path.trim())throw Error("HALT_FILE_PATH_REQUIRED");
  return {
-  async readState(){const f=await open(path,constants.O_RDONLY|(constants.O_NOFOLLOW??0));try{const info=await f.stat();if(!info.isFile()||info.size>16384)throw Error("INVALID_HALT_FILE");const bytes=await f.readFile();if(bytes.length>16384)throw Error("INVALID_HALT_FILE");return JSON.parse(bytes.toString("utf8"));}finally{await f.close();}},
+  async readState(){const bytes=await readBoundedRegularFile(path,16384);return JSON.parse(bytes.toString("utf8"));},
   async writeState(state){await mkdir(dirname(path),{recursive:true,mode:0o700});const temp=join(dirname(path),"."+randomUUID()+".halt.tmp"),f=await open(temp,"wx",0o600);
    try{await f.writeFile(JSON.stringify(state)+"\n","utf8");await f.sync();}finally{await f.close();}
    try{await rename(temp,path);}finally{await unlink(temp).catch(e=>{if(e.code!=="ENOENT")throw e;});}

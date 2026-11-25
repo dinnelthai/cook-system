@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {mkdtemp,rm,writeFile,readFile} from "node:fs/promises";
+import {mkdtemp,rm,writeFile,readFile,symlink} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {createAlertStore} from "../src/risk/alert-store.mjs";
@@ -45,4 +45,10 @@ test("concurrent alert writers publish complete journal versions",async()=>{
  try{await Promise.all([createAlertStore(path).openAlert(alert,10),createAlertStore(path).openAlert({...alert,alert_id:"a2"},11)]);
   assert.equal((await createAlertStore(path).audit()).record_count,2);
  }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test("alert journal refuses a symbolic-link journal path",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-alert-link-")),path=join(dir,"alerts.jsonl"),target=join(dir,"outside.jsonl");
+ try{await writeFile(target,"");await symlink(target,path);await assert.rejects(()=>createAlertStore(path).audit(),/FILE_INVALID_OR_TOO_LARGE/);}
+ finally{await rm(dir,{recursive:true,force:true});}
 });

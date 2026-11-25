@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {mkdtemp,rm} from "node:fs/promises";
+import {mkdtemp,rm,writeFile,symlink} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {evaluateQuotePlan,createEmergencyHaltController,createFileHaltStorage} from "../src/risk/quote-risk-gate.mjs";
@@ -60,4 +60,11 @@ test("unbounded numeric strings are rejected before BigInt parsing",()=>{
  assert.throws(()=>evaluateQuotePlan({...i,nowMs:2000}),/invalid quote balance/);
  const j=input();j.market.mid_price_decimal="9".repeat(10000);
  assert.throws(()=>evaluateQuotePlan({...j,nowMs:2000}),/invalid price/);
+});
+
+test("file-backed halt treats a symbolic-link state file as unavailable and stays halted",{skip:process.platform==="win32"},async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-halt-link-")),path=join(dir,"risk","halt.json"),target=join(dir,"outside.json");
+ try{await (await import("node:fs/promises")).mkdir(join(dir,"risk"));await writeFile(target,JSON.stringify({schema_version:"cook-emergency-halt.1",halted:false,reason:"operator",at_ms:1,operator_confirmed:true}));await symlink(target,path);
+  const c=createEmergencyHaltController(createFileHaltStorage(path));const state=await c.load();assert.equal(state.halted,true);assert.equal(state.reason,"HALT_STATE_UNAVAILABLE");
+ }finally{await rm(dir,{recursive:true,force:true});}
 });

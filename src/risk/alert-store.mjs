@@ -1,6 +1,6 @@
 import {createHash,randomUUID} from "node:crypto";
 import {mkdir,open,rm,rename,unlink,rmdir} from "node:fs/promises";
-import {constants} from "node:fs";
+import {readBoundedRegularFile} from "../core/bounded-private-file.mjs";
 import {dirname,join} from "node:path";
 const stable=v=>v===null||typeof v!=="object"?JSON.stringify(v):Array.isArray(v)?"["+v.map(stable).join(",")+"]":"{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+stable(v[k])).join(",")+"}";
 const hash=v=>createHash("sha256").update(stable(v)).digest("hex");
@@ -27,15 +27,12 @@ export function createAlertStore(path,{maxBytes=64*1024*1024,lockAttempts=80,loc
  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>64*1024*1024||!Number.isSafeInteger(lockAttempts)||lockAttempts<1||lockAttempts>1000||!Number.isSafeInteger(lockDelayMs)||lockDelayMs<0||lockDelayMs>1000)throw Error("INVALID_ALERT_STORE_LIMIT");
  const lockPath=path+".lock";
  async function readRecords(){
-  let f;
-  try{f=await open(path,constants.O_RDONLY|(constants.O_NOFOLLOW??0));const info=await f.stat();
-   if(!info.isFile()||info.size>maxBytes)throw Error("ALERT_JOURNAL_SIZE_LIMIT");
-   const bytes=await f.readFile();if(bytes.length>maxBytes)throw Error("ALERT_JOURNAL_SIZE_LIMIT");
+  try{const bytes=await readBoundedRegularFile(path,maxBytes);
    if(bytes.length&&bytes.at(-1)!==10)throw Error("ALERT_JOURNAL_TRUNCATED");
    const lines=bytes.toString("utf8").split("\n");lines.pop();
    if(lines.some(s=>!s))throw Error("ALERT_JOURNAL_RECORD_INVALID");
    return lines.map(line=>JSON.parse(line));
-  }catch(e){if(e.code==="ENOENT")return [];throw e;}finally{if(f)await f.close();}
+  }catch(e){if(e.code==="ENOENT")return [];throw e;}
  }
  async function withLock(fn){
   await mkdir(dirname(path),{recursive:true,mode:0o700});let locked=false;
