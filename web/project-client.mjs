@@ -9,7 +9,7 @@ async function request(path, { method = "GET", body } = {}) {
   });
   let result;
   try { result = await response.json(); } catch { throw Error("PROJECT_API_INVALID_RESPONSE"); }
-  if (!response.ok) throw Error(result?.code || "PROJECT_API_REQUEST_FAILED");
+  if (!response.ok) throw Object.assign(Error(result?.code || "PROJECT_API_REQUEST_FAILED"),{httpStatus:response.status});
   if(!result||typeof result!=="object"||Array.isArray(result))throw Error("PROJECT_API_INVALID_RESPONSE");
   return result;
   }catch(error){
@@ -36,6 +36,12 @@ export async function createProject(input) {
   const result = await request("/api/projects", { method: "POST", body: input });
   if (!result.project?.project_id) throw Error("PROJECT_API_INVALID_RESPONSE");
   return result.project;
+}
+export async function lookupCreateRequest(id){
+ const r=await request("/api/projects/request-recovery/create",{method:"POST",body:{create_request_id:id}});
+ if(r.execution_enabled!==false||!["RECORDED","NOT_OBSERVED"].includes(r.status)||
+    (r.status==="RECORDED"?(!r.project?.project_id||r.project.execution_policy?.enabled!==false):r.project!==null))throw Error("PROJECT_API_INVALID_RESPONSE");
+ return r;
 }
 export async function appendProjectCommand(projectId, command, expectedRevision) {
   const result = await request("/api/projects/" + encodeURIComponent(projectId) + "/commands", {

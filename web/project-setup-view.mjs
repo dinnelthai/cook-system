@@ -1,4 +1,5 @@
-import { listProjects, getProject, createProject, appendProjectCommand, getProjectConfig, inspectProjectEvidence, listProjectArchive, inspectProjectMarket, listProjectReportCandidates, linkProjectReport } from "./project-client.mjs";
+import {createProjectRequestRecovery} from "./project-request-recovery.mjs";
+import { lookupCreateRequest, listProjects, getProject, createProject, appendProjectCommand, getProjectConfig, inspectProjectEvidence, listProjectArchive, inspectProjectMarket, listProjectReportCandidates, linkProjectReport } from "./project-client.mjs";
 
 const U64_MAX = 18446744073709551615n;
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -14,7 +15,11 @@ export function mountProjectSetup(container, {
   // Retry the same immutable request after an uncertain acknowledgement.
   // Bound this cache to the current mounted view; do not retry automatically.
   const pendingCommands=new Map();
-  let pendingCreate=null;
+  let pendingCreate=null,recovery=null,recoveryId=null,recoveryError="";
+  try{
+    recovery=createProjectRequestRecovery(globalThis.sessionStorage);
+    recoveryId=recovery.read();
+  }catch{recoveryError="PROJECT_RECOVERY_STORAGE_UNAVAILABLE";}
 
   function setActive(id) {
     activeProjectId = id;
@@ -89,6 +94,7 @@ export function mountProjectSetup(container, {
 
     container.innerHTML = screenHeading("Project Setup / 项目准备", "项目主记录 · Localnet 身份 · 生命周期证据") +
       note("Project 数据现已保存到本机 SQLite，不再写入浏览器 localStorage。此页面只管理项目配置和证据，不会创建 Token、签名或提交交易。执行权限固定关闭。") +
+      (recoveryId||recoveryError?panel("保存请求恢复",'<p id="project-recovery-status" role="status" class="muted">'+esc(recoveryError||"存在未确认的项目创建请求。仅查询已保存结果，不自动重发。")+'</p><button id="project-recovery-check"'+(recoveryError?" disabled":"")+'>查询此前保存结果</button>'):"")+
       panel("项目配置", '<form id="project-draft-form"><div class="grid">' +
         '<div><label>项目名称</label><input name="name" required maxlength="32" value="' + esc(current?.profile.name ?? "") + '" placeholder="Project name"' + lock + '></div>' +
         '<div><label>Token Symbol</label><input name="symbol" required maxlength="10" pattern="[A-Za-z0-9]{1,10}" value="' + esc(current?.profile.symbol ?? "") + '" placeholder="TOKEN"' + lock + '></div>' +
@@ -122,6 +128,21 @@ export function mountProjectSetup(container, {
       panel("市场账户身份观察",table(["Market ID","Venue","账户","登记状态"],(current?.markets??[]).map(m=>[m.market_id,m.venue,m.market_account,m.verification_status]))+
         '<select id="project-market-select">'+(current?.markets??[]).map(m=>'<option value="'+esc(m.market_id)+'">'+esc(m.market_id+" · "+m.venue)+'</option>').join("")+'</select><button id="project-market-inspect"'+(current?.markets?.length?"":" disabled")+'>只读核验并归档</button><p id="project-market-result" role="status" class="muted">仅检查已登记市场账户身份，不认证来源。</p>')+
       panel("已保存历史报告关联",'<button id="project-report-candidates"'+(current?"":" disabled")+'>读取当前工作区匹配报告</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>关联所选报告</button><p id="project-report-result" role="status" class="muted">仅关联声明身份一致的已保存报告。</p>');
+    const recoveryButton=container.querySelector("#project-recovery-check");
+    if(recoveryButton)recoveryButton.onclick=async()=>{
+      if(!recoveryId||recoveryError)return;
+      const id=recoveryId,target=container.querySelector("#project-recovery-status");
+      recoveryButton.disabled=true;
+      try{
+        const r=await lookupCreateRequest(id);
+        if(!isActive()||version!==viewVersion)return;
+        if(r.status==="NOT_OBSERVED"){target.textContent="尚未观察到保存记录；不能确认原请求不会提交，请再次查询。";return;}
+        recovery.clear(id);recoveryId=null;pendingCreate=null;
+        projects=[...projects.filter(p=>p.project_id!==r.project.project_id),r.project];
+        setActive(r.project.project_id);message="已找到此前保存的项目；未重新提交请求。";render();
+      }catch(error){if(isActive()&&version===viewVersion)target.textContent=errorKind(error);}
+      finally{if(isActive()&&version===viewVersion)recoveryButton.disabled=false;}
+    };
     const marketButton=container.querySelector("#project-market-inspect");
     marketButton.onclick=async()=>{
       marketButton.disabled=true;
@@ -250,9 +271,18 @@ export function mountProjectSetup(container, {
           const draft={profile,network,token,wallet_group:walletGroup};
           const key=JSON.stringify(draft);
           if(pendingCreate&&pendingCreate.key!==key)throw Error("PROJECT_CREATE_UNCONFIRMED_RELOAD_REQUIRED");
+          if(recoveryError)throw Error(recoveryError);
+          if(recoveryId&&!pendingCreate)throw Error("PROJECT_CREATE_UNCONFIRMED_RELOAD_REQUIRED");
           pendingCreate??={key,id:commandId()};
-          project = await createProject({...draft,create_request_id:pendingCreate.id});
-          pendingCreate=null;
+          recovery.remember(pendingCreate.id);
+          recoveryId=pendingCreate.id;
+          try{project = await createProject({...draft,create_request_id:pendingCreate.id});}
+          catch(error){
+            // A validated HTTP 400 rejection did not commit a new record.
+            if(error.httpStatus===400){recovery.clear(pendingCreate.id);recoveryId=null;pendingCreate=null;}
+            throw error;
+          }
+          recovery.clear(pendingCreate.id);recoveryId=null;pendingCreate=null;
         }
         // The mutation succeeded. A subsequent list failure must not invite a duplicate create.
         if (!isActive() || version !== viewVersion) return;
@@ -270,7 +300,7 @@ export function mountProjectSetup(container, {
       }
     };
     container.querySelector("#project-new").onclick = () => {
-      if(pendingCreate){message="上一笔创建尚未确认，请重试原表单或重新读取项目列表。";const status=container.querySelector("#project-status");if(status)status.textContent=message;return;}
+      if(pendingCreate||recoveryId){message="上一笔创建尚未确认，请重试原表单或重新读取项目列表。";const status=container.querySelector("#project-status");if(status)status.textContent=message;return;}
       setActive(null); message = "新建 Project 草稿"; render();
     };
     container.querySelector("#project-open").onclick = () => {

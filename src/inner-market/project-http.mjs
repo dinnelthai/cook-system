@@ -85,6 +85,12 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         send(res, 200, { network: networkConfig ?? { chain_id: "solana", cluster: "localnet", genesis_hash: null, quote_mint: "So11111111111111111111111111111111111111112" }, execution_enabled: false });
         return true;
       }
+      if(parts.length===4&&parts[2]==="request-recovery"&&parts[3]==="create"){
+        if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        const input=await bodyJson(req,readRequestJson,maxBodyBytes);
+        if(Object.keys(input).length!==1||!Object.hasOwn(input,"create_request_id"))throw Error("INVALID_PROJECT_CREATE_REQUEST_ID");
+        send(res,200,store.lookupCreateRequest(input.create_request_id,{actor_id:"operator"}));return true;
+      }
       if (parts.length === 2) {
         if (req.method === "GET") {
           const projects=store.list();

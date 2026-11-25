@@ -321,3 +321,17 @@ test("project create retries through HTTP reuse the same persisted draft",async 
  assert.equal(conflict.status,409);
  assert.equal((await (await fetch(url)).json()).projects.length,1);
 });
+
+test("creation recovery is a read-only observation, including missing request keys",async t=>{
+ const base=await setup(t),url=base+"/api/projects";
+ const key={create_request_id:"recover-qa"};
+ const lookup=async()=>await (await json(url+"/request-recovery/create","POST",key)).json();
+ assert.deepEqual(await lookup(),{status:"NOT_OBSERVED",project:null,execution_enabled:false});
+ assert.equal((await (await fetch(url)).json()).projects.length,0);
+ const first=await json(url,"POST",{...key,profile:{name:"Recover QA",symbol:"QA"}});
+ const created=(await first.json()).project;
+ const found=await lookup();assert.equal(found.status,"RECORDED");assert.deepEqual(found.project,created);
+ assert.equal(found.execution_enabled,false);
+ assert.equal((await (await fetch(url+"/"+created.project_id+"/events")).json()).events.length,1);
+ assert.equal((await json(url+"/request-recovery/create","POST",{...key,profile:{name:"wrong"}})).status,400);
+});

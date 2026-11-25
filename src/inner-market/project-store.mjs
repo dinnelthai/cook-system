@@ -212,6 +212,21 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         return clone(aggregate);
       } catch (error) { try { db.exec("ROLLBACK"); } catch {} throw error; }
     }
+    // Read-only lookup of a previously recorded metadata creation. A missing
+    // event is not proof that an in-flight request will never commit.
+    function lookupCreateRequest(create_request_id,{actor_id="operator"}={}){
+      const actorId=actor(actor_id);
+      if(typeof create_request_id!=="string"||!create_request_id.trim()||
+        create_request_id.trim()!==create_request_id||create_request_id.length>128)throw Error("INVALID_PROJECT_CREATE_REQUEST_ID");
+      const eventId="create:"+hash(canonicalJson([actorId,create_request_id]));
+      return readSnapshot(()=>{
+        const prior=eventById.get(eventId);
+        if(!prior)return {status:"NOT_OBSERVED",project:null,execution_enabled:false};
+        if(prior.event_type!=="PROJECT_CREATED"||prior.revision!==1||prior.actor_id!==actorId)throw Error("PROJECT_IDEMPOTENCY_KEY_CONFLICT");
+        const latest=currentInSnapshot(prior.project_id);
+        return {status:"RECORDED",project:clone(latest.aggregate),execution_enabled:false};
+      });
+    }
     function append(projectId, command, { expected_revision, actor_id = "operator" } = {}) {
       if (typeof projectId !== "string" || !projectId) throw Error("INVALID_PROJECT_ID");
       if (!Number.isSafeInteger(expected_revision) || expected_revision < 1) throw Error("EXPECTED_PROJECT_REVISION_REQUIRED");
@@ -447,7 +462,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
           original_database_replaced:false,source_attestation:"UNKNOWN",execution_enabled:false};
       }finally{copy.close();}
     }
-    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, getBusinessReview, getRuntimeContext, getEvidenceSnapshot, close: () => db.close() };
+    return { create, lookupCreateRequest, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, getBusinessReview, getRuntimeContext, getEvidenceSnapshot, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;
