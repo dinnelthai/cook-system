@@ -20,6 +20,7 @@ import {mountSavedProjectReview} from "./saved-project-review.mjs";
 import {mountGraduationReview} from "./graduation-review-view.mjs";
 import {mountProjectLifecycleReview} from "./project-lifecycle-review-view.mjs";
 import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-workflow.mjs";
+import {summarizeImportedParticipantValidation} from "./participant-validation-view.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
 import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview,reviewProjectMarketEvidence} from "./project-client.mjs";
@@ -490,7 +491,17 @@ function render(){
  panel("随机压力实验",'<div class="grid"><div><label for="experiment-seed">随机种子</label><input id="experiment-seed" type="number" min="0" max="4294967295" value="42"></div><div><label for="experiment-runs">每类实验次数</label><input id="experiment-runs" type="number" min="1" max="1000" value="100"></div></div><p class="muted">仅随机抽取预置风险场景，不生成交易；采样权重并非真实行为概率。</p><button id="run-experiment" class="primary">运行随机实验</button> <button id="export-experiment" disabled>导出实验</button><div id="experiment-result"></div>')+
  panel("场景报告",'<button id="export-participants">导出实验结果 JSON</button>'+details("实验原始数据",results))+
  panel("离线账簿复核",'<p class="muted">仅导入已记录的合成账簿；不生成交易，不认证市场行为。</p><label for="synthetic-ledger-file">账簿输入 JSON</label><input type="file" id="synthetic-ledger-file" accept=".json"><button id="synthetic-ledger-sample">载入固定测试样本</button> <button id="synthetic-ledger-export" disabled>导出核验结果</button><div id="synthetic-ledger-result" role="status"></div>')+
+ panel("统一仿真实验验收",'<p class="muted">使用 npm run simulate:validate 生成离线报告；导入仅复核报告计数，不独立验证运行结果。</p><input id="participant-validation-file" type="file" accept=".json"><div id="participant-validation-result" role="status"></div>')+
  panel("多实验报告复盘",'<p class="muted">导入已完成的离线合成报告数组，重新核验账簿和记录；不导入派生审计结论，不评估真实市场行为。</p><label for="batch-review-file">原始实验报告数组 JSON（最多 100 份 / 4 MiB）</label><input id="batch-review-file" type="file" accept=".json"><button id="batch-review-export" disabled>导出批量核验报告</button><div id="batch-review-result" role="status"></div>');
+ const validationResult=main.querySelector("#participant-validation-result");let validationTicket=0;
+ main.querySelector("#participant-validation-file").onchange=async e=>{
+  const ticket=++validationTicket,file=e.target.files[0];validationResult.textContent="";if(!file)return;
+  try{if(file.size>4*1024*1024)throw Error("FILE_TOO_LARGE");
+   const data=JSON.parse(await file.text());if(ticket!==validationTicket||!validationResult.isConnected)return;
+   const view=summarizeImportedParticipantValidation(data);
+   validationResult.innerHTML=note("导入声明计数："+view.status+" · 来源未认证")+table(["测试组","案例","通过","失败"],view.groups)+note("历史校准："+view.calibration_status);
+  }catch{if(ticket===validationTicket&&validationResult.isConnected)validationResult.textContent="报告无效或计数不一致。";}
+ };
  let experiment=null;
  document.querySelector("#run-experiment").onclick=()=>{
   const el=document.querySelector("#experiment-result"),exportButton=document.querySelector("#export-experiment");

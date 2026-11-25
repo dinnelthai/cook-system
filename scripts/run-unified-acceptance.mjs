@@ -52,6 +52,7 @@ async function main(){
  command("json_schema_registry",["scripts/validate-json-schemas.mjs"]);
  const temp=await mkdtemp(join(tmpdir(),"cook-unified-acceptance-"));
  try{
+  command("participant_validation_suite",["scripts/run-participant-validation-suite.mjs",join(temp,"participant-validation.json")]);
   const evalPath=join(temp,"heldout.json");
   const heldout=command("heldout_synthetic_regression",["scripts/run-heldout-defensive-evaluation.mjs",evalPath,"901,902,903"]);
   if(heldout.ok){
