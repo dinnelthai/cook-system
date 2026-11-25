@@ -31,6 +31,12 @@ export function runParticipantValidationSuite({base,seeds=[701,702,703,704,705],
   bad.agent_states[0].quote_balance_base_units=(BigInt(bad.agent_states[0].quote_balance_base_units)+1n).toString();
   bad.detector_input.events.reverse();
   const badState=reviewParticipantStates(bad);
+  const corrupt=structuredClone(report);
+  const firstTrade=corrupt.detector_input.events.find(x=>x.event_kind.startsWith("CURVE_"));
+  if(!firstTrade)throw Error("MISSING_VALIDATION_TRADE");
+  firstTrade.payload.execution_price_decimal="0";
+  firstTrade.payload.fee_components=[{fee_type:"simulated_pool_fee",amount_base_units:"1",mint:"invalid-fixture-mint"}];
+  const compound=buildUnifiedSyntheticReview(corrupt);
   const assetCoverage=runParticipantAssetCoverage({seed});
   const checks=[
    result("passive_asset_coverage",assetCoverage.status==="SYNTHETIC_REGRESSION_PASS"),
@@ -41,6 +47,7 @@ export function runParticipantValidationSuite({base,seeds=[701,702,703,704,705],
    result("observer_accounting",coverage.observers.every(o=>o.samples.every(s=>s.oracle_record_count===s.received_record_count+s.not_yet_due_record_count+s.missing_after_due_count))),
    result("detector_non_execution",detector.execution_enabled===false&&detector.is_trading_signal===false),
    result("compound_record_and_balance_conflict",badState.status==="REVIEW_REQUIRED"&&badState.checkpoints.length===0),
+   result("compound_numeric_conflict",compound.accounting.status==="INTERNALLY_CONSISTENT"&&compound.status==="REVIEW_REQUIRED"&&compound.issues.some(x=>x.startsWith("RECORDED_PRICE_MISMATCH:"))&&compound.issues.some(x=>x.startsWith("INVALID_RECORDED_FEE_COMPONENT:"))),
    result("reproducible_fixture",hash(report)===hash(runParticipantSimulation({scenarioId:"validation-qa-"+seed,seed,steps})))
   ];
   paths.push({seed,fixture_digest:hash(report),event_count:report.summary.event_count,account_count:ledger.observed_record_counts.agent_count+1,
