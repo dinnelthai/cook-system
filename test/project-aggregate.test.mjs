@@ -89,10 +89,10 @@ test("symbol cannot be changed after launch", () => {
   assert.equal(p.token.mint, mint);
 });
 test("initial Dev wallet group can be created with the Project aggregate", () => {
-  const project = createProjectAggregate({ ...base, wallet_group: group }, { now: () => 1000   assert.throws(() => createProjectAggregate({ ...base, wallet_group: { ...group, members: [{ ...group.members[0], wallet_address: mint }] } }, { now: () => 1000 }), /PROJECT_DEV_WALLET_GROUP_MISMATCH/);
-});
+  const project = createProjectAggregate({ ...base, wallet_group: group }, { now: () => 1000 });
   assert.equal(project.wallet_groups.length, 1);
   assert.equal(project.wallet_groups[0].members[0].wallet_address, wallet);
+  assert.throws(() => createProjectAggregate({ ...base, wallet_group: { ...group, members: [{ ...group.members[0], wallet_address: mint }] } }, { now: () => 1000 }), /PROJECT_DEV_WALLET_GROUP_MISMATCH/);
 });
 test("draft configuration updates profile, network, token and Dev wallet atomically", () => {
   let p = createProjectAggregate({ project_id: "atomic-draft", profile: base.profile }, { now: () => 1000 });
