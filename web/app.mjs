@@ -23,6 +23,7 @@ import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
 import {listProjects} from "./project-client.mjs";
+import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 // Session storage retains diagnostics across refreshes in the same tab, without cross-tab writers.
@@ -136,7 +137,8 @@ function renderTerminal(){
  const actionForm='<form id="terminal-meta"><div class="field-pair"><label>名称<input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"></label><label>Symbol<input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"></label></div><div class="row"><button type="submit" class="primary">保存项目资料</button><button type="button" disabled>提交发行</button></div><p class="muted">仅保存当前会话资料，不代表已发行，不调用发行接口。</p></form>';
  main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>项目操作台</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
  '<div id="terminal-project-context" class="pro-statebar">正在读取 Project 数据…</div>'+
- '<div id="terminal-context-notice" role="status"></div>'+
+ '<div id="terminal-context-notice" role="status"></div>'+ 
+ '<section id="terminal-order-review" class="pro-pane" hidden></section>'+
  '<div id="terminal-report-area"'+(activeProjectId?' hidden inert style="display:none"':'')+'>'+
  '<section class="pro-pane"><h3>独立离线报告</h3><p class="muted">报告项目：'+esc(scope.projectId)+' · Mint：'+esc(scope.tokenMint)+' · '+esc(sourceLabel)+'</p></section>'+
   '<div class="pro-statebar"><span><i class="status-dot"></i> '+(isSample?"SYNTHETIC SAMPLE":"OFFLINE REVIEW")+'</span><span>'+esc(sourceLabel)+'</span><span>'+(isSample?"仅展示合成样本 · 执行禁用":"离线审阅 · 禁止交易")+'</span><span>阶段：'+esc(workflow.review_status)+'</span></div>'+
@@ -162,6 +164,7 @@ function renderTerminal(){
     '<span>Execution: DISABLED</span></div>';
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
+    if(selected){const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download});}
     const match=matchProjectReport(selected,data);
     notice.innerHTML=note(match.status==="DECLARED_MATCH"?"当前报告与 Project 的声明身份一致（Project ID、Mint、网络、Genesis、SOL）。仅为历史复盘；未独立认证，不是实时余额或结算证据。":"历史报告保持隔离："+match.reasons.join(" / ")+"。清除项目选择后可继续独立复盘。");
     if(match.status==="DECLARED_MATCH"){

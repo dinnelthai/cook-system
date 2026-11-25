@@ -61,3 +61,20 @@ export async function inspectProjectMarket(projectId,marketId,expectedRevision){
 export async function listProjectReportCandidates(projectId){
  return request("/api/projects/"+encodeURIComponent(projectId)+"/report-candidates");
 }
+
+export async function listProjectOrders(projectId,revision){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/order-review");
+ if(r.project_id!==projectId||r.project_revision!==revision||!Array.isArray(r.orders)||r.execution_enabled!==false||r.settlement_allowed!==false||r.orders.some(o=>o.project_id!==projectId||o.execution_enabled!==false||o.settlement_allowed!==false))throw Error("PROJECT_ORDER_SCOPE_MISMATCH");
+ return r.orders;
+}
+export async function getOrderReviewEvents(projectId,revision,order){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/order-review-events",{method:"POST",body:{order_id:order.order_id,expected_revision:revision,expected_order_revision:order.revision}});
+ if(r.project_id!==projectId||r.project_revision!==revision||r.order_id!==order.order_id||r.order_revision!==order.revision||!Array.isArray(r.events)||r.execution_enabled!==false)throw Error("PROJECT_ORDER_SCOPE_MISMATCH");
+ return r.events;
+}
+export async function getOrderReceiptReview(projectId,revision,order,archiveId){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/order-receipt-review",{method:"POST",body:{order_id:order.order_id,archive_id:archiveId,expected_revision:revision,expected_order_revision:order.revision}});
+ const v=r.review;
+ if(v?.project_id!==projectId||v.project_revision!==revision||v.order_id!==order.order_id||v.order_revision!==order.revision||v.signature!==order.signature||v.archive_id!==archiveId||v.execution_enabled!==false||v.settlement_allowed!==false)throw Error("PROJECT_ORDER_SCOPE_MISMATCH");
+ return v;
+}

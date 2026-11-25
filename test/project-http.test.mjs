@@ -194,3 +194,13 @@ test("order receipt review rejects unregistered orders and caller-supplied finan
  assert.equal((await json(url,"POST",body)).status,404);
  assert.equal((await fetch(url)).status,405);
 });
+
+test("order review events reject missing orders and arbitrary event submissions",async t=>{
+ const base=await setup(t),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"order-events-http",profile:{name:"Order Events",symbol:"ORD"}})).status,201);
+ const url=root+"/order-events-http/order-review-events";
+ const body={order_id:"missing",expected_revision:1,expected_order_revision:1};
+ assert.equal((await json(url,"POST",body)).status,404);
+ assert.equal((await json(url,"POST",{...body,event:{type:"OBSERVE_OUTCOME"}})).status,400);
+ assert.equal((await fetch(url)).status,405);
+});

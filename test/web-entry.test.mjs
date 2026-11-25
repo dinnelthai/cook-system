@@ -32,3 +32,12 @@ test('selected Project keeps unrelated report hidden and inert', async () => {
   assert.match(app, /open-data"\)\.disabled=Boolean\(activeProjectId\)/);
   assert.match(app, /独立离线报告/);
 });
+
+test("Project terminal mounts a scoped retrospective order review only",async()=>{
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");
+ assert.match(app,/terminal-order-review/);assert.match(app,/mountOrderReview\(orderArea/);
+ assert.match(app,/activeProjectId===selected.project_id/);
+ const view=await readFile(new URL("../web/order-review-view.mjs",import.meta.url),"utf8");
+ assert.match(view,/own!==ticket/);assert.match(view,/source_attestation:"UNKNOWN"/);
+ assert.doesNotMatch(view,/sendTransaction|signTransaction/);
+});

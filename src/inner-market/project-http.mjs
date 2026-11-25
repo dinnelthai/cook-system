@@ -159,7 +159,23 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
       }
       if(action==="order-review"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
-        send(res,200,{orders:store.orderReview.list(projectId),source_attestation:"UNKNOWN",settlement_allowed:false,execution_enabled:false});return true;
+        const project=store.get(projectId);
+        const orders=store.orderReview.list(projectId);
+        if(store.get(projectId).revision!==project.revision)throw Error("PROJECT_REVISION_CONFLICT");
+        send(res,200,{project_id:projectId,project_revision:project.revision,orders,source_attestation:"UNKNOWN",settlement_allowed:false,execution_enabled:false});return true;
+      }
+      if(action==="order-review-events"){
+        if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        const input=await bodyJson(req,readRequestJson,maxBodyBytes);
+        if(Object.keys(input).some(k=>!["order_id","expected_revision","expected_order_revision"].includes(k))||typeof input.order_id!=="string"||
+          !Number.isSafeInteger(input.expected_revision)||!Number.isSafeInteger(input.expected_order_revision))throw Error("INVALID_ORDER_REVIEW_REQUEST");
+        const project=store.get(projectId),order=store.orderReview.list(projectId).find(o=>o.order_id===input.order_id);
+        if(!order)throw Error("ORDER_NOT_FOUND");
+        if(project.revision!==input.expected_revision||order.revision!==input.expected_order_revision)throw Error("PROJECT_REVISION_CONFLICT");
+        const events=store.orderReview.events(projectId,order.order_id);
+        const latest=store.orderReview.list(projectId).find(o=>o.order_id===order.order_id);
+        if(store.get(projectId).revision!==project.revision||latest?.revision!==order.revision)throw Error("PROJECT_REVISION_CONFLICT");
+        send(res,200,{project_id:projectId,project_revision:project.revision,order_id:order.order_id,order_revision:order.revision,events,source_attestation:"UNKNOWN",execution_enabled:false});return true;
       }
       if(action==="archive"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
