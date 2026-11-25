@@ -107,6 +107,10 @@ test("review clearance is evidence-gated and ACTIVE never enables execution", ()
   assert.equal(p.lifecycle.operational_status, "ACTIVE");
   assert.equal(p.execution_policy.enabled, false);
 });
+test("token supply must be positive and fit Solana u64 base units", () => {
+  assert.throws(() => createProjectAggregate({ ...base, token: { supply_base_units: "0", decimals: 6, creator_wallet_address: wallet } }), /INVALID_TOKEN_SUPPLY/);
+  assert.throws(() => createProjectAggregate({ ...base, token: { supply_base_units: "18446744073709551616", decimals: 0, creator_wallet_address: wallet } }), /TOKEN_SUPPLY_EXCEEDS_U64/);
+});
 test("unsupported execution enabling and non-SOL quote assets are rejected", () => {
   const p = createProjectAggregate(base, { now: () => 1000 });
   assert.throws(() => applyProjectCommand(p, { type: "SET_EXECUTION_POLICY", payload: { enabled: true } }), /UNSUPPORTED_PROJECT_COMMAND/);
