@@ -198,13 +198,27 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
   assert.equal(candidates(p).records.length,1);assert.equal(candidates(other).records.length,0);
   const resolve=createProjectWorkspaceResolver(opts),selection={workspace_revision:1,record_key:key};
   assert.throws(()=>resolve(other,selection),/PROJECT_REPORT_IDENTITY_MISMATCH/);
+  const initialRuntime=s.getRuntimeContext(p.project_id);
   const link=s.recordArchive(p.project_id,"HISTORICAL_REPORT_LINK",resolve(p,selection),1);
+  const linkedRuntime=s.getRuntimeContext(p.project_id);
+  assert.notEqual(linkedRuntime.runtime_context_id,initialRuntime.runtime_context_id);
+  const select=(ctx)=>({expected_revision:p.revision,expected_context_id:ctx.runtime_context_id,report_link_archive_id:link.archive_id});
+  assert.throws(()=>s.getRuntimeContext(p.project_id,select(initialRuntime)),/PROJECT_EVIDENCE_SNAPSHOT_CONFLICT/);
+  assert.equal(s.getRuntimeContext(p.project_id,select(linkedRuntime)).selected_interval.assets.cash,null);
   const treasury=createProjectTreasuryReviewer(opts)(p,link);
   assert.equal(treasury.cash_flow.observed_closing_cash_base_units,"887");
   s.recordArchive(p.project_id,"TREASURY_REVIEW",treasury,1);
+  const fundedRuntime=s.getRuntimeContext(p.project_id);
+  assert.throws(()=>s.getRuntimeContext(p.project_id,select(linkedRuntime)),/PROJECT_EVIDENCE_SNAPSHOT_CONFLICT/);
+  const selectedAsset=s.getRuntimeContext(p.project_id,select(fundedRuntime));
+  assert.equal(selectedAsset.selected_interval.assets.cash,treasury.cash_flow.observed_closing_cash_base_units);
+  assert.equal(selectedAsset.live_assets,null);
+  assert.equal(s.getRuntimeContext(p.project_id).selected_interval,null);
+  assert.throws(()=>s.getRuntimeContext(other.project_id,select(fundedRuntime)),/PROJECT_EVIDENCE_SNAPSHOT_CONFLICT/);
   const samples=createOrderReceiptImporter(opts)(p,link).samples;
   assert.equal(s.orderReview.importReceipts(p.project_id,1,link.archive_id,samples).imported,2);
   assert.equal(s.orderReview.importReceipts(p.project_id,1,link.archive_id,samples).already_present,2);
+  assert.throws(()=>s.getRuntimeContext(p.project_id,select(fundedRuntime)),/PROJECT_EVIDENCE_SNAPSHOT_CONFLICT/);
   const receiptSnapshot=s.getEvidenceSnapshot(p.project_id),orders=receiptSnapshot.orders;
   const review=await createOrderReceiptReviewer(opts)(p,orders[0],link);
   assert.equal(review.status,"INTERNAL_MATCH");assert.equal(review.rpc_observation.status,"UNKNOWN");
@@ -225,6 +239,32 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
   assert.equal(business.close.review_count,1);assert.equal(business.risk.status,"REVIEW_REQUIRED");
   const risk=s.getRiskReview(p.project_id),bundle=s.exportAuditBundle(p.project_id,1);
   assert.equal(risk.status,"REVIEW_REQUIRED");assert.deepEqual(bundle.risk,risk);assert.deepEqual(bundle.business_review.global_risk,risk);
+  const runtime=s.getRuntimeContext(p.project_id);
+  assert.equal(runtime.runtime_context_id,business.runtime_context_id);
+  assert.deepEqual(runtime.risk.counts,risk.counts);
+  assert.equal(runtime.risk.status,risk.status);
+  const lifecycle=s.getLifecycleReview(p.project_id);
+  assert.deepEqual(lifecycle.exception_review.critical_findings,risk.findings.filter(f=>f.severity==="CRITICAL").map(f=>f.code));
+  assert.deepEqual(lifecycle.exception_review,bundle.exception_review);
+  const scoped=s.getRuntimeContext(p.project_id,select(runtime));
+  assert.deepEqual(scoped.selected_interval,bundle.business_review.runtime.asset_intervals.find(x=>x.report_link_archive_id===link.archive_id));
+  assert.equal(scoped.settlement_allowed,false);
+  assert.equal(scoped.execution_enabled,false);
+  assert.equal(scoped.live_assets,null);
+  const backupPath=join(dir,"project-recovery.sqlite");
+  const backup=s.createVerifiedBackup(backupPath);
+  assert.equal(backup.status,"VERIFIED_INDEPENDENT_COPY");
+  assert.equal(backup.original_database_replaced,false);
+  const copy=openProjectStore(backupPath);
+  try{
+   assert.deepEqual(copy.getRuntimeContext(p.project_id),runtime);
+   assert.deepEqual(copy.getRuntimeContext(p.project_id,select(runtime)),scoped);
+   assert.deepEqual(copy.getRiskReview(p.project_id),risk);
+   assert.deepEqual(copy.exportAuditBundle(p.project_id,1),bundle);
+   assert.deepEqual(copy.getBusinessReview(p.project_id),business);
+   assert.equal(copy.getRuntimeContext(other.project_id).asset_intervals.length,0);
+  }finally{copy.close();}
+  assert.throws(()=>s.createVerifiedBackup(backupPath),/PROJECT_BACKUP_DESTINATION_EXISTS/);
   assert.ok(risk.findings.some(f=>f.code==="RECEIPT_EVIDENCE_INCOMPLETE"));
   assert.equal(bundle.orders.length,2);assert.equal(bundle.archives.length,5);assert.equal(bundle.settlement_allowed,false);
   assert.equal(checkProjectAuditBundleDigest(bundle).status,"DIGEST_MATCH_NOT_AUTHENTICATED");
@@ -236,6 +276,8 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
   assert.equal(reopened.exportAuditBundle(i.scope.projectId,1).orders.length,2);
   assert.equal(reopened.getRiskReview(i.scope.projectId).status,"REVIEW_REQUIRED");
   assert.equal(reopened.getRiskReview(i.scope.projectId).coverage.market_evidence_review_count,1);
+  assert.equal(reopened.getRuntimeContext(i.scope.projectId).runtime_context_id,reopened.getBusinessReview(i.scope.projectId).runtime_context_id);
+  assert.equal(reopened.getRuntimeContext(i.scope.projectId).execution_enabled,false);
  }finally{reopened.close();}
 });
 

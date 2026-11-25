@@ -367,7 +367,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       return readSnapshot(()=>{
         const latest=current(projectId),{project,archives,orders}=evidenceSnapshotInTransaction(projectId,latest);
         const lifecycle=describeProjectLifecycleEvidence(project,archives,orders);
-        const risk=describeProjectRiskReview(project,archives,orders);
+        const risk=buildProjectBusinessReview(project,archives,orders).global_risk;
         return {...lifecycle,recorded_timeline:describeRecordedProjectTimeline(project,latest.events),
           exception_review:describeLifecycleExceptions(project,lifecycle,risk)};
       });
