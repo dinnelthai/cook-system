@@ -142,6 +142,72 @@ function candleChart(result){
  svg+='<text x="36" y="210" font-size="9" fill="#92a6c0">'+esc(new Date(points[0].interval_start_ms).toISOString())+'</text><text x="550" y="210" text-anchor="end" font-size="9" fill="#92a6c0">'+esc(new Date(points.at(-1).interval_start_ms).toISOString())+'</text></svg>';
  return svg+'<p class="muted">历史成交 · UTC · 显示 '+points.length+' / '+result.candles.length+' 根 · 图中缺少 K 线的周期：'+esc(layout.missing_intervals)+'（无成交或缺数据，不补造） · 图形近似，原始记录精确。</p><details class="audit-detail"><summary>原始 OHLCV 数值（当前窗口）</summary>'+table(["UTC","开","高","低","收","报价成交量（base units）"],candleEvidenceRows(points))+'</details>';
 }
+
+const issuedMemeStages=new Set(["LAUNCHED","BONDING_CURVE_ACTIVE","GRADUATION_PENDING","PUMPSWAP_ACTIVE","EXIT_IN_PROGRESS","SETTLEMENT_PENDING","CLOSED","ARCHIVED"]);
+let memeFilter="",memeMode="operations";
+function mountMemeDesk(){
+ const rail=document.createElement("section");rail.className="meme-rail";rail.setAttribute("aria-label","我的 Meme 项目");
+ rail.innerHTML='<div class="meme-rail-head"><strong>我的 MEME</strong><button type="button" id="meme-new" aria-label="新建项目">＋</button></div><label for="meme-search">搜索项目</label><input id="meme-search" type="search" placeholder="名称 / Symbol / Mint"><div id="meme-list">读取项目目录…</div><button type="button" id="meme-independent">独立历史复盘</button>';
+ nav.prepend(rail);
+ const go=(target,id=activeProjectId)=>{importTicket++;selectProjectContext(id);page=target;render();};
+ rail.querySelector("#meme-new").onclick=()=>go("create",null);
+ rail.querySelector("#meme-independent").onclick=()=>go("terminal",null);
+ rail.querySelector("#meme-search").value=memeFilter;
+ const shell=document.createElement("div");shell.className="meme-desk";
+ const center=document.createElement("div");center.className="meme-center";
+ const side=document.createElement("aside");side.className="meme-control";side.setAttribute("aria-label","项目运营与发行准备");
+ side.innerHTML='<div class="meme-mode" role="group" aria-label="工作模式"><button data-desk-mode="operations">运营</button><button data-desk-mode="launch">发行准备</button></div><div id="meme-control-body"></div>';
+ shell.append(center,side);
+ const reportArea=main.querySelector("#terminal-report-area"),placeholder=main.querySelector("#terminal-scoped-placeholder");
+ const wallet=document.createElement("section");wallet.className="pro-pane meme-wallet";wallet.innerHTML='<h3>项目钱包 / Wallets</h3>'+emptyState("未选择项目","从左侧选择 Meme 查看登记钱包。");
+ const extra=document.createElement("details");extra.className="meme-report-extra";extra.innerHTML="<summary>市场数据与历史复盘明细</summary>";
+ const chart=reportArea.querySelector(".pro-chart");
+ reportArea.prepend(chart);
+ for(const el of [...reportArea.children])if(el!==chart)extra.append(el);
+ reportArea.append(extra);
+ placeholder.classList.add("meme-chart-empty");
+ if(!activeProjectId&&!offlineReview){reportArea.hidden=true;reportArea.inert=true;reportArea.style.display="none";placeholder.hidden=false;placeholder.innerHTML='<h3>市场行情 / Market</h3>'+emptyState("未选择 Meme","选择左侧项目以查看对应的历史行情与资产。");}
+ center.append(main.querySelector("#terminal-project-context"),main.querySelector("#terminal-context-notice"),placeholder,reportArea,wallet,main.querySelector("#terminal-business-review"),main.querySelector("#terminal-project-details"));
+ main.insertBefore(shell,main.querySelector("#launch-dialog"));
+ let selected=null,projects=[],loaded=false,failed=false;
+ const controls=side.querySelector("#meme-control-body"),list=rail.querySelector("#meme-list");
+ function drawList(){
+  if(!loaded){list.textContent=failed?"目录不可用，请重试。":"读取项目目录…";return;}
+  const q=memeFilter.trim().toLowerCase(),match=p=>[p.profile?.name,p.profile?.symbol,p.token?.mint].some(v=>String(v??"").toLowerCase().includes(q));
+  const issued=p=>issuedMemeStages.has(p.lifecycle?.stage)&&Boolean(p.token?.mint);
+  const row=p=>'<button type="button" class="meme-project '+(p.project_id===activeProjectId?"selected":"")+'" data-meme-project="'+esc(p.project_id)+'"'+(p.project_id===activeProjectId?' aria-current="true"':'')+'><span class="meme-avatar" aria-hidden="true">'+esc((p.profile.symbol||"?").slice(0,2))+'</span><span class="meme-project-label"><strong>'+esc(p.profile.symbol)+'</strong><small>'+esc(p.profile.name)+'</small><small>'+esc(lifecycleLabel(p.lifecycle.stage))+'</small></span></button>';
+  const group=(title,rows)=>'<div class="meme-list-title">'+title+' <span>'+rows.length+'</span></div>'+(rows.filter(match).map(row).join("")||'<p class="muted meme-list-empty">'+(q?"无匹配项目":"暂无记录")+'</p>');
+  list.innerHTML=group("已发行 Meme",projects.filter(issued))+group("准备 / 待核验",projects.filter(p=>!issued(p)));
+  list.querySelectorAll("[data-meme-project]").forEach(b=>b.onclick=()=>{record("project.context.selected",{project_id:b.dataset.memeProject});go("terminal",b.dataset.memeProject);});
+ }
+ rail.querySelector("#meme-search").oninput=e=>{memeFilter=e.target.value;drawList();};
+ function drawControls(){
+  side.querySelectorAll("[data-desk-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.deskMode===memeMode)));
+  const button=(action,label,disabled=false)=>'<button type="button" data-desk-action="'+action+'"'+(disabled?" disabled":"")+'>'+label+'</button>';
+  const missing=!selected;
+  controls.innerHTML=memeMode==="launch"?'<section class="meme-control-section"><h3>发行准备</h3><p class="muted">创建项目资料、登记钱包与发行证据。当前没有链上发行执行权限。</p>'+button("new","＋ 新建 Meme 项目")+button("setup","编辑当前项目",missing)+'</section>':'<section class="meme-control-section"><h3>当前项目</h3><strong class="meme-current">'+esc(selected?selected.profile.symbol:"未选择")+'</strong><p class="muted">'+esc(selected?lifecycleLabel(selected.lifecycle.stage):"选择左侧 Meme")+'</p><div class="meme-kv"><span>Mint</span><strong>'+esc(selected?.token?.mint||"—")+'</strong><span>实时资产</span><strong>未接入</strong><span>执行状态</span><strong>已禁用</strong></div></section><section class="meme-control-section"><h3>资金与风控</h3>'+button("assets","资产与钱包",missing)+button("risk","项目风险复核",missing)+button("market","市场证据",missing)+button("orders","历史订单复核",missing)+button("review","财务与项目复盘",missing)+'</section><section class="meme-control-section"><h3>数据与记录</h3>'+button("sample","载入离线样本",Boolean(activeProjectId))+button("data","载入历史记录",Boolean(activeProjectId))+button("refresh","刷新项目目录")+'</section>';
+  controls.querySelectorAll("[data-desk-action]").forEach(b=>b.onclick=()=>{
+   const x=b.dataset.deskAction;
+   if(x==="new")return go("create",null);
+   if(x==="setup")return go("create");
+   if(x==="assets")return go("wallet");
+   if(x==="review")return go("dashboard");
+   if(x==="sample")return main.querySelector("#workflow-sample").click();
+   if(x==="data")return main.querySelector("#open-data").click();
+   if(x==="refresh")return render();
+   const target=main.querySelector(({risk:"#terminal-risk-review",market:"#terminal-market-evidence",orders:"#terminal-order-review"})[x]);
+   if(target&&!target.hidden){main.querySelector("#terminal-project-details").open=true;target.scrollIntoView({block:"start"});}
+  });
+ }
+ side.querySelectorAll("[data-desk-mode]").forEach(b=>b.onclick=()=>{memeMode=b.dataset.deskMode;drawControls();});
+ drawControls();
+ return {update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();
+  if(current)wallet.innerHTML='<div class="meme-rail-head"><h3>项目钱包 / Wallets</h3><button id="meme-wallet-assets" type="button">资产详情</button></div><p class="muted">登记钱包 · 非实时余额 · 归属未独立核验</p>'+table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(current));
+  else wallet.innerHTML='<h3>项目钱包 / Wallets</h3>'+emptyState("未选择项目","选择左侧 Meme 查看登记钱包。");
+  const b=wallet.querySelector("#meme-wallet-assets");if(b)b.onclick=()=>go("wallet");
+ },error(){failed=true;drawList();}};
+}
+
 function renderTerminal(){
  const d=report.terminal_state,a=d.treasury,m=d.market,scope=d.scope;
  const ready=d.status==="REPORT_READY";
@@ -193,12 +259,14 @@ function renderTerminal(){
  '</div>'+
  '<dialog id="launch-dialog" class="pro-dialog"><div class="pro-dialog-head"><h3>发行配置</h3><button data-close="launch-dialog" aria-label="关闭">×</button></div>'+actionForm+'</dialog>'+
  '<dialog id="data-dialog" class="pro-dialog"><div class="pro-dialog-head"><h3>项目数据</h3><button data-close="data-dialog" aria-label="关闭">×</button></div><label for="terminal-import">导入区间报告</label><input type="file" id="terminal-import" accept=".json"><div class="row"><button id="terminal-local-load" class="primary">读取本地记录</button></div><p id="terminal-error" class="negative" role="status"></p></dialog>';
+ const memeDesk=mountMemeDesk();
  const projectContext=main.querySelector("#terminal-project-context");
   main.querySelector("#open-data").disabled=Boolean(activeProjectId);
   const contextVersion=++terminalContextVersion;
   getProjectDirectory().then(({projects,directory})=>{
    if(page!=="terminal"||contextVersion!==terminalContextVersion)return;
    const selected=projects.find(x=>x.project_id===activeProjectId)||null;
+    memeDesk.update(projects,selected);
    const options='<option value="">选择 Project</option>'+(!selected&&activeProjectId?'<option value="'+esc(activeProjectId)+'" selected>此前项目不可用，请重新选择</option>':"")+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
    projectContext.innerHTML='<div class="row"><label>当前 Project <select id="terminal-project-select">'+options+'</select></label>'+
     (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(lifecycleLabel(selected.lifecycle.stage))+'</span><span>运行登记：'+esc(operationalLabel(selected.lifecycle.operational_status))+'</span><span>Mint：'+esc(selected.token.mint||"未登记")+'</span><span>市场：'+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' 已核验</span>':'<span>尚未选择项目</span>')+
@@ -420,7 +488,8 @@ function renderTerminal(){
    main.querySelector("#terminal-project-select").onchange=e=>{importTicket++;selectProjectContext(e.target.value||null);record("project.context.selected",{project_id:activeProjectId});render()};
   }).catch(()=>{
    if(page==="terminal"&&contextVersion===terminalContextVersion){
-    projectContext.textContent="Project 数据库不可用；交易执行保持关闭。";
+    memeDesk.error();
+     projectContext.textContent="Project 数据库不可用；交易执行保持关闭。";
     const retry=document.createElement("button");retry.textContent="重新读取项目";retry.onclick=()=>render();projectContext.append(retry);
     if(activeProjectId){
      const clear=document.createElement("button");clear.textContent="返回独立复盘";

@@ -86,6 +86,37 @@ nav button span:last-child{min-width:0;overflow-wrap:anywhere}main[data-page=ter
 /* Keyboard and small-screen refinements; retain full project identity and mode control. */
 .skip-link{position:fixed;top:8px;left:8px;z-index:100;padding:10px 14px;background:var(--surface);color:var(--text);border:2px solid var(--cyan);border-radius:4px;transform:translateY(-160%)}.skip-link:focus{transform:none}main:focus{outline:none}button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 @media(max-width:700px){header{padding:8px 12px;gap:6px;flex-wrap:wrap;align-items:center}.brand{gap:8px}.header-meta{flex:1 1 100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;align-items:center}.header-meta #global-project-context{grid-column:1;min-width:0}.header-meta .view-mode-label{grid-column:2;grid-row:1}.header-meta .tag{grid-column:1/-1;justify-self:start;margin:0}.header-meta .view-mode-label select{max-width:86px}.header-meta #global-project-context span{max-width:none;min-width:0}.header-meta #global-project-context button{padding:4px 6px;flex-shrink:0}.header-meta .view-mode-label{font-size:10px}nav{scrollbar-width:thin}}
+
+/* Meme-first three-pane terminal */
+.layout:has(main[data-page=terminal]){grid-template-columns:225px minmax(0,1fr)}
+nav:has(.meme-rail){padding:10px 9px;background:#0c1115}nav:has(.meme-rail)::before{display:none}
+.meme-rail{border-bottom:1px solid var(--line);padding:0 0 12px;margin-bottom:12px}
+.meme-rail-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.meme-rail-head strong{font-size:13px;letter-spacing:.04em}
+nav .meme-rail-head button{width:auto;padding:5px 9px;min-height:30px;border:1px solid var(--line);margin:0}
+.meme-rail label{font-size:11px;margin:9px 0 4px}.meme-rail input{padding:7px;font-size:11px;background:#10191d}
+#meme-list{max-height:48vh;overflow:auto;padding:4px 0}
+.meme-list-title{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;padding:10px 4px 4px}.meme-list-empty{padding:0 4px 6px}
+nav button.meme-project{display:flex;width:100%;min-height:50px;margin:3px 0;padding:7px;gap:8px;border:1px solid transparent}
+nav button.meme-project.selected{background:#173339;border-color:#376a6f;box-shadow:inset 2px 0 var(--cyan)}
+.meme-avatar{display:grid;place-items:center;background:#1d3638;color:#9bd1ce;width:30px;height:30px;border-radius:7px;flex-shrink:0;font:600 11px var(--mono)}
+.meme-project-label{min-width:0;display:grid;gap:1px;line-height:1.25}.meme-project-label strong{font-size:12px;color:var(--text)}.meme-project-label small{font-size:10px;overflow-wrap:anywhere}
+nav #meme-independent{border:1px solid var(--line);margin-top:7px;font-size:11px;justify-content:center}
+.meme-desk{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,310px);gap:10px;padding:10px;align-items:start}
+.meme-center{display:flex;flex-direction:column;min-width:0;gap:10px}.meme-center>.pro-pane,.meme-center>.pro-statebar{margin:0;min-width:0}
+.meme-control{display:grid;gap:8px;min-width:0;position:sticky;top:64px;background:#101719;border:1px solid #304344;border-radius:7px;padding:9px}
+.meme-mode{display:grid;grid-template-columns:1fr 1fr;gap:5px;background:#0d1316;padding:3px;border-radius:5px}.meme-mode button[aria-pressed=true]{background:#234347;color:#b9e6e2;border-color:#41686a}
+.meme-control-section{border-top:1px solid var(--line);padding:11px 2px;display:grid;gap:8px}.meme-control-section:first-child{border-top:0}.meme-control-section p.muted{margin:0}
+.meme-current{font-size:19px}.meme-kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px;font-size:11px;align-items:start}.meme-kv span{color:var(--muted)}.meme-kv strong{font-weight:500;overflow-wrap:anywhere;text-align:right}
+.meme-control-section>button{text-align:left;width:100%}
+.meme-center #terminal-project-context .row{gap:8px}.meme-center #terminal-project-context details{margin-top:4px}.meme-center #terminal-context-notice .notice{margin:0;font-size:11px}
+.meme-chart-empty{min-height:315px;background:#101719}.meme-chart-empty .empty-state{min-height:270px;border:0;background:transparent}
+.meme-center #terminal-report-area:not([hidden]){display:flex;flex-direction:column;gap:10px}.meme-center .pro-chart{min-height:310px;margin:0}.meme-center .pro-chart-body{min-height:210px}
+.meme-report-extra{padding:10px;border:1px solid var(--line);border-radius:5px}.meme-report-extra>summary{cursor:pointer;color:var(--muted)}.meme-report-extra .pro-workspace{grid-template-columns:1fr 1fr}
+.meme-wallet{min-height:140px}.meme-wallet p.muted{margin:3px 0 8px}.meme-center .operator-workspace{grid-template-columns:1fr}.meme-center .project-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:1200px){.layout:has(main[data-page=terminal]){grid-template-columns:190px minmax(0,1fr)}.meme-desk{grid-template-columns:minmax(0,1fr) minmax(220px,260px)}}
+@media(max-width:980px){.meme-desk{grid-template-columns:1fr}.meme-control{position:static}.meme-control-section{grid-template-columns:repeat(2,minmax(0,1fr))}.meme-control-section>h3,.meme-control-section>p,.meme-control-section>.meme-kv{grid-column:1/-1}}
+@media(max-width:700px){.layout:has(main[data-page=terminal]){display:block}nav:has(.meme-rail){display:block;max-height:44vh;overflow:auto}nav:has(.meme-rail)>button{display:inline-flex;width:auto}#meme-list{max-height:22vh}.meme-desk{padding:8px}.meme-chart-empty{min-height:240px}.meme-chart-empty .empty-state{min-height:190px}.meme-report-extra .pro-workspace{grid-template-columns:1fr}}
+
 </style></head>
 <body><a class="skip-link" href="#main">跳转到主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div class="header-meta"><div id="global-project-context" role="status"></div><label class="view-mode-label">视图 <select id="operator-view-mode" aria-label="工作区展示模式"><option value="OPERATOR">操作员</option><option value="AUDIT">工程审计</option></select></label><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="页面导航" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
