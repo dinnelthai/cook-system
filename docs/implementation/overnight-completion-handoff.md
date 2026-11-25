@@ -1,6 +1,6 @@
 # Overnight implementation handoff — review required
 
-Base commit: da6e1c6267bfa7d34eabdc76d956325392a3d9fa
+Base commit: da6e1c6267bfa18b255a27c5c148c68483703b26
 Review branch: codex/overnight-market-quality-completion
 
 ## Implemented
@@ -35,3 +35,7 @@ Review branch: codex/overnight-market-quality-completion
 7. Inspect alert journal locking, crash recovery and state transitions.
 8. Confirm no signing/submission endpoint was added.
 9. Review blocked mainnet/Meteora prerequisites before any production decision.
+
+## Index hardening follow-up
+
+The index now uses an unambiguous serialized namespace tuple, sorts within each namespace by the full chain ordering coordinates (synthetic records use event time and sequence), requires the archive manifest and checks bounded reads, and rejects unsupported filters. Query responses disclose truncation. Existing index snapshots lacking the full ordering fields must be rebuilt; immutable batch files are unchanged. Checksums remain consistency checks, not independent source authentication or a transactional snapshot under concurrent writes.

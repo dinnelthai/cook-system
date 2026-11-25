@@ -35,3 +35,33 @@ test("index detects tampering of any indexed batch, not only the queried batch",
   await assert.rejects(()=>loadHistoricalEventIndex(dir),/HISTORICAL_INDEX_BATCH_CHECKSUM_MISMATCH/);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test("compound namespace encoding cannot collapse distinct scopes with delimiters",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-index-key-"));
+ try{const store=createHistoricalEventStore(dir);
+  for(const [genesis_hash,token_mint] of [["a|b","c"],["a","b|c"]]){
+   const e=event(1);e.market.token_mint=token_mint;
+   await store.put({scope:{...scope,genesis_hash,token_mint},events:[e]});
+  }
+  const idx=await store.rebuildIndex();assert.equal(idx.unique_event_count,2);
+  assert.equal(new Set(idx.entries.map(e=>e.event_key)).size,2);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+test("observed events preserve chain order across batches in the same slot",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-index-order-"));
+ try{const store=createHistoricalEventStore(dir),s={...scope,network:"local_sim",provenance:"observed_chain"};
+  const e=(id,tx,inner,seq)=>{const x=event(1);delete x.synthetic_metadata;x.event_id=id;x.provenance="observed_chain";x.market.network=s.network;x.ordering={slot:100,transaction_index:tx,instruction_index:0,inner_instruction_index:inner,event_sequence:seq,ordering_confidence:"complete"};return x;};
+  await store.put({scope:s,events:[e("z",0,null,0),e("b",0,1,0)]});
+  await store.put({scope:{...s,interval_id:"later"},events:[e("a",1,null,0),e("y",0,1,1)]});
+  await store.rebuildIndex();const q=await store.query({network:"local_sim"},2);
+  assert.deepEqual(q.results.map(r=>r.event.event_id),["z","b"]);assert.equal(q.matched_count,4);assert.equal(q.truncated,true);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+test("unknown filters, invalid ranges and wrong scenario cannot silently broaden a query",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-index-filter-"));
+ try{const store=createHistoricalEventStore(dir);await store.put({scope,events:[event(1)]});await store.rebuildIndex();
+  await assert.rejects(()=>store.query({tokenMint:"token"}),/UNKNOWN_INDEX_FILTER/);
+  await assert.rejects(()=>store.query({from_time_ms:5,to_time_ms:1}),/INVALID_INDEX_FILTER_RANGE/);
+  assert.equal((await store.query({scenario_id:"wrong"})).result_count,0);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
