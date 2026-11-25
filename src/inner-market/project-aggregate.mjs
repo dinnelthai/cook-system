@@ -272,6 +272,8 @@ export function assertProjectAggregate(value) {
   const executionPolicy = normalizeExecutionPolicy(value.execution_policy);
   if (value.source_attestation !== "UNKNOWN") fail("INVALID_SOURCE_ATTESTATION");
   if (token.creator_wallet_address && walletGroups.some(g => g.members.some(m => m.wallet_address === token.creator_wallet_address && m.role !== "DEV"))) fail("CREATOR_WALLET_ROLE_MISMATCH");
+  const devGroup = walletGroups.find(group => group.group_id === "dev-wallets");
+  if (devGroup && (!token.creator_wallet_address || !devGroup.members.some(member => member.wallet_address === token.creator_wallet_address && member.role === "DEV" && member.enabled))) fail("PROJECT_DEV_WALLET_GROUP_MISMATCH");
   const normalized = {
     schema_version: PROJECT_SCHEMA_VERSION, project_id: value.project_id, revision: value.revision,
     created_at_ms: value.created_at_ms, updated_at_ms: value.updated_at_ms,
