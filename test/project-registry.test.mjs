@@ -15,6 +15,7 @@ test("issuance evidence is deduplicated and remains explicitly unverified",()=>{
  assert.equal(registry.recordIssuanceEvidence(row.id,{mint,signature}).status,"ALREADY_PRESENT");
  assert.throws(()=>registry.recordIssuanceEvidence(row.id,{mint:"11111111111111111111111111111113",signature}),/ISSUANCE_SIGNATURE_CONFLICT/);
  assert.equal(registry.get(row.id).status,"ISSUANCE_EVIDENCE_UNVERIFIED");
+ const updated=registry.saveDraft({...base,id:row.id,name:"Updated Token"});assert.equal(updated.status,"ISSUANCE_EVIDENCE_UNVERIFIED");assert.equal(updated.issuance_records.length,1);
 });
 test("invalid supply, symbol, mint, signature, URL and unsafe supply precision are rejected",()=>{
  const registry=createProjectRegistry({storage:new MemoryStorage(),idFactory:()=>"p1"});
