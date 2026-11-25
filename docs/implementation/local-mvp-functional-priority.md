@@ -59,3 +59,7 @@ The receipt extraction now exposes a separate transaction-wide native_fee_audit.
 ## R3 follow-up — T04 evidence and synthetic launch QA
 
 Token receipt rows now explicitly distinguish two recorded balances from provisional zero treatment of a one-sided record. Account lifecycle and rent attribution remain UNKNOWN; no new expenses are inferred. Added bounded offline creation-marker batch QA (`scripts/run-synthetic-launch-review.mjs`), with duplicate detection, synthetic-only inputs and existing fixed role-specific audit tests. Each marker runs the same fixed QA fixture, not an independent market path or a participant trading policy. No live monitoring, autonomous buying/selling, wallet orchestration, execution or deceptive activity simulation. Actual account instruction/rent and raw-receipt verification remain open.
+
+## C02–C05 follow-up — offline accounting QA only
+
+Added a standalone synthetic closed-ledger auditor for already recorded postings and separately supplied opening/closing balances. It checks per-account exact differences, rejects cross-scenario rows and duplicate IDs, and diagnoses missing endpoints and unbalanced aggregate postings. It does not generate postings, infer economic ownership, or validate actual execution. Batch launch QA now reports deduplicated trial totals and explicitly distinguishes scenario labels from the single reused QA fixture. The auditor is not yet wired to simulator exports or a browser. No participant policy, live discovery, market competition or transaction execution is added.

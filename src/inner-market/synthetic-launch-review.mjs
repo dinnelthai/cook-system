@@ -16,5 +16,6 @@ export function reviewSyntheticLaunchBatch({records,base,seed=42,runs=10}={}){
   results.push({event_id:record.event_id,scenario_id:record.scenario_id,qa_fixture_project_id:base.scope.projectId,
    status:report.total_matches===report.total_trials?"QA_MATCH":"REVIEW_REQUIRED",trial_count:report.total_trials,match_count:report.total_matches,role_summaries:report.summaries});
  }
- return {source_mode:"SYNTHETIC",status:"QA_ONLY",input_count:records.length,unique_creation_count:seen.size,duplicate_count:records.length-seen.size,results,execution_enabled:false,live_discovery_enabled:false,independent_market_paths_claimed:false,note:"Reuses fixed synthetic QA fixture per creation marker; not trading or market competition simulation."};
+ const summary={qa_match_count:results.filter(r=>r.status==="QA_MATCH").length,review_required_count:results.filter(r=>r.status==="REVIEW_REQUIRED").length,total_trials:results.reduce((n,r)=>n+r.trial_count,0),total_matches:results.reduce((n,r)=>n+r.match_count,0),distinct_scenario_labels:new Set(results.map(r=>r.scenario_id)).size,distinct_qa_templates:results.length?1:0};
+ return {source_mode:"SYNTHETIC",status:"QA_ONLY",input_count:records.length,unique_creation_count:seen.size,duplicate_count:records.length-seen.size,summary,results,execution_enabled:false,live_discovery_enabled:false,independent_market_paths_claimed:false,note:"Reuses fixed synthetic QA fixture per creation marker; not trading or market competition simulation."};
 }

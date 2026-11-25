@@ -18,3 +18,10 @@ test("reject non-synthetic and conflicting creation markers",()=>{
  assert.throws(()=>reviewSyntheticLaunchBatch({base:b,records:[marker("a"),marker("a","different")]}),/CONFLICTING_CREATION_RECORD/);
  assert.throws(()=>reviewSyntheticLaunchBatch({base:{...b,sourceMode:"ARCHIVED_HISTORICAL"},records:[]}),/SYNTHETIC_FIXTURE_REQUIRED/);
 });
+
+test("batch totals exclude duplicates and do not count labels as independent templates",()=>{
+ const r=reviewSyntheticLaunchBatch({base:base(),records:[marker("a","same"),marker("a","same"),marker("b","same"),marker("c","other")],runs:2});
+ assert.deepEqual(r.summary,{qa_match_count:3,review_required_count:0,total_trials:36,total_matches:36,distinct_scenario_labels:2,distinct_qa_templates:1});
+ const empty=reviewSyntheticLaunchBatch({base:base(),records:[]});
+ assert.equal(empty.summary.total_trials,0);assert.equal(empty.summary.distinct_qa_templates,0);
+});
