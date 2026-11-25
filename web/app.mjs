@@ -23,7 +23,7 @@ import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-
 import {summarizeImportedParticipantValidation,compareImportedParticipantValidation} from "./participant-validation-view.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
-import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview,reviewProjectMarketEvidence,getProjectBusinessReview} from "./project-client.mjs";
+import {getProjectDirectory,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview,reviewProjectMarketEvidence,getProjectBusinessReview} from "./project-client.mjs";
 import {treasuryReviewSections} from "./treasury-review-view.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
@@ -161,13 +161,13 @@ function renderTerminal(){
  const projectContext=main.querySelector("#terminal-project-context");
   main.querySelector("#open-data").disabled=Boolean(activeProjectId);
   const contextVersion=++terminalContextVersion;
-  listProjects().then(projects=>{
+  getProjectDirectory().then(({projects,directory})=>{
    if(page!=="terminal"||contextVersion!==terminalContextVersion)return;
    const selected=projects.find(x=>x.project_id===activeProjectId)||null;
    const options='<option value="">选择 Project</option>'+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
    projectContext.innerHTML='<div class="row"><label>当前 Project <select id="terminal-project-select">'+options+'</select></label>'+
     (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(selected.lifecycle.stage)+'</span><span>Mint：'+esc(selected.token.mint||"未登记")+'</span><span>市场：'+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' 已核验</span>':'<span>尚未选择项目</span>')+
-    '<span>Execution: DISABLED</span></div>';
+    '<span>Execution: DISABLED</span></div><details><summary>项目组合登记复核</summary>'+table(["项目","阶段","配置状态","登记重叠"],directory.projects.map(x=>[x.project_id,x.stage,x.configuration_status,x.registration_overlap_count]))+table(["登记异常","项目"],directory.findings.map(x=>[x.code,x.project_ids.join(", ")]))+note("登记重叠不等于共同控制，组合资金与 NAV 未核验")+'</details>';
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
     if(selected){
@@ -187,6 +187,8 @@ function renderTerminal(){
          (v.offline_workflow?'<details><summary>离线业务证据覆盖（非执行许可）</summary>'+table(["区间开始","区间结束","状态","资金 / 市场 / 关闭"],v.offline_workflow.intervals.map(x=>[x.opening_cutoff,x.closing_cutoff,x.status,x.evidence.map(e=>e.status).join(" / ")]))+'</details>':"")+
          (v.model_evidence?'<details><summary>区间库存、数学与市场证据</summary>'+table(["区间","证据类别","状态","数学 / 储备","历史数量（基础单位）"],v.model_evidence.intervals.flatMap(i=>i.evidence.map(e=>[i.opening_cutoff+" → "+i.closing_cutoff,e.kind,e.status,e.math_status??e.reserve_evidence_status??"UNKNOWN",e.inventory?.closing_quantity_base_units??"—"])))+note("参与者模型："+v.model_evidence.participant_model.status+" · 独立需求、当前库存及真实市场准确度未验证")+'</details>':"")+
          (v.continuity?'<details><summary>毕业与财务连续性复核</summary>'+table(["阶段","证据状态"],v.continuity.milestones.map(m=>[m.stage,m.status]))+table(["区间","核对项","状态"],v.continuity.intervals.flatMap(i=>i.checks.map(c=>[i.opening_cutoff+" → "+i.closing_cutoff,c.id,c.status])))+note("历史声明一致性不代表实际迁移资金核对、LP 归属或结算许可")+'</details>':"")+
+         (v.launch_review?'<details><summary>发行准备风险清单</summary>'+table(["检查","状态"],v.launch_review.checks.map(x=>[x.id,x.status]))+note("非发行推荐，真实需求与法律审查未验证")+'</details>':"")+
+         (v.operating_components?'<details><summary>历史经营收益构成（非因果归因）</summary>'+table(["区间","状态","交易已实现损益","Creator 现金收入","其他收入","费用"],v.operating_components.rows.map(x=>[x.opening_cutoff+" → "+x.closing_cutoff,x.status,x.components.trade_realized_pnl_base_units??"—",x.components.creator_cash_income_base_units??"—",x.components.other_cash_income_base_units??"—",x.components.separate_expenses_base_units??"—"]))+note("金额为报价资产基础单位；不跨区间汇总")+'</details>':"")+
          '<details><summary>历史区间与报告关联</summary>'+table(["区间开始","区间结束","关联复核数"],v.intervals.map(x=>[x.opening_cutoff,x.closing_cutoff,x.reviews.length]))+'</details>'+
          table(["证据冲突","引用"],v.findings.map(x=>[x.code,x.reference??"—"]))+
          table(["证据未知","引用"],(v.unknown??[]).map(x=>[x.code,x.reference??"—"]))+

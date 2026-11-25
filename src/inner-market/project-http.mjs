@@ -1,3 +1,4 @@
+import {describeProjectDirectory} from "./project-governance-review.mjs";
 import {describeProjectRiskReview} from "./project-risk-review.mjs";
  import {reviewProjectGraduationEvidence} from "./project-graduation-evidence.mjs";
 const ROOT = "/api/projects";
@@ -86,7 +87,8 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
       }
       if (parts.length === 2) {
         if (req.method === "GET") {
-          send(res, 200, { projects: store.list() });
+          const projects=store.list();
+          send(res, 200, { projects, directory: describeProjectDirectory(projects) });
           return true;
         }
         if (req.method !== "POST") { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }

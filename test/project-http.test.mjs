@@ -58,7 +58,10 @@ test("Project HTTP API creates, reads, mutates and verifies a persisted project"
 
   const listResponse = await fetch(base + "/api/projects");
   assert.equal(listResponse.status, 200);
-  assert.equal((await listResponse.json()).projects.length, 1);
+  const directoryResult=await listResponse.json();
+  assert.equal(directoryResult.projects.length,1);
+  assert.equal(directoryResult.directory.project_count,1);
+  assert.equal(directoryResult.directory.execution_enabled,false);
 
   const group = {
     group_id: "dev-wallets", name: "Dev Wallets", purpose: "DEV",

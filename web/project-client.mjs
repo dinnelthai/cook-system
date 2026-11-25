@@ -9,6 +9,11 @@ async function request(path, { method = "GET", body } = {}) {
   if (!response.ok) throw Error(result?.code || "PROJECT_API_REQUEST_FAILED");
   return result;
 }
+export async function getProjectDirectory() {
+ const result=await request("/api/projects");
+ if(!Array.isArray(result.projects)||result.directory?.schema_version!=="cook-project-directory.1"||result.directory.execution_enabled!==false||result.directory.project_count!==result.projects.length)throw Error("PROJECT_API_INVALID_RESPONSE");
+ return result;
+}
 export async function listProjects() {
   const result = await request("/api/projects");
   if (!Array.isArray(result.projects)) throw Error("PROJECT_API_INVALID_RESPONSE");
