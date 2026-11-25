@@ -44,7 +44,7 @@ function errorResponse(error) {
 
 /** Loopback HTTP adapter for Project CRUD, versioned commands and audit reads.
  * Host/origin enforcement is performed by the parent local-only server. */
-export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536 } = {}) {
+export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig } = {}) {
   if (!store || typeof readRequestJson !== "function" || !Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1024) {
     throw Error("INVALID_PROJECT_HTTP_CONFIGURATION");
   }
@@ -56,6 +56,11 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
     if (url.search || url.hash) { send(res, 400, { code: "QUERY_NOT_SUPPORTED" }); return true; }
     const parts = url.pathname.split("/").filter(Boolean);
     try {
+      if (parts.length === 3 && parts[2] === "config") {
+        if (req.method !== "GET") { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }
+        send(res, 200, { network: networkConfig ?? { chain_id: "solana", cluster: "localnet", genesis_hash: null, quote_mint: "So11111111111111111111111111111111111111112" }, execution_enabled: false });
+        return true;
+      }
       if (parts.length === 2) {
         if (req.method === "GET") {
           send(res, 200, { projects: store.list() });
