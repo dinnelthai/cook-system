@@ -7,6 +7,51 @@ export class SolanaRpcError extends Error {
   }
 }
 
+// Native Fetch bodies are bounded while streaming, including decompressed bytes.
+// JSON-only injected test adapters can only be checked after their own parsing.
+async function readRpcPayload(response, method, maxBytes, allowInjectedJson) {
+  const tooLarge = () => new SolanaRpcError(method, "response size limit exceeded");
+  const declared = response.headers?.get?.("content-length");
+  if (typeof declared === "string" && /^\d+$/.test(declared) && Number(declared) > maxBytes) {
+    if (response.body?.cancel) await response.body.cancel().catch(() => {});
+    throw tooLarge();
+  }
+  if (response.body?.getReader) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    const parts = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > maxBytes) throw tooLarge();
+        parts.push(decoder.decode(value, { stream: true }));
+      }
+      parts.push(decoder.decode());
+      return JSON.parse(parts.join(""));
+    } catch (error) {
+      await reader.cancel().catch(() => {});
+      if (error instanceof SolanaRpcError || error?.name === "AbortError") throw error;
+      throw new SolanaRpcError(method, "invalid or unreadable JSON response");
+    } finally {
+      reader.releaseLock();
+    }
+  }
+  if (allowInjectedJson && typeof response.json === "function") {
+    let payload;
+    try { payload = await response.json(); } catch {
+      throw new SolanaRpcError(method, "invalid JSON response");
+    }
+    const encoded = JSON.stringify(payload);
+    if (typeof encoded !== "string") throw new SolanaRpcError(method, "invalid JSON response");
+    if (new TextEncoder().encode(encoded).byteLength > maxBytes) throw tooLarge();
+    return payload;
+  }
+  throw new SolanaRpcError(method, "response body unavailable");
+}
+
 export class SolanaRpcClient {
   constructor({
     endpoint,
@@ -15,7 +60,8 @@ export class SolanaRpcClient {
     timeoutMs = 30_000,
     maxRetries = 2,
     headers = {},
-    strictEnvelope = false,
+    strictEnvelope = true,
+    maxResponseBytes = 32 * 1024 * 1024,
   } = {}) {
     if (typeof endpoint !== "string" || !/^https?:\/\//.test(endpoint)) {
       throw new TypeError("an HTTP(S) Solana RPC endpoint is required");
@@ -23,6 +69,10 @@ export class SolanaRpcClient {
     if (typeof fetchImpl !== "function") throw new TypeError("fetch implementation is required");
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new RangeError("timeoutMs must be positive");
     if (!Number.isSafeInteger(maxRetries) || maxRetries < 0 || maxRetries > 5) throw new RangeError("maxRetries must be between 0 and 5");
+    if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes < 1 || maxResponseBytes > 128 * 1024 * 1024) throw new RangeError("invalid maxResponseBytes");
+    if (typeof strictEnvelope !== "boolean") throw new TypeError("strictEnvelope must be boolean");
+    this.maxResponseBytes = maxResponseBytes;
+    this.allowInjectedJson = fetchImpl !== globalThis.fetch;
     this.endpoint = endpoint;
     this.fetchImpl = fetchImpl;
     this.commitment = commitment;
@@ -60,15 +110,19 @@ export class SolanaRpcClient {
           }
           throw error;
         }
-        const payload = await response.json();
-        if (this.strictEnvelope && (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.jsonrpc !== "2.0" || payload.id !== id || Object.hasOwn(payload,"result") === Object.hasOwn(payload,"error"))) {
+        const payload = await readRpcPayload(response, method, this.maxResponseBytes, this.allowInjectedJson);
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+            Object.hasOwn(payload,"result") === Object.hasOwn(payload,"error") ||
+            (this.strictEnvelope && (payload.jsonrpc !== "2.0" || payload.id !== id))) {
           throw new SolanaRpcError(method, "invalid JSON-RPC response envelope");
         }
-        if (payload.error) {
-          throw new SolanaRpcError(method, payload.error.message ?? "unknown JSON-RPC error", payload.error);
-        }
-        if (!Object.hasOwn(payload, "result")) {
-          throw new SolanaRpcError(method, "response is missing result", { payload });
+        if (Object.hasOwn(payload,"error")) {
+          const err = payload.error;
+          if (!err || typeof err !== "object" || Array.isArray(err) || !Number.isSafeInteger(err.code) || typeof err.message !== "string") {
+            throw new SolanaRpcError(method, "invalid JSON-RPC error envelope");
+          }
+          // Do not propagate arbitrary upstream message/data into logs or reports.
+          throw new SolanaRpcError(method, "JSON-RPC error", { code: err.code });
         }
         return payload.result;
       } catch (error) {

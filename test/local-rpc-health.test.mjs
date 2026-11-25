@@ -22,5 +22,5 @@ test("only fixed health methods are requested and reachable is not proof of netw
 });
 test("bad response is unavailable or requires review",async()=>{
  const result=await checkLocalRpcHealth("http://localhost:8899",{fetchImpl:async()=>({ok:true,json:async()=>({result:null})})});
- assert.equal(result.status,"REVIEW_REQUIRED");
+ assert.equal(result.status,"RPC_UNAVAILABLE");
 });

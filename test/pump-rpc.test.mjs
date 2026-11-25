@@ -40,11 +40,11 @@ test("Solana RPC client retries rate limits but propagates JSON-RPC errors", asy
   let calls = 0;
   const rpc = new SolanaRpcClient({
     endpoint: "https://rpc.example.invalid",
-    fetchImpl: async () => {
+    fetchImpl: async (_url, init) => {
       calls += 1;
       return calls === 1
         ? jsonResponse({ error: { code: -32005, message: "rate limited" } }, 429)
-        : jsonResponse({ result: "ok" });
+        : jsonResponse({ jsonrpc:"2.0", id:JSON.parse(init.body).id, result: "ok" });
     },
     maxRetries: 1,
   });
@@ -53,7 +53,7 @@ test("Solana RPC client retries rate limits but propagates JSON-RPC errors", asy
 
   const failing = new SolanaRpcClient({
     endpoint: "https://rpc.example.invalid",
-    fetchImpl: async () => jsonResponse({ error: { code: -32602, message: "invalid params" } }),
+    fetchImpl: async (_url, init) => jsonResponse({jsonrpc:"2.0",id:JSON.parse(init.body).id,error: { code: -32602, message: "invalid params" } }),
     maxRetries: 0,
   });
   await assert.rejects(() => failing.request("getAccountInfo"), SolanaRpcError);
@@ -79,4 +79,36 @@ test("bonding curve PDA derivation is deterministic and returns a valid Solana k
   const b = derivePumpBondingCurveAddress(mint);
   assert.equal(a, b);
   assert.equal(a.length, 44);
+});
+
+test("strict RPC envelopes are the default and reject incomplete or mismatched responses",async()=>{
+ for(const build of [id=>({result:1}),id=>({jsonrpc:"2.0",id:id+1,result:1}),id=>({jsonrpc:"1.0",id,result:1}),id=>({jsonrpc:"2.0",id,result:1,error:null}),id=>({jsonrpc:"2.0",id,error:null}),id=>null,id=>[]]){
+  const rpc=new SolanaRpcClient({endpoint:"https://rpc.example.invalid",maxRetries:0,
+   fetchImpl:async(_u,init)=>jsonResponse(build(JSON.parse(init.body).id))});
+  await assert.rejects(()=>rpc.getSlot(),SolanaRpcError);
+ }
+});
+test("native HTTP response streaming enforces byte bounds and accepts valid UTF-8",async()=>{
+ const rpc=new SolanaRpcClient({endpoint:"https://rpc.example.invalid",maxRetries:0,maxResponseBytes:100,
+  fetchImpl:async(_u,init)=>new Response(JSON.stringify({jsonrpc:"2.0",id:JSON.parse(init.body).id,result:"测试"}))});
+ assert.equal(await rpc.request("getHealth"),"测试");
+ const oversized=new SolanaRpcClient({endpoint:"https://rpc.example.invalid",maxRetries:0,maxResponseBytes:64,
+  fetchImpl:async()=>new Response(new ReadableStream({start(c){c.enqueue(new Uint8Array(32));c.enqueue(new Uint8Array(33));c.close();}}))});
+ await assert.rejects(()=>oversized.getSlot(),/response size limit exceeded/);
+ const declared=new SolanaRpcClient({endpoint:"https://rpc.example.invalid",maxRetries:0,maxResponseBytes:64,
+  fetchImpl:async()=>new Response("{}",{headers:{"content-length":"65"}})});
+ await assert.rejects(()=>declared.getSlot(),/response size limit exceeded/);
+});
+test("malformed native JSON and oversized injected objects fail closed",async()=>{
+ const malformed=new SolanaRpcClient({endpoint:"https://rpc.example.invalid",maxRetries:0,fetchImpl:async()=>new Response("{")});
+ await assert.rejects(()=>malformed.getSlot(),/invalid or unreadable JSON response/);
+ const oversized=new SolanaRpcClient({endpoint:"https://rpc.example.invalid",maxRetries:0,maxResponseBytes:64,
+  fetchImpl:async(_u,init)=>jsonResponse({jsonrpc:"2.0",id:JSON.parse(init.body).id,result:"x".repeat(100)})});
+ await assert.rejects(()=>oversized.getSlot(),/response size limit exceeded/);
+ assert.throws(()=>new SolanaRpcClient({endpoint:"https://rpc.example.invalid",maxResponseBytes:0}),RangeError);
+});
+test("RPC upstream error details do not leak arbitrary response text",async()=>{
+ const rpc=new SolanaRpcClient({endpoint:"https://rpc.example.invalid",maxRetries:0,
+  fetchImpl:async(_u,init)=>jsonResponse({jsonrpc:"2.0",id:JSON.parse(init.body).id,error:{code:-32602,message:"private upstream text",data:{private:"value"}}})});
+ await assert.rejects(()=>rpc.getSlot(),err=>err instanceof SolanaRpcError&&err.details.code===-32602&&!err.message.includes("private")&&!Object.hasOwn(err.details,"data"));
 });
