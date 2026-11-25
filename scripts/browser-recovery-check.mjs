@@ -46,7 +46,7 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
  assert.equal(seed.status,201);
  const project=(await seed.json()).project;
  const child=spawn(browser,["--headless","--disable-background-networking","--disable-sync","--no-first-run",
-  "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost","--remote-debugging-address=127.0.0.1",
+  "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1","--no-proxy-server","--remote-debugging-address=127.0.0.1",
   "--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],{env,stdio:"ignore"});
  let cdp,spawnError=null;child.on("error",e=>{spawnError=e;});
  const observations=[],requests=new Map();
@@ -88,7 +88,8 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   await cdp.call("Network.enable");
   await cdp.call("Log.enable");
   await cdp.call("Page.enable");
-  await cdp.call("Page.navigate",{url});
+  const navigation=await cdp.call("Page.navigate",{url});
+  if(navigation.errorText)throw Error("BROWSER_NAVIGATION_FAILED:"+brief(navigation.errorText));
   await wait("initial-terminal",'location.origin==='+JSON.stringify(url)+' && document.querySelector("#terminal-project-select")');
   assert.equal(await evaluate('document.querySelector("#terminal-project-context").textContent.includes("Execution: DISABLED")'),true);
   await evaluate('sessionStorage.setItem("cook.project.create.pending.v1",'+JSON.stringify(key)+');window.__cookQaBeforeReload=true');
