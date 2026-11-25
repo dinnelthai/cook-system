@@ -7,20 +7,22 @@ import { checkLocalRpcHealth } from "../src/inner-market/local-rpc-health.mjs";
 import { buildTerminalState } from "../src/inner-market/terminal-state.mjs";
 import { realpath } from "node:fs/promises";
 import {readBoundedRegularFile} from "../src/core/bounded-private-file.mjs";
+import {resolveLocalFeatureFlags} from "../src/core/local-feature-flags.mjs";
 import { fileURLToPath } from "node:url";
 import { resolve,extname,sep,relative as relativePath,isAbsolute } from "node:path";
 const root=await realpath(fileURLToPath(new URL("../",import.meta.url)));
 const allowed=["web/","src/inner-market/","src/core/","fixtures/synthetic/"];
 const types={".html":"text/html; charset=utf-8",".mjs":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8"};
 const reportPath=process.env.COOK_TERMINAL_REPORT;
+const localFeatures=resolveLocalFeatureFlags();
 const maxReportBytes=16*1024*1024;
 const port=Number(process.env.PORT??4173);
 if(!Number.isInteger(port)||port<1||port>65535)throw new Error("invalid PORT");
 const wallets=createWalletStore();
-const faucet=createLocalFaucet({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:process.env.COOK_LOCAL_FAUCET==="1"});
-const transfers=createLocalTransfer({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:process.env.COOK_LOCAL_FAUCET==="1",loadSigner:wallets.loadSigner});
-const trading=createLocalTrading({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:process.env.COOK_LOCAL_FAUCET==="1",labUrl:process.env.COOK_PUMP_LAB_URL,wallets});
-createServer(async(req,res)=>{
+const faucet=createLocalFaucet({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.faucet});
+const transfers=createLocalTransfer({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.transfer,loadSigner:wallets.loadSigner});
+const trading=createLocalTrading({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.trading,labUrl:process.env.COOK_PUMP_LAB_URL,wallets});
+const server=createServer(async(req,res)=>{
  try{
   const requestHost=req.headers.host,requestOrigin=req.headers.origin;
   if(!["127.0.0.1:"+port,"localhost:"+port].includes(requestHost)||req.headers["sec-fetch-site"]==="cross-site"||(requestOrigin&&requestOrigin!=="http://"+requestHost)){res.writeHead(403,{"Cache-Control":"no-store","Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"FORBIDDEN"}));return;}
@@ -70,4 +72,10 @@ createServer(async(req,res)=>{
   res.writeHead(200,{"Content-Type":types[extname(target)],"Cache-Control":"no-store","X-Content-Type-Options":"nosniff","Content-Security-Policy":"default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});
   res.end(bytes);
  }catch{res.writeHead(404);res.end("Not found")}
-}).listen(port,"127.0.0.1",()=>console.log("Offline MVP: http://127.0.0.1:"+port));
+});
+server.headersTimeout=10_000;
+server.requestTimeout=15_000;
+server.keepAliveTimeout=5_000;
+server.maxRequestsPerSocket=100;
+server.maxConnections=64;
+server.listen(port,"127.0.0.1",()=>console.log("Offline MVP: http://127.0.0.1:"+port));

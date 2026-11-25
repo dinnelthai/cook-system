@@ -25,3 +25,8 @@ Merge gate: latest CI green, operator review completed, outstanding limitations 
 ## Post-merge follow-up
 
 Master merge e0031bb passed 314/314 tests and both auxiliary CI steps in run 45528929553. The report bridge, CLI validator and local read preflight now share a bounded regular-file reader; it rejects leaf symlinks and non-regular files and caps actual bytes read, including when files grow during reading. Static serving retains its existing path checks. The configured report must be an actual private regular file; a symlink is no longer accepted. Trusted parent directories and operator-controlled file permissions are still required; this is not a complete filesystem sandbox. The bridge still serves raw report inputs to the local terminal, so operators must not place secrets or unrelated sensitive fields in them. Actual local Validator and browser acceptance remain pending.
+
+
+## Local capability isolation follow-up
+
+The local faucet, wallet transfer and PumpSwap trading adapters now have separate explicit environment opt-ins (`COOK_LOCAL_FAUCET`, `COOK_LOCAL_TRANSFER`, `COOK_LOCAL_TRADING`); all default disabled. Setting the faucet flag no longer enables transfer or trading. The offline HTTP server also sets bounded header/request/keep-alive timeouts and connection/request caps. Tests cover the independent feature flags and the faucet-only server configuration. Actual localnet transactions remain disabled unless the operator separately enables the corresponding local-only adapter and supplies a pinned private genesis.
