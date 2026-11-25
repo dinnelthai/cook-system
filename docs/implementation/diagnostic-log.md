@@ -10,3 +10,5 @@ Review issue objects and strings are normalized to explicitly approved codes, wi
 
 ### Local HTTP transport diagnostics
 GET `/api/terminal/diagnostics` on the existing localhost server returns a bounded memory-only transport log. It includes route groups, allowed method categories, HTTP status, disconnect outcome and elapsed time. It deliberately excludes URLs, query strings, headers, request bodies, account identifiers and raw errors. The existing Host/Origin/fetch-site checks apply. The log resets when the server restarts, is not a financial audit trail, and does not enable execution.
+
+The existing export button now downloads a combined diagnostic bundle. Browser events and server HTTP observations are separate sections. A failed or timed-out local server fetch exports browser diagnostics anyway and marks server_status UNAVAILABLE. The offline archive command accepts both legacy browser-only and combined formats, independently re-sanitizing both sections. No external upload is performed.

@@ -7,6 +7,7 @@ import {buildTerminalCandles} from "../src/inner-market/terminal-candles.mjs";
 import {advanceReview,makeReviewArchive,restoreReviewArchive} from "../src/inner-market/terminal-state.mjs";
 import { buildUnifiedHistoricalReport } from "../src/inner-market/unified-historical-report.mjs";
 import {createDiagnosticLog,errorKind} from "./diagnostic-log.mjs";
+import {collectDiagnosticBundle} from "./diagnostic-bundle.mjs";
 import {historicalReviewRows} from "./historical-review-view.mjs";
 import {buildProjectFinancialCloseReview} from "../src/inner-market/project-financial-close-review.mjs";
 import {financialCloseRows} from "./financial-close-view.mjs";
@@ -35,9 +36,10 @@ const record=(event,detail={},level="INFO")=>diagnostics.record(event,detail,lev
 record("app.start");
 window.addEventListener("error",e=>record("runtime.error",{error_kind:errorKind(e.error)},"ERROR"));
 window.addEventListener("unhandledrejection",e=>record("runtime.rejection",{error_kind:errorKind(e.reason)},"ERROR"));
-function exportDiagnostics(){
+async function exportDiagnostics(){
  record("log.export");
- download("cook-diagnostics-"+new Date().toISOString().replace(/[:.]/g,"-")+".json",JSON.stringify(diagnostics.snapshot(),null,2));
+ const bundle=await collectDiagnosticBundle(diagnostics.snapshot());
+ download("cook-diagnostics-"+new Date().toISOString().replace(/[:.]/g,"-")+".json",JSON.stringify(bundle,null,2));
 }
 function startupFailure(error){
  main.textContent="启动失败："+errorKind(error)+"。请导出诊断日志。";
@@ -613,7 +615,7 @@ function render(){
  panel("日志工具",'<div class="row"><button id="log-download" class="primary">导出诊断日志 JSON</button><button id="log-refresh">刷新</button><button id="log-clear">清空日志</button></div>')+
  panel("最近事件",table(["时间 (UTC)","级别","事件","详情"],logs.entries.slice().reverse().map(x=>[x.time,x.level,x.event,JSON.stringify(x.detail)])));
  document.querySelector("#rpc-health").onclick=async()=>{const output=document.querySelector("#rpc-health-result");output.textContent="检查中…";try{const response=await fetch("/api/terminal/health",{cache:"no-store"});if(!response.ok)throw Error("health endpoint unavailable");const result=await response.json();output.innerHTML=table(["检查","状态"],[["报告桥",result.report_bridge],["RPC",result.rpc?.status],["最终确认 slot",result.rpc?.slot],["版本",result.rpc?.version],["Genesis hash",result.rpc?.genesis_hash],["网络身份","待独立核验"]]);}catch{output.textContent="本地检查接口不可用";}};
- document.querySelector("#log-download").onclick=()=>{exportDiagnostics();render()};
+ document.querySelector("#log-download").onclick=async()=>{await exportDiagnostics();render()};
  document.querySelector("#log-refresh").onclick=()=>render();
  document.querySelector("#log-clear").onclick=()=>{if(window.confirm("清空当前会话诊断日志？")){diagnostics.clear();render()}};
  }else{
