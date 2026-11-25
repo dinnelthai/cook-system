@@ -49,3 +49,8 @@ test("declared migration inputs and reserves are different concepts",()=>{
  const f=fixture();f.events[3].payload.migrated_quote_amount_base_units="301";
  const r=reviewGraduationHistory(f);assert.equal(r.lifecycle.declared_amounts.declared_input_comparison,"DIFFERENT_REQUIRES_EXPLANATION");assert.equal(r.status,"PARTIAL");
 });
+
+test("missing account address withholds pool data and completion alone is not migration",()=>{
+ const f=fixture();delete f.pool_replays[0].current_snapshot.decoded_pool.account_address;assert.equal(reviewGraduationHistory(f).pools[0].metrics,null);
+ const g=fixture();g.events=g.events.filter(e=>["MARKET_CREATED","CURVE_COMPLETE"].includes(e.event_kind));g.pool_replays=[];const r=reviewGraduationHistory(g);assert.equal(r.lifecycle.phase,"COMPLETION_RECORDED_NO_MIGRATION");assert.equal(r.lifecycle.transaction_link,"UNKNOWN");assert.equal(r.execution_enabled,false);
+});

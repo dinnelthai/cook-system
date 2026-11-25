@@ -17,7 +17,7 @@ export function mountGraduationReview(host,{download,initial=null,onReview=()=>{
   const l=review.lifecycle;
   table("记录身份",["字段","值"],Object.entries(review.scope));
   table("毕业证据",["阶段","事件","签名","Slot"],[["创建",l.creation?.event_id,l.creation?.signature,l.creation?.slot],["内盘完成",l.completion?.event_id,l.completion?.signature,l.completion?.slot],["迁移",l.migration?.event_id,l.migration?.signature,l.migration?.slot]]);
-  table("迁移输入（原始单位，非到账凭证）",["字段","值"],[["池地址",l.migration_pool_address],["交易关联",l.transaction_link],...Object.entries(l.declared_amounts??{})]);
+  table("迁移输入（原始单位，非到账凭证）",["字段","值"],[["生命周期证据",l.phase],["池地址",l.migration_pool_address],["交易关联",l.transaction_link],...Object.entries(l.declared_amounts??{})]);
   table("外盘历史核对",["池地址","迁移关联","声明覆盖","重放","账户对账","Slot"],review.pools.map(p=>[p.pool_address,p.linked_to_migration?"声明匹配":"未核验",p.reported_coverage,p.replay_status,p.snapshot_status,p.snapshot_slot]));
   for(const p of review.pools)if(p.metrics)table("历史池快照 · "+p.pool_address,["字段","值"],Object.entries(p.metrics));
   table("待复核事项",["等级","事项","池地址"],review.issues.map(i=>[i.level,i.code,i.pool_address]));

@@ -21,18 +21,21 @@ export function reviewGraduationHistory(input){
  let ordered;
  try{ordered=sortForReplay(deduplicateEvents(relevant));}catch{throw Error("INVALID_GRADUATION_ORDER");}
  if(ordered.some(e=>!usable(e)))add("EVENT_QUALITY_UNCONFIRMED");
+ const positions=new Map(ordered.map((e,i)=>[e.event_id,i]));
+ const position=e=>positions.get(e.event_id);
  const select=k=>ordered.filter(e=>e.event_kind===k);
  const creates=select("MARKET_CREATED"),completes=select("CURVE_COMPLETE"),migrations=select("CURVE_MIGRATED"),poolCreates=select("POOL_CREATED");
  if(creates.length!==1)add("CREATION_EVIDENCE_MISSING_OR_AMBIGUOUS",creates.length>1?"FAIL":"UNKNOWN");
  if(completes.length>1||migrations.length>1)add("AMBIGUOUS_CURVE_LIFECYCLE","FAIL");
  const complete=completes.length===1?completes[0]:null,migration=migrations.length===1?migrations[0]:null;
- if(complete&&creates.length===1&&ordered.indexOf(creates[0])>=ordered.indexOf(complete))add("COMPLETE_BEFORE_CREATION","FAIL");
- if(migration&&(!complete||ordered.indexOf(complete)>=ordered.indexOf(migration)))add("MIGRATION_WITHOUT_PRIOR_COMPLETION",complete?"FAIL":"UNKNOWN");
+ if(complete&&creates.length===1&&position(creates[0])>=position(complete))add("COMPLETE_BEFORE_CREATION","FAIL");
+ if(migration&&(!complete||position(complete)>=position(migration)))add("MIGRATION_WITHOUT_PRIOR_COMPLETION",complete?"FAIL":"UNKNOWN");
  const address=migration?.payload?.pool_address??null;
  const pair=address?poolCreates.filter(e=>e.payload?.pool_address===address):[];
  if(migration&&(!id(address)||pair.length!==1))add("MIGRATED_POOL_CREATION_MISSING_OR_AMBIGUOUS",pair.length>1?"FAIL":"UNKNOWN");
  const creation=pair.length===1?pair[0]:null;
  let link="UNKNOWN",amounts=null;
+ if(!migration&&poolCreates.length)add("POOL_CREATION_WITHOUT_MIGRATION_LINK");
  if(migration&&creation){
   const p=migration.payload,c=creation.payload;
   if(c.pool_program_id!==AMM||c.base_mint!==m.token_mint||c.quote_mint!==m.quote_mint||p.mint!==m.token_mint||p.quote_mint!==m.quote_mint){link="FAIL";add("MIGRATION_POOL_IDENTITY_MISMATCH","FAIL",address);}
@@ -58,12 +61,12 @@ export function reviewGraduationHistory(input){
   out.creation=fact(start);
   if(p.pool_program_id!==AMM||p.base_mint!==m.token_mint||p.quote_mint!==m.quote_mint){add("POOL_CREATION_SCOPE_MISMATCH","FAIL",pool);continue;}
   const events=ordered.filter(e=>POOL_KINDS.has(e.event_kind)&&e.payload?.pool_address===pool);
-  if(events.some(e=>ordered.indexOf(e)<=ordered.indexOf(start))){add("POOL_EVENT_BEFORE_CREATION","FAIL",pool);continue;}
+  if(events.some(e=>position(e)<=position(start))){add("POOL_EVENT_BEFORE_CREATION","FAIL",pool);continue;}
   if(!usable(start)||events.some(e=>!usable(e))||r.signature_coverage?.coverage_complete!==true||!Array.isArray(r.data_gaps)||r.data_gaps.length||!Array.isArray(r.unresolved_events)||r.unresolved_events.length||!Array.isArray(r.initialization_evidence)||r.initialization_evidence.length||!Array.isArray(s?.errors)||s.errors.length){add("POOL_EVIDENCE_INCOMPLETE","UNKNOWN",pool);continue;}
   if(!dd||!b||!q){add("POOL_SNAPSHOT_MISSING","UNKNOWN",pool);continue;}
   if(d.account_owner!==AMM||dd.base_mint!==m.token_mint||dd.quote_mint!==m.quote_mint||b.mint!==m.token_mint||q.mint!==m.quote_mint||(d.account_address!=null&&d.account_address!==pool)||b.token_authority!==pool||q.token_authority!==pool){add("POOL_SNAPSHOT_SCOPE_MISMATCH","FAIL",pool);continue;}
   // Missing account address is not proof of pool identity.
-  if(d.account_address==null){add("POOL_ACCOUNT_ADDRESS_UNATTESTED","UNKNOWN",pool);}
+  if(d.account_address==null){add("POOL_ACCOUNT_ADDRESS_UNATTESTED","UNKNOWN",pool);continue;}
   if(![d.context_slot,b.context_slot,q.context_slot].every(slot)||d.context_slot!==b.context_slot||d.context_slot!==q.context_slot||events.some(e=>e.ordering.slot>d.context_slot)||start.ordering.slot>d.context_slot){add("POOL_SNAPSHOT_SLOT_NOT_COMPARABLE","UNKNOWN",pool);continue;}
   if(events.some(e=>["POOL_BUY_EXECUTED","POOL_SELL_EXECUTED"].includes(e.event_kind)&&e.quality?.transaction_balance_reconciliation?.status!=="PASS")){add("POOL_TRADE_RECONCILIATION_UNCONFIRMED","UNKNOWN",pool);continue;}
   try{
@@ -81,5 +84,6 @@ export function reviewGraduationHistory(input){
  if(ordered.some(e=>POOL_KINDS.has(e.event_kind)&&!rows.has(e.payload?.pool_address)))add("POOL_EVENT_WITHOUT_REPLAY_RECORD");
  if(input.curve_replay_status!=="REPLAYED_FULL_CURVE_HISTORY"||input.current_account_reconciliation?.status!=="PASS"||input.signature_coverage?.coverage_complete!==true||!Array.isArray(input.data_gaps)||input.data_gaps.length)add("CURVE_COVERAGE_OR_RECONCILIATION_UNCONFIRMED");
  const status=issues.some(x=>x.level==="FAIL")?"REVIEW_REQUIRED":issues.length?"PARTIAL":"INTERNAL_CHECKS_CONSISTENT";
- return {schema_version:"cook-graduation-review.1",status,scope:{network:m.network,token_mint:m.token_mint,quote_mint:m.quote_mint,curve_address:curve},lifecycle:{creation:creates.length===1?fact(creates[0]):null,completion:fact(complete),migration:fact(migration),migration_pool_address:address,transaction_link:link,declared_amounts:amounts},pools,issues,source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",settlement_allowed:false,execution_enabled:false};
+ const phase=status==="REVIEW_REQUIRED"?"CONTRADICTORY_EVIDENCE":migration?link==="MATCHED_DECLARED_TRANSACTION"&&complete?"MIGRATION_LINK_RECORDED":"MIGRATION_UNCONFIRMED":complete?"COMPLETION_RECORDED_NO_MIGRATION":"NO_COMPLETION_RECORDED";
+ return {schema_version:"cook-graduation-review.1",status,scope:{network:m.network,token_mint:m.token_mint,quote_mint:m.quote_mint,curve_address:curve},lifecycle:{phase,creation:creates.length===1?fact(creates[0]):null,completion:fact(complete),migration:fact(migration),migration_pool_address:address,transaction_link:link,declared_amounts:amounts},pools,issues,source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",settlement_allowed:false,execution_enabled:false};
 }

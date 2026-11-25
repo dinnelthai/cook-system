@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {reviewGraduationHistory} from "../src/inner-market/graduation-history-review.mjs";
 import snapshot from "../src/adapters/pump/pump-idl.snapshot.json" with { type: "json" };
 import { decodeBase58 } from "../src/adapters/pump/borsh.mjs";
 import {
@@ -270,6 +271,10 @@ test("full mint collector follows migration into PumpSwap and reconciles post-gr
   assert.equal(result.events.filter(x=>x.event_kind==="POOL_BUY_EXECUTED").length,1);
   assert.equal(result.raw_candles_status,"AVAILABLE");
   assert.equal(result.raw_candles_1m.length,2);
+  const archived=JSON.parse(JSON.stringify(result,(_,v)=>typeof v==="bigint"?v.toString():v));
+  const review=reviewGraduationHistory(archived);
+  assert.equal(review.scope.token_mint,MINT);assert.equal(review.lifecycle.migration_pool_address,POOL);
+  assert.equal(review.pools.length,1);assert.equal(review.source_attestation,"UNKNOWN");assert.equal(review.settlement_allowed,false);
   }
   // Encoded synthetic stage-event regression, not a retained RPC receipt.
   // The earlier creation values must not silently become a final snapshot.
