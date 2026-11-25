@@ -46,3 +46,24 @@ Verified baseline: `498a1b9ac66fa98780420fc14107df4757d07c57`, [CI 45626203552](
 ## Populated evidence display regression
 
 Baseline b7b60e2 passed both Node matrix jobs (run [45626530040](https://github.com/dinnelthai/cook-system/actions/runs/45626530040)). The follow-up browser harness uses its own disposable project database only: a synthetic historical interval with exact positive cash, negative NAV, and a quantity larger than Number.MAX_SAFE_INTEGER; a separate conflicting interval; and the existing synthetic candle report. It verifies explicit interval selection, matching exact values on terminal/assets/review pages, conflict masking, clearing a selection, and independent chart rendering. No real chain evidence, operator database, model calibration, live data or execution is involved. Existing 14 screenshots still cover the original metadata fixture; the new populated checks are DOM assertions, not visual acceptance. This follow-up requires its own CI result.
+
+## UI structure freeze — verified engineering baseline
+
+Baseline: `c003f266c6debcc422feee052b8b03180eec30fe`. [CI 45626814027](https://github.com/dinnelthai/cook-system/actions/runs/45626814027): Node 22 and Node 24 completed successfully. The Node 22 unified acceptance report recorded 802 tests, 201 business regression tests and zero test failures. The Chromium job reported `BROWSER_RECOVERY_PASS`, `populated_historical_display: PASS`, `synthetic_candle_display: PASS`, 14 captured previews and temporary cleanup PASS. Its scope is a disposable offline fixture; `full_browser_e2e_validated` remains false and `manual_visual_review` remains NOT_RUN.
+
+Freeze the seven-page navigation, project-first review workspace, asset/evidence grouping, responsive structure and common table conventions. Correct verified regressions; postpone further structural redesign until real read-only historical evidence is available. Preserve disabled project execution, unknown values, report isolation and explicit historical interval selection. This is an engineering UI milestone, not a production release or independent financial certification.
+
+## Next engineering acceptance gates (all pending at this baseline)
+
+| Gate from unified acceptance | Required evidence | Current status |
+|---|---|---|
+| localnet_read_only_preflight | Operator-configured read-only RPC, Genesis identity and bounded evidence file | NOT_RUN |
+| browser_ui | Operator inspection in the actual local environment with representative populated records, console and disabled controls | NOT_RUN |
+| wallet_key_custody | Operator inspection of OS file permissions and response redaction; no key material in report | NOT_RUN |
+| wallet_transfer_confirmation | Separate explicitly approved disposable localnet-only verification; not run by unified acceptance | NOT_RUN |
+| historical_financial_parity | Independent closed-interval balance, fee, inventory, cost basis and NAV reconciliation | NOT_RUN |
+| mainnet_archive_fixtures | Independent confirmed historical receipt and archival replay parity, read-only | NOT_RUN |
+| performance_soak | Operator-controlled resource/load/soak measurements, separate from bounded CI benchmark | NOT_RUN |
+| credential_rotation | Operator verification of credential rotation and history exposure remediation if needed | NOT_VERIFIED |
+
+Read-only engineering acceptance can proceed without changing the UI or calibration parameters. No gate is inferred to be passed from CI, and no production or transaction authorization follows from this milestone.
