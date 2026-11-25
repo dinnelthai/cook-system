@@ -45,7 +45,7 @@ async function main(){
  const hygiene=command("repository_hygiene",["scripts/audit-repository-hygiene.mjs"]);
  let hygieneResult=null;try{hygieneResult=JSON.parse(hygiene.out)}catch{}
  if(hygieneResult)add("repository_hygiene_detail",hygieneResult.findings.length?"FAIL":"PASS","High-confidence current-tree secret scan",{tracked_file_count:hygieneResult.tracked_file_count,scanned_text_file_count:hygieneResult.scanned_text_file_count,findings:hygieneResult.findings});
- const test=command("unit_and_integration_tests",["--test"]);
+ const test=command("unit_and_integration_tests",["--test","--test-reporter=tap"]);
   const counts={tests:parseCount(test.out,"tests"),passed:parseCount(test.out,"pass"),failed:parseCount(test.out,"fail"),skipped:parseCount(test.out,"skipped")};
   const countsValid=test.ok&&counts.tests!==null&&counts.passed===counts.tests&&counts.failed===0&&counts.skipped===0;
   add("test_count",countsValid?"PASS":"FAIL",countsValid?"All tests passed with no skips":"Test summary missing or contains failures/skips",counts);
