@@ -76,7 +76,7 @@ export function computeHistoricalMvp(input){
     accounting:{closing_cash_base_units:complete?dual.cash_report.observed_closing_cash_base_units:null,closing_token_balance_base_units:complete?inv.expected_token_balance:null,remaining_cost_basis_base_units:complete?inv.verified_cost_basis:null,realized_project_pnl_base_units:complete?dual.project_pnl.project_realized_net_pnl_base_units:null,creator_cash_income_base_units:complete?fees.verified_cash_income_base_units:null,max_observed_drawdown_bps:complete&&sourceMode==="SYNTHETIC"?perf.max_observed_drawdown_bps:null},
     cost_basis_evidence:costBasisEvidence,trade_evidence:tradeEvidence,nav_evidence:navEvidence,audits:{dual:dual.issues,creator:fees.issues,inventory:inv.issues,nav:perf.issues,nav_endpoints:navEvidence.issues,trade_evidence:[...tradeEvidence.issues,...tradeEvidence.missing],cost_basis:costBasisEvidence.issues},execution_enabled:false,
     note:"Retrospective report only. Synthetic records are not chain evidence. Source completeness and NAV valuations require external verification; trade notionals are not reserve deltas."};
-  return {report,cash:dual.cash_report,nav:perf};
+  return {report,cash:dual.cash_report,nav:perf,fees,projectPnl:dual.project_pnl};
 }
 
 export function buildHistoricalMvpReport(input){return computeHistoricalMvp(input).report;}
