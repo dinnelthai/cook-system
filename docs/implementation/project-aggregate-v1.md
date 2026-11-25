@@ -87,7 +87,20 @@ The caller must supply an absolute database path. The snippet is illustrative; d
 - Domain validation adds cross-field invariants that JSON Schema cannot express in the repository's supported subset.
 - Tests cover strict shape validation, wallet-group uniqueness, SOL-only quote identity, issuance verification gates, market binding, lifecycle gates, revision conflicts, idempotency, persistence, hash-chain verification and event immutability.
 
-## 7. Explicitly not implemented in this slice
+## 7. Loopback HTTP API
+
+The local server exposes the same Project store through loopback-only endpoints. The parent server enforces localhost Host and same-origin checks; responses are no-store JSON.
+
+- GET /api/projects — list Project aggregates.
+- POST /api/projects — create a Project draft.
+- GET /api/projects/:project_id — read the latest aggregate.
+- POST /api/projects/:project_id/commands — append a version-checked, idempotent domain command.
+- GET /api/projects/:project_id/events — read the verified event journal.
+- GET /api/projects/:project_id/verify — verify the snapshot hash and full event chain.
+
+Command requests include command_id, type, payload and expected_revision. The HTTP adapter does not expose an actor override or arbitrary SQL. The database defaults to ~/.cook-system/projects.sqlite; COOK_PROJECT_DB can select another path subject to private-directory checks.
+
+## 8. Explicitly not implemented in this slice
 
 - browser UI / API integration;
 - migration from web/project-registry.mjs localStorage;
