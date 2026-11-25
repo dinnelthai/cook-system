@@ -78,7 +78,7 @@ function renderGlobalContext(){
  if(!host)return;
  host.replaceChildren();
  const label=document.createElement("span");
- label.textContent=id?"读取当前项目身份…":"独立工作区 · 未选项目";
+ label.textContent=id?"读取当前项目…":"独立工作区 · 未选项目";
  host.append(label);
  const button=document.createElement("button");button.type="button";button.textContent="我的 Meme";
  button.onclick=()=>{importTicket++;page="terminal";render();};host.append(button);
@@ -86,9 +86,9 @@ function renderGlobalContext(){
  getProjectDirectory().then(({projects})=>{
   if(ticket!==globalContextTicket||activeProjectId!==id)return;
   const p=projects.find(x=>x.project_id===id);
-  label.textContent=p?p.profile.symbol+" · "+lifecycleLabel(p.lifecycle.stage)+" · v"+p.revision:"项目身份不可用 · 请核对选择";
-  label.title=p?p.profile.name+" / "+p.project_id:"项目身份不可用";
- }).catch(()=>{if(ticket===globalContextTicket&&activeProjectId===id)label.textContent="项目身份读取失败 · 不使用其他项目替代";});
+  label.textContent=p?p.profile.symbol+" · "+lifecycleLabel(p.lifecycle.stage)+" · v"+p.revision:"项目不可用，请重新选择";
+  label.title=p?p.profile.name+" / "+p.project_id:"项目不可用";
+ }).catch(()=>{if(ticket===globalContextTicket&&activeProjectId===id)label.textContent="项目读取失败，请刷新";});
 }
 let workspaceRevision=null,workspaceBusy=false,workspaceMessage="尚未读取数据库；文件导入导出仍可使用。",workspaceVersions=[];
 let data=structuredClone(fixture),report,page="terminal",importTicket=0,offlineReview=false,workflowMessage="";
@@ -204,7 +204,7 @@ function mountMemeDesk(){
   side.querySelectorAll("[data-desk-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.deskMode===memeMode)));
   const button=(action,label,disabled=false)=>'<button type="button" data-desk-action="'+action+'"'+(disabled?" disabled":"")+'>'+label+'</button>';
   const missing=!selected;
-  controls.innerHTML=memeMode==="launch"?'<section class="meme-control-section"><h3>发行准备</h3><p class="muted">创建项目资料、登记钱包与发行证据。当前没有链上发行执行权限。</p>'+button("new","＋ 新建 Meme 项目")+button("setup","编辑当前项目",missing)+'</section>':'<section class="meme-control-section"><h3>当前项目</h3><strong class="meme-current">'+esc(selected?selected.profile.symbol:"未选择")+'</strong><p class="muted">'+esc(selected?lifecycleLabel(selected.lifecycle.stage):"选择左侧 Meme")+'</p><div class="meme-kv"><span>Mint</span><strong>'+esc(selected?.token?.mint||"—")+'</strong><span>实时资产</span><strong>未接入</strong><span>执行状态</span><strong>已禁用</strong></div></section><section class="meme-control-section"><h3>项目管理</h3>'+button("assets","资产与钱包",missing)+button("risk","项目风险复核",missing)+button("market","市场证据",missing)+button("orders","历史订单复核",missing)+button("review","财务与项目复盘",missing)+'</section><section class="meme-control-section"><h3>数据与记录</h3>'+button("sample","载入离线样本",Boolean(activeProjectId))+button("data","载入历史记录",Boolean(activeProjectId))+button("refresh","刷新项目目录")+'</section>';
+  controls.innerHTML=memeMode==="launch"?'<section class="meme-control-section"><h3>发行准备</h3><p class="muted">创建项目资料、配置钱包及记录发行信息。</p>'+button("new","＋ 新建 Meme 项目")+button("setup","编辑当前项目",missing)+'</section>':'<section class="meme-control-section"><h3>当前项目</h3><strong class="meme-current">'+esc(selected?selected.profile.symbol:"未选择")+'</strong><p class="muted">'+esc(selected?lifecycleLabel(selected.lifecycle.stage):"选择左侧 Meme")+'</p><div class="meme-kv"><span>Mint</span><strong>'+esc(selected?.token?.mint||"—")+'</strong><span>实时资产</span><strong>未接入</strong></div></section><section class="meme-control-section"><h3>项目管理</h3>'+button("assets","资产与钱包",missing)+button("risk","项目风险复核",missing)+button("market","市场证据",missing)+button("orders","历史订单复核",missing)+button("review","财务与项目复盘",missing)+'</section><section class="meme-control-section"><h3>数据与记录</h3>'+button("sample","载入离线样本",Boolean(activeProjectId))+button("data","载入历史记录",Boolean(activeProjectId))+button("refresh","刷新项目目录")+'</section>';
   controls.querySelectorAll("[data-desk-action]").forEach(b=>b.onclick=()=>{
    const x=b.dataset.deskAction;
    if(x==="new")return go("create",null);
@@ -229,7 +229,7 @@ function mountMemeDesk(){
   else wallet.innerHTML='<h3>项目钱包 / Wallets</h3>'+emptyState("未选择项目","选择左侧 Meme 查看登记钱包。");
   const b=wallet.querySelector("#meme-wallet-assets");if(b)b.onclick=()=>go("wallet");
  },error(){failed=true;drawList();bundleReview.clear("项目目录不可用。");summaryState("项目目录不可用，未显示资产与风险。");},
-  pending(){bundleReview.clear("等待项目历史报告身份与摘要核对。");summaryState("读取项目核算与风险…");},
+  pending(){bundleReview.clear("正在读取当前 Meme 的历史成交。");summaryState("读取项目核算与风险…");},
   historicalTrades(input){if(selected&&input.scope?.projectId===selected.project_id&&input.scope?.tokenMint===selected.token?.mint)bundleReview.show(input);},
   unavailable(){bundleReview.clear("项目复核不可用。");summaryState("项目复核不可用，请刷新。");},
   showReview(v,model,treasury){
@@ -281,7 +281,7 @@ function renderTerminal(){
  '<section id="terminal-risk-review" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-lifecycle-evidence" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-order-review" class="pro-pane" hidden></section></details>'+
- '<section id="terminal-scoped-placeholder" class="pro-pane"'+(activeProjectId?"":" hidden")+'><h3>当前项目行情与资产</h3>'+emptyState("尚无已绑定的可展示行情报告","选择项目关联的历史报告并完成身份核对；不会使用其他项目或合成样本代替。")+'</section>'+
+ '<section id="terminal-scoped-placeholder" class="pro-pane"'+(activeProjectId?"":" hidden")+'><h3>当前项目行情与资产</h3>'+emptyState("暂无项目行情","在项目资料中关联历史报告后显示。")+'</section>'+
  '<div id="terminal-report-area"'+(activeProjectId?' hidden inert style="display:none"':'')+'>'+
  '<section class="pro-pane"><h3>独立离线报告</h3><p class="muted">报告项目：'+esc(scope.projectId)+' · Mint：'+esc(scope.tokenMint)+' · '+esc(sourceLabel)+'</p></section>'+
   '<div class="pro-statebar"><span><i class="status-dot"></i> '+(isSample?"SYNTHETIC SAMPLE":"OFFLINE REVIEW")+'</span><span>'+esc(sourceLabel)+'</span><span>'+(isSample?"仅展示合成样本 · 执行禁用":"离线审阅 · 禁止交易")+'</span><span>阶段：'+esc(workflow.review_status)+'</span></div>'+
@@ -289,7 +289,7 @@ function renderTerminal(){
  '<div class="pro-metrics">'+[["历史期末净值",money(d.performance.closing_nav_base_units)],["历史期末现金",money(a.closing_cash_base_units)],["已实现收益",money(a.realized_project_pnl_base_units)],["库存成本",money(a.remaining_cost_basis_base_units)],["创作者费",money(a.creator_cash_income_base_units)],["最大回撤",isSample||a.max_observed_drawdown_bps==null?"—":Number(a.max_observed_drawdown_bps)/100+"%"]].map(([k,v])=>'<div class="pro-metric"><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div>'+
  '<div class="pro-workspace"><aside class="pro-market"><section class="pro-pane"><h3>市场概览</h3><div class="key-values">'+participantRows.map(([k,v])=>'<div><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div></section><section class="pro-pane"><h3>风险监测</h3><div class="key-values"><div><span>证据风险</span><strong>'+esc(isSample?"待载入":d.risk.status)+'</strong></div><div><span>严重 / 警告</span><strong>'+esc(isSample?"—":d.risk.counts.critical+" / "+d.risk.counts.warning)+'</strong></div><div><span>未知项</span><strong>'+esc(isSample?"—":d.risk.counts.unknown)+'</strong></div><div><span>实时市场风险</span><strong>未核验</strong></div></div></section><section class="pro-pane" id="market-quality"><h3>市场质量</h3><div data-quality-summary>'+esc(isSample?"合成样本行情 · 非实时数据":"历史报告 · 质量数据以证据审计为准")+'</div><div data-quality-metrics>'+table(["证据检查","状态 / 数量"],marketQualityRows(null))+'</div><p class="muted">独立报告仅展示 K 线证据；完整市场质量审计由项目关联报告的服务端复核提供。未复核不视为通过。</p></section><section class="pro-pane"><h3>生命周期</h3><div class="pro-stage-list">'+workflow.steps.map(x=>'<div><i></i>'+esc(x.label+" · "+x.status)+'</div>').join("")+'</div></section></aside>'+
  '<section class="pro-pane pro-chart"><div class="pro-pane-head"><div><h3>市场行情</h3><small>OHLCV · '+esc(sourceLabel)+'</small></div>'+candleControls+'</div><div class="pro-chart-body">'+candleChart(candleResult)+'</div><div class="pro-chart-volume"><div class="pro-volume-label">成交量</div>'+(isSample?'<div class="volume-empty">见上方报价成交量</div>':seriesChart(trades.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE"))+'</div></section>'+
- '<aside class="pro-actions"><section class="pro-pane"><h3>执行状态</h3><div class="notice">交易执行已关闭。当前尚未完成 Project Market 身份绑定、Venue Adapter、订单账本和交易前 Risk Gate；不会调用 Pump Lab 默认 Mint。</div></section><section class="pro-pane"><h3>资产核算</h3><div class="key-values"><div><span>库存成本</span><strong>'+esc(money(a.remaining_cost_basis_base_units))+'</strong></div><div><span>已实现收益</span><strong>'+esc(money(a.realized_project_pnl_base_units))+'</strong></div><div><span>可兑现估值</span><strong>— SOL</strong></div></div></section></aside></div>'+
+ '<aside class="pro-actions"><section class="pro-pane"><h3>数据状态</h3><div class="notice">历史报告，仅供复盘；当前不支持交易提交。</div></section><section class="pro-pane"><h3>资产核算</h3><div class="key-values"><div><span>库存成本</span><strong>'+esc(money(a.remaining_cost_basis_base_units))+'</strong></div><div><span>已实现收益</span><strong>'+esc(money(a.realized_project_pnl_base_units))+'</strong></div><div><span>可兑现估值</span><strong>— SOL</strong></div></div></section></aside></div>'+
  '<section class="pro-pane pro-blotter"><div class="pro-blotter-head"><div class="terminal-tabs" role="group" aria-label="操作台明细">'+[["inventory","钱包库存"],...tabs.filter(t=>t[0]!=="inventory"),["nav","资产曲线"]].map(([id,label])=>'<button data-tab="'+id+'" aria-pressed="'+(terminalTab===id)+'">'+label+'</button>').join("")+'</div><button id="terminal-pause">'+(reviewPaused?"恢复浏览":"暂停浏览")+'</button></div><div class="tab-content">'+(reviewPaused?emptyState("浏览已暂停","恢复浏览后查看当前报告明细"):terminalTab==="nav"?navContent:isSample&&terminalTab!=="logs"?emptyState("暂无记录","载入项目数据后显示明细"):rows[terminalTab]())+'</div></section>'+
  '<div class="pro-bottom"><span>数据来源：'+esc(sourceLabel)+(!isSample&&!d.settlement_allowed?" · 未通过独立认证，禁止结算":"")+'</span><div class="row"><button id="terminal-export" '+(isSample?"disabled":"")+'>导出报告</button><button id="terminal-settle" '+(!isSample&&workflow.test_settlement_allowed?"":"disabled")+'>合成报告测试结算</button><button id="terminal-archive" '+(workflow.test_archive_allowed?"":"disabled")+'>导出测试归档</button></div></div>'+
  '</div>'+
@@ -306,7 +306,7 @@ function renderTerminal(){
    const options='<option value="">选择 Project</option>'+(!selected&&activeProjectId?'<option value="'+esc(activeProjectId)+'" selected>此前项目不可用，请重新选择</option>':"")+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
    projectContext.innerHTML='<div class="row"><details class="meme-context-select"><summary>切换项目</summary><label>项目 <select id="terminal-project-select">'+options+'</select></label></details>'+
     (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(lifecycleLabel(selected.lifecycle.stage))+'</span><span>运行登记：'+esc(operationalLabel(selected.lifecycle.operational_status))+'</span><span>Mint：'+esc(selected.token.mint||"未登记")+'</span><span>市场：'+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' 已核验</span>':'<span>尚未选择项目</span>')+
-    '<span>Execution: DISABLED</span></div><details><summary>项目组合登记复核</summary>'+table(["项目","阶段","配置状态","登记重叠"],directory.projects.map(x=>[x.project_id,x.stage,x.configuration_status,x.registration_overlap_count]))+table(["登记异常","项目"],directory.findings.map(x=>[x.code,x.project_ids.join(", ")]))+note("登记重叠不等于共同控制，组合资金与 NAV 未核验")+'</details>';
+    '</div><details><summary>项目组合登记复核</summary>'+table(["项目","阶段","配置状态","登记重叠"],directory.projects.map(x=>[x.project_id,x.stage,x.configuration_status,x.registration_overlap_count]))+table(["登记异常","项目"],directory.findings.map(x=>[x.code,x.project_ids.join(", ")]))+note("登记重叠不等于共同控制，组合资金与 NAV 未核验")+'</details>';
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
     if(selected){
@@ -335,9 +335,9 @@ function renderTerminal(){
          if(linkedReportMatches(v,digest,data.scope)){
            if(report.source_mode==="ARCHIVED_HISTORICAL"&&report.status==="REPORT_READY")memeDesk.historicalTrades(data);
           reportArea.hidden=false;reportArea.removeAttribute("inert");reportArea.style.removeProperty("display");placeholder.hidden=true;
-          main.querySelector("#terminal-context-notice").innerHTML=note("历史报告身份与已关联摘要一致；仅内部证据匹配，不代表独立认证或结算许可。");
+          main.querySelector("#terminal-context-notice").innerHTML=note("已读取当前 Meme 的历史报告。");
          }else{
-          main.querySelector("#terminal-context-notice").innerHTML=note("声明身份匹配，但报告摘要未关联、证据冲突或无法验证；独立报告保持隔离。");
+          main.querySelector("#terminal-context-notice").innerHTML=note("当前报告尚未关联或数据不一致，请在项目资料中检查。");
          }
         }
         businessArea.innerHTML='<div class="project-overview-heading"><div><h3>项目运行概览 · v'+esc(v.project_revision)+'</h3><p class="muted">'+esc(model.status)+' · 历史声明数据 · 执行禁用</p></div><button id="business-refresh">刷新项目</button></div>'+
@@ -514,9 +514,9 @@ function renderTerminal(){
        };
       }).catch(e=>{if(stillCurrent())lifecycleArea.textContent="生命周期证据不可用："+errorKind(e);});
       const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download});}
-    if(!selected){notice.innerHTML=note("此前选择的项目无法在当前数据库核对，历史报告继续隔离。请选择其他项目或明确退出。")+'<button id="clear-missing-project">退出项目上下文</button>';notice.querySelector("#clear-missing-project").onclick=()=>{importTicket++;selectProjectContext(null);render();};}
+    if(!selected){notice.innerHTML=note("项目不存在或已删除，请选择其他 Meme。")+'<button id="clear-missing-project">退出项目上下文</button>';notice.querySelector("#clear-missing-project").onclick=()=>{importTicket++;selectProjectContext(null);render();};}
     const match=matchProjectReport(selected,data);
-    if(selected)notice.innerHTML=note(match.status==="DECLARED_MATCH"?"当前报告声明身份一致，正在核对已关联报告摘要；未核对前保持隔离。":"历史报告保持隔离："+match.reasons.join(" / ")+"。清除项目选择后可继续独立复盘。");
+    if(selected)notice.innerHTML=note(match.status==="DECLARED_MATCH"?"正在读取项目报告…":"暂无匹配的项目报告。可在项目资料中关联，或打开独立复盘。");
     // Scope equality is insufficient; only the matching archived digest may open the report area.
     for(const id of ["workflow-sample","terminal-settle","terminal-archive","workflow-save"]){const control=main.querySelector("#"+id);if(control)control.disabled=true;}
     main.querySelector("#open-data").disabled=true;
@@ -657,7 +657,7 @@ panel("项目全生命周期复盘",'<div id="project-lifecycle-review"></div>')
 
  }else if(page==="dashboard"){
  if(activeProjectId){
-  main.innerHTML=screenHeading("复盘分析","当前 Project · 已归档历史区间")+note("项目级复盘不读取独立报告缓冲区。无证据时显示未知；不合并不同区间。")+'<div class="row"><button id="dashboard-return-project" class="primary">返回项目操作台</button><button id="dashboard-open-independent">退出项目上下文，打开独立复盘</button></div><section id="scoped-project-review" class="panel"></section>';
+  main.innerHTML=screenHeading("复盘分析","当前 Project · 已归档历史区间")+note("项目级复盘不读取独立报告缓冲区。无证据时显示未知；不合并不同区间。")+'<div class="row"><button id="dashboard-return-project" class="primary">返回 Meme</button><button id="dashboard-open-independent">退出项目上下文，打开独立复盘</button></div><section id="scoped-project-review" class="panel"></section>';
   const reviewHost=main.querySelector("#scoped-project-review"),scope=activeProjectId;
   mountScopedProjectReview(reviewHost,{projectId:scope,isActive:()=>page==="dashboard"&&activeProjectId===scope&&reviewHost.isConnected,esc,table,note,download});
   main.querySelector("#dashboard-return-project").onclick=()=>{importTicket++;page="terminal";render();};
@@ -830,7 +830,7 @@ panel("角色与风险特征",table(["角色","特征","观测关注","局限"],
  }
  const extras=page==="market"?[["lab","历史回放 / 导入"],["create","发行资料"]]:page==="lab"?[["market","返回市场中心"]]:["create","logs"].includes(page)?[["terminal","返回操作台"]]:[];
  if(extras.length){main.insertAdjacentHTML("afterbegin",links(extras));main.querySelectorAll("[data-subpage]").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.subpage;record("page.open",{page});render()});}
- main.insertAdjacentHTML("beforeend",'<p class="foot">Cook System · 项目历史证据复核 · 项目交易执行禁用</p>');
+ main.insertAdjacentHTML("beforeend",'<p class="foot">Cook System · 历史数据复盘</p>');
  if(operatorMode==="AUDIT")main.querySelectorAll("details.audit-detail").forEach(d=>{d.open=true;});
 }
 render();

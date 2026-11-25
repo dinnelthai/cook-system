@@ -13,8 +13,8 @@ test('terminal never mounts unbound Pump Lab trading or market adapters', async 
   const app = await readFile(new URL('../web/app.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(app, /mountLocalTrading|mountLocalMarket|mountWalletSelector/);
   assert.match(app, /terminal-project-context/);
-  assert.match(app, /Execution: DISABLED/);
-  assert.match(app, /不会调用 Pump Lab 默认 Mint/);
+  assert.match(app, /当前不支持交易提交/);
+  assert.match(app, /linkedReportMatches\(v,digest,data.scope\)/);
 });
 
 test('Project Setup writes through the canonical Project API, not the legacy browser registry', async () => {

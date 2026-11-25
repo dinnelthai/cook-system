@@ -94,7 +94,7 @@ export function mountProjectSetup(container, {
     ]);
 
     container.innerHTML = screenHeading("项目准备", "项目配置 · 风险声明 · 历史证据登记") +
-      note("本机项目台账 · 配置和证据登记 · 项目交易执行禁用。") +
+      note("本地项目资料 · 发行记录") +
       (recoveryId||recoveryError?panel("保存请求恢复",'<p id="project-recovery-status" role="status" class="muted">'+esc(recoveryError||"存在未确认的项目创建请求。仅查询已保存结果，不自动重发。")+'</p><button id="project-recovery-check"'+(recoveryError?" disabled":"")+'>查询此前保存结果</button>'):"")+
       (missingSelection?note("此前选择的项目不在当前数据库中。请选择已存在项目，或主动点击新建项目以退出此前上下文。"):"")+
       '<div class="setup-workspace"><div class="setup-primary">'+
@@ -107,7 +107,7 @@ export function mountProjectSetup(container, {
         '<div><label for="draft-quote">报价资产</label><input id="draft-quote" value="SOL" disabled><input type="hidden" name="quote_asset" value="SOL"></div>' +
         '<div><label for="draft-network">网络</label><input id="draft-network" value="Localnet（本地验证）" disabled><input type="hidden" name="network" value="localnet"></div>' +
         '<div><label for="draft-genesis">本地 Genesis Hash</label><input id="draft-genesis" value="' + esc(current?.network.genesis_hash ?? config?.network?.genesis_hash ?? "未配置") + '" disabled></div>' +
-        '<div><label for="project-wallet">项目主钱包 / Dev Wallet</label><select name="creator_wallet" id="project-wallet"' + lock + '><option value="">读取受管钱包中…</option></select></div>' +
+        '<div><label for="project-wallet">主钱包</label><select name="creator_wallet" id="project-wallet"' + lock + '><option value="">读取受管钱包中…</option></select></div>' +
         '</div><details class="profile-optional"><summary>公开资料与项目描述（选填）</summary><div class="grid form-section">'+
         '<div><label for="draft-website">Website</label><input id="draft-website" name="website" type="url" value="' + esc(current?.profile.website ?? "") + '" placeholder="https://"' + lock + '></div>' +
         '<div><label for="draft-telegram">Telegram</label><input id="draft-telegram" name="telegram" type="url" value="' + esc(current?.profile.telegram ?? "") + '" placeholder="https://"' + lock + '></div>' +
