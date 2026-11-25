@@ -32,6 +32,7 @@ export function buildHistoricalEventBatch({scope,events}){
  for(const e of events){
   if(!plain(e)||e.schema_version!=="1.0.0"||!nonempty(e.event_id)||!nonempty(e.event_kind)||!plain(e.payload)||!plain(e.source)||!nonempty(e.source.source_id)||!nonempty(e.source.source_type)||!plain(e.quality)||typeof e.quality.is_complete!=="boolean"||!["valid","warning","invalid","unknown"].includes(e.quality.validation_status))throw Error("invalid event envelope");
   if(e.provenance!==s.provenance||!plain(e.market)||!["chain_id","network","token_mint","quote_mint"].every(k=>e.market[k]===s[k]))throw Error("event scope mismatch");
+   if(e.market.genesis_hash!=null&&e.market.genesis_hash!==s.genesis_hash)throw Error("event genesis scope mismatch");
   if(!Number.isSafeInteger(e.event_time_ms)||e.event_time_ms<0)throw Error("invalid event timestamp");
   if(s.provenance==="synthetic"){
    if(!nonempty(e.synthetic_metadata?.scenario_id))throw Error("missing synthetic scenario");

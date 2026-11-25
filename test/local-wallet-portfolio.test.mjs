@@ -42,3 +42,12 @@ test("malformed token rows cannot be reported as a complete portfolio",async()=>
  assert.equal(result.snapshot_consistency,"NON_ATOMIC_OBSERVATION");
  assert.deepEqual(result.token_holdings,[]);
 });
+
+test("stalled read calls are bounded and do not leave the portfolio permanently busy",async()=>{
+ const never=()=>new Promise(()=>{}),walletStore={list:async()=>[{address:a}]};
+ const connectionFactory=()=>({getGenesisHash:async()=>genesis,getBalance:never,getParsedTokenAccountsByOwner:never,getSignaturesForAddress:never});
+ const service=createLocalWalletPortfolio({endpoint:"http://127.0.0.1:8899",expectedGenesis:genesis,walletStore,connectionFactory,requestTimeoutMs:10,snapshotTimeoutMs:30});
+ for(let i=0;i<2;i++){
+  const r=await service.snapshot();assert.equal(r.balance_status,"PARTIAL");assert.equal(r.total_sol_balance_lamports,null);assert.equal(r.token_holdings_status,"PARTIAL");
+ }
+});

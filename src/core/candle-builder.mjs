@@ -37,6 +37,7 @@ function marketKey(market, provenance, scenarioId, poolAddress) {
   return JSON.stringify({
     chain_id: market.chain_id,
     network: market.network,
+    genesis_hash: market.genesis_hash ?? null,
     token_mint: market.token_mint,
     quote_mint: market.quote_mint,
     curve_program_id: market.curve_program_id,
@@ -61,6 +62,15 @@ export function buildRawCandles(events, intervalMs) {
   const executions = events.filter((event) => EXECUTION_KINDS.has(event?.event_kind));
   if (executions.length === 0) return [];
 
+  // Ordering keys are only comparable inside one declared network instance.
+  // Old unpinned records remain compatible but must not be mixed with pinned records.
+  const genesisSet=new Set();
+  for(const e of executions){
+    const g=e.market?.genesis_hash;
+    if(g!=null&&(typeof g!=="string"||!g.trim()||g.trim()!==g||g.length>256))throw Error("INVALID_CANDLE_GENESIS");
+    if(e.provenance==="observed_chain")genesisSet.add(JSON.stringify([e.market?.network,g??null]));
+  }
+  if(genesisSet.size>1)throw Error("MIXED_CANDLE_NETWORK_INSTANCE");
   const ordered = sortForReplay(executions);
   const candles = new Map();
 
