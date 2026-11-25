@@ -99,7 +99,8 @@ function normalizeToken(input, { persisted = false } = {}) {
   const mint = input.mint ?? null;
   if (mint !== null) publicKey(mint, "INVALID_TOKEN_MINT");
   const supply = input.supply_base_units ?? null;
-  if (supply !== null && BigInt(baseUnits(supply, "INVALID_TOKEN_SUPPLY")) > U64_MAX) fail("TOKEN_SUPPLY_EXCEEDS_U64");
+  if (supply !== null && BigInt(baseUnits(supply, "INVALID_TOKEN_SUPPLY")) < 1n) fail("INVALID_TOKEN_SUPPLY");
+  if (supply !== null && BigInt(supply) > U64_MAX) fail("TOKEN_SUPPLY_EXCEEDS_U64");
   const decimals = input.decimals ?? null;
   if (decimals !== null && (!Number.isInteger(decimals) || decimals < 0 || decimals > 9)) fail("INVALID_TOKEN_DECIMALS");
   if ((supply === null) !== (decimals === null)) fail("INCOMPLETE_TOKEN_SUPPLY");
