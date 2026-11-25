@@ -54,3 +54,7 @@ R07 correction and R08 CI passed (45598829777). Project mode leads with compact 
 ## R10 — integrated offline business acceptance
 
 R09 CI passed (45599140278). Extend the existing M13 producer-to-store integration instead of duplicating fixtures. Verify context invalidation after report linking, treasury recording and order import; historical interval selection, producer cash parity, project isolation, risk counts and lifecycle exceptions, audit export, immutable read context, verified independent SQLite backup and restoration, duplicate backup rejection and original database reopen. Lifecycle exception review now uses global project risk just like the export. Include runtime-context and overview view tests in the explicit business regression command. This is an offline integration test, not a real issuance-to-exit execution path, browser, actual chain or independent settlement test. R10 CI pending. R11 follows after verification.
+
+## R11 — final review
+
+R10 CI passed on Node 22 and 24 (45599299890); 688 tests and 108 business regressions per runtime, 17 code checks passed, 8 operator gates pending. See [R11 final business review](R11-FINAL-BUSINESS-REVIEW.md) for M25–M49 and R01–R11 scope, remaining gaps and conditional read-only data-integration decision. Production acceptance is not granted.

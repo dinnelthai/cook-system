@@ -45,3 +45,7 @@ Run the existing participant validation suite and digest/manifest summary alongs
 M33/M39/M40 remain partial: this is defensive QA, not behavioral calibration, LP accounting ownership or full operational strategy evaluation. No real data or transaction capability. M50–M52 deferred. CI separately verified.
 
 See [R01–R11 consolidation](R01-R11-CONSOLIDATION.md) for runtime and remaining gaps.
+
+## Final reviewed baseline
+
+See [R11 final business review](R11-FINAL-BUSINESS-REVIEW.md) for the per-module acceptance matrix and external gates at e9672c3.
