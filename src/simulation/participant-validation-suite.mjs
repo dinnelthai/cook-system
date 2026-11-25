@@ -9,6 +9,7 @@ import {runParticipantEnvironmentSuite} from "./participant-environment-stress.m
 import {runParticipantObservationSuite} from "./participant-observation-stress.mjs";
 import {runHeldOutDefensiveEvaluation} from "./defensive-evaluation.mjs";
 import {assessHistoricalCalibrationReadiness} from "./participant-calibration-readiness.mjs";
+import {reviewMixedParticipantConditions} from "./participant-mixed-conditions.mjs";
 import {runParticipantAssetCoverage} from "./participant-asset-coverage.mjs";
 const hash=v=>createHash("sha256").update(canonicalJson(v),"utf8").digest("hex");
 const result=(id,passed)=>({id,passed:passed===true});
@@ -38,7 +39,9 @@ export function runParticipantValidationSuite({base,seeds=[701,702,703,704,705],
   firstTrade.payload.fee_components=[{fee_type:"simulated_pool_fee",amount_base_units:"1",mint:"invalid-fixture-mint"}];
   const compound=buildUnifiedSyntheticReview(corrupt);
   const assetCoverage=runParticipantAssetCoverage({seed});
+  const mixed=reviewMixedParticipantConditions(report,{seed});
   const checks=[
+   ...mixed.checks.map(c=>result("mixed_conditions/"+c.id,c.passed)),
    result("passive_asset_coverage",assetCoverage.status==="SYNTHETIC_REGRESSION_PASS"),
    result("per_account_ledger",ledger.status==="INTERNALLY_CONSISTENT"),
    result("record_numeric_consistency",ledger.numeric_audit.status==="PASS"),

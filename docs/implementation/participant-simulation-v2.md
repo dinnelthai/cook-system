@@ -45,3 +45,7 @@ Adds simultaneous price and fee corruption to each seed-path regression, while t
 ## V2K — review fixes
 
 Move the pure experiment contract from browser code into the shared core. Validate exact expected case sets per seed, duplicate IDs, configuration, observation/detector outcome consistency, parent/subcheck agreement and nested asset-coverage totals. Compare subcheck outcomes and reject comparison when subcheck manifests differ. Batch review now displays numeric evidence status. These checks validate declared experiment structure, not independent execution or authenticity; real data remains deferred.
+
+### R03 mixed conditions
+
+The canonical validation suite now checks mixed simultaneous observer conditions and passive account invariants on completed synthetic records. This is data-plane QA, not participant decision-policy development or calibrated market behavior. See R01-R11-CONSOLIDATION.md.
