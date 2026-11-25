@@ -14,7 +14,7 @@ import {
   decodeTokenAccount,
   normalizeBondingCurveMarket,
 } from "./pump-account-codec.mjs";
-import { decodePumpTransaction, findTransactionIndexInBlock } from "./pump-transaction-parser.mjs";
+import { decodePumpTransaction, findTransactionIndexInBlock, archivedPumpReceiptIssue } from "./pump-transaction-parser.mjs";
 import {
   reconcilePumpTradesWithTransaction,
   reconcilePumpSwapTradesWithTransaction,
@@ -85,6 +85,8 @@ async function getTransactions(rpc, signatures, concurrency, commitment) {
   return mapLimit(signatures, concurrency, async (item) => {
     try {
       const transaction = await rpc.getTransaction(item.signature, { commitment });
+      const issue=transaction?archivedPumpReceiptIssue(transaction,item.signature,item.slot):null;
+      if(issue)return {signature:item.signature,transaction:null,status:issue};
       return {
         signature: item.signature,
         transaction,

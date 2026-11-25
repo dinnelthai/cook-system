@@ -169,3 +169,24 @@ test("historical RPC requests preserve the explicitly declared commitment",async
  for(const method of ["account","signatures","transaction","block"])assert.ok(calls.includes(method));
  await assert.rejects(()=>fetchPumpMintHistory({rpc,mint:MINT,commitment:"processed"}),/INVALID_HISTORICAL_COMMITMENT/);
 });
+
+test("historical collection records inconsistent archived receipt identity as a gap",async()=>{
+ const curve=derivePumpBondingCurveAddress(MINT);
+ for(const [change,code] of [
+  [t=>t.transaction.signatures[0]="wrong","RECEIPT_SIGNATURE_MISMATCH"],
+  [t=>t.slot=99,"RECEIPT_SLOT_MISMATCH"],
+  [t=>delete t.meta.err,"RECEIPT_OUTCOME_UNKNOWN"]
+ ]){
+  const tx=transactionFixture();change(tx);
+  const rpc={
+   async getAccountInfo(address){return address===MINT?mintAccountInfo():bondingCurveAccountInfo();},
+   async getSignaturesForAddress(address){assert.equal(address,curve);return [{signature:SIGNATURE,slot:100,err:null}];},
+   async getTransaction(){return tx;},
+   async getBlock(){throw Error("must not fetch invalid receipt block");}
+  };
+  const r=await fetchPumpMintHistory({rpc,mint:MINT,maxSignatures:10});
+  assert.equal(r.status,"NO_CREATION_EVENT");assert.equal(r.events.length,0);
+  assert.equal(r.signature_coverage.fetched_transactions,0);
+  assert.equal(r.historical_read_evidence.status,"PARTIAL");
+ }
+});

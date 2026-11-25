@@ -273,7 +273,7 @@ test("failed Solana transactions never become observed execution events", () => 
   });
   const parsed = decodePumpTransaction({
     transaction,
-    signature: "failed-signature",
+    signature: "fixture-signature",
     transactionIndex: 1,
     tokenDecimalsByMint: { [MINT]: 6 },
   });
@@ -314,7 +314,7 @@ test("program data events preserve the protocol order across Pump and PumpSwap p
   const transaction = makeTransaction({ logs });
   const parsed = decodePumpTransaction({
     transaction,
-    signature: "migration-signature",
+    signature: "fixture-signature",
     transactionIndex: 9,
     tokenDecimalsByMint: { [MINT]: 6 },
   });
@@ -342,7 +342,7 @@ test("curve replay initializes from observed CreateEvent and stops at migration"
   const transaction = makeTransaction({ logs });
   const parsed = decodePumpTransaction({
     transaction,
-    signature: "create-to-migrate",
+    signature: "fixture-signature",
     transactionIndex: 0,
     tokenDecimalsByMint: { [MINT]: 6 },
   });
@@ -367,7 +367,7 @@ test("V3 retained fees accrue on the curve and sweep events debit the correct bu
   const transaction = makeTransaction({ logs });
   const parsed = decodePumpTransaction({
     transaction,
-    signature: "fee-sweep-replay",
+    signature: "fixture-signature",
     transactionIndex: 0,
     tokenDecimalsByMint: { [MINT]: 6 },
   });
@@ -416,4 +416,19 @@ test("decoded pool initialization is retained as an explicit historical evidence
  assert.equal(gap.status,"POOL_INITIALIZATION_PHASE_UNRECONCILED");assert.equal(gap.pool,POOL);
  assert.equal(String(gap.decoded_event.data.real_quote_reserves_after),"662281004");
  assert.equal(String(gap.decoded_event.data.virtual_quote_reserves),"172772587");
+});
+
+test("archived parser refuses mislabeled or incomplete receipts without emitting normalized events",()=>{
+ const fixture=()=>makeTransaction({logs:[`Program ${PUMP_PROGRAM_ID} invoke [1]`,`Program data: ${buildTradeEvent().toString("base64")}`,`Program ${PUMP_PROGRAM_ID} success`]});
+ for(const [change,signature,code] of [
+  [t=>{},"wrong","RECEIPT_SIGNATURE_MISMATCH"],
+  [t=>delete t.transaction.signatures,"fixture-signature","RECEIPT_SIGNATURE_MISMATCH"],
+  [t=>delete t.meta.err,"fixture-signature","RECEIPT_OUTCOME_UNKNOWN"],
+  [t=>t.slot=-1,"fixture-signature","RECEIPT_SLOT_MISMATCH"]
+ ]){
+  const transaction=fixture();change(transaction);
+  const r=decodePumpTransaction({transaction,signature,transactionIndex:0,tokenDecimalsByMint:{[MINT]:6}});
+  assert.equal(r.status,"PARTIAL");assert.deepEqual(r.events,[]);assert.deepEqual(r.decoded_events,[]);
+  assert.equal(r.unresolved_events[0].status,code);
+ }
 });

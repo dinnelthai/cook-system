@@ -1,5 +1,5 @@
 import { PUMP_FEES_PROGRAM_ID, PUMP_FEE_CONFIG_PDA, decodeProgramAccount } from "./pump-decoder.mjs";
-import { decodePumpTransaction, findTransactionIndexInBlock } from "./pump-transaction-parser.mjs";
+import { decodePumpTransaction, findTransactionIndexInBlock, archivedPumpReceiptIssue } from "./pump-transaction-parser.mjs";
 import {
   buildFeeConfigTimeline,
   feeConfigChangeRecordFromDecodedEvent,
@@ -76,6 +76,8 @@ export async function fetchPumpFeeConfigHistory({
   const fetched = await mapLimit(collection.signatures, concurrency, async (record) => {
     try {
       const transaction = await rpc.getTransaction(record.signature, { commitment });
+      const issue=transaction?archivedPumpReceiptIssue(transaction,record.signature,record.slot):null;
+      if(issue)return {signature:record.signature,transaction:null,status:issue};
       return { signature: record.signature, transaction, status: transaction ? "FETCHED" : "UNAVAILABLE" };
     } catch (error) {
       return { signature: record.signature, transaction: null, status: "RPC_ERROR", error: error.message };

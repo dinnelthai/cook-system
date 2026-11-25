@@ -287,7 +287,7 @@ test("PumpSwap v2 fee sweeps move virtual reserves opposite to quote-vault balan
   const transaction=makeTransaction();
   const parsed=decodePumpTransaction({
     transaction,
-    signature:"pool-buy-with-fees",
+    signature:"pool-buy-signature",
     transactionIndex:2,
     poolMetadataByAddress:{
       [POOL]:{

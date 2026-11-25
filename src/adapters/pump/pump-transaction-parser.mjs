@@ -240,6 +240,18 @@ function relatedInstruction(instructions, logOrder, mint) {
   ) ?? null;
 }
 
+/** Validate the identity and recorded outcome of an archived receipt.
+ * This is not signature authentication or proof of finality. */
+export function archivedPumpReceiptIssue(transaction, expectedSignature, expectedSlot=null) {
+  const signature=transaction?.transaction?.signatures?.[0];
+  if(typeof signature!=="string"||!signature.trim()||signature!==expectedSignature)return "RECEIPT_SIGNATURE_MISMATCH";
+  if(!Number.isSafeInteger(transaction.slot)||transaction.slot<0||
+     (expectedSlot!==null&&transaction.slot!==expectedSlot))return "RECEIPT_SLOT_MISMATCH";
+  const meta=transaction.meta;
+  if(!meta||typeof meta!=="object"||Array.isArray(meta)||!Object.hasOwn(meta,"err")||meta.err===undefined)
+    return "RECEIPT_OUTCOME_UNKNOWN";
+  return null;
+}
 export function decodePumpTransaction({
   transaction,
   signature,
@@ -255,6 +267,12 @@ export function decodePumpTransaction({
   if (typeof resolvedSignature !== "string" || resolvedSignature.length === 0) {
     throw new TypeError("transaction signature is required");
   }
+  const receiptIssue=archivedPumpReceiptIssue(transaction,resolvedSignature);
+  if(receiptIssue)return {
+    status:"PARTIAL",signature:resolvedSignature,slot:transaction.slot??null,transaction_index:transactionIndex,
+    decoded_instructions:[],decoded_events:[],events:[],
+    unresolved_events:[{status:receiptIssue,log_index:null}],balance_deltas:null
+  };
   const meta = transaction.meta;
   const logs = meta.logMessages ?? [];
   const decodedInstructions = decodeTransactionInstructions(transaction);
