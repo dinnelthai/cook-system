@@ -90,3 +90,9 @@ export async function getProjectLifecycleEvidence(projectId,revision){
  if(r.project_id!==projectId||r.project_revision!==revision||r.execution_enabled!==false||r.lifecycle_mutated!==false||r.settlement_allowed!==false||!Array.isArray(r.steps)||!Array.isArray(r.blockers))throw Error("PROJECT_LIFECYCLE_SCOPE_MISMATCH");
  return r;
 }
+
+export async function reviewProjectGraduationHistory(projectId,revision,history){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/graduation-history-review",{method:"POST",body:{expected_revision:revision,history}});
+ if(r.review?.project_id!==projectId||r.review.project_revision!==revision||r.review.execution_enabled!==false||r.review.lifecycle_mutated!==false||r.review.settlement_allowed!==false)throw Error("PROJECT_GRADUATION_SCOPE_MISMATCH");
+ return r;
+}

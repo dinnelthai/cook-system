@@ -22,7 +22,7 @@ import {mountProjectLifecycleReview} from "./project-lifecycle-review-view.mjs";
 import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-workflow.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
-import {listProjects,getProjectLifecycleEvidence} from "./project-client.mjs";
+import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory} from "./project-client.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
@@ -173,7 +173,22 @@ function renderTerminal(){
        if(!stillCurrent())return;
        lifecycleArea.innerHTML="<h3>Project 生命周期证据覆盖</h3>"+note("登记阶段："+v.recorded_stage+" · 观察结果不代表正式阶段推进。")+
         table(["业务阶段","登记状态","证据状态"],v.steps.map(s=>[s.stage,s.recorded,s.evidence_status]))+
-        table(["待复核事项"],v.blockers.map(s=>[s]))+note("旧版本档案 "+v.stale_archive_count+" · 当前关联报告 "+v.report_link_count+" · 当前订单记录 "+v.order_review_count);
+        table(["历史里程碑","证据状态"],(v.historical_milestones??[]).map(s=>[s.stage,s.status]))+
+        table(["待复核事项"],v.blockers.map(s=>[s]))+note("旧版本档案 "+v.stale_archive_count+" · 当前关联报告 "+v.report_link_count+" · 当前订单记录 "+v.order_review_count)+
+        '<label>历史 Pump 回放 JSON（最大 900 KiB）<input id="project-graduation-file" type="file" accept=".json"></label><button id="project-graduation-review">复核并归档历史里程碑</button><p id="project-graduation-status" role="status"></p>';
+       const button=lifecycleArea.querySelector("#project-graduation-review");
+       button.onclick=async()=>{
+        button.disabled=true;const output=lifecycleArea.querySelector("#project-graduation-status");
+        try{
+         const file=lifecycleArea.querySelector("#project-graduation-file").files?.[0];
+         if(!file||file.size>900*1024)throw Error("HISTORY_FILE_MISSING_OR_TOO_LARGE");
+         const history=JSON.parse(await file.text());if(!stillCurrent())return;
+         const result=await reviewProjectGraduationHistory(selected.project_id,selected.revision,history);
+         if(!stillCurrent())return;
+         output.textContent=result.review.status+" · 已归档摘要 "+result.archive.archive_id+" · 刷新操作台查看更新。";
+        }catch(e){if(stillCurrent())output.textContent="复核失败："+errorKind(e);}
+        finally{if(stillCurrent())button.disabled=false;}
+       };
       }).catch(e=>{if(stillCurrent())lifecycleArea.textContent="生命周期证据不可用："+errorKind(e);});
       const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download});}
     const match=matchProjectReport(selected,data);

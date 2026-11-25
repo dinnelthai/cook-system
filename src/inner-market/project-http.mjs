@@ -1,4 +1,5 @@
 import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs";
+import {reviewProjectGraduationEvidence} from "./project-graduation-evidence.mjs";
 const ROOT = "/api/projects";
 // This public operator boundary is not a chain verifier or an internal auditor.
 const OPERATOR_COMMANDS = new Set([
@@ -140,6 +141,16 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         if(typeof listReportCandidates!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         send(res,200,listReportCandidates(store.get(projectId)));return true;
+      }
+      if(action==="graduation-history-review"){
+        if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        const input=await bodyJson(req,readRequestJson,Math.min(maxBodyBytes*16,1024*1024));
+        if(Object.keys(input).some(k=>!["expected_revision","history"].includes(k))||!Number.isSafeInteger(input.expected_revision))throw Error("INVALID_GRADUATION_REVIEW_REQUEST");
+        const project=store.get(projectId);
+        if(project.revision!==input.expected_revision)throw Error("PROJECT_REVISION_CONFLICT");
+        const review=reviewProjectGraduationEvidence(project,input.history);
+        const archive=store.recordArchive(projectId,"GRADUATION_HISTORY_REVIEW",review,project.revision);
+        send(res,200,{review,archive});return true;
       }
       if(action==="lifecycle-evidence"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}

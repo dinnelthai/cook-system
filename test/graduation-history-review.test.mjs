@@ -54,3 +54,21 @@ test("missing account address withholds pool data and completion alone is not mi
  const f=fixture();delete f.pool_replays[0].current_snapshot.decoded_pool.account_address;assert.equal(reviewGraduationHistory(f).pools[0].metrics,null);
  const g=fixture();g.events=g.events.filter(e=>["MARKET_CREATED","CURVE_COMPLETE"].includes(e.event_kind));g.pool_replays=[];const r=reviewGraduationHistory(g);assert.equal(r.lifecycle.phase,"COMPLETION_RECORDED_NO_MIGRATION");assert.equal(r.lifecycle.transaction_link,"UNKNOWN");assert.equal(r.execution_enabled,false);
 });
+
+test("Project graduation review requires declared genesis and issuance identity, never promotes lifecycle",async()=>{
+ const {createProjectAggregate}=await import("../src/inner-market/project-aggregate.mjs");
+ const {derivePumpBondingCurveAddress}=await import("../src/adapters/pump/pump-history-collector.mjs");
+ const {reviewProjectGraduationEvidence}=await import("../src/inner-market/project-graduation-evidence.mjs");
+ const pin="11111111111111111111111111111111",mint="11111111111111111111111111111112",signature="1".repeat(64);
+ const p=createProjectAggregate({project_id:"graduation",profile:{name:"Graduation",symbol:"GRAD"},network:{cluster:"localnet",genesis_hash:pin},token:{mint,issuance_signature:signature}});
+ const f=fixture(),curve=derivePumpBondingCurveAddress(mint);
+ f.market={...f.market,token_mint:mint,quote_mint:p.network.quote_mint,curve_account:curve};f.bonding_curve_address=curve;
+ f.events=f.events.filter(x=>["MARKET_CREATED","CURVE_COMPLETE"].includes(x.event_kind));f.pool_replays=[];
+ for(const [index,x] of f.events.entries()){x.market={...x.market,token_mint:mint,quote_mint:p.network.quote_mint,curve_account:curve};x.source.signature=x.payload.signature=String(index+1).repeat(64);}
+ f.source_provenance={scope:{network:"local_sim",provenance:"observed_chain",genesis_hash:pin},source:{observed_genesis_hash:pin},status:"IDENTITY_MATCHED_NOT_AUTHENTICATED"};
+ const r=reviewProjectGraduationEvidence(p,f);
+ assert.equal(r.milestones[0].status,"RECORDED_NOT_ATTESTED");assert.equal(r.milestones[1].status,"RECORDED_NOT_ATTESTED");assert.equal(r.milestones[2].status,"UNKNOWN");assert.equal(r.lifecycle_mutated,false);
+ f.events[0].source.signature=f.events[0].payload.signature="3".repeat(64);
+ assert.equal(reviewProjectGraduationEvidence(p,f).status,"REVIEW_REQUIRED");
+ f.source_provenance.source.observed_genesis_hash=mint;assert.throws(()=>reviewProjectGraduationEvidence(p,f),/GRADUATION_GENESIS_SCOPE_MISMATCH/);
+});
