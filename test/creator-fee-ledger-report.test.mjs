@@ -64,3 +64,18 @@ test("distinct business IDs cannot certify repeated transaction identity as two 
  assert.equal(r.status,"REVIEW_REQUIRED");assert.equal(r.summary.verified_cash_income_base_units,null);
  assert.ok(r.issues.some(x=>x.code==="AMBIGUOUS_CREATOR_RECEIPT_TRANSACTION"));
 });
+
+test("optional instruction coordinates cannot contradict the linked historical receipt",()=>{
+ const i=fixture(),e=i.creator.entries.find(x=>x.kind==="CREATOR_RECEIPT"),p=i.cash.entries.find(x=>x.kind==="CREATOR_FEE_RECEIVED");
+ e.signature=p.signature="fixture-transaction";e.slot=p.slot=10;
+ const c={instruction_index:2,inner_instruction_index:null,event_sequence:0};
+ e.receipt_coordinates={...c};p.receipt_coordinates={...c};
+ const report=()=>buildCreatorFeeLedgerReport({scope:i.scope,creator:i.creator,cash:i.cash});
+ assert.equal(report().fee_events.find(x=>x.kind==="CREATOR_RECEIPT").receipt_identity.instruction_identity_status,"DECLARED_MATCH");
+ p.receipt_coordinates.event_sequence=1;
+ assert.equal(report().status,"REVIEW_REQUIRED");assert.ok(report().issues.some(x=>x.code==="RECEIPT_COORDINATES_MISMATCH"));
+ p.receipt_coordinates={...c,inner_instruction_index:-1};
+ assert.ok(report().issues.some(x=>x.code==="RECEIPT_COORDINATES_INVALID"));
+ delete p.receipt_coordinates;
+ assert.equal(report().fee_events.find(x=>x.kind==="CREATOR_RECEIPT").receipt_identity.instruction_identity_status,"INCOMPLETE");
+});

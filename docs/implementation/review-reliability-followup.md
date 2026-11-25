@@ -24,3 +24,9 @@ The SQLite mode creates and removes its own private temporary metadata fixture. 
 ## Concurrent metadata writers
 
 `node --test test/project-store-contention.test.mjs` races two independent worker-thread SQLite connections against the same expected revision in a private fixture. Exactly one must commit; the other must report a revision conflict. The resulting database is fully audited. This is a concurrent-connection regression test, not a multi-process load or latency benchmark.
+
+## Historical receipt evidence
+
+An optional receipt_coordinates object with instruction_index, inner_instruction_index (null for an outer instruction), and event_sequence is independently checked between linked historical creator receipt and cash posting records. Contradictions and malformed coordinates require review. Legacy missing coordinates remain incomplete. Repeated transaction signatures still require review: caller-supplied coordinates do not authenticate the underlying economic posting. No source attestation or permission to execute is inferred.
+
+Local wallet history excludes instruction transfer amounts from failed or unknown receipts; a failed transaction may still carry a network fee. Repeated token account addresses across different wallet observations are counted once and the holdings result is marked PARTIAL. Non-atomic observations and parsed instructions are not a full balance reconciliation.

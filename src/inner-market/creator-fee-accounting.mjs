@@ -10,12 +10,31 @@ export function compareCreatorReceiptIdentity(event,posting){
   ["slot",v=>Number.isSafeInteger(v)&&v>=0]
  ];
  const issues=[];let compared=0;
+ const validIndex=v=>Number.isSafeInteger(v)&&v>=0;
+ const coordinateKeys=["instruction_index","inner_instruction_index","event_sequence"];
  for(const [key,valid] of checks){
   const a=event[key],b=posting[key];
   if((a!=null&&!valid(a))||(b!=null&&!valid(b)))issues.push("RECEIPT_"+key.toUpperCase()+"_INVALID");
   else if(a!=null&&b!=null){compared++;if(a!==b)issues.push("RECEIPT_"+key.toUpperCase()+"_MISMATCH");}
  }
- return {status:issues.length?"REVIEW_REQUIRED":compared===checks.length?"DECLARED_MATCH":"INCOMPLETE",issues,source_attestation:"UNKNOWN"};
+ // Optional instruction-level receipt evidence, checked independently of the
+ // legacy signature/slot label coverage. Null inner index means outer instruction.
+ const coordinate=row=>{
+  const x=row.receipt_coordinates;
+  if(x===undefined)return {status:"MISSING",value:null};
+  if(!x||typeof x!=="object"||Array.isArray(x)||Object.keys(x).length!==coordinateKeys.length||
+     !coordinateKeys.every(k=>Object.hasOwn(x,k))||!validIndex(x.instruction_index)||!validIndex(x.event_sequence)||
+     !(x.inner_instruction_index===null||validIndex(x.inner_instruction_index)))return {status:"INVALID",value:null};
+  return {status:"PRESENT",value:coordinateKeys.map(k=>x[k])};
+ };
+ const a=coordinate(event),b=coordinate(posting);
+ let coordinateStatus="INCOMPLETE";
+ if(a.status==="INVALID"||b.status==="INVALID"){issues.push("RECEIPT_COORDINATES_INVALID");coordinateStatus="REVIEW_REQUIRED";}
+ else if(a.status==="PRESENT"&&b.status==="PRESENT"){
+  if(a.value.some((v,i)=>v!==b.value[i])){issues.push("RECEIPT_COORDINATES_MISMATCH");coordinateStatus="REVIEW_REQUIRED";}
+  else coordinateStatus="DECLARED_MATCH";
+ }
+ return {status:issues.length?"REVIEW_REQUIRED":compared===checks.length?"DECLARED_MATCH":"INCOMPLETE",instruction_identity_status:coordinateStatus,issues,source_attestation:"UNKNOWN"};
 }
 
 /** Historical accounting only. Creator entitlement and cash receipts must be
@@ -79,7 +98,7 @@ export function reconcileCreatorReceivables({
   const ready=issues.length===0;
   const identityMatches=identityResults.filter(r=>r.status==="DECLARED_MATCH").length;
   const receipt_identity_coverage={status:!ready?"REVIEW_REQUIRED":receipts.size>0&&identityMatches===receipts.size?"DECLARED_MATCH":"INCOMPLETE",
-   receipt_count:receipts.size,matched_identity_count:identityMatches,source_attestation:"UNKNOWN"};
+   receipt_count:receipts.size,matched_identity_count:identityMatches,matched_instruction_identity_count:identityResults.filter(r=>r.status==="DECLARED_MATCH"&&r.instruction_identity_status==="DECLARED_MATCH").length,source_attestation:"UNKNOWN"};
   return {scope,status:ready?"RECONCILED":"REVIEW_REQUIRED",issues,receipt_identity_coverage,
     opening_receivable_base_units:opening.toString(),accrued_base_units:accrued.toString(),
     recorded_receipts_base_units:received.toString(),written_off_base_units:writtenOff.toString(),
