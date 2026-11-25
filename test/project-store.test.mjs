@@ -10,7 +10,8 @@ const wallet = "11111111111111111111111111111111";
 const base = {
   project_id: "persisted-alpha",
   profile: { name: "Persisted Alpha", symbol: "ALPHA" },
-  network: { cluster: "localnet", genesis_hash: wallet }
+  network: { cluster: "localnet", genesis_hash: wallet },
+  token: { supply_base_units: "1000000000", decimals: 6, creator_wallet_address: wallet }
 };
 function setup(t) {
   const dir = mkdtempSync(join(tmpdir(), "cook-project-store-"));
