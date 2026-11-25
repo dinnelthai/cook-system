@@ -9,11 +9,14 @@ export function projectOverviewModel(review){
  if(!r||r.execution_enabled!==false||r.live_assets!==null||r.project_revision!==review.project_revision||r.project_id!==review.project_id)throw Error("INVALID_PROJECT_OVERVIEW");
  return {stage:review.recorded_stage,status:display(review.status),counts:{critical:review.risk.critical,warning:review.risk.warning,unknown:review.risk.unknown},
  work:r.work.map(x=>({label:labels[x.id]??x.id,status:display(x.status)})),
- intervals:r.asset_intervals.map(x=>({id:x.report_link_archive_id,label:x.opening_cutoff+" → "+x.closing_cutoff})),
+ intervals:r.asset_intervals.map(x=>({id:x.report_link_archive_id,label:x.opening_cutoff+" → "+x.closing_cutoff+(x.status==="REVIEW_REQUIRED"?" · 证据冲突":"")})),
  market:{status:display(r.market.status),interval_count:r.market.curve_intervals?.length??0,pool_count:r.market.historical_pools?.length??0,active_venue:"未知"},
  live_assets:"未接入",execution:"已禁用"};
 }
 export function projectIntervalMetrics(row){
  const blocked=!row||row.status==="REVIEW_REQUIRED";
- return names.map(([id,label,unit])=>({id,label,unit,value:blocked?"—":raw(row.assets?.[id])}));
+ return names.map(([id,label,unit])=>{
+  const value=blocked?"—":raw(row.assets?.[id]);
+  return {id,label,unit,value,evidence_label:row?.status==="REVIEW_REQUIRED"?"证据冲突 · 金额隐藏":value==="—"?"未取得声明值":"历史声明值 · 未独立认证"};
+ });
 }

@@ -19,3 +19,10 @@ test("overview rejects mismatched revision or enabled execution",()=>{
  const r=fixture();r.runtime.project_revision=2;assert.throws(()=>projectOverviewModel(r),/INVALID_PROJECT_OVERVIEW/);
  const s=fixture();s.runtime.execution_enabled=true;assert.throws(()=>projectOverviewModel(s),/INVALID_PROJECT_OVERVIEW/);
 });
+
+test("display distinguishes missing, conflicting and declared unverified amounts",()=>{
+ const m=projectIntervalMetrics({status:"INCOMPLETE",assets:{cash:"0"}});
+ assert.equal(m.find(x=>x.id==="cash").evidence_label,"历史声明值 · 未独立认证");
+ assert.equal(m.find(x=>x.id==="nav").evidence_label,"未取得声明值");
+ assert.ok(projectIntervalMetrics({status:"REVIEW_REQUIRED",assets:{cash:"123"}}).every(x=>x.value==="—"&&x.evidence_label==="证据冲突 · 金额隐藏"));
+});

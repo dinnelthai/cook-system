@@ -125,7 +125,7 @@ function renderTerminal(){
  let feeReview=null;
  const getFeeReview=()=>feeReview??=buildCreatorFeeLedgerReport({scope:data.scope,creator:data.creator,cash:data.cash});
  const rows={
- finance:()=>{const review=getCloseReview(),groups=financialCloseRows(review);return note("历史区间复核 · "+review.status+" · 来源、归属、估值未独立认证。不是退出执行或真实结算。")+table(["项目","来源","起始","结束"],[[scope.projectId,review.source_mode,scope.openingCutoff,scope.closingCutoff]])+groups.map(g=>'<h3>'+esc(g.label)+'</h3>'+table(["指标","值"],g.rows.map(([label,value,unit])=>[label,unit==="quote"?money(value):value??"未知"]))).join("")+table(["检查","状态","证据"],review.review_checks.map(c=>[c.id,c.status,c.evidence.join(" / ")]))+'<button id="financial-close-export">导出财务复核报告</button>';},
+ finance:()=>{const review=getCloseReview(),groups=financialCloseRows(review);return note("库存成本证据覆盖："+d.trust.metrics.cost_basis.coverage_status+" · 已实现损益证据覆盖："+d.trust.metrics.realized_pnl.coverage_status+" · 均未独立认证")+note("历史区间复核 · "+review.status+" · 来源、归属、估值未独立认证。不是退出执行或真实结算。")+table(["项目","来源","起始","结束"],[[scope.projectId,review.source_mode,scope.openingCutoff,scope.closingCutoff]])+groups.map(g=>'<h3>'+esc(g.label)+'</h3>'+table(["指标","值"],g.rows.map(([label,value,unit])=>[label,unit==="quote"?money(value):value??"未知"]))).join("")+table(["检查","状态","证据"],review.review_checks.map(c=>[c.id,c.status,c.evidence.join(" / ")]))+'<button id="financial-close-export">导出财务复核报告</button>';},
  "creator-fees":()=>{const r=getFeeReview();return note("Creator Fee 子账 · "+r.status+" · 应收不等于到账，PumpSwap Fee Bucket 不等于钱包收入。")+creatorFeeLedgerRows(r).map(g=>"<h3>"+esc(g.label)+"</h3>"+table(g.headers,g.rows)).join("")+details("审计限制",r.notes)+'<button id="creator-fee-export">导出 Creator Fee 子账</button>';},
  trades:()=>table(["事件","序号","方向","名义金额","状态"],data.market.trades.map(x=>[x.id,x.sequence,x.side,money(x.quoteNotionalBaseUnits),x.status])),
  cash:()=>table(["事件","类型","金额","对账"],data.cash.entries.map(x=>[x.id,x.kind,money(x.amountBaseUnits),x.reconciliation])),
@@ -175,7 +175,7 @@ function renderTerminal(){
       const businessArea=main.querySelector("#terminal-business-review");businessArea.hidden=false;
       main.querySelector("#terminal-project-details").hidden=false;
       const riskArea=main.querySelector("#terminal-risk-review");riskArea.hidden=false;
-      const assetCards=row=>'<div class="project-asset-grid">'+projectIntervalMetrics(row).map(x=>'<div class="project-stat"><span>'+esc(x.label)+'</span><strong>'+esc(x.value)+'</strong><small>'+esc(x.unit)+'</small></div>').join("")+'</div>';
+      const assetCards=row=>'<div class="project-asset-grid">'+projectIntervalMetrics(row).map(x=>'<div class="project-stat"><span>'+esc(x.label)+'</span><strong>'+esc(x.value)+'</strong><small>'+esc(x.unit)+'</small><small>'+esc(x.evidence_label)+'</small></div>').join("")+'</div>';
       const businessCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&businessArea.isConnected;
       let businessTicket=0;
       async function refreshBusiness(){
@@ -219,7 +219,7 @@ function renderTerminal(){
            const ctx=await selectProjectRuntimeInterval(selected.project_id,selected.revision,v.runtime_context_id,archiveId);
            if(!businessCurrent()||ticket!==businessTicket||seq!==intervalTicket||!detail.isConnected)return;
            const row=ctx.selected_interval;
-           detail.innerHTML=note(row.status+" · "+row.opening_cutoff+" → "+row.closing_cutoff)+assetCards(row)+'<details><summary>全部资产字段</summary>'+table(["区间资产项","基础单位"],Object.entries(row.assets).map(([key,value])=>[key,value??"—"]))+"</details>"+(row.account_coverage?note("钱包标签覆盖："+row.account_coverage.registered_label_coverage+" · 归属未独立验证")+table(["项目 / 账户合计核对","状态"],row.account_coverage.checks.map(c=>[c.field,c.status])):"");
+           detail.innerHTML=note(row.status+" · "+row.opening_cutoff+" → "+row.closing_cutoff+(row.evidence_conflict_codes?.length?" · "+row.evidence_conflict_codes.join(" / "):""))+assetCards(row)+'<details><summary>全部资产字段</summary>'+table(["区间资产项","基础单位"],Object.entries(row.assets).map(([key,value])=>[key,value??"—"]))+"</details>"+(row.account_coverage?note("钱包标签覆盖："+row.account_coverage.registered_label_coverage+" · 归属未独立验证")+table(["项目 / 账户合计核对","状态"],row.account_coverage.checks.map(c=>[c.field,c.status])):"");
           }catch(err){if(businessCurrent()&&ticket===businessTicket&&seq===intervalTicket&&detail.isConnected)detail.textContent="区间不可用，请刷新运行概览："+errorKind(err);}
          };
         }

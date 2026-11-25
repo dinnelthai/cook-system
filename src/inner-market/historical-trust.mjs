@@ -18,8 +18,13 @@ export function describeHistoricalTrust({sourceMode,ready,checks,navEndpoints,tr
    cash_balance:group(true,archivedEvidence.status==="INTERNALLY_CONSISTENT"?[]:["RECEIPT_EVIDENCE_INCOMPLETE"]),
    inventory_quantity:group(true,["OWNERSHIP_UNATTESTED"]),
    closing_account_set:group(accountSet?.status==="INTERNALLY_CONSISTENT",["ACCOUNT_SET_COMPLETENESS_UNATTESTED","OWNERSHIP_UNATTESTED"]),
-   cost_basis:group(true,[costBasisEvidence.status,"ALLOCATION_UNATTESTED"]),
-   realized_pnl:group(true,[tradeEvidence.status,"ECONOMIC_CLASSIFICATION_UNATTESTED","ALLOCATION_UNATTESTED"]),
+   cost_basis:{...group(true,[costBasisEvidence.status,"ALLOCATION_UNATTESTED"]),
+    supplied_replay_status:costBasisEvidence.status,coverage_status:costBasisEvidence.status==="INTERNALLY_CONSISTENT"?"SUPPLIED_REPLAY_MATCH":costBasisEvidence.status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":"INCOMPLETE",
+    independent_verification:"UNKNOWN"},
+   realized_pnl:{...group(true,[tradeEvidence.status,costBasisEvidence.status,"ECONOMIC_CLASSIFICATION_UNATTESTED","ALLOCATION_UNATTESTED"]),
+    coverage_status:tradeEvidence.status==="REVIEW_REQUIRED"||costBasisEvidence.status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":
+     tradeEvidence.status==="INTERNALLY_CONSISTENT"&&costBasisEvidence.status==="INTERNALLY_CONSISTENT"?"SUPPLIED_CHECKS_MATCH":"INCOMPLETE",
+    independent_verification:"UNKNOWN"},
    nav_endpoints:group(sample||navEndpoints.status==="INTERNALLY_CONSISTENT",["VALUATION_UNATTESTED"]),
    historical_performance:group(sample,sample?[]:["TIME_SERIES_VALUATION_UNAVAILABLE"])
   }};
