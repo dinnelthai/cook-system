@@ -27,3 +27,7 @@ The replay checks conflicting repeated vault-delta annotations in one recorded t
 ## F05 — historical inventory and cost journal
 
 The existing historical cost audit now diagnoses duplicate source/journal event IDs, ambiguous ordering, invalid side, zero-quantity trade rows and intermediate integer range violations even when supplied endpoints agree. Existing conservation checks remain. Six additional regressions cover these cases; independently retained cost records and ordered external adjustments remain required for actual Localnet accounting acceptance.
+
+## F06 — historical NAV evidence arithmetic
+
+Compare available endpoint balance-sheet components independently. Missing or malformed valuation data must not hide a known cash or inventory contradiction or be silently converted into zero. Only complete supplied components are used for the NAV identity. Four integration regressions cover partial/malformed endpoint evidence. Independent valuation and real historical cash-flow evidence remain operator-side acceptance requirements.

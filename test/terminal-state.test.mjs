@@ -192,3 +192,20 @@ test("missing account set evidence remains unknown without altering legacy repor
  assert.equal(s.checks.find(x=>x.id==="closing_account_set").status,"UNKNOWN");
  const i=historicalWithAccountSet();i.closingAccountEvidence.expectedAccounts.push("missing");assert.equal(buildTerminalState(i).closing_account_set.status,"PARTIAL");
 });
+
+test("missing inventory valuation does not mask a known cash contradiction",()=>{
+ const i=historicalWithEndpoints();i.nav.endpointEvidence.closing.inventoryValueBaseUnits=null;i.nav.endpointEvidence.closing.cashBaseUnits="888";
+ const s=buildTerminalState(i);assert.equal(s.status,"REVIEW_REQUIRED");assert.ok(s.issues.includes("NAV_ENDPOINT_FIELDS_MISSING:CLOSING"));assert.ok(s.issues.includes("NAV_ENDPOINT_CASH_MISMATCH:CLOSING"));assert.equal(s.treasury.closing_cash_base_units,null);
+});
+test("malformed liability evidence becomes a review finding instead of aborting the report",()=>{
+ const i=historicalWithEndpoints();i.nav.endpointEvidence.closing.liabilitiesBaseUnits="1.5";
+ const s=buildTerminalState(i);assert.equal(s.status,"REVIEW_REQUIRED");assert.ok(s.issues.includes("NAV_ENDPOINT_AMOUNT_INVALID:CLOSING:liabilities"));assert.equal(s.performance.closing_nav_base_units,null);
+});
+test("absent balance sheet field is distinct from a recorded zero",()=>{
+ const i=historicalWithEndpoints();delete i.nav.endpointEvidence.closing.otherAssetsBaseUnits;
+ const s=buildTerminalState(i);assert.equal(s.status,"REVIEW_REQUIRED");assert.ok(s.issues.includes("NAV_ENDPOINT_FIELDS_MISSING:CLOSING"));
+});
+test("known inventory contradiction remains visible when another valuation is absent",()=>{
+ const i=historicalWithEndpoints();i.nav.endpointEvidence.opening.inventoryValueBaseUnits="1";delete i.nav.endpointEvidence.opening.otherAssetsBaseUnits;
+ const s=buildTerminalState(i);assert.ok(s.issues.includes("NAV_ENDPOINT_VALUE_WITHOUT_INVENTORY:OPENING"));assert.equal(s.status,"REVIEW_REQUIRED");
+});
