@@ -1,4 +1,5 @@
 import {reconcileRuntimeAccountCoverage} from "./runtime-account-coverage.mjs";
+import {describeRuntimeMarkets} from "./runtime-market-state.mjs";
 import {archiveApplicable} from "./project-evidence-scope.mjs";
 const signed=v=>typeof v==="string"&&v.length<=160&&/^(0|-?[1-9][0-9]*)$/.test(v);
 const unsigned=v=>signed(v)&&!v.startsWith("-");
@@ -43,7 +44,9 @@ export function buildProjectRuntime(project,{archives,intervals,lifecycle,config
   return {report_link_archive_id:i.archive_id,report_digest:i.report_digest,opening_cutoff:i.opening_cutoff,closing_cutoff:i.closing_cutoff,
    status,assets,account_coverage,lp_assets:null,asset_unit_contract:"TOKEN_BASE_UNITS_FOR_TOKEN_QUANTITY; SOL_LAMPORTS_FOR_OTHER_FIELDS",archive_ids:linked.map(a=>a.archive_id)};
  });
- const blocked=issues.length>0||findings.length>0||configuration.issues.length>0||risk.status==="REVIEW_REQUIRED";
+ const market=describeRuntimeMarkets(project,{archives,intervals,lifecycle,operational});
+ issues.push(...market.issues);unknown.push(...market.unknown);
+ const blocked=market.status==="REVIEW_REQUIRED"||issues.length>0||findings.length>0||configuration.issues.length>0||risk.status==="REVIEW_REQUIRED";
  const work=[
   {id:"configuration",status:configuration.status},
   {id:"issuance_evidence",status:lifecycle.issuance.status},
@@ -55,7 +58,7 @@ export function buildProjectRuntime(project,{archives,intervals,lifecycle,config
  return {schema_version:"cook-project-runtime.1",project_id:project.project_id,project_revision:project.revision,
   recorded_stage:project.lifecycle.stage,recorded_operational_status:project.lifecycle.operational_status,
   status:blocked?"REVIEW_REQUIRED":"EVIDENCE_INCOMPLETE",work,asset_intervals:rows,
-  market:{registered:project.markets.map(m=>({market_id:m.market_id,venue:m.venue,verification_status:m.verification_status})),historical_pools:operational.pools,live_state:null},
+  market,
   risk:{historical_status:risk.status,configuration_issue_count:configuration.issues.length,open_order_count:receipts.filter(r=>r.status!=="DECLARED_SAMPLE_MATCH").length},
   live_assets:null,project_wide_nav:null,selected_interval:null,issues,unknown,real_data_connected:false,execution_enabled:false,settlement_allowed:false,lifecycle_mutated:false,source_attestation:"UNKNOWN"};
 }

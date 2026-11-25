@@ -81,3 +81,12 @@ test("historical SOL report rejects a non-SOL candle quote mint",()=>{
  const i=withEvidence();i.sourceMode="ARCHIVED_HISTORICAL";i.market.candleEvidence.market.network="local_sim";
  assert.equal(buildTerminalCandles(i).reason,"QUOTE_ASSET_MISMATCH");
 });
+
+test("closed market quality calls the canonical analyzer only after event parity",async()=>{
+ const {describeClosedMarketQuality}=await import("../src/inner-market/closed-market-quality.mjs");
+ const i=withEvidence(),before=structuredClone(i),v=describeClosedMarketQuality(i);
+ assert.equal(v.status,"DESCRIPTIVE_ONLY");assert.equal(v.event_count,2);assert.equal(v.execution_enabled,false);assert.deepEqual(i,before);
+ assert.equal(describeClosedMarketQuality(fixture()).status,"UNKNOWN");
+ i.market.candleEvidence.events[0].payload.quote_amount_base_units="199";
+ const bad=describeClosedMarketQuality(i);assert.equal(bad.status,"REVIEW_REQUIRED");assert.equal(bad.event_count,null);
+});

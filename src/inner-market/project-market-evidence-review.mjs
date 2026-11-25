@@ -3,6 +3,7 @@ import {canonicalJson} from "../core/canonical-json.mjs";
 import {assertProjectAggregate} from "./project-aggregate.mjs";
 import {matchProjectReport} from "./project-report-identity.mjs";
 import {buildTerminalState} from "./terminal-state.mjs";
+import {describeClosedMarketQuality} from "./closed-market-quality.mjs";
 import {buildTerminalCandles} from "./terminal-candles.mjs";
 import {loadLinkedReport} from "./order-receipt-review.mjs";
 const sha=x=>createHash("sha256").update(canonicalJson(x),"utf8").digest("hex");
@@ -48,11 +49,14 @@ export function reviewProjectMarketEvidence(projectInput,input){
   return {interval_ms,status:r.status,reason:r.reason,candle_count:r.status==="CONSISTENT"||r.status==="EMPTY"?r.candles.length:null};
  });
  if(intervals.some(x=>x.status==="REVIEW"))issues.push("MULTI_INTERVAL_CANDLE_REVIEW_REQUIRED");
+ const quality=describeClosedMarketQuality(input);
+ if(quality.status==="REVIEW_REQUIRED")issues.push("MARKET_QUALITY_EVIDENCE_CONFLICT");
+ else if(quality.status==="UNKNOWN")unknown.push("MARKET_QUALITY_EVIDENCE_UNAVAILABLE");
  unknown.push("INDEPENDENT_MARKET_SOURCE_UNATTESTED","MARKET_HISTORY_COMPLETENESS_UNATTESTED","LIVE_LIQUIDITY_UNAVAILABLE");
  return {schema_version:"cook-project-market-evidence-review.1",project_id:p.project_id,project_revision:p.revision,report_digest:sha(input),scope:m.scope,
   status:issues.length?"REVIEW_REQUIRED":"PARTIAL",declared_history_complete:m.declared_history_complete,
   trade_evidence_status:trade?.status??"UNKNOWN",candle_evidence_status:state.candles.status,
-  candle_intervals:intervals,market_snapshot_status:m.snapshot.status,
+  candle_intervals:intervals,market_snapshot_status:m.snapshot.status,closed_market_quality:quality,
   participant_coverage:participantCoverage,reserve_evidence:reserveEvidence,
   observed_trade_record_count:input.market.trades.length,issues:[...new Set(issues)],unknown:[...new Set(unknown)],
   source_attestation:"UNKNOWN",live_market_assessed:false,execution_enabled:false,settlement_allowed:false};

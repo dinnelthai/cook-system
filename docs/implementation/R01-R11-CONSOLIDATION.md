@@ -29,3 +29,8 @@ R03 CI passed (45597277906). Compare existing canonical account-set totals with 
 ## R05 — synthetic passive LP accounting mark
 
 R04 CI passed (45597635208). Extend the canonical LP statement with a same-pool, same-cutoff supplied fungible-share fixture and a supplied rational base/quote mark. Exact integer floor arithmetic uses the existing integer helpers. Explicit distributable assets only; no virtual reserves, protocol fee buckets or assumption that a pool reserve is an owned asset. The mark excludes separate fee cash and fee receivables. Invalid share, stale scope, malformed amounts or ledger discrepancies suppress the mark. Five regression tests and two new business scenario checks (13 total). This is a synthetic accounting mark, not a PumpSwap redemption formula, real position valuation, or project NAV inclusion. Actual LP ownership, protocol-specific claim rules and independent valuation remain open; R06 next after CI.
+
+
+## R06 — historical market state and data-quality integration
+
+R05 CI passed (45598036893). Closed market quality now calls the existing market-quality analyzer after canonical candle-event parity, retaining only bounded descriptive record count and source-quality status. The runtime keeps closed curve intervals, migration milestone evidence, and pool replay snapshots separate, with exact report-link digest and count checks. No inferred active venue, shared timestamp, live depth, market intervention or signal. Legacy evidence remains unknown. Three regression tests cover canonical analyzer integration, interval separation, and contradictory counts. The terminal displays the historical market state. R06 historical integration advanced; actual synchronized chain state and external parity remain pending. R07 next after CI.

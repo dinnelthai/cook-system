@@ -69,3 +69,17 @@ test("malformed or conflicting canonical account totals require review",()=>{
  t.payload.account_set.totals.cashBaseUnits="0";
  assert.equal(buildProjectBusinessReview(p,[link(),t,x]).runtime.asset_intervals[0].status,"REVIEW_REQUIRED");
 });
+
+test("market runtime retains distinct historical intervals and does not infer active venue",()=>{
+ const a=link(),b=link();b.archive_id="link2";b.payload.report_digest="b".repeat(64);b.payload.scope={...b.payload.scope,openingCutoff:"end",closingCutoff:"later"};
+ const m=(id,linkId,d,status,count)=>({archive_id:id,kind:"MARKET_EVIDENCE_REVIEW",project_id:p.project_id,project_revision:1,stale:false,payload:{project_id:p.project_id,project_revision:1,execution_enabled:false,source_attestation:"UNKNOWN",status:"PARTIAL",report_link_archive_id:linkId,report_digest:d,observed_trade_record_count:count,closed_market_quality:{status,event_count:count}}});
+ const v=buildProjectBusinessReview(p,[a,b,m("m1","link",digest,"DESCRIPTIVE_ONLY",2),m("m2","link2","b".repeat(64),"NO_EXECUTIONS",0)]).runtime.market;
+ assert.equal(v.curve_intervals.length,2);assert.equal(v.curve_intervals[0].records[0].event_count,2);assert.equal(v.curve_intervals[1].records[0].event_count,0);
+ assert.equal(v.active_venue,null);assert.equal(v.common_snapshot_established,false);
+});
+test("conflicting quality counts withhold interval market evidence",()=>{
+ const m=a("m","MARKET_EVIDENCE_REVIEW",{status:"PARTIAL",report_link_archive_id:"link",report_digest:digest,observed_trade_record_count:2,closed_market_quality:{status:"DESCRIPTIVE_ONLY",event_count:3}});
+ const v=buildProjectBusinessReview(p,[link(),m]);
+ assert.equal(v.status,"REVIEW_REQUIRED");assert.equal(v.runtime.market.curve_intervals[0].records[0].event_count,null);
+ assert.ok(v.findings.some(x=>x.code==="RUNTIME_MARKET_QUALITY_CONFLICT"));
+});
