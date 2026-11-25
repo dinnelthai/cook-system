@@ -55,3 +55,17 @@ test("numeric checks validate recorded fees without claiming independent fee att
  trades[1].payload.signature=trades[0].payload.signature;
  assert.ok(buildUnifiedSyntheticReview(r).issues.some(i=>i.startsWith("INVALID_OR_DUPLICATE_TRADE_SIGNATURE:")));
 });
+
+test("unrecognized generator and contradictory current model declaration fail offline review",()=>{
+ const unknown=fixture();for(const e of unknown.detector_input.events)e.synthetic_metadata.generator_version="unrecognized";
+ delete unknown.model_contract;
+ const u=buildUnifiedSyntheticReview(unknown);
+ assert.equal(u.status,"REVIEW_REQUIRED");assert.ok(u.issues.includes("UNSUPPORTED_GENERATOR_VERSION"));
+ const bad=fixture();bad.model_contract.actual_mev_verified=true;
+ const b=buildUnifiedSyntheticReview(bad);
+ assert.equal(b.status,"REVIEW_REQUIRED");assert.ok(b.issues.includes("GENERATOR_CONTRACT_DECLARATION_MISMATCH"));
+ const missing=fixture();delete missing.model_contract;
+ const m=buildUnifiedSyntheticReview(missing);
+ assert.equal(m.checks.find(c=>c.id==="generator_identity").status,"UNKNOWN");
+ assert.equal(m.real_market_validated,false);assert.equal(m.execution_enabled,false);
+});

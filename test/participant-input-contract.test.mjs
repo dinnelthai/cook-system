@@ -34,3 +34,28 @@ test("unused parameter validation does not modify fixture decisions",()=>{
  const one=run([a]),two=run([{...a,risk_aversion:0.9,holding_horizon_ms:1234}]);
  assert.deepEqual(one,two);
 });
+
+test("every declared unused parameter is excluded from normalized fixture inputs",async()=>{
+ const {validateSyntheticParticipantInputs}=await import("../src/simulation/participant-input-contract.mjs");
+ const {describeParticipantModel}=await import("../src/simulation/participant-model-contract.mjs");
+ const config={scenarioId:"boundary",seed:7,steps:120,initialQuoteReserve:"1000",initialTokenReserve:"1000",feeBps:30};
+ const a=agent("a");
+ const declarations={risk_aversion:0.9,holding_horizon_ms:1234,observation_latency_ms:500,
+  observation_noise:{profile:"high",scale:2},public_information_sensitivity:0.7,transaction_cost_sensitivity:0.5,random_stream_id:"test-stream"};
+ assert.deepEqual(Object.keys(declarations).sort(),describeParticipantModel().parameters.declared_but_unused.slice().sort());
+ const base=validateSyntheticParticipantInputs({...config,agents:[a]});
+ const supplied=validateSyntheticParticipantInputs({...config,agents:[{...a,...declarations}]});
+ assert.deepEqual(base,supplied);
+ for(const k of Object.keys(declarations))assert.equal(Object.hasOwn(supplied.agents[0],k),false);
+ assert.equal(describeParticipantModel().execution_enabled,false);
+});
+
+test("timestamp-only input is bounded and not promoted to a behavior parameter",async()=>{
+ const {validateSyntheticParticipantInputs}=await import("../src/simulation/participant-input-contract.mjs");
+ const {describeParticipantModel}=await import("../src/simulation/participant-model-contract.mjs");
+ const config={scenarioId:"boundary",seed:7,steps:120,initialQuoteReserve:"1000",initialTokenReserve:"1000",feeBps:30};
+ const a=agent("a");
+ assert.deepEqual(describeParticipantModel().parameters.timestamp_only,["execution_latency_ms"]);
+ for(const offset of [0,999])assert.equal(validateSyntheticParticipantInputs({...config,agents:[{...a,execution_latency_ms:offset}]}).agents[0].execution_latency_ms,offset);
+ for(const offset of [-1,1000,0.5])assert.throws(()=>validateSyntheticParticipantInputs({...config,agents:[{...a,execution_latency_ms:offset}]}),/INVALID_SIMULATION_AGENT_LATENCY/);
+});
