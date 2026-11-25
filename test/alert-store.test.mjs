@@ -22,3 +22,27 @@ test("alert journal rejects invalid transitions and detects hash-chain tampering
   await assert.rejects(()=>store.audit(),/ALERT_JOURNAL_CHAIN_INVALID/);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test("journal rejects time regression and retains the last complete state",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-alert-time-")),path=join(dir,"alerts.jsonl");
+ try{const store=createAlertStore(path);await store.openAlert(alert,10);
+  await assert.rejects(()=>store.acknowledge("a1",{actor:"operator",atMs:9}),/ALERT_TIME_REGRESSION/);
+  assert.equal((await store.audit()).record_count,1);
+  assert.equal((await store.list())[0].status,"OPEN");
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+test("truncated journal is rejected without rewriting evidence",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-alert-trunc-")),path=join(dir,"alerts.jsonl");
+ try{const store=createAlertStore(path);await store.openAlert(alert,10);
+  const original=await readFile(path,"utf8"),broken=original.slice(0,-1);await writeFile(path,broken);
+  await assert.rejects(()=>store.audit(),/ALERT_JOURNAL_TRUNCATED/);
+  await assert.rejects(()=>store.resolve("a1",{reason:"review",atMs:20}),/ALERT_JOURNAL_TRUNCATED/);
+  assert.equal(await readFile(path,"utf8"),broken);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+test("concurrent alert writers publish complete journal versions",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-alert-concurrent-")),path=join(dir,"alerts.jsonl");
+ try{await Promise.all([createAlertStore(path).openAlert(alert,10),createAlertStore(path).openAlert({...alert,alert_id:"a2"},11)]);
+  assert.equal((await createAlertStore(path).audit()).record_count,2);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});

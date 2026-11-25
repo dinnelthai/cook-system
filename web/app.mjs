@@ -9,7 +9,8 @@ import {advanceReview,makeReviewArchive,restoreReviewArchive} from "../src/inner
 import { buildUnifiedHistoricalReport } from "../src/inner-market/unified-historical-report.mjs";
 import {createDiagnosticLog,errorKind} from "./diagnostic-log.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
-const diagnostics=createDiagnosticLog();
+// Session storage retains diagnostics across refreshes in the same tab, without cross-tab writers.
+const diagnostics=createDiagnosticLog({storage:(()=>{try{return window.sessionStorage;}catch{return null;}})()});
 const record=(event,detail={},level="INFO")=>diagnostics.record(event,detail,level);
 record("app.start");
 window.addEventListener("error",e=>record("runtime.error",{error_kind:errorKind(e.error)},"ERROR"));
