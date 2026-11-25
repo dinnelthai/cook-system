@@ -5,6 +5,6 @@ try{
  const base=JSON.parse(await readFile(new URL("../fixtures/synthetic/inner-market-mvp.json",import.meta.url),"utf8"));
  const report=runOfflineRiskLaboratory({base});
  await writeFile(output,JSON.stringify(report,null,2)+"\n",{flag:"wx",mode:0o600});
- console.log(JSON.stringify({status:report.status,participant_groups:report.participant.groups,pool_cases:report.pools.case_count,pool_passed:report.pools.passed_count,output,execution_enabled:false}));
+ console.log(JSON.stringify({status:report.status,participant_groups:report.participant.groups,pool_cases:report.pools.case_count,pool_passed:report.pools.passed_count,business_stress_cases:report.business.stress.case_count,business_stress_passed:report.business.stress.passed_count,business_checks:report.business.business.cases.length,output,execution_enabled:false}));
  if(report.status!=="SYNTHETIC_REGRESSION_PASS")process.exitCode=1;
 }catch(e){console.error(e.message);process.exitCode=1;}

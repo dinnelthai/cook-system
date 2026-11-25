@@ -224,7 +224,7 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
   const business=s.getBusinessReview(p.project_id);
   assert.equal(business.close.review_count,1);assert.equal(business.risk.status,"REVIEW_REQUIRED");
   const risk=s.getRiskReview(p.project_id),bundle=s.exportAuditBundle(p.project_id,1);
-  assert.equal(risk.status,"REVIEW_REQUIRED");assert.deepEqual(bundle.risk,risk);
+  assert.equal(risk.status,"REVIEW_REQUIRED");assert.deepEqual(bundle.risk,risk);assert.deepEqual(bundle.business_review.global_risk,risk);
   assert.ok(risk.findings.some(f=>f.code==="RECEIPT_EVIDENCE_INCOMPLETE"));
   assert.equal(bundle.orders.length,2);assert.equal(bundle.archives.length,5);assert.equal(bundle.settlement_allowed,false);
   assert.equal(checkProjectAuditBundleDigest(bundle).status,"DIGEST_MATCH_NOT_AUTHENTICATED");

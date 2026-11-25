@@ -1,7 +1,6 @@
 import {createHash} from "node:crypto";
 import {canonicalJson} from "../core/canonical-json.mjs";
 import {buildProjectBusinessReview} from "./project-business-review.mjs";
-import {describeProjectRiskReview} from "./project-risk-review.mjs";
 import {evidenceApplicable} from "./project-evidence-scope.mjs";
 import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs";
 import {describeRecordedProjectTimeline,describeLifecycleExceptions} from "./project-lifecycle-timeline.mjs";
@@ -11,7 +10,8 @@ export const PROJECT_AUDIT_BUNDLE_MAX_BYTES=32*1024*1024;
  * backup of original report bytes, or lifecycle archive transition. */
 export function buildProjectAuditBundle({project,integrity,events,archives,orders}){
  const lifecycle=describeProjectLifecycleEvidence(project,archives,orders.map(o=>o.order));
- const risk=describeProjectRiskReview(project,archives,orders.map(o=>o.order));
+ const business_review=buildProjectBusinessReview(project,archives,orders.map(o=>o.order));
+ const risk=business_review.global_risk;
  const exceptions=[
   ...lifecycle.blockers.map(code=>({category:"LIFECYCLE",code})),
   ...orders.flatMap(({order:o})=>[
@@ -23,11 +23,10 @@ export function buildProjectAuditBundle({project,integrity,events,archives,order
    ...(["STALE","UNKNOWN_LEGACY"].includes(a.evidence_snapshot_status)?[{category:"ARCHIVE",code:"CLOSE_EVIDENCE_SNAPSHOT_OUTDATED_OR_UNKNOWN",archive_id:a.archive_id}]:[]),
    ...(a.payload.status==="REVIEW_REQUIRED"||a.payload.rpc_observation?.status==="REVIEW_REQUIRED"?[{category:"ARCHIVE",code:"EVIDENCE_CONFLICT",archive_id:a.archive_id}]:[])
   ]),
-  ...risk.findings.filter(f=>f.category==="CROSS_MODULE").map(f=>({category:f.category,code:f.code,severity:f.severity,references:f.references}))
+  ...risk.findings.filter(f=>f.categories?.includes("CROSS_MODULE")||f.category==="CROSS_MODULE").map(f=>({category:f.category,code:f.code,severity:f.severity,references:f.references}))
  ];
  const recorded_timeline=describeRecordedProjectTimeline(project,events);
  const exception_review=describeLifecycleExceptions(project,lifecycle,risk);
- const business_review=buildProjectBusinessReview(project,archives,orders.map(o=>o.order));
  const content={schema_version:"cook-project-audit-bundle.1",project_id:project.project_id,project_revision:project.revision,
   project,business_review,integrity:{...integrity,status:"INTERNAL_HASH_CHAIN_CHECKED"},events,archives,orders,lifecycle,risk,exceptions,recorded_timeline,exception_review,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",

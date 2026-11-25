@@ -39,3 +39,10 @@ R05 CI passed (45598036893). Closed market quality now calls the existing market
 ## R07 — consistent retrospective global project risk
 
 R06 CI passed (45598391081). The global risk result combines canonical historical findings, configuration errors and warnings, interval accounting/market conflicts and unknowns. Deduplicate by risk code with category and reference sets; highest severity prevails. The business overview, runtime risk status and dedicated GET risk-review now consume the same computation on one snapshot. Portfolio exposure, drawdown, daily loss and depth remain explicitly unknown, not fake zero or inferred from historical PnL/reserves. Canonical portfolio risk engine remains exercised in fixed synthetic acceptance only. Three regression tests including HTTP parity. No trading authorization or live risk certification. R07 retrospective integration advanced, real portfolio input coverage remains open; R08 next after CI.
+
+
+## R07 regression correction and R08 — fixed offline business scenario evaluation
+
+R07 CI 45598578809 failed on Node 22 and 24: M13 integration expected bundle.risk to equal the dedicated risk API, but export still computed the older historical risk. Fix export to reuse the same business_review.global_risk, retain cross-module categories, and strengthen the existing equality assertion. No test removed or weakened.
+
+R08 integrates the existing fixed stress catalogue, unified historical report builder and 13 business scenario checks into the existing offline risk laboratory CLI and unified acceptance. Six fixed stress cases each check expected status, non-execution, blocked test settlement on rejected reports, and cash invariance for valuation-only stress. Separate participant, pool and business groups; stable input and artifact digests, immutable original fixture, reproducibility test. No performance prediction, strategy ranking, or live order operations. R08 submitted with R07 correction; CI must confirm both. R09 next after verification.

@@ -1,5 +1,6 @@
 import {reconcilePumpSwapPoolSnapshot} from "../core/pool-state.mjs";
 import {runParticipantValidationSuite} from "./participant-validation-suite.mjs";
+import {evaluateOfflineBusinessScenarios} from "./offline-business-scenarios.mjs";
 import {summarizeMathValidation} from "./math-validation-summary.mjs";
 
 /** Fixed synthetic reserve observation faults. These are read-only accounting
@@ -35,7 +36,8 @@ export function runOfflineRiskLaboratory({base,seeds=[701,702,703],steps=120}={}
  if(base?.sourceMode!=="SYNTHETIC"||!Array.isArray(seeds)||seeds.length>5||!Number.isSafeInteger(steps)||steps>240)throw Error("OFFLINE_LAB_INPUT_LIMIT");
  const participant=summarizeMathValidation(runParticipantValidationSuite({base,seeds,steps}));
  const pools=runPoolEvidenceStress();
- return {schema_version:"cook-offline-risk-laboratory.1",status:participant.status==="SYNTHETIC_REGRESSION_PASS"&&pools.status==="SYNTHETIC_REGRESSION_PASS"?"SYNTHETIC_REGRESSION_PASS":"REVIEW_REQUIRED",
-  participant,pools,real_market_validated:false,lp_position_valuation:null,operating_profit_forecast:null,real_data_connected:false,
+ const business=evaluateOfflineBusinessScenarios(base);
+ return {schema_version:"cook-offline-risk-laboratory.1",status:participant.status==="SYNTHETIC_REGRESSION_PASS"&&pools.status==="SYNTHETIC_REGRESSION_PASS"&&business.status==="SYNTHETIC_REGRESSION_PASS"?"SYNTHETIC_REGRESSION_PASS":"REVIEW_REQUIRED",
+  participant,pools,business,real_market_validated:false,lp_position_valuation:null,operating_profit_forecast:null,real_data_connected:false,
   source_attestation:"UNKNOWN",execution_enabled:false,settlement_allowed:false};
 }
