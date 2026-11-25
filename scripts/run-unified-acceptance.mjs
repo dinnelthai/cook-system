@@ -79,7 +79,7 @@ async function main(){
  const out=process.argv[2]?resolve(root,process.argv[2]):join(root,".cook-system","acceptance","unified-acceptance-"+new Date().toISOString().replace(/[:.]/g,"-")+".json");
  await mkdir(dirname(out),{recursive:true});await writeFile(out,JSON.stringify(report,null,2)+"\n",{flag:"wx",mode:0o600});
  const testSummary=checks.find(c=>c.id==="test_count");
- process.stdout.write(JSON.stringify({overall_status:report.overall_status,passed:pass,failed:failed.length,tests:testSummary?.tests??null,test_failures:testSummary?.failed??null,report_path:relative(root,out),operator_gates_pending:operatorGates.length},null,2)+"\\n");
+ process.stdout.write(JSON.stringify({overall_status:report.overall_status,passed:pass,failed:failed.length,tests:testSummary?.tests??null,test_failures:testSummary?.failed??null,report_path:relative(root,out),operator_gates_pending:operatorGates.length},null,2)+"\n");
  if(failed.length)process.exitCode=1;
 }
 main().catch(error=>{process.stderr.write("Unified acceptance runner failed: "+(error.code??error.name)+"\n");process.exitCode=1;});
