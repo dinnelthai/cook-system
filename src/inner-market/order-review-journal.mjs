@@ -59,10 +59,10 @@ export function createOrderReviewJournal(db,{current,now}){
    db.exec("COMMIT");return {status:"RECORDED",order:state};
   }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
  }
- function list(projectId){
-  const p=current(projectId);
-  return [...replay(projectId,p).values()].map(x=>({...x.state,stale:x.state.project_revision!==p.aggregate.revision,current_revision:p.aggregate.revision,evidence_applicability:evidenceApplicability(p,x.state.project_revision),head_hash:x.head_hash}));
+ function readVerifiedJournal(projectId,p){
+  return [...replay(projectId,p).values()].map(x=>({order:{...x.state,stale:x.state.project_revision!==p.aggregate.revision,current_revision:p.aggregate.revision,evidence_applicability:evidenceApplicability(p,x.state.project_revision),head_hash:x.head_hash},events:x.events}));
  }
+ function list(projectId){return readVerifiedJournal(projectId,current(projectId)).map(x=>x.order);}
  function events(projectId,orderId){
   const p=current(projectId),record=replay(projectId,p).get(orderId);
   if(!record)throw Error("ORDER_NOT_FOUND");
@@ -113,5 +113,5 @@ export function createOrderReviewJournal(db,{current,now}){
    db.exec("COMMIT");return {imported,already_present,execution_enabled:false,settlement_allowed:false,source_attestation:"UNKNOWN"};
   }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
  }
- return {append,list,events,importReceipts};
+ return {append,list,events,importReceipts,readVerifiedJournal};
 }

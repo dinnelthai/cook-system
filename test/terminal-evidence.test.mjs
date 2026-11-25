@@ -205,13 +205,10 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
   const samples=createOrderReceiptImporter(opts)(p,link).samples;
   assert.equal(s.orderReview.importReceipts(p.project_id,1,link.archive_id,samples).imported,2);
   assert.equal(s.orderReview.importReceipts(p.project_id,1,link.archive_id,samples).already_present,2);
-  const orders=s.orderReview.list(p.project_id);
+  const receiptSnapshot=s.getEvidenceSnapshot(p.project_id),orders=receiptSnapshot.orders;
   const review=await createOrderReceiptReviewer(opts)(p,orders[0],link);
   assert.equal(review.status,"INTERNAL_MATCH");assert.equal(review.rpc_observation.status,"UNKNOWN");
-  s.recordArchive(p.project_id,"ORDER_RECEIPT_REVIEW",{...review,order_head_hash:orders[0].head_hash},1);
-  const close=createProjectCloseReviewer(opts)(p,link,orders,s.listArchive(p.project_id));
-  assert.ok(close.blockers.includes("TOKEN_INVENTORY_OUTSTANDING"));
-  s.recordArchive(p.project_id,"PROJECT_CLOSE_REVIEW",close,1);
+  s.recordArchive(p.project_id,"ORDER_RECEIPT_REVIEW",{...review,order_head_hash:orders[0].head_hash,evidence_snapshot_digest:receiptSnapshot.receipt_snapshot_digest},1,receiptSnapshot.receipt_snapshot_digest);
   const market=createProjectMarketEvidenceReviewer(opts)(p,link);
   assert.equal(market.status,"PARTIAL");
   const marketArchive=s.recordArchive(p.project_id,"MARKET_EVIDENCE_REVIEW",market,1);
@@ -220,6 +217,12 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
   assert.ok(marketRisk.findings.some(f=>f.code==="CANDLE_EVIDENCE_UNAVAILABLE"&&f.references.includes(marketArchive.archive_id)));
   assert.ok(!marketRisk.findings.some(f=>f.code==="MARKET_EVIDENCE_REVIEW_MISSING"));
   assert.throws(()=>createProjectMarketEvidenceReviewer(opts)(other,link),/ORDER_REPORT_LINK_SCOPE_MISMATCH/);
+  const closeSnapshot=s.getEvidenceSnapshot(p.project_id);
+  const close=createProjectCloseReviewer(opts)(p,link,closeSnapshot.orders,closeSnapshot.archives);
+  assert.ok(close.blockers.includes("TOKEN_INVENTORY_OUTSTANDING"));
+  s.recordArchive(p.project_id,"PROJECT_CLOSE_REVIEW",{...close,evidence_snapshot_digest:closeSnapshot.evidence_snapshot_digest},1,closeSnapshot.evidence_snapshot_digest);
+  const business=s.getBusinessReview(p.project_id);
+  assert.equal(business.close.review_count,1);assert.equal(business.risk.status,"REVIEW_REQUIRED");
   const risk=s.getRiskReview(p.project_id),bundle=s.exportAuditBundle(p.project_id,1);
   assert.equal(risk.status,"REVIEW_REQUIRED");assert.deepEqual(bundle.risk,risk);
   assert.ok(risk.findings.some(f=>f.code==="RECEIPT_EVIDENCE_INCOMPLETE"));

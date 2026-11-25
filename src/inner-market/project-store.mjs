@@ -243,8 +243,8 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       });
     }
     function events(projectId) { return clone(current(projectId).events); }
-    function verify(projectId) {
-      const latest = current(projectId);
+    function verify(projectId) {return describeVerified(projectId,current(projectId));}
+    function describeVerified(projectId,latest) {
       return {
         status: "VERIFIED", project_id: projectId, revision: latest.aggregate.revision,
         event_count: latest.events.length, aggregate_hash: latest.aggregate_hash,
@@ -269,17 +269,17 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
     }
     function evidenceSnapshotInTransaction(projectId,latest){
       const archives=archiveRows.all(projectId).map(row=>decodeArchive(row,latest));
-      const orders=rawOrderReview.list(projectId);
+      const journal=rawOrderReview.readVerifiedJournal(projectId,latest),orders=journal.map(x=>x.order);
       const orderHeads=orders.map(o=>[o.order_id,o.revision,o.head_hash]).sort((a,b)=>a[0].localeCompare(b[0],"en"));
       const snapshotDigest=predicate=>hash(canonicalJson({project_head_hash:latest.head_hash,
         archive_hashes:archives.filter(predicate).map(a=>a.record_hash).sort(),orders:orderHeads}));
       const digest=snapshotDigest(a=>a.kind!=="PROJECT_CLOSE_REVIEW");
       const receiptDigest=snapshotDigest(a=>a.kind==="HISTORICAL_REPORT_LINK");
       return {project:latest.aggregate,archives:archives.map(a=>a.kind==="PROJECT_CLOSE_REVIEW"?{...a,
-        evidence_snapshot_status:!a.payload.evidence_snapshot_digest?"UNKNOWN_LEGACY":a.payload.evidence_snapshot_digest===digest?"MATCHED":"STALE"}:a),orders,evidence_snapshot_digest:digest,receipt_snapshot_digest:receiptDigest};
+        evidence_snapshot_status:!a.payload.evidence_snapshot_digest?"UNKNOWN_LEGACY":a.payload.evidence_snapshot_digest===digest?"MATCHED":"STALE"}:a),orders,journal,evidence_snapshot_digest:digest,receipt_snapshot_digest:receiptDigest};
     }
     function getEvidenceSnapshot(projectId){
-      return readSnapshot(()=>evidenceSnapshotInTransaction(projectId,current(projectId)));
+      return readSnapshot(()=>{const {journal,...snapshot}=evidenceSnapshotInTransaction(projectId,current(projectId));return snapshot;});
     }
     function recordArchive(projectId, kind, payload, expectedRevision, expectedEvidenceDigest=null) {
       if (!["ISSUANCE_OBSERVATION","MARKET_OBSERVATION","HISTORICAL_REPORT_LINK","ORDER_RECEIPT_REVIEW","GRADUATION_HISTORY_REVIEW","PROJECT_CLOSE_REVIEW","TREASURY_REVIEW","MARKET_EVIDENCE_REVIEW"].includes(kind) ||
@@ -315,7 +315,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       return getEvidenceSnapshot(projectId).archives;
     }
     const rawOrderReview=createOrderReviewJournal(db,{current,now});
-    const orderReview={...rawOrderReview,
+    const orderReview={append:rawOrderReview.append,importReceipts:rawOrderReview.importReceipts,
       list:projectId=>readSnapshot(()=>rawOrderReview.list(projectId)),
       events:(projectId,orderId)=>readSnapshot(()=>rawOrderReview.events(projectId,orderId))
     };
@@ -324,18 +324,19 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       try{
         const latest=current(projectId);
         if(latest.aggregate.revision!==expectedRevision)throw Error("PROJECT_REVISION_CONFLICT");
-        const integrity=verify(projectId),archives=listArchive(projectId);
-        const orders=orderReview.list(projectId).map(order=>({order,events:orderReview.events(projectId,order.order_id)}));
+        const integrity=describeVerified(projectId,latest),snapshot=evidenceSnapshotInTransaction(projectId,latest);
+        const archives=snapshot.archives,orders=snapshot.journal;
         const bundle=buildProjectAuditBundle({project:latest.aggregate,integrity,events:latest.events,archives,orders});
         db.exec("COMMIT");return bundle;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
     function getBusinessReview(projectId){
-      return readSnapshot(()=>buildProjectBusinessReview(current(projectId).aggregate,listArchive(projectId),orderReview.list(projectId)));
+      const snapshot=getEvidenceSnapshot(projectId);
+      return buildProjectBusinessReview(snapshot.project,snapshot.archives,snapshot.orders);
     }
     function getLifecycleReview(projectId){
       return readSnapshot(()=>{
-        const latest=current(projectId),project=latest.aggregate,archives=listArchive(projectId),orders=orderReview.list(projectId);
+        const latest=current(projectId),{project,archives,orders}=evidenceSnapshotInTransaction(projectId,latest);
         const lifecycle=describeProjectLifecycleEvidence(project,archives,orders);
         const risk=describeProjectRiskReview(project,archives,orders);
         return {...lifecycle,recorded_timeline:describeRecordedProjectTimeline(project,latest.events),
@@ -345,8 +346,8 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
     function getRiskReview(projectId){
       db.exec("BEGIN");
       try{
-        const project=current(projectId).aggregate;
-        const result=describeProjectRiskReview(project,listArchive(projectId),orderReview.list(projectId));
+        const {project,archives,orders}=evidenceSnapshotInTransaction(projectId,current(projectId));
+        const result=describeProjectRiskReview(project,archives,orders);
         db.exec("COMMIT");return result;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
@@ -359,8 +360,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         const projects=health.projects.map(row=>{
           if(row.status!=="INTERNALLY_CONSISTENT")return row;
           try{
-            const archives=listArchive(row.project_id),orders=orderReview.list(row.project_id);
-            for(const order of orders)orderReview.events(row.project_id,order.order_id);
+            const {archives,orders}=getEvidenceSnapshot(row.project_id);
             return {...row,archive_count:archives.length,order_count:orders.length};
           }catch(error){
             return {...row,status:"REVIEW_REQUIRED",reason:typeof error?.message==="string"&&/^[A-Z][A-Z0-9_]{2,100}$/.test(error.message)?error.message:"PROJECT_JOURNAL_READ_FAILED"};

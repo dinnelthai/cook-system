@@ -14,6 +14,7 @@ export function auditSyntheticRecordNumbers(report){
  const versions=new Set(events.map(e=>e.synthetic_metadata?.generator_version));
  const known=versions.size===1&&["participant-simulator.1","participant-simulator.2","participant-simulator.3"].includes([...versions][0]);
  const issues=[],signatures=new Set();
+ let invariantChecked=0,invariantDecreases=0,invalidReservePath=false;
  let q=amount(d.initial_state?.quote_reserves_base_units,true),t=amount(d.initial_state?.token_reserves_base_units,true),fees=0n;
  const feeBps=report.summary?.fee_bps,feeKnown=known&&Number.isSafeInteger(feeBps)&&feeBps>=0&&feeBps<10000;
  if(q===null||t===null)issues.push("INVALID_OPENING_RESERVES");
@@ -42,13 +43,17 @@ export function auditSyntheticRecordNumbers(report){
    }
   }
   if(q!==null&&t!==null){
+   const priorProduct=q*t,priorPositive=q>0n&&t>0n;
    q+=buy?cash:-cash;t+=buy?-token:token;
-   if(q<=0n||t<=0n)issues.push("NONPOSITIVE_RECORDED_RESERVE:"+id);
+   if(q<=0n||t<=0n){issues.push("NONPOSITIVE_RECORDED_RESERVE:"+id);invalidReservePath=true;}
+   else if(priorPositive){invariantChecked++;if(q*t<priorProduct)invariantDecreases++;}
   }
  }
  if(q===null||t===null||q.toString()!==d.final_state?.quote_reserves_base_units||t.toString()!==d.final_state?.token_reserves_base_units)issues.push("RECORDED_RESERVE_ENDPOINT_MISMATCH");
  return {status:issues.length?"REVIEW_REQUIRED":trades.length&&known?"PASS":"UNKNOWN",
   issues,trade_count:trades.length,declared_fee_total_base_units:known&&!issues.length?fees.toString():null,
   fee_convention:known?"SYNTHETIC_EMBEDDED_POOL_FEE":"UNVERIFIED_GENERATOR",
+  reserve_product_diagnostic:{status:!known||invalidReservePath||invariantChecked!==trades.length||!trades.length||issues.length?"UNKNOWN":invariantDecreases?"REVIEW_REQUIRED":"NO_DECREASE_OBSERVED",
+   checked_record_count:invariantChecked,decrease_count:invariantDecreases,interpretation:"RECORDED_RESERVE_PRODUCT_ONLY_NOT_PROTOCOL_PARITY"},
   invariant_model_verified:false,independent_fee_attestation:"UNKNOWN",execution_enabled:false};
 }

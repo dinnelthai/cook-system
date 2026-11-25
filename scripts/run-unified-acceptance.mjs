@@ -50,6 +50,9 @@ async function main(){
   const countsValid=test.ok&&counts.tests!==null&&counts.passed===counts.tests&&counts.failed===0&&counts.skipped===0;
   add("test_count",countsValid?"PASS":"FAIL",countsValid?"All tests passed with no skips":"Test summary missing or contains failures/skips",counts);
  command("json_schema_registry",["scripts/validate-json-schemas.mjs"]);
+ const businessRegression=command("project_business_regression",["--test","--test-reporter=tap","test/project-store.test.mjs","test/project-business-review.test.mjs","test/project-risk-review.test.mjs","test/project-http.test.mjs","test/terminal-evidence.test.mjs","test/project-storage-regression.test.mjs","test/synthetic-reserve-product-diagnostic.test.mjs"]);
+ const businessCounts={tests:parseCount(businessRegression.out,"tests"),passed:parseCount(businessRegression.out,"pass"),failed:parseCount(businessRegression.out,"fail"),skipped:parseCount(businessRegression.out,"skipped")};
+ add("business_regression_count",businessRegression.ok&&businessCounts.tests!==null&&businessCounts.tests===businessCounts.passed&&businessCounts.failed===0&&businessCounts.skipped===0?"PASS":"FAIL","Project storage, evidence, API and synthetic numerical diagnostic regression; not external acceptance",businessCounts);
  const temp=await mkdtemp(join(tmpdir(),"cook-unified-acceptance-"));
  try{
   command("participant_validation_suite",["scripts/run-participant-validation-suite.mjs",join(temp,"participant-validation.json")]);

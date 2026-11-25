@@ -180,11 +180,13 @@ function renderTerminal(){
         const v=await getProjectBusinessReview(selected.project_id,selected.revision);
         if(!businessCurrent()||ticket!==businessTicket)return;
         businessArea.innerHTML="<h3>项目统一复核 · v"+esc(v.project_revision)+"</h3>"+note(v.status+" · 区间历史证据 · 实时资产与执行不可用")+
+         table(["项目阶段","严重异常","警告","未知项"],[[v.recorded_stage,v.risk.critical,v.risk.warning,v.risk.unknown]])+
+         note("历史归档容量："+(v.capacity?.archive_count??"—")+"/"+(v.capacity?.archive_limit??"—")+" · 订单记录："+(v.capacity?.order_count??"—")+"/"+(v.capacity?.order_limit??"—")+" · "+(v.capacity?.status??"UNKNOWN"))+
          table(["模块","状态","记录数"],[["资金与库存",v.treasury.status,v.treasury.review_count],["市场证据",v.market.status,v.market.review_count],["财务关闭",v.close.status,v.close.review_count],["订单复核","未充分复核 "+v.orders.unresolved_count,v.orders.record_count]])+
-         table(["区间开始","区间结束","关联复核数"],v.intervals.map(x=>[x.opening_cutoff,x.closing_cutoff,x.reviews.length]))+
+         '<details><summary>历史区间与报告关联</summary>'+table(["区间开始","区间结束","关联复核数"],v.intervals.map(x=>[x.opening_cutoff,x.closing_cutoff,x.reviews.length]))+'</details>'+
          table(["证据冲突","引用"],v.findings.map(x=>[x.code,x.reference??"—"]))+
          table(["证据未知","引用"],(v.unknown??[]).map(x=>[x.code,x.reference??"—"]))+
-         table(["接入验收条件","状态"],v.data_integration.gates.map(g=>[g.id,g.status]))+
+         '<details><summary>真实数据接入与环境验收（未完成）</summary>'+table(["接入验收条件","状态"],v.data_integration.gates.map(g=>[g.id,g.status]))+'</details>'+
          '<button id="business-refresh">刷新统一复核</button><button id="business-export">导出复核 JSON</button>';
         businessArea.querySelector("#business-refresh").onclick=refreshBusiness;
         businessArea.querySelector("#business-export").onclick=()=>download("project-business-review.json",JSON.stringify(v,null,2));

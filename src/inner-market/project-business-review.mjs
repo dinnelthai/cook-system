@@ -27,6 +27,8 @@ export function buildProjectBusinessReview(projectInput,archives=[],orders=[]){
   treasury:{...treasury,project_wide_total:null,live_balance:null},market:{...market,live_market_assessed:false},close,
   orders:{record_count:receipts.length,unresolved_count:receipts.filter(r=>!["DECLARED_SAMPLE_MATCH"].includes(r.status)).length,records:receipts},
   risk:{...risk.counts,status:risk.status},lifecycle:{recorded_stage:lifecycle.recorded_stage,blockers:lifecycle.blockers},
+  capacity:{archive_count:archives.length,archive_limit:256,order_count:orders.length,order_limit:256,
+   status:archives.length>=256||orders.length>=256?"LIMIT_REACHED":archives.length>=230||orders.length>=230?"NEAR_LIMIT":"WITHIN_LIMIT"},
   intervals,findings,unknown,data_integration:{status:"EXTERNAL_ACCEPTANCE_PENDING",gates,real_data_connected:false,source_attestation:"UNKNOWN"},
   source_attestation:"UNKNOWN",lifecycle_mutated:false,settlement_allowed:false,execution_enabled:false};
 }
