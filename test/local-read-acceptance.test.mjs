@@ -134,3 +134,25 @@ test("token contradiction is not masked by missing native balance evidence",asyn
  const r=await auditLocalReadAcceptance({...tokenInput(),fetchImpl:mock({getTransaction:t})});
  assert.equal(r.status,"REVIEW_REQUIRED");
 });
+
+test("retained report samples bind exact closed interval and declared financial expectations",async()=>{
+ const {bindLocalReadReportSamples}=await import("../src/inner-market/local-read-report-binding.mjs");
+ const sample={signature:sig,slot:110,expected};
+ const reportInput={sourceMode:"ARCHIVED_HISTORICAL",scope:{network:"localnet",genesisHash:pin,openingCutoff:"slot:100",closingCutoff:"slot:120"},
+ archivedEvidence:{accountInterval:{scope:{genesisHash:pin,openingSlot:100,closingSlot:120},receipts:[{signature:sig,genesisHash:pin,finality:"FINALIZED",transaction:tx()}]}}};
+ const args={reportInput,range:{start_slot:100,end_slot:120},receiptSamples:[sample],expectedGenesisHash:pin};
+ const r=bindLocalReadReportSamples(args);
+ assert.equal(r.status,"PARTIAL");assert.equal(r.counts.matched,1);assert.equal(r.financial_parity_attested,false);
+ assert.equal(r.code,"REPORT_RETAINED_SAMPLE_MATCH_INTERVAL_COMPLETENESS_UNATTESTED");
+ assert.ok(!JSON.stringify(r).includes(sig));
+ assert.equal(bindLocalReadReportSamples({...args,range:{start_slot:99,end_slot:120}}).code,"REPORT_INTERVAL_MISMATCH");
+ const bad=structuredClone(reportInput);bad.archivedEvidence.accountInterval.receipts[0].transaction.meta.fee=5001;
+ assert.equal(bindLocalReadReportSamples({...args,reportInput:bad}).status,"REVIEW_REQUIRED");
+ const missing=structuredClone(reportInput);missing.archivedEvidence.accountInterval.receipts=[];
+ assert.equal(bindLocalReadReportSamples({...args,reportInput:missing}).counts.incomplete,1);
+ const legacy=structuredClone(reportInput);legacy.scope.network="local_sim";
+ assert.equal(bindLocalReadReportSamples({...args,reportInput:legacy}).code,"LEGACY_REPORT_NETWORK_ALIAS");
+ const noExpected=bindLocalReadReportSamples({...args,receiptSamples:[{signature:sig,slot:110}]});
+ assert.equal(noExpected.counts.incomplete,1);
+ assert.equal(bindLocalReadReportSamples({...args,receiptSamples:[{...sample,slot:100}]}).status,"REVIEW_REQUIRED");
+});

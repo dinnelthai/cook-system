@@ -1,5 +1,6 @@
 import {SolanaRpcClient} from "../adapters/pump/solana-rpc.mjs";
 import {validateReceiptExpectation,auditReceiptObservation} from "./local-receipt-observation.mjs";
+import {bindLocalReadReportSamples} from "./local-read-report-binding.mjs";
 import {buildUnifiedHistoricalReport} from "./unified-historical-report.mjs";
 const slot=v=>Number.isSafeInteger(v)&&v>=0;
 const base58=v=>typeof v==="string"&&/^[1-9A-HJ-NP-Za-km-z]+$/.test(v);
@@ -26,9 +27,10 @@ export async function auditLocalReadAcceptance({endpoint,expectedGenesisHash,ran
  const checks=[];
  const add=(id,status,code)=>checks.push({id,status,code});
  const financialSamples=[];
+ let report_binding=null;
  let observed=null,retention=null,receiptSummary={requested:receiptSamples.length,matched:0,unavailable:0,contradicted:0};
  const finish=()=>({schema_version:"cook-local-read-acceptance.1",status:checks.some(c=>c.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":checks.some(c=>c.status==="UNKNOWN"||c.status==="PARTIAL")?"PARTIAL":"READ_PREFLIGHT_PASS",
-  checks,range:{start_slot:range.start_slot,end_slot:range.end_slot},observed,retention,receipts:receiptSummary,receipt_financial_observations:financialSamples,
+  checks,range:{start_slot:range.start_slot,end_slot:range.end_slot},observed,retention,receipts:receiptSummary,receipt_financial_observations:financialSamples,report_binding,
   source_attestation:"UNKNOWN",history_complete_attested:false,financial_parity_attested:false,production_ready:false,execution_enabled:false});
  try{observed=await rpc.getGenesisHash();}catch{add("identity","UNKNOWN","GENESIS_UNAVAILABLE");return finish();}
  if(observed!==expectedGenesisHash){add("identity","REVIEW_REQUIRED","GENESIS_PIN_MISMATCH");return finish();}
@@ -64,12 +66,12 @@ export async function auditLocalReadAcceptance({endpoint,expectedGenesisHash,ran
  if(reportInput===null)add("report","UNKNOWN","HISTORICAL_REPORT_UNAVAILABLE");
  else {
   try{
-   if(reportInput.sourceMode!=="ARCHIVED_HISTORICAL"||reportInput.scope?.network!=="local_sim"||reportInput.scope?.genesisHash!==expectedGenesisHash){
+   if(reportInput.sourceMode!=="ARCHIVED_HISTORICAL"||!["localnet","local_sim"].includes(reportInput.scope?.network)||reportInput.scope?.genesisHash!==expectedGenesisHash){
     add("report","REVIEW_REQUIRED","REPORT_SCOPE_MISMATCH");
    }else{
     const report=buildUnifiedHistoricalReport(reportInput),state=report.terminal_state;
     if(report.status!=="REPORT_READY"||state.status!==report.status||report.execution_enabled!==false||report.settlement_allowed!==false||state.execution_enabled!==false||state.settlement_allowed!==false)add("report","REVIEW_REQUIRED","REPORT_INTEGRITY_OR_BOUNDARY_FAILURE");
-    else add("report","PARTIAL","REPORT_INTERNALLY_READY_INTERVAL_BINDING_UNATTESTED");
+    else {report_binding=bindLocalReadReportSamples({reportInput,range,receiptSamples,expectedGenesisHash});add("report",report_binding.status,report_binding.code);}
    }
   }catch{add("report","REVIEW_REQUIRED","REPORT_VALIDATION_FAILED");}
  }
