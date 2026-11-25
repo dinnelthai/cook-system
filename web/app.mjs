@@ -10,6 +10,7 @@ import { buildUnifiedHistoricalReport } from "../src/inner-market/unified-histor
 import {createDiagnosticLog,errorKind} from "./diagnostic-log.mjs";
 import {historicalReviewRows} from "./historical-review-view.mjs";
 import {reviewSyntheticLedgerInput} from "./synthetic-ledger-view.mjs";
+import {reviewSyntheticBatchInput} from "./synthetic-batch-view.mjs";
 import {createHistoricalProjectCatalogue} from "../src/inner-market/historical-project-catalogue.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 // Session storage retains diagnostics across refreshes in the same tab, without cross-tab writers.
@@ -244,7 +245,8 @@ function render(){
  panel("固定场景验收",table(["场景","风险","预期","实际","结果"],results.map(r=>[r.title,r.risk_category,r.expected_status,r.actual_status,r.passed?"PASS":"FAIL"])))+
  panel("随机压力实验",'<div class="grid"><div><label for="experiment-seed">随机种子</label><input id="experiment-seed" type="number" min="0" max="4294967295" value="42"></div><div><label for="experiment-runs">每类实验次数</label><input id="experiment-runs" type="number" min="1" max="1000" value="100"></div></div><p class="muted">仅随机抽取预置风险场景，不生成交易；采样权重并非真实行为概率。</p><button id="run-experiment" class="primary">运行随机实验</button> <button id="export-experiment" disabled>导出实验</button><div id="experiment-result"></div>')+
  panel("场景报告",'<button id="export-participants">导出实验结果 JSON</button>'+details("实验原始数据",results))+
- panel("离线账簿复核",'<p class="muted">仅导入已记录的合成账簿；不生成交易，不认证市场行为。</p><label for="synthetic-ledger-file">账簿输入 JSON</label><input type="file" id="synthetic-ledger-file" accept=".json"><button id="synthetic-ledger-sample">载入固定测试样本</button> <button id="synthetic-ledger-export" disabled>导出核验结果</button><div id="synthetic-ledger-result" role="status"></div>');
+ panel("离线账簿复核",'<p class="muted">仅导入已记录的合成账簿；不生成交易，不认证市场行为。</p><label for="synthetic-ledger-file">账簿输入 JSON</label><input type="file" id="synthetic-ledger-file" accept=".json"><button id="synthetic-ledger-sample">载入固定测试样本</button> <button id="synthetic-ledger-export" disabled>导出核验结果</button><div id="synthetic-ledger-result" role="status"></div>')+
+ panel("多实验报告复盘",'<p class="muted">导入已完成的离线合成报告数组，重新核验账簿和记录；不导入派生审计结论，不评估真实市场行为。</p><label for="batch-review-file">原始实验报告数组 JSON（最多 100 份 / 4 MiB）</label><input id="batch-review-file" type="file" accept=".json"><button id="batch-review-export" disabled>导出批量核验报告</button><div id="batch-review-result" role="status"></div>');
  let experiment=null;
  document.querySelector("#run-experiment").onclick=()=>{
   const el=document.querySelector("#experiment-result"),exportButton=document.querySelector("#export-experiment");
@@ -279,6 +281,26 @@ function render(){
   const response=await fetch("/fixtures/synthetic/closed-ledger-review.json",{cache:"no-store"});if(!response.ok)throw Error("FIXTURE_UNAVAILABLE");return response.json();
  });
  ledgerExport.onclick=()=>{if(ledgerAudit)download("synthetic-ledger-audit.json",JSON.stringify(ledgerAudit,null,2))};
+ const batchResult=main.querySelector("#batch-review-result"),batchExport=main.querySelector("#batch-review-export");
+ let batchAudit=null,batchTicket=0;
+ main.querySelector("#batch-review-file").onchange=async e=>{
+  const ticket=++batchTicket,file=e.target.files[0];
+  batchAudit=null;batchExport.disabled=true;batchResult.textContent="";
+  if(!file)return;
+  batchResult.textContent="读取离线报告";
+  try{
+   if(file.size>4*1024*1024)throw Error("FILE_TOO_LARGE");
+   const raw=JSON.parse(await file.text());
+   if(ticket!==batchTicket||!batchResult.isConnected)return;
+   const view=reviewSyntheticBatchInput(raw);
+   batchResult.innerHTML=note("合成记录内部核验 · "+view.audit.status)+metrics(view.metrics)+
+    table(["检查","通过","需复核","未知","未评估"],view.comparison)+
+    table(["实验","状态","事件","成交","账户差异或记录问题"],view.rows)+
+    table(["异常类型","受影响报告数"],view.issues);
+   batchAudit=view.audit;batchExport.disabled=false;
+  }catch{if(ticket===batchTicket&&batchResult.isConnected){batchAudit=null;batchExport.disabled=true;batchResult.textContent="批量输入无效，未生成核验报告。"}}
+ };
+ batchExport.onclick=()=>{if(batchAudit)download("synthetic-batch-audit.json",JSON.stringify(batchAudit,null,2))};
  }else if(page==="logs"){
  const logs=diagnostics.snapshot();
  main.innerHTML=screenHeading("系统设置","连接状态 · 诊断事件 · 数据导入")+panel("服务状态",table(["服务","状态"],[["浏览器应用","已初始化"],["报告引擎",report.status],["Localnet RPC","待检查"],["交易执行","测试链按配置启用"]])+'<div class="row"><button id="rpc-health">检查本地连接</button></div><div id="rpc-health-result" role="status"></div>')+note("仅保存当前页面会话的最近 1000 条结构化诊断事件，同一标签页刷新时保留（浏览器存储不可用时除外）。不会记录原始输入、钱包地址、私钥、RPC URL 或原始错误信息。")+

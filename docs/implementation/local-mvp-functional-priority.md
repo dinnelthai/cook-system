@@ -95,3 +95,7 @@ The completed-report batch auditor now uses a unified synthetic review containin
 ## M05 — multi-report QA comparison
 
 Batch review now exposes per-check PASS / REVIEW_REQUIRED / UNKNOWN / NOT_EVALUATED counts, observed record counts per accepted report, and issue categories counted once per affected report. Rejected records are not treated as failed or successful evidence checks. Comparison is restricted to retrospective QA evidence; no return ranking, actor strategy comparison, calibration or independent market-path claim. Three regression cases verify count partition, issue deduplication and duplicate-scenario handling. UI integration and local operator acceptance remain pending.
+
+## M06 — browser batch review integration
+
+The market-risk experiment page imports a bounded array of completed synthetic reports (100 maximum, 4 MiB browser file limit), recomputes the batch review, and shows per-report status, observed record counts, check-state matrix and issue-category counts. Exports are derived audits, not original report inputs. Stale reads and failed imports cannot export a previous result. CLI and browser share the pure core review modules; original simulation import paths remain compatibility re-exports. Two view regressions verify CLI parity and derived-report rejection. No live discovery, execution, wallet routing, model behavior or market calibration changes. Actual browser acceptance and unified live project lifecycle remain open.
