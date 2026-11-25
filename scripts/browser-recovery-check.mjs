@@ -1,5 +1,5 @@
 import {spawn} from "node:child_process";
-import {readFile} from "node:fs/promises";
+import {readFile,writeFile} from "node:fs/promises";
 import {join} from "node:path";
 import {once} from "node:events";
 import assert from "node:assert/strict";
@@ -38,7 +38,7 @@ async function connect(url){
  };
 }
 /** Disposable loopback browser QA; only metadata fixtures and read-only recovery. */
-export async function checkBrowserRecovery({browser,dir,env,url}){
+export async function checkBrowserRecovery({browser,dir,env,url,previewDir=null}){
  const profile=join(dir,"browser-interactions");
  const key="browser-recovery-qa";
  const seed=await fetch(url+"/api/projects",{method:"POST",headers:{"content-type":"application/json"},
@@ -50,7 +50,7 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   "--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],{env,stdio:["ignore","ignore","pipe"]});
  let cdp,spawnError=null,stderrTail="";child.on("error",e=>{spawnError=e;});
  child.stderr.on("data",chunk=>{stderrTail=(stderrTail+String(chunk)).slice(-8192);});
- const observations=[],requests=new Map();
+ const observations=[],requests=new Map(),previews=[];
  const add=(kind,detail)=>{if(observations.length<80)observations.push({kind,...detail});};
  const pathOnly=value=>{try{const u=new URL(value);return u.origin===url?u.pathname:"OTHER_ORIGIN";}catch{return "UNKNOWN";}};
  const brief=value=>String(value??"").replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,240);
@@ -79,6 +79,20 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
     throw error;
    }
   },12000,stage);
+  // Capture only the fixed disposable QA pages. No live user session, keys or RPC.
+  async function capturePreview(page,viewport){
+   if(!previewDir)return;
+   assert.ok(["wallet","dashboard","projects","participants","logs","create","terminal"].includes(page));
+   assert.ok(["desktop","narrow"].includes(viewport));
+   const dimensions=await evaluate('({viewport_width:innerWidth,viewport_height:innerHeight,document_width:document.documentElement.scrollWidth,main_width:Math.round(document.querySelector("#main").getBoundingClientRect().width),page:document.querySelector("#main").dataset.page})');
+   assert.equal(dimensions.page,page);
+   const result=await cdp.call("Page.captureScreenshot",{format:"png",fromSurface:true,captureBeyondViewport:false});
+   const png=Buffer.from(result.data??"","base64");
+   assert.ok(png.length>8&&png.length<=8*1024*1024&&png.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),"invalid preview image");
+   const name=viewport+"-"+page+".png";
+   await writeFile(join(previewDir,name),png,{flag:"wx"});
+   previews.push({file:name,...dimensions,document_horizontal_overflow:Math.max(0,dimensions.document_width-dimensions.viewport_width)});
+  }
   cdp.on("Runtime.exceptionThrown",({exceptionDetails:d})=>{
    add("exception",{text:brief(d?.exception?.description??d?.text),path:pathOnly(d?.url),line:d?.lineNumber??null});
   });
@@ -115,10 +129,15 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   await evaluate('(()=>{const s=document.querySelector("#operator-view-mode");s.value="AUDIT";s.dispatchEvent(new Event("change"));})()');
   assert.equal(await evaluate('document.querySelector("#main").dataset.viewMode==="AUDIT"&&document.querySelector("details.audit-detail").open'),true);
   const pageChecks=[["wallet",'document.querySelector("#asset-interval")'],["dashboard",'document.querySelector("#scoped-review-interval")'],["projects",'document.querySelector("#workspace-export")'],["participants",'document.querySelector("#run-experiment")'],["logs",'document.querySelector("#log-download")'],["create",'document.querySelector("#project-budget-form")'],["terminal",'document.querySelector(".operator-task-grid")']];
-  for(const [id,condition] of pageChecks){
-   await evaluate('document.querySelector('+JSON.stringify('[data-page="'+id+'"]')+').click()');
-   await wait("navigation-"+id,'document.querySelector("#main").dataset.page==='+JSON.stringify(id)+'&&'+condition);
+  if(previewDir)await cdp.call("Emulation.setDeviceMetricsOverride",{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+  async function navigatePrimaryPages(viewport){
+   for(const [id,condition] of pageChecks){
+    await evaluate('document.querySelector('+JSON.stringify('[data-page="'+id+'"]')+').click()');
+    await wait("navigation-"+viewport+"-"+id,'document.querySelector("#main").dataset.page==='+JSON.stringify(id)+'&&'+condition);
+    await capturePreview(id,viewport);
+   }
   }
+  await navigatePrimaryPages("desktop");
   assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
   await evaluate('document.querySelector("#project-show-risk").click()');
   await wait("risk-filter",'document.querySelector("#risk-severity")&&document.querySelector("#terminal-project-details").open');
@@ -129,6 +148,7 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   await cdp.call("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:false});
   await wait("narrow-viewport",'innerWidth===390&&document.querySelector(".operator-task-grid")');
   assert.equal(await evaluate('document.querySelector("#main").getBoundingClientRect().width<=innerWidth+1'),true);
+  if(previewDir)await navigatePrimaryPages("narrow");
   await cdp.call("Emulation.clearDeviceMetricsOverride");
   await evaluate('sessionStorage.setItem("cook.project.selection.v1","missing-qa-project");window.__cookMissingReload=true');
   await cdp.call("Page.reload");
@@ -148,7 +168,11 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   const directory=await (await fetch(url+"/api/projects",{signal:AbortSignal.timeout(3000)})).json();
   assert.equal(directory.projects.length,1);
   assert.equal(directory.projects[0].execution_policy.enabled,false);
-  return {status:"BROWSER_RECOVERY_PASS",scope:"DISPOSABLE_METADATA_RECOVERY_NAVIGATION_AND_MISSING_SELECTION",execution_enabled:false,full_browser_e2e_validated:false};
+  if(previewDir){
+   assert.equal(previews.length,14);
+   await writeFile(join(previewDir,"manifest.json"),JSON.stringify({schema_version:"cook-browser-preview.1",scope:"DISPOSABLE_METADATA_ONLY",manual_visual_review:"NOT_RUN",execution_enabled:false,previews},null,2),{flag:"wx"});
+  }
+  return {status:"BROWSER_RECOVERY_PASS",scope:"DISPOSABLE_METADATA_RECOVERY_NAVIGATION_AND_MISSING_SELECTION",execution_enabled:false,full_browser_e2e_validated:false,preview_count:previews.length,manual_visual_review:"NOT_RUN"};
  }catch(error){
   let state=null;
   if(cdp)try{

@@ -20,3 +20,17 @@ Use the existing local offline terminal, no real funds or mainnet execution. Che
 ## Release boundary
 
 Offline code/metadata QA is distinct from independent source authenticity, chain/account reconciliation, real browser operator acceptance, local key custody, local transfer confirmation, archive replay parity, load/soak and credential review. Do not mark these gates PASS merely because CI succeeds. Core math and real data integration are unchanged; execution stays disabled for project workflows.
+
+## Automated visual evidence
+
+Verified follow-up baseline: commit `653276f0160053648b724c46237fb6aa84f7955d`, CI [45624039462](https://github.com/dinnelthai/cook-system/actions/runs/45624039462). Node 22 and 24 passed; 798 tests, 201 business regressions, 19 code checks, zero failures. Chromium recovery, seven-page navigation, risk filter, narrow viewport and missing selection checks passed. Eight external operator gates remain pending.
+
+The browser recovery runner now optionally captures 14 viewport PNGs (seven primary pages at 1440 × 900 and 390 × 844), with a manifest of viewport and document widths. CI collects the disposable fixture previews as `cook-system-browser-previews`. These screenshots support, but do not replace, manual visual review. Captures are made from an isolated temporary project database, not an operator's existing environment. No user wallet keys or live RPC are used.
+
+Local command on a non-root system with a supported Chromium binary:
+
+```sh
+COOK_BROWSER_BINARY="/path/to/chromium" npm run accept:browser-recovery -- --capture-previews
+```
+
+Look in `.cook-system/acceptance/browser-preview-*/` for the manifest and PNG files. The manifest reports document overflow measurements instead of claiming visual quality. A missing screenshot or a failed navigation is not a visual pass.

@@ -1,6 +1,6 @@
 import {spawn,execFile} from "node:child_process";
 import {promisify} from "node:util";
-import {mkdtemp,rm} from "node:fs/promises";
+import {mkdir,mkdtemp,rm} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {createServer} from "node:net";
@@ -10,6 +10,8 @@ import {checkBrowserRecovery} from "./browser-recovery-check.mjs";
 const root=fileURLToPath(new URL("../",import.meta.url));
 const run=promisify(execFile);
 const browser=process.env.COOK_BROWSER_BINARY;
+const capturePreviews=process.argv.includes("--capture-previews");
+if(capturePreviews&&!process.argv.includes("--interactions"))throw Error("BROWSER_PREVIEWS_REQUIRE_INTERACTIONS");
 if(!browser)throw Error("COOK_BROWSER_BINARY_REQUIRED");
 if(process.getuid?.()===0)throw Error("BROWSER_SMOKE_REQUIRES_NON_ROOT_SANDBOX");
 const dir=await mkdtemp(join(tmpdir(),"cook-browser-qa-"));
@@ -31,7 +33,13 @@ try{
  }
  if(!ready)throw Error("BROWSER_SMOKE_SERVER_NOT_READY");
  if(process.argv.includes("--interactions")){
-  result=await checkBrowserRecovery({browser,dir,env,url});
+  let previewDir=null;
+  if(capturePreviews){
+   const output=join(root,".cook-system","acceptance");
+   await mkdir(output,{recursive:true});
+   previewDir=await mkdtemp(join(output,"browser-preview-"));
+  }
+  result=await checkBrowserRecovery({browser,dir,env,url,previewDir});
  }else{
  const {stdout}=await run(browser,["--headless","--disable-background-networking","--disable-sync","--no-first-run","--user-data-dir="+join(dir,"browser"),"--virtual-time-budget=5000","--dump-dom",url],{env,timeout:30000,maxBuffer:8*1024*1024});
  // These are rendered DOM markers, not static source-code regular expressions.
