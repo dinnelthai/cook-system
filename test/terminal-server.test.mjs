@@ -69,6 +69,13 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  const disabled=await fetch(base+"/api/historical-workspace");assert.equal(disabled.status,503);assert.equal((await disabled.json()).code,"WORKSPACE_DISABLED");
  assert.equal((await fetch(base+"/api/historical-workspace",{headers:{origin:"https://example.invalid"}})).status,403);
  const response=await fetch(base+"/api/terminal/report");assert.equal(response.status,200);assert.equal((await response.json()).sourceMode,"SYNTHETIC");
+ const logs=await fetch(base+"/api/terminal/diagnostics");assert.equal(logs.status,200);
+ assert.equal(logs.headers.get("cache-control"),"no-store");
+ const diagnostic=await logs.json();assert.equal(diagnostic.schema_version,"cook-http-diagnostics.1");assert.equal(diagnostic.execution_enabled,false);
+ assert.ok(diagnostic.entries.some(x=>x.route_group==="rejected"&&x.status_code===403));
+ assert.ok(diagnostic.entries.every(x=>!Object.hasOwn(x,"url")&&!Object.hasOwn(x,"headers")));
+ assert.equal((await fetch(base+"/api/terminal/diagnostics",{headers:{origin:"https://example.invalid"}})).status,403);
+ assert.equal((await fetch(base+"/api/terminal/diagnostics?private=value")).status,400);
  const health=await fetch(base+"/api/terminal/health");assert.equal(health.status,200);assert.deepEqual(await health.json(),{report_bridge:"CONFIGURED",rpc:{status:"NOT_CONFIGURED",network_verified:false},execution_enabled:false});
  const trade=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:"{}"});assert.equal(trade.status,400);assert.equal((await trade.json()).code,"TRADE_DISABLED");
  const portfolio=await fetch(base+"/api/local-wallet/portfolio",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({limit:5})});assert.equal(portfolio.status,503);assert.equal((await portfolio.json()).code,"PORTFOLIO_UNAVAILABLE");

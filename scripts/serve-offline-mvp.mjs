@@ -1,3 +1,4 @@
+import {createHttpDiagnostics,classifyDiagnosticRoute} from "../src/inner-market/local-http-diagnostics.mjs";
 import {sendJson,readRequestJson} from "../src/inner-market/local-http-common.mjs";
 import { createServer } from "node:http";
 import { homedir } from "node:os";
@@ -40,11 +41,19 @@ const walletPortfolio=createLocalWalletPortfolio({endpoint:process.env.COOK_LOCA
 const faucet=createLocalFaucet({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.faucet});
 const transfers=createLocalTransfer({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.transfer,loadSigner:wallets.loadSigner});
 const trading=createLocalTrading({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.trading,labUrl:process.env.COOK_PUMP_LAB_URL,wallets});
+const diagnostics=createHttpDiagnostics();
 const server=createServer(async(req,res)=>{
+ const setDiagnosticGroup=diagnostics.observe(req,res);
  try{
   const requestHost=req.headers.host,requestOrigin=req.headers.origin;
-  if(!["127.0.0.1:"+port,"localhost:"+port].includes(requestHost)||req.headers["sec-fetch-site"]==="cross-site"||(requestOrigin&&requestOrigin!=="http://"+requestHost)){res.writeHead(403,{"Cache-Control":"no-store","Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"FORBIDDEN"}));return;}
+  if(!["127.0.0.1:"+port,"localhost:"+port].includes(requestHost)||req.headers["sec-fetch-site"]==="cross-site"||(requestOrigin&&requestOrigin!=="http://"+requestHost)){setDiagnosticGroup("rejected");res.writeHead(403,{"Cache-Control":"no-store","Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"FORBIDDEN"}));return;}
   const requestPath=new URL(req.url,"http://127.0.0.1").pathname;
+  setDiagnosticGroup(classifyDiagnosticRoute(requestPath));
+  if(requestPath==="/api/terminal/diagnostics"){
+   if(req.method!=="GET"){sendJson(res,405,{code:"METHOD_NOT_ALLOWED"});return;}
+   if(req.url!==requestPath){sendJson(res,400,{code:"QUERY_NOT_SUPPORTED"});return;}
+   sendJson(res,200,diagnostics.snapshot());return;
+  }
   if(requestPath==="/api/projects"||requestPath.startsWith("/api/projects/")){await projectHttp(req,res);return;}
   if(["/api/historical-workspace","/api/historical-workspace/revisions","/api/historical-workspace/query"].includes(req.url)){
    if(!workspaceHandler){res.writeHead(503,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"WORKSPACE_DISABLED"}));return;}

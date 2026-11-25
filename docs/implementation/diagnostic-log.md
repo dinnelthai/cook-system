@@ -7,3 +7,6 @@ The log contains UTC timestamps, sequence numbers, severity, event types, approv
 Run `node scripts/serve-offline-mvp.mjs` and open the printed localhost URL. Run `npm test` for diagnostic log tests.
 
 Review issue objects and strings are normalized to explicitly approved codes, with raw IDs, messages, endpoints and credentials omitted. Archive ingestion reuses the bounded regular-file reader and rejects oversized input, symlinks and detected concurrent file modifications. The export remains a browser diagnostic snapshot, not a server access log.
+
+### Local HTTP transport diagnostics
+GET `/api/terminal/diagnostics` on the existing localhost server returns a bounded memory-only transport log. It includes route groups, allowed method categories, HTTP status, disconnect outcome and elapsed time. It deliberately excludes URLs, query strings, headers, request bodies, account identifiers and raw errors. The existing Host/Origin/fetch-site checks apply. The log resets when the server restarts, is not a financial audit trail, and does not enable execution.
