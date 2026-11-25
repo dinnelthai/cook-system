@@ -204,3 +204,14 @@ test("order review events reject missing orders and arbitrary event submissions"
  assert.equal((await json(url,"POST",{...body,event:{type:"OBSERVE_OUTCOME"}})).status,400);
  assert.equal((await fetch(url)).status,405);
 });
+
+test("audit bundle endpoint is a revision-pinned export, not a closure command",async t=>{
+ const base=await setup(t),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"audit-http",profile:{name:"Audit",symbol:"AUD"}})).status,201);
+ const url=root+"/audit-http/audit-bundle";
+ assert.equal((await json(url,"POST",{expected_revision:2})).status,409);
+ assert.equal((await json(url,"POST",{expected_revision:1,stage:"ARCHIVED"})).status,400);
+ const r=await json(url,"POST",{expected_revision:1});assert.equal(r.status,200);
+ const {bundle}=await r.json();assert.equal(bundle.project_id,"audit-http");assert.equal(bundle.execution_enabled,false);assert.equal(bundle.settlement_allowed,false);
+ assert.equal((await (await fetch(root+"/audit-http")).json()).project.revision,1);
+});

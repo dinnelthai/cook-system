@@ -93,3 +93,22 @@ test("project archive is immutable, revision-pinned, deduplicated and survives r
  try{assert.throws(()=>db.exec("DELETE FROM project_archive"),/PROJECT_ARCHIVE_IMMUTABLE/);assert.throws(()=>db.exec("UPDATE project_archive SET content='{}'"),/PROJECT_ARCHIVE_IMMUTABLE/);}
  finally{db.close();}
 });
+
+test("audit export is a scoped, stable read snapshot and detects digest changes",async t=>{
+ const {checkProjectAuditBundleDigest}=await import("../src/inner-market/project-audit-bundle.mjs");
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000});
+ try{
+  const p=s.create(base);s.create({...base,project_id:"other-project"});
+  const payload={project_id:p.project_id,project_revision:1,status:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false};
+  s.recordArchive(p.project_id,"ISSUANCE_OBSERVATION",payload,1);
+  s.recordArchive("other-project","ISSUANCE_OBSERVATION",{...payload,project_id:"other-project"},1);
+  const b=s.exportAuditBundle(p.project_id,1);
+  assert.equal(b.project_id,p.project_id);assert.equal(b.archives.length,1);assert.equal(b.events.length,1);
+  assert.equal(b.settlement_allowed,false);assert.equal(b.lifecycle_mutated,false);assert.equal(b.original_report_bytes_included,false);
+  assert.equal(checkProjectAuditBundleDigest(b).status,"DIGEST_MATCH_NOT_AUTHENTICATED");
+  assert.equal(s.exportAuditBundle(p.project_id,1).content_sha256,b.content_sha256);
+  assert.throws(()=>s.exportAuditBundle(p.project_id,2),/PROJECT_REVISION_CONFLICT/);
+  const changed=structuredClone(b);changed.exceptions=[];assert.throws(()=>checkProjectAuditBundleDigest(changed),/PROJECT_AUDIT_BUNDLE_DIGEST_MISMATCH/);
+  assert.equal(s.get(p.project_id).revision,1);
+ }finally{s.close();}
+});

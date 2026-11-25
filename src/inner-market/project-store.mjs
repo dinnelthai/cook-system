@@ -4,6 +4,7 @@ import { lstatSync, mkdirSync, openSync, closeSync, realpathSync } from "node:fs
 import { resolve, dirname } from "node:path";
 import { canonicalJson } from "../core/canonical-json.mjs";
 import { createOrderReviewJournal } from "./order-review-journal.mjs";
+import { buildProjectAuditBundle } from "./project-audit-bundle.mjs";
 import { createProjectAggregate, applyProjectCommand, assertProjectAggregate } from "./project-aggregate.mjs";
 
 const MAX_AGGREGATE_BYTES = 1024 * 1024;
@@ -252,7 +253,18 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       return archiveRows.all(projectId).map(row=>decodeArchive(row,latest));
     }
     const orderReview=createOrderReviewJournal(db,{current,now});
-    return { create, append, get, list, events, verify, recordArchive, listArchive, orderReview, close: () => db.close() };
+    function exportAuditBundle(projectId,expectedRevision){
+      db.exec("BEGIN");
+      try{
+        const latest=current(projectId);
+        if(latest.aggregate.revision!==expectedRevision)throw Error("PROJECT_REVISION_CONFLICT");
+        const integrity=verify(projectId),archives=listArchive(projectId);
+        const orders=orderReview.list(projectId).map(order=>({order,events:orderReview.events(projectId,order.order_id)}));
+        const bundle=buildProjectAuditBundle({project:latest.aggregate,integrity,events:latest.events,archives,orders});
+        db.exec("COMMIT");return bundle;
+      }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
+    }
+    return { create, append, get, list, events, verify, recordArchive, listArchive, orderReview, exportAuditBundle, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

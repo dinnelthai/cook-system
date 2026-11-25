@@ -50,7 +50,7 @@ function errorResponse(error) {
   const code = typeof error?.message === "string" ? error.message : "";
   if (error?.httpStatus) return { status: error.httpStatus, code };
   if (["WORKSPACE_DISABLED","EVIDENCE_READER_UNAVAILABLE"].includes(code)) return {status:503,code};
-  if (["PROJECT_ARCHIVE_SIZE_LIMIT","PROJECT_ARCHIVE_CAPACITY"].includes(code)) return {status:413,code};
+  if (["PROJECT_ARCHIVE_SIZE_LIMIT","PROJECT_ARCHIVE_CAPACITY","PROJECT_AUDIT_BUNDLE_SIZE_LIMIT"].includes(code)) return {status:413,code};
   if (["WORKSPACE_REVISION_NOT_FOUND","CATALOGUE_RECORD_NOT_FOUND"].includes(code)) return {status:404,code};
   if (code === "PROJECT_ARCHIVE_INTEGRITY_FAILURE") return {status:422,code};
   if (code === "BODY_TOO_LARGE") return { status: 413, code };
@@ -141,6 +141,12 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         if(typeof listReportCandidates!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         send(res,200,listReportCandidates(store.get(projectId)));return true;
+      }
+      if(action==="audit-bundle"){
+        if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        const input=await bodyJson(req,readRequestJson,maxBodyBytes);
+        if(Object.keys(input).some(k=>k!=="expected_revision")||!Number.isSafeInteger(input.expected_revision)||input.expected_revision<1)throw Error("INVALID_PROJECT_AUDIT_REQUEST");
+        send(res,200,{bundle:store.exportAuditBundle(projectId,input.expected_revision)});return true;
       }
       if(action==="close-evidence-review"){
         if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}

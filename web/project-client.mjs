@@ -102,3 +102,10 @@ export async function reviewProjectCloseEvidence(projectId,revision,archiveId){
  if(r.review?.project_id!==projectId||r.review.project_revision!==revision||r.review.execution_enabled!==false||r.review.settlement_allowed!==false||r.review.lifecycle_mutated!==false)throw Error("PROJECT_CLOSE_SCOPE_MISMATCH");
  return r;
 }
+
+export async function exportProjectAuditBundle(projectId,revision){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/audit-bundle",{method:"POST",body:{expected_revision:revision}});
+ const b=r.bundle;
+ if(b?.schema_version!=="cook-project-audit-bundle.1"||b.project_id!==projectId||b.project_revision!==revision||b.execution_enabled!==false||b.settlement_allowed!==false||b.lifecycle_mutated!==false||typeof b.content_sha256!=="string")throw Error("PROJECT_AUDIT_BUNDLE_SCOPE_MISMATCH");
+ return b;
+}

@@ -22,7 +22,7 @@ import {mountProjectLifecycleReview} from "./project-lifecycle-review-view.mjs";
 import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-workflow.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
-import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence} from "./project-client.mjs";
+import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle} from "./project-client.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
@@ -178,7 +178,21 @@ function renderTerminal(){
         '<label>历史 Pump 回放 JSON（最大 900 KiB）<input id="project-graduation-file" type="file" accept=".json"></label><button id="project-graduation-review">复核并归档历史里程碑</button><p id="project-graduation-status" role="status"></p>'+
         '<h3>退出与财务证据复核</h3>'+note("当前归档复核状态："+(v.close_evidence?.status??"MISSING"))+
         table(["未解决事项"],[...(v.close_evidence?.blockers??[]),...(v.close_evidence?.unknown??[])].map(x=>[x]))+
-        '<label>关联历史报告<select id="project-close-report"><option value="">读取报告中…</option></select></label><button id="project-close-review" disabled>生成财务复核并归档</button><p id="project-close-status" role="status"></p><pre id="project-close-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+        '<label>关联历史报告<select id="project-close-report"><option value="">读取报告中…</option></select></label><button id="project-close-review" disabled>生成财务复核并归档</button><p id="project-close-status" role="status"></p><pre id="project-close-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>'+
+        '<h3>项目审计归档</h3>'+note("包含项目台账、订单事件、证据档案与异常清单。原始历史报告文件需另行保留。导出不改变生命周期。")+
+        '<button id="project-audit-export">导出当前项目审计归档 JSON</button><p id="project-audit-status" role="status"></p>';
+       const auditButton=lifecycleArea.querySelector("#project-audit-export");
+       auditButton.onclick=async()=>{
+        auditButton.disabled=true;const status=lifecycleArea.querySelector("#project-audit-status");
+        status.textContent="读取一致性快照…";
+        try{
+         const bundle=await exportProjectAuditBundle(selected.project_id,selected.revision);
+         if(!stillCurrent())return;
+         download("project-audit-bundle.json",JSON.stringify(bundle,null,2));
+         status.textContent="已导出 · "+bundle.exceptions.length+" 项待复核记录 · 内容摘要 "+bundle.content_sha256;
+        }catch(e){if(stillCurrent())status.textContent="导出失败："+errorKind(e);}
+        finally{if(stillCurrent())auditButton.disabled=false;}
+       };
        const closeSelect=lifecycleArea.querySelector("#project-close-report"),closeButton=lifecycleArea.querySelector("#project-close-review"),closeStatus=lifecycleArea.querySelector("#project-close-status");
        listProjectArchive(selected.project_id).then(rows=>{
         if(!stillCurrent())return;
