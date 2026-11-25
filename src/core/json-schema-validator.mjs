@@ -9,7 +9,54 @@ export async function loadSchemaRegistry(directory){
  for(const name of names)registry.set(name,JSON.parse(await readFile(join(directory,name),"utf8")));
  return registry;
 }
+const object=v=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+const TYPES=new Set(["null","array","object","integer","number","string","boolean"]);
+/** Check the entire supported schema subset before inspecting instance data.
+ * Unsupported rules, malformed keyword values and reference cycles are errors
+ * even in branches not visited by this particular instance. */
+export function inspectSchemaContract(schema,registry){
+ const errors=[],active=new Set(),checked=new Set();
+ const add=(path,code,detail)=>{if(errors.length<100)errors.push({path,code,detail});};
+ function visit(s,path,depth){
+  if(depth>64){add(path,"MAX_SCHEMA_DEPTH","schema recursion limit exceeded");return;}
+  if(!object(s)){add(path,"INVALID_SCHEMA","schema node must be an object");return;}
+  if(active.has(s)){add(path,"SCHEMA_REFERENCE_CYCLE","recursive schemas are unsupported");return;}
+  if(checked.has(s))return;
+  active.add(s);
+  for(const key of Object.keys(s))if(!META.has(key)&&!SUPPORTED.has(key))add(path,"UNSUPPORTED_SCHEMA_KEYWORD",key);
+  if(Object.hasOwn(s,"$ref")){
+   const ref=s.$ref;
+   if(typeof ref!=="string"||!/^[a-zA-Z0-9_-]+\.schema\.json$/.test(ref))add(path,"INVALID_SCHEMA_REF",String(ref));
+   else if(!registry?.has(ref))add(path,"UNRESOLVED_SCHEMA_REF",ref);
+   else visit(registry.get(ref),path+".$ref",depth+1);
+   if(Object.keys(s).some(k=>k!=="$ref"&&!META.has(k)))add(path,"UNSUPPORTED_REF_SIBLING","reference siblings are unsupported");
+  }
+  if(Object.hasOwn(s,"type")){
+   const types=Array.isArray(s.type)?s.type:[s.type];
+   if(!types.length||new Set(types).size!==types.length||types.some(t=>!TYPES.has(t)))add(path,"INVALID_SCHEMA_TYPE","invalid type");
+  }
+  if(Object.hasOwn(s,"enum")&&(!Array.isArray(s.enum)||!s.enum.length))add(path,"INVALID_SCHEMA_ENUM","nonempty enum required");
+  if(Object.hasOwn(s,"required")&&(!Array.isArray(s.required)||s.required.some(k=>typeof k!=="string")||new Set(s.required).size!==s.required.length))add(path,"INVALID_SCHEMA_REQUIRED","unique strings required");
+  if(Object.hasOwn(s,"minLength")&&(!Number.isSafeInteger(s.minLength)||s.minLength<0))add(path,"INVALID_SCHEMA_MIN_LENGTH","nonnegative integer required");
+  for(const k of ["minimum","maximum"])if(Object.hasOwn(s,k)&&(typeof s[k]!=="number"||!Number.isFinite(s[k])))add(path,"INVALID_SCHEMA_BOUND",k);
+  if(Object.hasOwn(s,"pattern")){try{if(typeof s.pattern!=="string")throw Error();new RegExp(s.pattern);}catch{add(path,"INVALID_PATTERN","invalid pattern");}}
+  if(Object.hasOwn(s,"properties")){
+   if(!object(s.properties))add(path,"INVALID_SCHEMA_PROPERTIES","object required");
+   else for(const [k,v] of Object.entries(s.properties))visit(v,path+".properties."+k,depth+1);
+  }
+  if(Object.hasOwn(s,"additionalProperties")&&typeof s.additionalProperties!=="boolean")visit(s.additionalProperties,path+".additionalProperties",depth+1);
+  for(const k of ["items","if","then"])if(Object.hasOwn(s,k))visit(s[k],path+"."+k,depth+1);
+  if(Object.hasOwn(s,"allOf")){
+   if(!Array.isArray(s.allOf)||!s.allOf.length)add(path,"INVALID_SCHEMA_ALLOF","nonempty array required");
+   else s.allOf.forEach((v,i)=>visit(v,path+".allOf["+i+"]",depth+1));
+  }
+  active.delete(s);checked.add(s);
+ }
+ visit(schema,"$",0);return {valid:errors.length===0,errors};
+}
 export function validateJsonSchema(value,schema,registry,{maxErrors=100}={}){
+ if(!Number.isSafeInteger(maxErrors)||maxErrors<1||maxErrors>1000)throw Error("INVALID_SCHEMA_ERROR_LIMIT");
+ const contract=inspectSchemaContract(schema,registry);if(!contract.valid)return {valid:false,errors:contract.errors.slice(0,maxErrors)};
  const errors=[],add=(path,code,detail)=>{if(errors.length<maxErrors)errors.push({path,code,detail});};
  const visit=(v,s,path,depth)=>{
   if(errors.length>=maxErrors)return;

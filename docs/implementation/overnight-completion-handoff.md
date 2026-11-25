@@ -63,3 +63,9 @@ The local alert journal publishes a complete fsynced temporary file with atomic 
 ## Reliability closeout
 
 Explicit offline diagnostic export archiving is available with `node scripts/archive-diagnostics.mjs <export.json> <private-directory>`. It validates and re-sanitizes browser exports, publishes immutable content-addressed files, and rejects conflicting existing content. This is an operator-driven archive, not automatic server logging. Paper-only halt checks now default blocked for missing state; persisted state requires a valid timestamp and bounded regular-file read. No live execution integration was added. Stale alert locks still require manual review after verifying no writer remains.
+
+## Final engineering review — 2026-11-25
+
+The prior commit 64f3df5 passed 311/311 tests, schema registry checks and synthetic regression in CI run 45528560965. The final review hardens schema inspection across all nested branches and references; unknown keywords, unsupported reference siblings, malformed supported keywords, cycles and invalid error limits cannot silently pass. The validator remains a repository-specific subset, not a general Draft 2020-12 implementation.
+
+Review disposition: offline implementation candidate only. Keep PR #9 draft/unmerged until operator code review. Local read preflight is available but only mocked in current CI; actual Validator, independent historical account/receipt reconciliation, browser UI and performance tests remain unexecuted for this revision. No production trading or custody security certification. Historical account evidence is now connected to the unified terminal and report export, superseding the earlier standalone-module note above. Real source authentication, cross-source UI, full coverage and durable multi-writer storage remain open.

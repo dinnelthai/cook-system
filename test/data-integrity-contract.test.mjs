@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {fileURLToPath} from "node:url";
 import {dirname,join} from "node:path";
-import {loadSchemaRegistry,validateJsonSchema} from "../src/core/json-schema-validator.mjs";
+import {loadSchemaRegistry,validateJsonSchema,inspectSchemaContract} from "../src/core/json-schema-validator.mjs";
 import {auditObservedEventTimeline} from "../src/core/event-timeline-audit.mjs";
 import {auditCandleEvidence} from "../src/core/candle-integrity-audit.mjs";
 import {assessSourceProvenance,observeHistoricalGenesis,compareArchivedSourceReceipts} from "../src/core/source-provenance.mjs";
@@ -97,4 +97,22 @@ test("archived cross-source receipts distinguish exact agreement, missing data a
  right.receipts[0].transaction.meta.fee=6;
  assert.equal(compareArchivedSourceReceipts({scope,left,right}).status,"REVIEW_REQUIRED");
  assert.equal(compareArchivedSourceReceipts({scope,left,right:left}).status,"PARTIAL");
+});
+
+test("schema contract rejects unsupported rules even in unvisited properties and conditionals",()=>{
+ for(const s of [{type:"object",properties:{optional:{maxLength:1}}},{if:{const:"other"},then:{not:{const:"x"}}},{if:{unknownRule:true},then:{const:"x"}}]){
+  const r=validateJsonSchema({},s,registry);assert.equal(r.valid,false);assert.ok(r.errors.some(e=>e.code==="UNSUPPORTED_SCHEMA_KEYWORD"));
+ }
+});
+test("schema error cap cannot disable validation",()=>{
+ for(const maxErrors of [0,-1,NaN,Infinity,1001])assert.throws(()=>validateJsonSchema("x",{type:"integer"},registry,{maxErrors}),/INVALID_SCHEMA_ERROR_LIMIT/);
+ assert.equal(validateJsonSchema("x",{type:"integer"},registry,{maxErrors:1}).valid,false);
+});
+test("schema contract rejects unresolved refs, cycles, unsupported ref siblings and malformed keyword types",()=>{
+ const a={$ref:"a.schema.json"},r=new Map([["a.schema.json",a]]);
+ assert.equal(inspectSchemaContract(a,r).valid,false);
+ for(const s of [{$ref:"missing.schema.json"},{$ref:"market-identity.schema.json",type:"object"},{required:"x"},{minimum:"1"},{type:"bogus"},{pattern:"["}]){
+  assert.equal(inspectSchemaContract(s,registry).valid,false);
+ }
+ for(const [name,s] of registry)assert.equal(inspectSchemaContract(s,registry).valid,true,name);
 });
