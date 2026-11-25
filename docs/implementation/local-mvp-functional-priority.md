@@ -91,3 +91,7 @@ Offline simulation reports now include a descriptive model_contract outside dete
 ## M04 — unified retrospective synthetic review
 
 The completed-report batch auditor now uses a unified synthetic review containing recomputed account differences, observed record counts, generator identity and event-order diagnostics. Contradictory declared counts and sequence metadata can require review even if the ledger balances. Independent fee attribution, historical calibration and real-market behavior remain UNKNOWN. Caller-supplied derived audit status is not trusted. Four regressions cover the unified contract and batch integration. This is data-quality and accounting QA only; no price, role policy, execution, risk-based trading or market competition logic is added. Browser integration and actual operator acceptance remain pending.
+
+## M05 — multi-report QA comparison
+
+Batch review now exposes per-check PASS / REVIEW_REQUIRED / UNKNOWN / NOT_EVALUATED counts, observed record counts per accepted report, and issue categories counted once per affected report. Rejected records are not treated as failed or successful evidence checks. Comparison is restricted to retrospective QA evidence; no return ranking, actor strategy comparison, calibration or independent market-path claim. Three regression cases verify count partition, issue deduplication and duplicate-scenario handling. UI integration and local operator acceptance remain pending.

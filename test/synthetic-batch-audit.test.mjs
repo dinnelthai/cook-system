@@ -42,3 +42,25 @@ test("unified batch detects summary contradictions even with a balanced ledger",
  assert.ok(r.results[0].issues.includes("SUMMARY_COUNT_MISMATCH:trade_count"));
  assert.equal(r.results[0].checks.find(c=>c.id==="historical_calibration").status,"UNKNOWN");
 });
+
+test("batch comparison distinguishes unknown evidence from rejected reports",()=>{
+ const a=report("a"),b=report("b");b.summary.event_count+=1;
+ const c=report("c");delete c.opening_agent_states;
+ const r=auditRecordedSyntheticBatch([a,b,c]);
+ assert.deepEqual(r.comparison.find(x=>x.id==="record_counts"),{id:"record_counts",pass:1,review_required:1,unknown:0,not_evaluated:1});
+ assert.deepEqual(r.comparison.find(x=>x.id==="historical_calibration"),{id:"historical_calibration",pass:0,review_required:0,unknown:2,not_evaluated:1});
+ for(const row of r.comparison)assert.equal(row.pass+row.review_required+row.unknown+row.not_evaluated,3);
+ assert.equal(r.results[0].observed_record_counts.event_count,a.detector_input.events.length);
+ assert.equal(r.comparison_scope,"QA_EVIDENCE_ONLY");
+});
+test("issue counts count affected reports rather than duplicate occurrences",()=>{
+ const a=report("a"),b=report("b");a.agent_states[0].quote_balance_base_units="0";a.agent_states[1].quote_balance_base_units="0";b.agent_states[0].quote_balance_base_units="0";
+ const r=auditRecordedSyntheticBatch([a,b]);
+ assert.deepEqual(r.issue_counts.find(x=>x.code==="ACCOUNT_BALANCE_MISMATCH"),{code:"ACCOUNT_BALANCE_MISMATCH",report_count:2});
+ assert.equal(r.independent_market_paths_attested,false);
+});
+test("duplicate scenarios remain not evaluated in comparison and rejection counts",()=>{
+ const r=auditRecordedSyntheticBatch([report("a"),report("a")]);
+ assert.ok(r.comparison.every(x=>x.not_evaluated===2&&x.pass===0));
+ assert.deepEqual(r.issue_counts,[{code:"DUPLICATE_SCENARIO_ID",report_count:2}]);
+});
