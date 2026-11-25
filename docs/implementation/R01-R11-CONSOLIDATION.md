@@ -24,3 +24,8 @@ R02 CI passed (45596359740). Fixed mixed observation cohorts (complete, delayed,
 ## R04 — scoped project/account asset reconciliation
 
 R03 CI passed (45597277906). Compare existing canonical account-set totals with the existing runtime asset fields for each linked interval (cash, token quantity, cost basis, inventory value, creator receivable, liabilities, other assets and NAV). No second ledger or aggregation. Missing or partial accounts remain unknown, explicit zero remains zero. Conflicting or malformed totals suppress all interval asset numbers and surface an overall review finding. Matching registered labels do not establish ownership. Explicit interval detail exposes the eight check states. Four regression tests. R04 historical reconciliation advanced; per-wallet live balances, LP valuation and independently verified coverage remain open. R05 follows after CI.
+
+
+## R05 — synthetic passive LP accounting mark
+
+R04 CI passed (45597635208). Extend the canonical LP statement with a same-pool, same-cutoff supplied fungible-share fixture and a supplied rational base/quote mark. Exact integer floor arithmetic uses the existing integer helpers. Explicit distributable assets only; no virtual reserves, protocol fee buckets or assumption that a pool reserve is an owned asset. The mark excludes separate fee cash and fee receivables. Invalid share, stale scope, malformed amounts or ledger discrepancies suppress the mark. Five regression tests and two new business scenario checks (13 total). This is a synthetic accounting mark, not a PumpSwap redemption formula, real position valuation, or project NAV inclusion. Actual LP ownership, protocol-specific claim rules and independent valuation remain open; R06 next after CI.

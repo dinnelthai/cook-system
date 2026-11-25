@@ -28,7 +28,7 @@ test("foreign and missing archive values do not become zero",()=>{
 test("fixed business scenarios reuse canonical portfolio risk and report workflow",()=>{
  const base=JSON.parse(readFileSync(new URL("../fixtures/synthetic/inner-market-mvp.json",import.meta.url),"utf8"));
  const v=runBusinessScenarioAcceptance(base);
- assert.equal(v.status,"SYNTHETIC_REGRESSION_PASS");assert.equal(v.cases.length,11);assert.equal(v.production_ready,false);
+ assert.equal(v.status,"SYNTHETIC_REGRESSION_PASS");assert.equal(v.cases.length,13);assert.equal(v.production_ready,false);
 });
 test("LP statement is synthetic-only and cannot establish ownership or valuation",()=>{
  assert.throws(()=>reconcileLpStatement({source_mode:"ARCHIVED_HISTORICAL"}),/INVALID_SYNTHETIC_LP_SCOPE/);
