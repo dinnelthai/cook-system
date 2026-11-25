@@ -1,3 +1,4 @@
+import {readProjectSelection,writeProjectSelection,projectStageStrip,projectReviewTasks,riskEvidenceRows} from "./operator-workspace.mjs";
 import {mountScopedProjectReview} from "./project-review-dashboard.mjs";
 import {experimentDisplayRows} from "./experiment-display.mjs";
 import {mountProjectAssets} from "./project-assets-view.mjs";
@@ -67,7 +68,9 @@ const fixture=await (async()=>{
 const original=structuredClone(fixture);
 let projectCatalogue=createHistoricalProjectCatalogue(),catalogueSelection=null,graduationReview=null,lifecycleReview=null;
 const projectRegistry=createProjectRegistry();
-let activeProjectId=null,projectMessage="",terminalContextVersion=0,globalContextTicket=0;
+let contextStorage=null;try{contextStorage=globalThis.sessionStorage;}catch{}
+let activeProjectId=readProjectSelection(contextStorage),projectMessage="",terminalContextVersion=0,globalContextTicket=0;
+function selectProjectContext(id){activeProjectId=id;writeProjectSelection(contextStorage,id);}
 function renderGlobalContext(){
  const host=document.querySelector("#global-project-context"),id=activeProjectId,ticket=++globalContextTicket;
  if(!host)return;
@@ -192,7 +195,7 @@ function renderTerminal(){
   getProjectDirectory().then(({projects,directory})=>{
    if(page!=="terminal"||contextVersion!==terminalContextVersion)return;
    const selected=projects.find(x=>x.project_id===activeProjectId)||null;
-   const options='<option value="">选择 Project</option>'+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
+   const options='<option value="">选择 Project</option>'+(!selected&&activeProjectId?'<option value="'+esc(activeProjectId)+'" selected>此前项目不可用，请重新选择</option>':"")+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
    projectContext.innerHTML='<div class="row"><label>当前 Project <select id="terminal-project-select">'+options+'</select></label>'+
     (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(lifecycleLabel(selected.lifecycle.stage))+'</span><span>运行登记：'+esc(operationalLabel(selected.lifecycle.operational_status))+'</span><span>Mint：'+esc(selected.token.mint||"未登记")+'</span><span>市场：'+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' 已核验</span>':'<span>尚未选择项目</span>')+
     '<span>Execution: DISABLED</span></div><details><summary>项目组合登记复核</summary>'+table(["项目","阶段","配置状态","登记重叠"],directory.projects.map(x=>[x.project_id,x.stage,x.configuration_status,x.registration_overlap_count]))+table(["登记异常","项目"],directory.findings.map(x=>[x.code,x.project_ids.join(", ")]))+note("登记重叠不等于共同控制，组合资金与 NAV 未核验")+'</details>';
@@ -212,11 +215,12 @@ function renderTerminal(){
         if(!businessCurrent()||ticket!==businessTicket)return;
         const model=projectOverviewModel(v);
         businessArea.innerHTML='<div class="project-overview-heading"><div><h3>项目运行概览 · v'+esc(v.project_revision)+'</h3><p class="muted">'+esc(model.status)+' · 历史声明数据 · 执行禁用</p></div><button id="business-refresh">刷新项目</button></div>'+
+         '<div class="operator-stage-strip" aria-label="登记生命周期">'+projectStageStrip(model.stage).map(s=>'<div class="operator-stage '+s.state.toLowerCase()+'"'+(s.state==="CURRENT"?' aria-current="step"':'')+'><strong>'+esc(s.label)+'</strong><small>'+esc(({CURRENT:"当前登记",EARLIER:"先前阶段",LATER:"后续阶段",UNKNOWN:"未知"})[s.state])+'</small></div>').join("")+'</div>'+
          '<div class="project-overview-grid"><div class="project-stat"><span>登记阶段</span><strong>'+esc(lifecycleLabel(model.stage))+'</strong></div><div class="project-stat"><span>严重 / 警告 / 未知</span><strong>'+esc([model.counts.critical,model.counts.warning,model.counts.unknown].join(" / "))+'</strong></div><div class="project-stat"><span>待核对订单</span><strong>'+esc(v.orders.unresolved_count)+'</strong></div><div class="project-stat"><span>实时资产 / 市场</span><strong>未接入</strong></div></div>'+
-         '<div class="row"><button id="project-show-risk">查看风险与证据</button><button id="project-show-setup">项目配置与风险上限</button></div>'+
+         '<div class="row operator-links"><button id="project-show-risk">风险与证据</button><button id="project-show-setup">项目配置</button><button data-project-nav="assets">资产中心</button><button data-project-nav="review">项目复盘</button><button data-project-nav="market">市场证据</button><button data-project-nav="orders">订单复核</button></div>'+
          '<details><summary>登记钱包与归属状态</summary>'+table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(selected))+'</details>'+
          (v.global_risk.findings.some(f=>f.severity==="CRITICAL")?'<section class="notice" role="status"><strong>严重证据风险 · '+esc(model.counts.critical)+'</strong>'+table(["类别","风险原因"],v.global_risk.findings.filter(f=>f.severity==="CRITICAL").slice(0,5).map(f=>[f.category,f.code]))+'<p>完整风险见风险与证据；不代表实时市场风险。</p></section>':"")+
-         '<div class="project-work-grid">'+model.work.map(x=>'<div><span>'+esc(x.label)+'</span><strong>'+esc(x.status)+'</strong></div>').join("")+'</div>'+
+         '<section class="operator-task-section"><h3>项目准备与证据待办</h3><p class="muted">状态来自当前运行快照；登记齐备不代表已认证或允许执行。</p><div class="operator-task-grid">'+projectReviewTasks(v.runtime).map(x=>'<div class="operator-task"><div><strong>'+esc(x.label)+'</strong><small>'+esc(x.status)+'</small></div><button data-project-nav="'+x.target+'">查看</button></div>').join("")+'</div></section>'+
          '<div class="project-interval-head"><h3>历史资产区间</h3>'+(v.runtime_context_id&&model.intervals.length?'<label>选择区间 <select id="runtime-interval"><option value="">请选择区间</option>'+model.intervals.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.label)+'</option>').join("")+'</select></label>':'<span class="muted">暂无关联区间</span>')+'</div><div id="runtime-interval-detail" role="status">'+assetCards(null)+note("请选择一个历史区间。未选择时不显示金额；不代表当前可用资产。")+'</div>'+
          '<div class="project-work-grid"><div><span>历史市场证据</span><strong>'+esc(model.market.status)+'</strong></div><div><span>内盘报告区间 / 外盘快照</span><strong>'+esc(model.market.interval_count+" / "+model.market.pool_count)+'</strong></div><div><span>当前市场</span><strong>未知</strong></div></div>'+
          '<details class="project-secondary"><summary>运行记录与审计明细</summary>'+
@@ -236,7 +240,18 @@ function renderTerminal(){
          '<details><summary>真实数据接入与环境验收（未完成）</summary>'+table(["接入验收条件","状态"],v.data_integration.gates.map(g=>[g.id,g.status]))+'</details>'+
          '<button id="business-export">导出复核 JSON</button></details>';
         const gr=v.global_risk;
-        riskArea.innerHTML="<h3>统一项目风险复核</h3>"+note("同一运行快照 · "+gr.status+" · 实时风险未评估")+table(["类别","级别","问题","记录引用数"],gr.findings.map(f=>[f.category,f.severity,f.code,f.references.length]))+'<button id="project-risk-export">导出风险清单</button>';
+        riskArea.innerHTML="<h3>统一项目风险复核</h3>"+note("同一运行快照 · "+gr.status+" · 实时风险未评估")+'<div class="row"><label>级别 <select id="risk-severity"><option value="ALL">全部</option><option value="CRITICAL">严重</option><option value="WARNING">警告</option><option value="UNKNOWN">未知</option></select></label><button id="project-risk-export">导出完整风险清单</button></div><div id="risk-evidence-rows"></div>';
+        const riskFilter=riskArea.querySelector("#risk-severity"),riskRows=riskArea.querySelector("#risk-evidence-rows");
+        const showRiskRows=()=>{const rows=riskEvidenceRows(gr.findings,riskFilter.value);riskRows.innerHTML=rows.length?table(["级别","类别","问题","关联证据 ID"],rows):note("此级别无已记录风险；不代表实时风险已通过。");};
+        riskFilter.onchange=showRiskRows;showRiskRows();
+        function openProjectSection(target){
+         if(["setup","assets","review"].includes(target)){importTicket++;page=({setup:"create",assets:"wallet",review:"dashboard"})[target];render();return;}
+         const section=({market:"#terminal-market-evidence",orders:"#terminal-order-review",lifecycle:"#terminal-lifecycle-evidence",risk:"#terminal-risk-review"})[target];
+         if(!section)return;
+         main.querySelector("#terminal-project-details").open=true;
+         main.querySelector(section)?.scrollIntoView({block:"start"});
+        }
+        businessArea.querySelectorAll("[data-project-nav]").forEach(button=>button.onclick=()=>openProjectSection(button.dataset.projectNav));
         businessArea.querySelector("#project-show-setup").onclick=()=>{importTicket++;page="create";render();};
         businessArea.querySelector("#project-show-risk").onclick=()=>{main.querySelector("#terminal-project-details").open=true;riskArea.scrollIntoView({block:"start"});};
         riskArea.querySelector("#project-risk-export").onclick=()=>download("project-risk-review.json",JSON.stringify(gr,null,2));
@@ -365,8 +380,9 @@ function renderTerminal(){
        };
       }).catch(e=>{if(stillCurrent())lifecycleArea.textContent="生命周期证据不可用："+errorKind(e);});
       const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download});}
+    if(!selected){notice.innerHTML=note("此前选择的项目无法在当前数据库核对，历史报告继续隔离。请选择其他项目或明确退出。")+'<button id="clear-missing-project">退出项目上下文</button>';notice.querySelector("#clear-missing-project").onclick=()=>{importTicket++;selectProjectContext(null);render();};}
     const match=matchProjectReport(selected,data);
-    notice.innerHTML=note(match.status==="DECLARED_MATCH"?"当前报告与 Project 的声明身份一致（Project ID、Mint、网络、Genesis、SOL）。仅为历史复盘；未独立认证，不是实时余额或结算证据。":"历史报告保持隔离："+match.reasons.join(" / ")+"。清除项目选择后可继续独立复盘。");
+    if(selected)notice.innerHTML=note(match.status==="DECLARED_MATCH"?"当前报告与 Project 的声明身份一致（Project ID、Mint、网络、Genesis、SOL）。仅为历史复盘；未独立认证，不是实时余额或结算证据。":"历史报告保持隔离："+match.reasons.join(" / ")+"。清除项目选择后可继续独立复盘。");
     if(match.status==="DECLARED_MATCH"){
      const area=main.querySelector("#terminal-report-area");
      area.hidden=false;area.removeAttribute("inert");area.style.removeProperty("display");
@@ -378,13 +394,13 @@ function renderTerminal(){
    }else{
     notice.innerHTML=note("当前为独立历史复盘模式，不代表任何 Project 的实时资产或市场状态。");
    }
-   main.querySelector("#terminal-project-select").onchange=e=>{importTicket++;activeProjectId=e.target.value||null;record("project.context.selected",{project_id:activeProjectId});render()};
+   main.querySelector("#terminal-project-select").onchange=e=>{importTicket++;selectProjectContext(e.target.value||null);record("project.context.selected",{project_id:activeProjectId});render()};
   }).catch(()=>{
    if(page==="terminal"&&contextVersion===terminalContextVersion){
     projectContext.textContent="Project 数据库不可用；交易执行保持关闭。";
     if(activeProjectId){
      const clear=document.createElement("button");clear.textContent="返回独立复盘";
-     clear.onclick=()=>{importTicket++;activeProjectId=null;render()};projectContext.append(clear);
+     clear.onclick=()=>{importTicket++;selectProjectContext(null);render()};projectContext.append(clear);
     }
    }
   });
@@ -463,7 +479,7 @@ function render(){
  dbLoad.disabled=workspaceBusy;dbSave.disabled=workspaceBusy||workspaceRevision===null;dbVersions.disabled=workspaceBusy;
  for(const id of ["workspace-import","catalogue-add","catalogue-file","catalogue-select"])main.querySelector("#"+id).disabled=workspaceBusy;
  if(workspaceBusy){removeButton.disabled=true;openReview.disabled=true;}
- openReview.onclick=()=>{if(!selected||workspaceBusy)return;if(!window.confirm("在离线审阅模式打开该记录？不会绑定钱包。"))return;const next=structuredClone(selected.input),nextReport=auditedReport(next);importTicket++;activeProjectId=null;offlineReview=true;data=next;report=nextReport;page="terminal";record("page.open",{page});render()};
+ openReview.onclick=()=>{if(!selected||workspaceBusy)return;if(!window.confirm("在离线审阅模式打开该记录？不会绑定钱包。"))return;const next=structuredClone(selected.input),nextReport=auditedReport(next);importTicket++;selectProjectContext(null);offlineReview=true;data=next;report=nextReport;page="terminal";record("page.open",{page});render()};
  async function databaseAction(action){
   if(workspaceBusy)return;
   if(action==="load"&&projectCatalogue.list().length&&!window.confirm("读取数据库将替换当前会话档案。请先导出未保存记录。继续？"))return;
@@ -507,7 +523,7 @@ function render(){
   const reviewHost=main.querySelector("#scoped-project-review"),scope=activeProjectId;
   mountScopedProjectReview(reviewHost,{projectId:scope,isActive:()=>page==="dashboard"&&activeProjectId===scope&&reviewHost.isConnected,esc,table,note,download});
   main.querySelector("#dashboard-return-project").onclick=()=>{importTicket++;page="terminal";render();};
-  main.querySelector("#dashboard-open-independent").onclick=()=>{importTicket++;activeProjectId=null;render();};
+  main.querySelector("#dashboard-open-independent").onclick=()=>{importTicket++;selectProjectContext(null);render();};
  }else{
  const d=report.terminal_state,t=d.treasury,v=d.market;
  const reviewRows=historicalReviewRows(d);
@@ -534,7 +550,7 @@ function render(){
   mountProjectSetup(main,{
    initialProjectId:activeProjectId,
    initialMessage:projectMessage,
-   onActiveProjectId:id=>{activeProjectId=id;renderGlobalContext();document.querySelector(".tag").textContent=id?"PROJECT REVIEW":offlineReview?"OFFLINE REVIEW":"LOCALNET";},
+   onActiveProjectId:id=>{selectProjectContext(id);renderGlobalContext();document.querySelector(".tag").textContent=id?"PROJECT REVIEW":offlineReview?"OFFLINE REVIEW":"LOCALNET";},
    isActive:()=>page==="create"&&importTicket===ticket,
    screenHeading,panel,note,table,esc,download,projectRegistry,record,errorKind
   });

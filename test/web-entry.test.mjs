@@ -73,3 +73,9 @@ test("scoped review is reachable and independent from report buffer",async()=>{
  assert.match(view,/selectProjectRuntimeInterval\(projectId,project.revision,v.runtime_context_id,id\)/);
  assert.doesNotMatch(view,/sendTransaction|signTransaction/);
 });
+
+test("project operator workspace retains only selection and provides review navigation",async()=>{
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");
+ assert.match(app,/readProjectSelection\(contextStorage\)/);assert.match(app,/clear-missing-project/);
+ assert.match(app,/projectStageStrip\(model.stage\)/);assert.match(app,/projectReviewTasks\(v.runtime\)/);assert.match(app,/riskEvidenceRows\(gr.findings,riskFilter.value\)/);
+});

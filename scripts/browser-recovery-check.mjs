@@ -106,6 +106,11 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   await evaluate('document.querySelector(\'[data-page="terminal"]\').click()');
   await wait("selected-project",'document.querySelector("#terminal-project-select")?.value==='+JSON.stringify(project.project_id));
   assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
+  await wait("operator-workspace",'document.querySelector(".operator-stage-strip")&&document.querySelector(".operator-task-grid")');
+  await evaluate('window.__cookSelectionReload=true');
+  await cdp.call("Page.reload");
+  await wait("project-selection-reload",'window.__cookSelectionReload!==true&&document.querySelector("#terminal-project-select")?.value==='+JSON.stringify(project.project_id));
+  assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
   const events=await (await fetch(url+"/api/projects/"+encodeURIComponent(project.project_id)+"/events",{signal:AbortSignal.timeout(3000)})).json();
   assert.equal(events.events.length,1);
   const directory=await (await fetch(url+"/api/projects",{signal:AbortSignal.timeout(3000)})).json();
