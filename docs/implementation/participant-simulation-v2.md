@@ -29,3 +29,7 @@ Data integration, empirical calibration and actual environment acceptance are de
 ## V2G — discrete observation clock
 
 A bounded priority queue now processes offline observation arrivals at irregular integer millisecond timestamps, with stable insertion-order ties, duplicate-index rejection, no clock rewind, and no scheduling into an already processed time. The per-observer coverage model supports separate seeded delivery jitter, preserves canonical history, and computes freshness from the newest received event rather than the last arrival. Tests compare heap order with a stable sort, exercise limits, and verify delayed catch-up and coverage conservation. This is an observation-data clock only: the illustrative participant generator still uses fixed ticks, and no transaction ordering policy or live execution is added. Data integration remains deferred.
+
+## V2H — SIM-C1: retrospective numeric evidence audit
+
+A separate pure audit checks existing synthetic records for duplicate transaction references, exact represented price arithmetic, the declared embedded fee convention, positive intermediate reserves and closing reserve parity. The unified synthetic review and validation suite now include this check. Price and fee corruption tests demonstrate that balanced cash/token postings alone are insufficient. The audit does not calculate prospective quotes or validate real protocol fee attribution or the full market invariant. Unknown generator versions do not receive a numeric PASS. Data integration and empirical validation remain deferred.

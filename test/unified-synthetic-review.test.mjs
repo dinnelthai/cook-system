@@ -31,3 +31,27 @@ test("synthetic ledger rejects mixed protocol, phase and explicit curve identity
   assert.throws(()=>buildUnifiedSyntheticReview(r),/INVALID_OR_DUPLICATE_SIMULATION_EVENT/);
  }
 });
+
+test("numeric audit catches price and declared fee corruption even when balances still reconcile",()=>{
+ for(const [mutate,code] of [
+  [p=>p.execution_price_decimal="0","RECORDED_PRICE_MISMATCH:"],
+  [p=>p.fee_components=[{fee_type:"simulated_pool_fee",mint:p.quote_mint,amount_base_units:"1"}],"RECORDED_FEE_ARITHMETIC_MISMATCH:"],
+  [p=>p.fee_components=[{fee_type:"simulated_pool_fee",mint:"wrong-mint",amount_base_units:"1"}],"INVALID_RECORDED_FEE_COMPONENT:"]
+ ]){
+  const r=fixture(),trade=r.detector_input.events.find(e=>e.event_kind.startsWith("CURVE_"));
+  mutate(trade.payload);const v=buildUnifiedSyntheticReview(r);
+  assert.equal(v.accounting.status,"INTERNALLY_CONSISTENT");
+  assert.equal(v.status,"REVIEW_REQUIRED");assert.ok(v.issues.some(i=>i.startsWith(code)));
+  assert.equal(v.numeric_audit.declared_fee_total_base_units,null);
+ }
+});
+test("numeric checks validate recorded fees without claiming independent fee attribution",()=>{
+ const r=fixture(),v=buildUnifiedSyntheticReview(r);
+ assert.equal(v.numeric_audit.status,"PASS");
+ assert.equal(v.numeric_audit.declared_fee_total_base_units,r.detector_input.events.reduce((n,e)=>n+(e.payload.fee_components??[]).reduce((s,c)=>s+BigInt(c.amount_base_units),0n),0n).toString());
+ assert.equal(v.numeric_audit.independent_fee_attestation,"UNKNOWN");
+ assert.equal(v.numeric_audit.invariant_model_verified,false);
+ const trades=r.detector_input.events.filter(e=>e.event_kind.startsWith("CURVE_"));
+ trades[1].payload.signature=trades[0].payload.signature;
+ assert.ok(buildUnifiedSyntheticReview(r).issues.some(i=>i.startsWith("INVALID_OR_DUPLICATE_TRADE_SIGNATURE:")));
+});

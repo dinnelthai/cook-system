@@ -32,6 +32,7 @@ export function runParticipantValidationSuite({base,seeds=[701,702,703,704,705],
   const badState=reviewParticipantStates(bad);
   const checks=[
    result("per_account_ledger",ledger.status==="INTERNALLY_CONSISTENT"),
+   result("record_numeric_consistency",ledger.numeric_audit.status==="PASS"),
    result("asset_state_replay",states.status==="INTERNALLY_CONSISTENT"&&states.endpoint_checked),
    result("checkpoint_recomputation",states.checkpoints.length>0&&verifyParticipantStateCheckpoint(report,states.checkpoints.at(-1)).status==="RECOMPUTED_MATCH"),
    result("observer_accounting",coverage.observers.every(o=>o.samples.every(s=>s.oracle_record_count===s.received_record_count+s.not_yet_due_record_count+s.missing_after_due_count))),
