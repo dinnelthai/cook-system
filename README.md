@@ -158,3 +158,8 @@ These additions do not complete real-chain acceptance. Mainnet archive-RPC fixtu
 ## Unified Codex acceptance
 
 After `npm ci`, run `npm run accept:all`. It checks Node/runtime prerequisites, syntax for tracked source modules, the complete automated test suite, JSON Schema registry validation, repository hygiene and deterministic held-out synthetic regression. It writes a machine-readable report under `.cook-system/acceptance/` (ignored by Git). This is a code-level gate, not proof of actual Localnet, wallet-funded transaction, browser, historical financial parity, or performance acceptance. See [Codex Unified Acceptance Playbook](docs/implementation/CODEX-ACCEPTANCE-PLAYBOOK.md) for the operator-side steps and required report format.
+
+
+## Offline workflow integration
+
+See [M25–M49 first offline workflow batch](docs/implementation/M25-M49-OFFLINE-WORKFLOW.md) for static configuration audit and per-interval evidence coverage; this does not establish real-world operating readiness.

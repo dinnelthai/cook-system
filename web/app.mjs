@@ -183,6 +183,8 @@ function renderTerminal(){
          table(["项目阶段","严重异常","警告","未知项"],[[v.recorded_stage,v.risk.critical,v.risk.warning,v.risk.unknown]])+
          note("历史归档容量："+(v.capacity?.archive_count??"—")+"/"+(v.capacity?.archive_limit??"—")+" · 订单记录："+(v.capacity?.order_count??"—")+"/"+(v.capacity?.order_limit??"—")+" · "+(v.capacity?.status??"UNKNOWN"))+
          table(["模块","状态","记录数"],[["资金与库存",v.treasury.status,v.treasury.review_count],["市场证据",v.market.status,v.market.review_count],["财务关闭",v.close.status,v.close.review_count],["订单复核","未充分复核 "+v.orders.unresolved_count,v.orders.record_count]])+
+         (v.configuration?'<details open><summary>项目准备与配置审计</summary>'+table(["状态","已登记钱包","缺少额度"],[[v.configuration.status,v.configuration.wallets.registered_count,v.configuration.budget.members_missing_cap]])+table(["配置异常 / 缺项 / 警告"],[...v.configuration.issues,...v.configuration.missing,...v.configuration.warnings].map(x=>[x]))+'</details>':"")+
+         (v.offline_workflow?'<details><summary>离线业务证据覆盖（非执行许可）</summary>'+table(["区间开始","区间结束","状态","资金 / 市场 / 关闭"],v.offline_workflow.intervals.map(x=>[x.opening_cutoff,x.closing_cutoff,x.status,x.evidence.map(e=>e.status).join(" / ")]))+'</details>':"")+
          '<details><summary>历史区间与报告关联</summary>'+table(["区间开始","区间结束","关联复核数"],v.intervals.map(x=>[x.opening_cutoff,x.closing_cutoff,x.reviews.length]))+'</details>'+
          table(["证据冲突","引用"],v.findings.map(x=>[x.code,x.reference??"—"]))+
          table(["证据未知","引用"],(v.unknown??[]).map(x=>[x.code,x.reference??"—"]))+

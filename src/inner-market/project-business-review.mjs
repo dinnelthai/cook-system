@@ -1,6 +1,7 @@
 import {assertProjectAggregate} from "./project-aggregate.mjs";
 import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs";
 import {describeProjectRiskReview} from "./project-risk-review.mjs";
+import {reviewProjectConfiguration,describeOfflineWorkflow} from "./project-offline-workflow.mjs";
 import {indexProjectEvidence} from "./project-evidence-index.mjs";
 /** M18–24: read-only review projection, scoped to a single local snapshot.
  * A digest/link match establishes internal association, not source truth.
@@ -15,6 +16,8 @@ export function buildProjectBusinessReview(projectInput,archives=[],orders=[]){
   status:intervals.some(x=>x.reviews.some(r=>r.kind===kind&&r.status==="REVIEW_REQUIRED"))?"REVIEW_REQUIRED":
     intervals.some(x=>x.reviews.some(r=>r.kind===kind))?"DECLARED_EVIDENCE_PRESENT":"MISSING"});
  const treasury=section("TREASURY_REVIEW"),market=section("MARKET_EVIDENCE_REVIEW"),close=section("PROJECT_CLOSE_REVIEW");
+ const configuration=reviewProjectConfiguration(p);
+ const offline_workflow=describeOfflineWorkflow({configuration,lifecycle,intervals,receipts,risk,findings});
  const gates=[
   {id:"project_identity",status:p.token.mint&&p.network.genesis_hash?"DECLARED_PRESENT":"MISSING"},
   {id:"linked_closed_interval",status:intervals.length?"DECLARED_PRESENT":"MISSING"},
@@ -23,7 +26,8 @@ export function buildProjectBusinessReview(projectInput,archives=[],orders=[]){
   ...["independent_genesis_check","retained_finalized_history","independent_account_ownership","independent_financial_parity","real_browser_acceptance","load_and_recovery_acceptance"].map(id=>({id,status:"NOT_RUN"}))
  ];
  return {schema_version:"cook-project-business-review.1",project_id:p.project_id,project_revision:p.revision,recorded_stage:p.lifecycle.stage,
-  status:findings.length||risk.status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":"EVIDENCE_INCOMPLETE",
+  configuration,offline_workflow,
+  status:offline_workflow.status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":"EVIDENCE_INCOMPLETE",
   treasury:{...treasury,project_wide_total:null,live_balance:null},market:{...market,live_market_assessed:false},close,
   orders:{record_count:receipts.length,unresolved_count:receipts.filter(r=>!["DECLARED_SAMPLE_MATCH"].includes(r.status)).length,records:receipts},
   risk:{...risk.counts,status:risk.status},lifecycle:{recorded_stage:lifecycle.recorded_stage,blockers:lifecycle.blockers},
