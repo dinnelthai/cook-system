@@ -520,3 +520,29 @@ P0 不要求主网交易。先在本地验证环境完成业务完整性、故�
 5. 最后完成端到端 Localnet 验收。
 
 **后续开发的完成标准不是“页面做出来了”或“函数写出来了”，而是对应业务场景的输入、执行、状态、资金变化、异常恢复和审计证据全部闭环。**
+
+---
+
+## 10. Implementation progress update — 2026-11-25
+
+The first Project Aggregate foundation and the Project Setup integration have now been implemented on master. See [Project Aggregate & Event Store — V1](project-aggregate-v1.md).
+
+Completed in this slice:
+
+- canonical Project aggregate with profile, Solana network identity, token parameters, Dev wallet group, market bindings, limits and lifecycle;
+- atomic draft configuration command and optimistic revision checks;
+- private local SQLite snapshot store with idempotent commands and append-only hash-chained audit events;
+- loopback Project HTTP API for create, list, read, commands, event history and integrity verification;
+- Project Setup page now reads and writes the canonical SQLite-backed API; legacy browser registry is retained only for export;
+- terminal now displays the selected Project context and verified-market count;
+- removed the unbound Pump Lab market/trading mounts from the terminal; execution remains disabled until Project-bound market identity, Venue Adapter, order ledger and Risk Gate are implemented.
+
+Still incomplete:
+
+- chain-backed verification of issuance and market accounts;
+- Project-bound live market subscriptions and market adapters;
+- Bonding Curve and PumpSwap execution bound to the selected Project;
+- persistent orders, execution recovery, inventory, Treasury and settlement;
+- browser-level operator acceptance and full Localnet end-to-end acceptance.
+
+The current GitHub Actions result is a code-level gate only. It does not constitute a live Localnet launch, funded wallet transaction, mainnet execution or production acceptance.
