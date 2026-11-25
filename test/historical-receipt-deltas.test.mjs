@@ -26,3 +26,27 @@ test("owner reassignment is accounted on each recorded side without inventing an
  const t=fixture();t.meta.postTokenBalances[0].owner="other";
  const d=extractTransactionBalanceDeltas(t);assert.equal(d.token_accounts[0].owner,null);assert.equal(d.tokens.find(x=>x.owner==="owner").post_amount_base_units,"0");assert.equal(d.tokens.find(x=>x.owner==="other").pre_amount_base_units,"0");
 });
+
+test("transaction-wide native conservation matches recorded network fee without attributing project expenses",()=>{
+ const t=fixture();t.meta.preBalances=[20000,1000];t.meta.postBalances=[13000,3000];
+ const a=extractTransactionBalanceDeltas(t).native_fee_audit;
+ assert.equal(a.status,"RECORDED_FEE_MATCH");assert.equal(a.observed_native_delta_lamports,"-5000");
+ assert.equal(a.residual_lamports,"0");assert.equal(a.economic_attribution,"UNKNOWN");
+});
+test("native fee residual uses exact integers above safe number precision",()=>{
+ const t=fixture();t.meta.preBalances=["9007199254740999","1"];t.meta.postBalances=["9007199254735999","2"];
+ const a=extractTransactionBalanceDeltas(t).native_fee_audit;
+ assert.equal(a.status,"REVIEW_REQUIRED");assert.equal(a.residual_lamports,"1");
+});
+test("missing fee, incomplete balances or duplicate addresses cannot certify native conservation",()=>{
+ for(const change of [t=>delete t.meta.fee,t=>t.meta.postBalances.pop(),t=>t.transaction.message.accountKeys[1]="owner",t=>t.meta.preBalances[0]=Number.MAX_SAFE_INTEGER+1]){
+  const t=fixture();change(t);const a=extractTransactionBalanceDeltas(t).native_fee_audit;
+  assert.equal(a.status,"UNKNOWN");assert.equal(a.residual_lamports,null);
+ }
+});
+test("R3 reported network fee amounts match synthetic native balance pairs independently",()=>{
+ for(const fee of [10000,5000,5000,5000,5000,5000,5000]){
+  const t=fixture();t.meta.fee=fee;t.meta.preBalances=[30000,1000];t.meta.postBalances=[28000-fee,3000];
+  assert.equal(extractTransactionBalanceDeltas(t).native_fee_audit.residual_lamports,"0");
+ }
+});

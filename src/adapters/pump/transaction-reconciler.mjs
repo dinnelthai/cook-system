@@ -84,7 +84,18 @@ export function extractTransactionBalanceDeltas(transaction) {
   if(ownerIncomplete)issues.push("TOKEN_OWNER_AGGREGATION_INCOMPLETE");
   else for(const x of owners.values())tokens.push({owner:x.owner,mint:x.mint,pre_amount_base_units:x.pre.toString(),post_amount_base_units:x.post.toString(),delta_base_units:(x.post-x.pre).toString(),decimals:x.decimals,account_count:x.accounts.size});
  }
- return {fee_lamports:fee,lamports,tokens,token_accounts:tokenAccounts,balance_evidence_status:issues.length?"PARTIAL":"RECORDED_DELTAS",balance_evidence_issues:[...new Set(issues)]};
+ // Transaction-wide native conservation is separate from economic attribution.
+ // A discrepancy is a review observation, not proof of a missing fee or rent.
+ const nativeComplete=keys.length>0&&lamports.length===keys.length&&new Set(keys).size===keys.length;
+ const observed=nativeComplete?lamports.reduce((sum,row)=>sum+BigInt(row.delta_lamports),0n):null;
+ const expected=fee===null?null:-BigInt(fee);
+ const residual=observed===null||expected===null?null:observed-expected;
+ const nativeFeeAudit={status:residual===null?"UNKNOWN":residual===0n?"RECORDED_FEE_MATCH":"REVIEW_REQUIRED",
+  recorded_account_count:lamports.length,expected_account_count:keys.length,
+  recorded_network_fee_lamports:fee,observed_native_delta_lamports:observed?.toString()??null,
+  expected_native_delta_lamports:expected?.toString()??null,residual_lamports:residual?.toString()??null,
+  scope:"TRANSACTION_ALL_RECORDED_ACCOUNTS",economic_attribution:"UNKNOWN",source_attestation:"UNKNOWN"};
+ return {fee_lamports:fee,lamports,tokens,token_accounts:tokenAccounts,balance_evidence_status:issues.length?"PARTIAL":"RECORDED_DELTAS",balance_evidence_issues:[...new Set(issues)],native_fee_audit:nativeFeeAudit};
 }
 
 function transactionInstructions(transaction) {
