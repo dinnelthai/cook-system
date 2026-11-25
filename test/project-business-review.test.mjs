@@ -68,3 +68,36 @@ test("missing portfolio inputs do not imply zero risk or trading permission",()=
  assert.ok(r.findings.some(f=>f.code==="PORTFOLIO_DAILY_LOSS_INPUT_UNAVAILABLE"&&f.severity==="UNKNOWN"));
  assert.equal(r.execution_enabled,false);assert.equal(r.live_risk_assessed,false);
 });
+
+test("a blocked interval propagates to financial summary, workflow and derived continuity, without contaminating a separate interval",()=>{
+ const a=treasury();
+ a.payload.cash_flow={observed_closing_cash_base_units:"10",creator_fee_cash_receipts_base_units:"2"};
+ a.payload.creator_receivables={cash_received_base_units:"2",closing_receivable_base_units:"3"};
+ a.payload.creator_fee_audit={summary:{verified_cash_income_base_units:"2",verified_closing_receivable_base_units:"3"}};
+ a.payload.realized_pnl={creator_cash_income_base_units:"2"};
+ a.payload.account_set={status:"INTERNALLY_CONSISTENT",totals:{cashBaseUnits:"9"},coverage:{status:"DECLARED_LABELS_MATCH"}};
+ const second=link();second.archive_id="second";second.payload.report_digest="b".repeat(64);second.payload.scope.openingCutoff="later";second.payload.scope.closingCutoff="last";
+ const b=treasury();b.archive_id="second-treasury";b.payload.report_link_archive_id="second";b.payload.report_digest=second.payload.report_digest;b.payload.cash_flow={observed_closing_cash_base_units:"123"};
+ const r=buildProjectBusinessReview(p,[link(),a,second,b]);
+ assert.equal(r.treasury.status,"REVIEW_REQUIRED");
+ assert.equal(r.market.status,"MISSING");assert.equal(r.close.status,"MISSING");
+ assert.equal(r.data_integration.gates.find(g=>g.id==="treasury_review").status,"REVIEW_REQUIRED");
+ const interval=id=>r.runtime.asset_intervals.find(x=>x.report_link_archive_id===id);
+ assert.equal(interval("link").assets.cash,null);assert.equal(interval("second").assets.cash,"123");
+ const workflow=id=>r.offline_workflow.intervals.find(x=>x.report_link_archive_id===id);
+ assert.equal(workflow("link").status,"REVIEW_REQUIRED");
+ assert.equal(workflow("link").evidence.find(x=>x.kind==="MARKET_EVIDENCE_REVIEW").status,"MISSING");
+ assert.equal(workflow("second").evidence.find(x=>x.kind==="TREASURY_REVIEW").status,"DECLARED_PRESENT");
+ assert.equal(r.continuity.status,"REVIEW_REQUIRED");
+ const checks=r.continuity.intervals.find(x=>x.report_link_archive_id==="link").checks;
+ assert.ok(checks.length);assert.ok(checks.every(x=>x.declared_value===null&&x.status!=="DECLARED_MATCH"));
+ assert.equal(r.operating_components.status,"REVIEW_REQUIRED");assert.equal(r.model_evidence.status,"REVIEW_REQUIRED");
+ assert.equal(r.execution_enabled,false);
+});
+test("unrecognized treasury producer status does not expose historical operating amounts",()=>{
+ const a=treasury();a.payload.status="UNKNOWN_PRODUCER_STATUS";a.payload.realized_pnl={creator_cash_income_base_units:"123",project_cash_basis_realized_pnl_base_units:"456"};
+ const r=buildProjectBusinessReview(p,[link(),a]);
+ assert.ok(Object.values(r.operating_components.rows[0].components).every(x=>x===null));
+ assert.equal(r.runtime.asset_intervals[0].assets.realized_pnl,null);
+ assert.equal(r.execution_enabled,false);
+});

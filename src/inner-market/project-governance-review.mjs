@@ -56,7 +56,7 @@ export function describeHistoricalOperatingComponents(project,intervals,archives
   let invalid=false,missing=false;
   for(const [k,valid] of definitions){
    if(p[k]==null)missing=true;else if(!valid(p[k]))invalid=true;
-   fields[k]=valid(p[k])?p[k]:null;
+   fields[k]=v.status==="PARTIAL"&&valid(p[k])?p[k]:null;
   }
   if(v.status==="REVIEW_REQUIRED"||v.mathematical_audit?.status==="REVIEW_REQUIRED"||invalid){
    findings.push({code:"OPERATING_COMPONENTS_CONFLICT",reference:a.archive_id});

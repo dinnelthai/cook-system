@@ -47,6 +47,17 @@ export function buildProjectBusinessReview(projectInput,archives=[],orders=[]){
  }
  const runtime=buildProjectRuntime(p,{archives,intervals,lifecycle,configuration,risk,findings,receipts,operational:operational_evidence,intervalConflicts});
  const blockedIntervals=new Set(runtime.asset_intervals.filter(i=>i.status==="REVIEW_REQUIRED").map(i=>i.report_link_archive_id));
+ // The runtime's exact interval conflict gate is authoritative for derived
+ // projections. Keep unrelated intervals and missing evidence distinct.
+ for(const [kind,summary] of [["TREASURY_REVIEW",treasury],["MARKET_EVIDENCE_REVIEW",market],["PROJECT_CLOSE_REVIEW",close]]){
+  if(intervals.some(i=>blockedIntervals.has(i.archive_id)&&i.reviews.some(r=>r.kind===kind)))summary.status="REVIEW_REQUIRED";
+ }
+ for(const row of continuity.intervals){
+  if(!blockedIntervals.has(row.report_link_archive_id))continue;
+  row.status="REVIEW_REQUIRED";
+  for(const check of row.checks){check.declared_value=null;if(check.status==="DECLARED_MATCH")check.status="REVIEW_REQUIRED";}
+ }
+ if(continuity.intervals.some(r=>r.status==="REVIEW_REQUIRED"))continuity.status="REVIEW_REQUIRED";
  for(const row of operating_components.rows){
   if(blockedIntervals.has(row.report_link_archive_id)){
    row.status="REVIEW_REQUIRED";
@@ -60,12 +71,14 @@ export function buildProjectBusinessReview(projectInput,archives=[],orders=[]){
    if("record_count" in e)e.record_count=null;
   }
  }
+ if(operating_components.rows.some(r=>r.status==="REVIEW_REQUIRED"))operating_components.status="REVIEW_REQUIRED";
+ if(model_evidence.intervals.some(r=>r.evidence.some(e=>e.status==="REVIEW_REQUIRED")))model_evidence.status="REVIEW_REQUIRED";
  findings.push(...runtime.issues);
  unknown.push(...runtime.unknown);
  const global_risk=consolidateProjectRisk({historical:risk,configuration,findings,unknown,runtime});
  runtime.risk={...runtime.risk,status:global_risk.status,counts:global_risk.counts};
  if(global_risk.status==="REVIEW_REQUIRED")runtime.status="REVIEW_REQUIRED";
- const offline_workflow=describeOfflineWorkflow({configuration,lifecycle,intervals,receipts,risk:global_risk,findings});
+ const offline_workflow=describeOfflineWorkflow({configuration,lifecycle,intervals,receipts,risk:global_risk,findings,blockedIntervals});
  const gates=[
   {id:"project_identity",status:p.token.mint&&p.network.genesis_hash?"DECLARED_PRESENT":"MISSING"},
   {id:"linked_closed_interval",status:intervals.length?"DECLARED_PRESENT":"MISSING"},

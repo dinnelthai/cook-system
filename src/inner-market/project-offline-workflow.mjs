@@ -44,16 +44,16 @@ export function reviewProjectConfiguration(input){
 
 /** Projection only: preserve each independent evidence interval. No totals across
  * intervals, no inferred coverage, no automatic transitions. */
-export function describeOfflineWorkflow({configuration,lifecycle,intervals,receipts,risk,findings}){
+export function describeOfflineWorkflow({configuration,lifecycle,intervals,receipts,risk,findings,blockedIntervals=new Set()}){
  const states=intervals.map(i=>{
   const kinds=["TREASURY_REVIEW","MARKET_EVIDENCE_REVIEW","PROJECT_CLOSE_REVIEW"];
   const rows=kinds.map(kind=>{
    const matches=i.reviews.filter(r=>r.kind===kind);
-   return {kind,status:matches.some(r=>r.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":matches.length?"DECLARED_PRESENT":"MISSING",
+   return {kind,status:matches.some(r=>r.status==="REVIEW_REQUIRED")||matches.length&&blockedIntervals.has(i.archive_id)?"REVIEW_REQUIRED":matches.length?"DECLARED_PRESENT":"MISSING",
     archive_ids:matches.map(r=>r.archive_id)};
   });
   return {report_link_archive_id:i.archive_id,report_digest:i.report_digest,opening_cutoff:i.opening_cutoff,closing_cutoff:i.closing_cutoff,
-   evidence:rows,status:rows.some(r=>r.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":rows.some(r=>r.status==="MISSING")?"INCOMPLETE":"DECLARED_PRESENT"};
+   evidence:rows,status:blockedIntervals.has(i.archive_id)||rows.some(r=>r.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":rows.some(r=>r.status==="MISSING")?"INCOMPLETE":"DECLARED_PRESENT"};
  });
  const conflict=configuration.issues.length>0||findings.length>0||risk.status==="REVIEW_REQUIRED"||states.some(s=>s.status==="REVIEW_REQUIRED");
  return {schema_version:"cook-offline-workflow.1",status:conflict?"REVIEW_REQUIRED":"EVIDENCE_INCOMPLETE",
