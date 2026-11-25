@@ -133,3 +133,35 @@ test("historical runtime never adds pool reserve or synthetic LP fields to decla
  assert.equal(row.lp_evidence.project_nav_inclusion,"NOT_ESTABLISHED");
  assert.equal(row.lp_evidence.pool_fee_bucket_cash_equivalence,"NOT_ESTABLISHED");
 });
+
+const qualityReview=(id,status,count,extras={})=>a(id,"MARKET_EVIDENCE_REVIEW",{status:"PARTIAL",report_link_archive_id:"link",report_digest:digest,observed_trade_record_count:count,closed_market_quality:{status,event_count:count},...extras});
+test("unrecognized market quality or producer status does not expose a trade count",()=>{
+ for(const m of [qualityReview("m","UNKNOWN",3),qualityReview("m","UNRECOGNIZED",3),qualityReview("m","DESCRIPTIVE_ONLY",3,{status:"UNKNOWN"})]){
+  const r=buildProjectBusinessReview(p,[link(),m]).runtime.market.curve_intervals[0];
+  assert.equal(r.status,"INCOMPLETE");assert.equal(r.records[0].status,"UNKNOWN");assert.equal(r.records[0].event_count,null);
+ }
+});
+test("market count, candle and declared source conflicts quarantine linked assets",()=>{
+ const cases=[qualityReview("m","DESCRIPTIVE_ONLY",0),qualityReview("m","NO_EXECUTIONS",2),qualityReview("m","DESCRIPTIVE_ONLY",2,{candle_evidence_status:"EMPTY"}),qualityReview("m","DESCRIPTIVE_ONLY",2,{closed_market_quality:{status:"DESCRIPTIVE_ONLY",event_count:2,execution_enabled:true}})];
+ for(const m of cases){
+  const v=buildProjectBusinessReview(p,[link(),treasury("t","100"),m]);
+  assert.equal(v.runtime.asset_intervals[0].assets.cash,null);assert.equal(v.market.status,"REVIEW_REQUIRED");
+  assert.equal(v.runtime.market.curve_intervals[0].records[0].event_count,null);
+  assert.equal(v.runtime.work.find(x=>x.id==="historical_market").status,"REVIEW_REQUIRED");
+ }
+});
+test("same interval market count disagreement masks all linked projections; unrelated intervals remain intact",()=>{
+ const t=treasury("t","10"),x=qualityReview("x","DESCRIPTIVE_ONLY",2),y=qualityReview("y","DESCRIPTIVE_ONLY",3);
+ const l=link();l.archive_id="next";l.payload.report_digest="b".repeat(64);l.payload.scope.openingCutoff="end";l.payload.scope.closingCutoff="later";
+ const other=treasury("other","20");other.payload.report_link_archive_id="next";other.payload.report_digest=l.payload.report_digest;
+ const v=buildProjectBusinessReview(p,[link(),t,x,y,l,other]);
+ assert.ok(v.findings.some(f=>f.code==="RUNTIME_MARKET_REVIEW_COUNT_CONFLICT"));
+ assert.ok(v.runtime.market.curve_intervals[0].records.every(r=>r.event_count===null));
+ assert.equal(v.runtime.asset_intervals[0].assets.cash,null);assert.equal(v.runtime.asset_intervals[1].assets.cash,"20");
+});
+test("financial contradiction also withholds same interval market summary",()=>{
+ const v=buildProjectBusinessReview(p,[link(),treasury("t","10"),treasury("u","11"),qualityReview("m","DESCRIPTIVE_ONLY",2)]);
+ assert.equal(v.runtime.market.curve_intervals[0].status,"REVIEW_REQUIRED");
+ assert.equal(v.runtime.market.curve_intervals[0].records[0].event_count,null);
+ assert.equal(v.market.status,"REVIEW_REQUIRED");
+});
