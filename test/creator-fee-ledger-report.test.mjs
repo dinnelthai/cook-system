@@ -30,3 +30,26 @@ test("scope mismatch is rejected",()=>{
  const i=fixture();i.creator.scope.tokenMint="other";
  assert.throws(()=>buildCreatorFeeLedgerReport({scope:i.scope,creator:i.creator,cash:i.cash}),/CREATOR_FEE_REPORT_SCOPE_MISMATCH/);
 });
+
+test("matching amount and reference cannot conceal conflicting receipt signatures or slots",()=>{
+ const i=fixture(),e=i.creator.entries.find(e=>e.kind==="CREATOR_RECEIPT"),p=i.cash.entries.find(e=>e.kind==="CREATOR_FEE_RECEIVED");
+ e.signature="receipt-a";p.signature="receipt-b";e.slot=10;p.slot=11;
+ const r=buildCreatorFeeLedgerReport({scope:i.scope,creator:i.creator,cash:i.cash});
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.equal(r.summary.verified_cash_income_base_units,null);
+ assert.equal(r.summary.verified_closing_receivable_base_units,null);
+ assert.ok(r.issues.some(x=>x.code==="RECEIPT_SIGNATURE_MISMATCH"));
+ assert.ok(r.issues.some(x=>x.code==="RECEIPT_SLOT_MISMATCH"));
+ assert.equal(r.fee_events.find(x=>x.kind==="CREATOR_RECEIPT").cash_link_status,"RECEIPT_IDENTITY_CONFLICT");
+});
+test("legacy missing receipt identity is incomplete rather than independently verified",()=>{
+ const i=fixture(),r=buildCreatorFeeLedgerReport({scope:i.scope,creator:i.creator,cash:i.cash});
+ assert.equal(r.status,"RECONCILED");
+ assert.equal(r.fee_events.find(x=>x.kind==="CREATOR_RECEIPT").receipt_identity.status,"INCOMPLETE");
+ const e=i.creator.entries.find(x=>x.kind==="CREATOR_RECEIPT"),p=i.cash.entries.find(x=>x.kind==="CREATOR_FEE_RECEIVED");
+ e.signature=p.signature="receipt-a";e.slot=p.slot=10;
+ const v=buildCreatorFeeLedgerReport({scope:i.scope,creator:i.creator,cash:i.cash});
+ const identity=v.fee_events.find(x=>x.kind==="CREATOR_RECEIPT").receipt_identity;
+ assert.equal(identity.status,"DECLARED_MATCH");assert.equal(identity.source_attestation,"UNKNOWN");
+ p.slot=-1;
+ assert.equal(buildCreatorFeeLedgerReport({scope:i.scope,creator:i.creator,cash:i.cash}).status,"REVIEW_REQUIRED");
+});

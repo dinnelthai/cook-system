@@ -2,6 +2,21 @@ import { parseBaseUnits, U128_MAX } from "../core/integer.mjs";
 const amount = (v,n) => parseBaseUnits(v,{name:n,max:U128_MAX});
 const verified = e => e.status==="FINALIZED" && e.reconciliation==="PASS";
 const kinds = new Set(["CREATOR_ACCRUAL","CREATOR_RECEIPT","CREATOR_WRITEOFF"]);
+// Compare supplied receipt identity labels without authenticating them.
+// Older records may omit either label; absence is not a contradiction.
+export function compareCreatorReceiptIdentity(event,posting){
+ const checks=[
+  ["signature",v=>typeof v==="string"&&v.length>0&&v.length<=256&&v.trim()===v],
+  ["slot",v=>Number.isSafeInteger(v)&&v>=0]
+ ];
+ const issues=[];let compared=0;
+ for(const [key,valid] of checks){
+  const a=event[key],b=posting[key];
+  if((a!=null&&!valid(a))||(b!=null&&!valid(b)))issues.push("RECEIPT_"+key.toUpperCase()+"_INVALID");
+  else if(a!=null&&b!=null){compared++;if(a!==b)issues.push("RECEIPT_"+key.toUpperCase()+"_MISMATCH");}
+ }
+ return {status:issues.length?"REVIEW_REQUIRED":compared===checks.length?"DECLARED_MATCH":"INCOMPLETE",issues,source_attestation:"UNKNOWN"};
+}
 
 /** Historical accounting only. Creator entitlement and cash receipts must be
  * independently verified by the caller. No fee projection or trading advice. */
@@ -27,7 +42,7 @@ export function reconcileCreatorReceivables({
     if(v===0n) throw new RangeError("fee amount must be positive");
     if(e.kind==="CREATOR_ACCRUAL") accrued+=v;
     if(e.kind==="CREATOR_WRITEOFF") writtenOff+=v;
-    if(e.kind==="CREATOR_RECEIPT") {received+=v; receipts.set(e.id,{amount:v,matched:false});}
+    if(e.kind==="CREATOR_RECEIPT") {received+=v; receipts.set(e.id,{amount:v,matched:false,event:e});}
   }
   const cashIds=new Set();
   for(const p of cashEntries) {
@@ -41,6 +56,7 @@ export function reconcileCreatorReceivables({
     if(r.matched) {issues.push({code:"DUPLICATE_RECEIPT_REFERENCE",id:p.id});continue;}
     r.matched=true;
     if(r.amount!==amount(p.amountBaseUnits,"receipt amount")) issues.push({code:"RECEIPT_AMOUNT_MISMATCH",id:p.id});
+    for(const code of compareCreatorReceiptIdentity(r.event,p).issues)issues.push({code,id:p.id});
   }
   for(const [id,r] of receipts) if(!r.matched) issues.push({code:"MISSING_CASH_RECEIPT",id});
   const closing=opening+accrued-received-writtenOff;
