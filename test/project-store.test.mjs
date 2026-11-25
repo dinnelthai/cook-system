@@ -27,6 +27,7 @@ test("project snapshots and append-only events survive close and reopen", t => {
   const created = store.create(base);
   assert.equal(created.revision, 1);
   assert.equal(store.verify(created.project_id).event_count, 1);
+  assert.deepEqual(store.events(created.project_id)[0].payload.aggregate, created);
   const applied = store.append(created.project_id, { command_id: "command-wallets", type: "UPSERT_WALLET_GROUP", payload: { group: group() } }, { expected_revision: 1 });
   assert.equal(applied.aggregate.revision, 2);
   store.close();
