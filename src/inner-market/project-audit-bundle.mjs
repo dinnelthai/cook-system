@@ -1,5 +1,6 @@
 import {createHash} from "node:crypto";
 import {canonicalJson} from "../core/canonical-json.mjs";
+import {buildProjectBusinessReview} from "./project-business-review.mjs";
 import {describeProjectRiskReview} from "./project-risk-review.mjs";
 import {evidenceApplicable} from "./project-evidence-scope.mjs";
 import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs";
@@ -26,8 +27,9 @@ export function buildProjectAuditBundle({project,integrity,events,archives,order
  ];
  const recorded_timeline=describeRecordedProjectTimeline(project,events);
  const exception_review=describeLifecycleExceptions(project,lifecycle,risk);
+ const business_review=buildProjectBusinessReview(project,archives,orders.map(o=>o.order));
  const content={schema_version:"cook-project-audit-bundle.1",project_id:project.project_id,project_revision:project.revision,
-  project,integrity:{...integrity,status:"INTERNAL_HASH_CHAIN_CHECKED"},events,archives,orders,lifecycle,risk,exceptions,recorded_timeline,exception_review,
+  project,business_review,integrity:{...integrity,status:"INTERNAL_HASH_CHAIN_CHECKED"},events,archives,orders,lifecycle,risk,exceptions,recorded_timeline,exception_review,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",
   original_report_bytes_included:false,settlement_allowed:false,lifecycle_mutated:false,execution_enabled:false};
  if(Buffer.byteLength(canonicalJson(content))>PROJECT_AUDIT_BUNDLE_MAX_BYTES)throw Error("PROJECT_AUDIT_BUNDLE_SIZE_LIMIT");

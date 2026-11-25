@@ -33,5 +33,6 @@ export function reviewProjectGraduationEvidence(projectInput,history){
   {stage:"PUMPSWAP_ACTIVE",status:conflict?"REVIEW_REQUIRED":poolMatch?"REPLAY_MATCH_NOT_ATTESTED":migrationMatch?"MIGRATION_LINK_ONLY":"UNKNOWN",evidence:l.migration}
  ];
  return {schema_version:"cook-project-graduation-evidence.1",project_id:p.project_id,project_revision:p.revision,history_digest:hash(history),status:conflict?"REVIEW_REQUIRED":g.status==="INTERNAL_CHECKS_CONSISTENT"&&poolMatch?"INTERNAL_CHECKS_CONSISTENT":"PARTIAL",
+  pool_evidence:g.pools.map(x=>({pool_address:x.pool_address,linked_to_migration:x.linked_to_migration,replay_status:x.replay_status,snapshot_status:x.snapshot_status,snapshot_slot:x.snapshot_slot})),
   milestones,issues:[...new Set(issues)].slice(0,100),source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",lifecycle_mutated:false,settlement_allowed:false,execution_enabled:false};
 }
