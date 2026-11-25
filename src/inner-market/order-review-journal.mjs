@@ -67,5 +67,50 @@ export function createOrderReviewJournal(db,{current,now}){
   if(!record)throw Error("ORDER_NOT_FOUND");
   return record.events;
  }
- return {append,list,events};
+ /** Import only server-resolved retrospective trade receipts. Atomic and idempotent.
+  * One signature is a receipt review unit, not an economic order or fill. */
+ function importReceipts(projectId,expectedRevision,archiveId,samples){
+  if(!id(projectId)||!Number.isSafeInteger(expectedRevision)||expectedRevision<1||!/^[a-f0-9]{64}$/.test(archiveId)||
+     !Array.isArray(samples)||samples.length>256)throw Error("INVALID_ORDER_IMPORT");
+  const seen=new Set();
+  for(const s of samples){
+   if(!s||Object.keys(s).some(k=>!["signature","slot","outcome"].includes(k))||typeof s.signature!=="string"||
+    !/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(s.signature)||!Number.isSafeInteger(s.slot)||s.slot<0||!["SUCCESS","FAILURE"].includes(s.outcome)||seen.has(s.signature))throw Error("INVALID_ORDER_IMPORT_SAMPLE");
+   seen.add(s.signature);
+  }
+  db.exec("BEGIN IMMEDIATE");
+  try{
+   const project=current(projectId),all=replay(projectId,project);
+   if(project.aggregate.revision!==expectedRevision)throw Error("PROJECT_REVISION_CONFLICT");
+   if(!project.aggregate.token.mint||!project.aggregate.network.genesis_hash)throw Error("ORDER_REVIEW_PROJECT_IDENTITY_INCOMPLETE");
+   const existing=new Map([...all.values()].filter(x=>x.state.source_mode==="ARCHIVED_HISTORICAL").map(x=>[x.state.signature,x]));
+   const fresh=samples.filter(s=>!existing.has(s.signature));
+   if(all.size+fresh.length>256)throw Error("ORDER_REVIEW_CAPACITY");
+   let imported=0,already_present=0;
+   const at=now();
+   if(!Number.isSafeInteger(at)||at<project.aggregate.updated_at_ms)throw Error("INVALID_ORDER_REVIEW_CLOCK");
+   for(const sample of samples){
+    const old=existing.get(sample.signature);
+    if(old){
+     if(old.state.project_revision!==expectedRevision||old.state.reported_slot!==sample.slot||old.state.reported_outcome!==sample.outcome||old.state.status==="REVIEW_REQUIRED")throw Error("ORDER_IMPORT_EXISTING_CONFLICT");
+     already_present++;continue;
+    }
+    const orderId="receipt-"+hash({projectId,signature:sample.signature});
+    if(all.has(orderId))throw Error("ORDER_IMPORT_EXISTING_CONFLICT");
+    const registration={type:"REGISTER_OBSERVATION",payload:{order_id:orderId,project_id:projectId,project_revision:expectedRevision,project_head_hash:project.head_hash,source_mode:"ARCHIVED_HISTORICAL",signature:sample.signature}};
+    const observation={type:"OBSERVE_OUTCOME",payload:{outcome:sample.outcome,slot:sample.slot,reference:archiveId}};
+    let state=null,previous=null;
+    for(const event of [registration,observation]){
+     state=applyOrderReviewEvent(state,event);
+     const event_id="import-"+hash({projectId,orderId,revision:state.revision});
+     const row={event_id,project_id:projectId,order_id:orderId,revision:state.revision,event_json:canonicalJson(event),recorded_at_ms:at,previous_hash:previous,request_hash:hash({archiveId,event})};
+     previous=hash(core(row));
+     insert.run(row.event_id,row.project_id,row.order_id,row.revision,row.event_json,row.recorded_at_ms,row.previous_hash,row.request_hash,previous);
+    }
+    imported++;
+   }
+   db.exec("COMMIT");return {imported,already_present,execution_enabled:false,settlement_allowed:false,source_attestation:"UNKNOWN"};
+  }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
+ }
+ return {append,list,events,importReceipts};
 }

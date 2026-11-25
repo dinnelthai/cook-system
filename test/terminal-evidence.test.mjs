@@ -118,3 +118,17 @@ test("historical order review matches archived receipt and cash posting without 
  assert.equal(reviewOrderReceipt(p,{...o,status:"REVIEW_REQUIRED"},i).status,"REVIEW_REQUIRED");
  delete i.archivedEvidence;assert.equal(reviewOrderReceipt(p,o,i).status,"UNKNOWN");
 });
+
+test("historical import derives only explicitly linked trade receipts",async()=>{
+ const {deriveArchivedTradeReceiptSamples}=await import("../src/inner-market/order-receipt-review.mjs");
+ const i=fixture();
+ for(let n=0;n<i.cash.entries.length;n++){
+  const sig=String(n+1).repeat(64);i.cash.entries[n].signature=sig;i.archivedEvidence.accountInterval.receipts[n].signature=sig;i.archivedEvidence.accountInterval.receipts[n].transaction.transaction.signatures=[sig];
+ }
+ const p={project_id:i.scope.projectId,revision:1,token:{mint:i.scope.tokenMint},network:{cluster:"localnet",genesis_hash:i.scope.genesisHash}};
+ const result=deriveArchivedTradeReceiptSamples(p,i);
+ assert.equal(result.samples.length,2);assert.equal(result.excluded_receipt_count,2);
+ assert.equal(result.execution_enabled,false);assert.equal(result.settlement_allowed,false);
+ i.archivedEvidence.accountInterval.closing.tokenAmount="49";
+ assert.throws(()=>deriveArchivedTradeReceiptSamples(p,i),/ORDER_IMPORT_REPORT_REVIEW_REQUIRED/);
+});

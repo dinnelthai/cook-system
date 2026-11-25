@@ -65,7 +65,7 @@ function errorResponse(error) {
 
 /** Loopback HTTP adapter for Project CRUD, versioned commands and audit reads.
  * Host/origin enforcement is performed by the parent local-only server. */
-export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence, inspectMarket, resolveReportLink, listReportCandidates, reviewOrderReceipt } = {}) {
+export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence, inspectMarket, resolveReportLink, listReportCandidates, reviewOrderReceipt, importOrderReceipts } = {}) {
   if (!store || typeof readRequestJson !== "function" || !Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1024) {
     throw Error("INVALID_PROJECT_HTTP_CONFIGURATION");
   }
@@ -140,6 +140,19 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(typeof listReportCandidates!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         send(res,200,listReportCandidates(store.get(projectId)));return true;
       }
+      if(action==="order-import"){
+        if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        if(typeof importOrderReceipts!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
+        const input=await bodyJson(req,readRequestJson,maxBodyBytes);
+        if(Object.keys(input).some(k=>!["archive_id","expected_revision"].includes(k))||typeof input.archive_id!=="string"||!Number.isSafeInteger(input.expected_revision))throw Error("INVALID_ORDER_IMPORT");
+        const project=store.get(projectId);
+        if(project.revision!==input.expected_revision)throw Error("PROJECT_REVISION_CONFLICT");
+        const link=store.listArchive(projectId).find(a=>a.archive_id===input.archive_id);
+        if(!link)throw Error("PROJECT_ARCHIVE_NOT_FOUND");
+        const derived=importOrderReceipts(project,link);
+        const result=store.orderReview.importReceipts(projectId,project.revision,link.archive_id,derived.samples);
+        send(res,200,{...result,excluded_receipt_count:derived.excluded_receipt_count,project_id:projectId,project_revision:project.revision});return true;
+      }
       if(action==="order-receipt-review"){
         if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         if(typeof reviewOrderReceipt!=="function"){send(res,503,{code:"EVIDENCE_READER_UNAVAILABLE"});return true;}
@@ -155,7 +168,8 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         const review=await reviewOrderReceipt(project,order,link);
         const latest=store.orderReview.list(projectId).find(o=>o.order_id===input.order_id);
         if(store.get(projectId).revision!==project.revision||latest?.revision!==order.revision)throw Error("PROJECT_REVISION_CONFLICT");
-        send(res,200,{review});return true;
+        const record=store.recordArchive(projectId,"ORDER_RECEIPT_REVIEW",{...review,order_head_hash:order.head_hash},project.revision);
+        send(res,200,{review,review_archive_id:record.archive_id});return true;
       }
       if(action==="order-review"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}

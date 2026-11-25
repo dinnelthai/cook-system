@@ -50,6 +50,42 @@ function expectedFromArchive(raw,scope){
   ...(r.tokens.length?{token_accounts:r.tokens.map(t=>({address:t.address,mint:t.mint,owner:t.owner,decimals:t.decimals,
    pre_amount:presence(m.preTokenBalances,t.address)?t.before.toString():null,post_amount:presence(m.postTokenBalances,t.address)?t.after.toString():null}))}:{})};
 }
+function loadLinkedReport(project,link,path){
+ if(link.kind!=="HISTORICAL_REPORT_LINK"||link.stale||link.project_id!==project.project_id||link.project_revision!==project.revision)throw Error("ORDER_REPORT_LINK_SCOPE_MISMATCH");
+ const p=link.payload,store=openHistoricalWorkspaceStore(path);
+ try{
+  const snapshot=store.load(p.workspace_revision);
+  if(snapshot.digest!==p.workspace_digest)throw Error("ORDER_REPORT_DIGEST_MISMATCH");
+  const input=restoreHistoricalWorkspace(snapshot.workspace).get(p.record_key).input;
+  if(sha(input)!==p.report_digest)throw Error("ORDER_REPORT_DIGEST_MISMATCH");
+  return input;
+ }finally{store.close();}
+}
+/** Derive receipt review units only from explicit, internally consistent trade postings.
+ * No inference of ownership, failed-order intent or economic order count. */
+export function deriveArchivedTradeReceiptSamples(project,input){
+ if(matchProjectReport(project,input).status!=="DECLARED_MATCH")throw Error("PROJECT_REPORT_IDENTITY_MISMATCH");
+ const report=buildUnifiedHistoricalReport(input);
+ if(report.status!=="REPORT_READY"||report.terminal_state.archived_evidence.status!=="INTERNALLY_CONSISTENT")throw Error("ORDER_IMPORT_REPORT_REVIEW_REQUIRED");
+ const receipts=input.archivedEvidence.accountInterval.receipts;
+ const signatures=new Set(input.cash.entries.filter(p=>["TRADE_CASH_COST","TRADE_NET_RECEIPT"].includes(p.kind)&&p.status==="FINALIZED"&&p.reconciliation==="PASS").map(p=>p.signature));
+ if(signatures.size>256)throw Error("ORDER_REVIEW_CAPACITY");
+ const samples=[];
+ for(const signature of signatures){
+  const matches=receipts.filter(x=>x.signature===signature);
+  if(matches.length!==1||!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(signature))throw Error("INVALID_ORDER_IMPORT_SAMPLE");
+  const receipt=normalizeArchivedReceipt(matches[0],project.network.genesis_hash);
+  if(receipt.issues.length||receipt.outcome!=="SUCCESS")throw Error("ORDER_IMPORT_RECEIPT_CONFLICT");
+  samples.push({signature,slot:receipt.slot,outcome:"SUCCESS"});
+ }
+ return {samples,excluded_receipt_count:receipts.length-samples.length,source_attestation:"UNKNOWN",execution_enabled:false,settlement_allowed:false};
+}
+export function createOrderReceiptImporter({path,enabled}={}){
+ return (project,link)=>{
+  if(!enabled)throw Error("WORKSPACE_DISABLED");
+  return deriveArchivedTradeReceiptSamples(project,loadLinkedReport(project,link,path));
+ };
+}
 /** Compare a single archived transaction to a configured finalized private RPC.
  * Never infer absent data as failure, never change order or project state. */
 export function createOrderReceiptReviewer({path,enabled,endpoint,expectedGenesis,fetchImpl=globalThis.fetch}={}){
@@ -59,15 +95,7 @@ export function createOrderReceiptReviewer({path,enabled,endpoint,expectedGenesi
  let busy=false;
  return async function review(project,order,link){
   if(!enabled)throw Error("WORKSPACE_DISABLED");
-  if(link.kind!=="HISTORICAL_REPORT_LINK"||link.stale||link.project_id!==project.project_id||link.project_revision!==project.revision)throw Error("ORDER_REPORT_LINK_SCOPE_MISMATCH");
-  const p=link.payload,store=openHistoricalWorkspaceStore(path);
-  let input;
-  try{
-   const snapshot=store.load(p.workspace_revision);
-   if(snapshot.digest!==p.workspace_digest)throw Error("ORDER_REPORT_DIGEST_MISMATCH");
-   input=restoreHistoricalWorkspace(snapshot.workspace).get(p.record_key).input;
-   if(sha(input)!==p.report_digest)throw Error("ORDER_REPORT_DIGEST_MISMATCH");
-  }finally{store.close();}
+  const input=loadLinkedReport(project,link,path);
   const internal=reviewOrderReceipt(project,order,input);
   const finish=(status,reason,extra={})=>({...internal,archive_id:link.archive_id,rpc_observation:{status,reason,...extra},financial_parity_attested:false});
   if(internal.status!=="INTERNAL_MATCH")return finish("NOT_ATTEMPTED","INTERNAL_REVIEW_REQUIRED");

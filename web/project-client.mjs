@@ -76,5 +76,11 @@ export async function getOrderReceiptReview(projectId,revision,order,archiveId){
  const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/order-receipt-review",{method:"POST",body:{order_id:order.order_id,archive_id:archiveId,expected_revision:revision,expected_order_revision:order.revision}});
  const v=r.review;
  if(v?.project_id!==projectId||v.project_revision!==revision||v.order_id!==order.order_id||v.order_revision!==order.revision||v.signature!==order.signature||v.archive_id!==archiveId||v.execution_enabled!==false||v.settlement_allowed!==false)throw Error("PROJECT_ORDER_SCOPE_MISMATCH");
- return v;
+ return {...v,review_archive_id:r.review_archive_id??null};
+}
+
+export async function importProjectOrderReceipts(projectId,revision,archiveId){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/order-import",{method:"POST",body:{archive_id:archiveId,expected_revision:revision}});
+ if(r.project_id!==projectId||r.project_revision!==revision||r.execution_enabled!==false||r.settlement_allowed!==false)throw Error("PROJECT_ORDER_SCOPE_MISMATCH");
+ return r;
 }

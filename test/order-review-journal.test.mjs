@@ -46,3 +46,18 @@ test("scope, event id conflicts and unsupported commands fail closed",t=>{
   assert.equal(j.list("q").length,0);
  }finally{s.close();}
 });
+
+test("historical receipt import is atomic, scoped and idempotent",t=>{
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000});
+ const mint="11111111111111111111111111111112",pin="11111111111111111111111111111111";
+ try{
+  s.create({...input,network:{cluster:"localnet",genesis_hash:pin},token:{mint}});
+  const a="a".repeat(64),b="b".repeat(64),sample={signature:sig,slot:10,outcome:"SUCCESS"};
+  const j=s.orderReview;
+  assert.equal(j.importReceipts("p",1,a,[sample]).imported,1);
+  assert.equal(j.importReceipts("p",1,a,[sample]).already_present,1);
+  assert.throws(()=>j.importReceipts("p",1,b,[{signature:"2".repeat(64),slot:11,outcome:"SUCCESS"},{...sample,slot:12}]),/ORDER_IMPORT_EXISTING_CONFLICT/);
+  assert.equal(j.list("p").length,1);
+  const [o]=j.list("p");assert.equal(o.status,"REPORTED_SUCCESS");assert.equal(j.events("p",o.order_id)[1].event.payload.reference,a);assert.equal(o.execution_enabled,false);
+ }finally{s.close();}
+});

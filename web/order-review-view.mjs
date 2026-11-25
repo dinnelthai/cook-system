@@ -1,4 +1,4 @@
-import {listProjectOrders,listProjectArchive,getOrderReviewEvents,getOrderReceiptReview} from "./project-client.mjs";
+import {listProjectOrders,listProjectArchive,getOrderReviewEvents,getOrderReceiptReview,importProjectOrderReceipts} from "./project-client.mjs";
 const known=new Set(["RECORDED","OUTCOME_UNKNOWN","REPORTED_SUCCESS","REPORTED_FAILURE","REVIEW_REQUIRED"]);
 export function summarizeOrderReviews(orders){
  const counts={total:orders.length,review:0,unknown:0,reported_success:0,reported_failure:0,stale:0};
@@ -29,10 +29,23 @@ export function mountOrderReview(container,{project,isActive,esc,table,note,down
     table(["订单 ID","来源","Signature","状态","Slot","版本","复核原因"],shown.map(o=>[o.order_id,o.source_mode,o.signature,o.status,o.reported_slot??"—",o.revision+(o.stale?" · 旧项目版本":""),(o.review_reasons??[]).join(" / ")])):"")+
     '<p id="order-load-status" role="status" class="muted">'+(loaded?(orders.length?"已读取项目台账": "当前无已登记订单；未导入历史订单。"):"尚未读取台账")+'</p>'+
     '<div class="row"><label>订单 <select id="order-select"><option value="">选择记录</option>'+shown.map(o=>'<option value="'+esc(o.order_id)+'"'+(selected?.order_id===o.order_id?" selected":"")+'>'+esc(o.order_id+" · "+o.status)+'</option>').join("")+'</select></label><button id="order-events" disabled>查看事件</button></div>'+
-    '<div class="row"><label>已关联报告 <select id="order-report-select"><option value="">选择报告</option>'+links.map(a=>'<option value="'+esc(a.archive_id)+'">'+esc("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff)+'</option>').join("")+'</select></label><button id="order-receipt" disabled>只读回执复核</button><button id="order-detail-export" disabled>导出复核明细</button></div><p id="order-detail-status" role="status"></p><pre id="order-detail" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+    '<div class="row"><label>已关联报告 <select id="order-report-select"><option value="">选择报告</option>'+links.map(a=>'<option value="'+esc(a.archive_id)+'">'+esc("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff)+'</option>').join("")+'</select></label><button id="order-import" disabled>导入报告交易回执</button><button id="order-receipt" disabled>只读回执复核并归档</button><button id="order-detail-export" disabled>导出复核明细</button></div><p id="order-detail-status" role="status"></p><pre id="order-detail" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
   const select=container.querySelector("#order-select"),linkSelect=container.querySelector("#order-report-select"),eventsButton=container.querySelector("#order-events"),receiptButton=container.querySelector("#order-receipt"),exportButton=container.querySelector("#order-detail-export");
   function reset(){ticket++;detail=null;container.querySelector("#order-detail").textContent="";container.querySelector("#order-detail-status").textContent="";exportButton.disabled=true;}
-  function buttons(){eventsButton.disabled=!selected;receiptButton.disabled=!selected||selected.stale||selected.source_mode!=="ARCHIVED_HISTORICAL"||!linkSelect.value;}
+  const importButton=container.querySelector("#order-import");
+  importButton.onclick=async()=>{
+   if(!linkSelect.value)return;
+   const own=++ticket;importButton.disabled=true;eventsButton.disabled=true;receiptButton.disabled=true;
+   const status=container.querySelector("#order-detail-status");status.textContent="从已关联报告导入历史回执…";
+   try{
+    const result=await importProjectOrderReceipts(project.project_id,project.revision,linkSelect.value);
+    if(!current()||own!==ticket)return;
+    await load();
+    if(current())container.querySelector("#order-detail-status").textContent="新增 "+result.imported+"，已存在 "+result.already_present+"，非交易回执排除 "+result.excluded_receipt_count+"。";
+   }catch(error){if(current()&&own===ticket)status.textContent="导入失败："+error.message;}
+   finally{if(current()&&own===ticket)buttons();}
+  };
+  function buttons(){importButton.disabled=!linkSelect.value;eventsButton.disabled=!selected;receiptButton.disabled=!selected||selected.stale||selected.source_mode!=="ARCHIVED_HISTORICAL"||!linkSelect.value;}
   select.onchange=()=>{reset();selected=shown.find(o=>o.order_id===select.value)??null;buttons();};
   linkSelect.onchange=()=>{reset();buttons();};
   container.querySelector("#order-filter").onchange=x=>{ticket++;filter=x.target.value;selected=null;detail=null;render();};
