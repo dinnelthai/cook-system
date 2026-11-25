@@ -55,7 +55,8 @@ function normalizeReserveState(input, previous = null) {
 
 function sameMarket(a, b) {
   return ["chain_id", "network", "token_mint", "quote_mint", "curve_program_id"]
-    .every((key) => a?.[key] === b?.[key]);
+    .every((key) => a?.[key] === b?.[key]) &&
+    !(a?.curve_account && b?.curve_account && a.curve_account !== b.curve_account);
 }
 
 function addVolume(current, amount, field) {
@@ -132,7 +133,7 @@ function applyCurveExecution(state, event) {
     throw new CurveStateTransitionError(event.event_id, "missing authoritative post_curve_state");
   }
   for (const field of ["virtual_token_reserves_base_units", "virtual_quote_reserves_base_units", "real_token_reserves_base_units", "real_quote_reserves_base_units", "complete"]) {
-    if (!Object.hasOwn(post, field)) {
+    if (!Object.hasOwn(post, field) || post[field] === null || post[field] === undefined) {
       throw new CurveStateTransitionError(event.event_id, `post_curve_state is missing ${field}`);
     }
   }
@@ -162,7 +163,7 @@ function applyCurveExecution(state, event) {
 
 function compareSnapshot(state, snapshot, eventId) {
   const requiredFields = [...RESERVE_FIELDS, "complete"];
-  const missingFields = requiredFields.filter((field) => !Object.hasOwn(snapshot, field));
+  const missingFields = requiredFields.filter((field) => !Object.hasOwn(snapshot, field) || snapshot[field] === null || snapshot[field] === undefined);
   if (missingFields.length > 0) {
     return { event_id: eventId, status: "UNKNOWN", mismatches: [], missing_fields: missingFields };
   }
@@ -181,12 +182,29 @@ function compareSnapshot(state, snapshot, eventId) {
   };
 }
 
+/** Retrospective consistency of recorded token reserve movements only.
+ * A mismatch is diagnostic, not a replacement reserve state or a quote.
+ * Quote/fee semantics are intentionally not inferred from event amounts. */
+function auditRecordedReserveTransition(before,after,event){
+ const issues=[];
+ const p=event.payload;
+ const q=parseBaseUnits(p.token_amount_base_units);
+ const sign=event.event_kind==="CURVE_BUY_EXECUTED"?-1n:1n;
+ for(const field of ["virtual_token_reserves_base_units","real_token_reserves_base_units"]){
+  const delta=parseBaseUnits(after[field])-parseBaseUnits(before[field]);
+  if(delta!==sign*q)issues.push({code:"RECORDED_TOKEN_DELTA_MISMATCH",field});
+ }
+ if(after.complete!==(after.real_token_reserves_base_units==="0"))issues.push({code:"COMPLETION_FLAG_MISMATCH"});
+ if(parseBaseUnits(after.real_token_reserves_base_units)>parseBaseUnits(after.token_total_supply_base_units))issues.push({code:"REAL_RESERVE_EXCEEDS_RECORDED_SUPPLY"});
+ return {event_id:event.event_id,status:issues.length?"REVIEW_REQUIRED":"RECORDED_TOKEN_MOVEMENT_MATCH",issues,quote_fee_parity:"NOT_CHECKED",source_attestation:"UNKNOWN"};
+}
 export function replayCurveEvents(initialState, events) {
   if (!initialState || !Array.isArray(events)) throw new TypeError("initialState and events are required");
   const ordered = sortForReplay(events);
   let state = structuredClone(initialState);
   const reconciliations = [];
   const processedEventIds = [];
+  const recordedTransitions = [];
 
   for (const event of ordered) {
     if (!sameMarket(state.market, event.market)) {
@@ -194,9 +212,12 @@ export function replayCurveEvents(initialState, events) {
     }
     switch (event.event_kind) {
       case "CURVE_BUY_EXECUTED":
-      case "CURVE_SELL_EXECUTED":
+      case "CURVE_SELL_EXECUTED": {
+        const before=state;
         state = applyCurveExecution(state, event);
+        recordedTransitions.push(auditRecordedReserveTransition(before,state,event));
         break;
+      }
       case "CURVE_STATE_SNAPSHOT":
         reconciliations.push(compareSnapshot(state, event.payload?.state ?? {}, event.event_id));
         break;
@@ -230,5 +251,6 @@ export function replayCurveEvents(initialState, events) {
     processedEventIds.push(event.event_id);
   }
 
-  return { state, reconciliations, processed_event_ids: processedEventIds };
+  return { state, reconciliations, processed_event_ids: processedEventIds,
+    recorded_reserve_audit:{status:recordedTransitions.some(x=>x.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":recordedTransitions.length?"RECORDED_TOKEN_MOVEMENTS_MATCH":"NO_EXECUTIONS",checks:recordedTransitions,quote_fee_parity:"NOT_CHECKED",source_attestation:"UNKNOWN"} };
 }

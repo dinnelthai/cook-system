@@ -664,6 +664,7 @@ export async function fetchPumpMintHistory({
     replay: replay ? {
       state: replay.state,
       reconciliations: replay.reconciliations,
+      recorded_reserve_audit: replay.recorded_reserve_audit,
       processed_event_ids: replay.processed_event_ids,
     } : null,
     current_account_reconciliation: snapshotReconciliation,

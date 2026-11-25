@@ -242,3 +242,35 @@ test("curve execution is rejected after completion", () => {
   });
   assert.throws(() => replayCurveEvents(initialCurve(), [completeBuy, invalidSell]), CurveStateTransitionError);
 });
+
+function recordedBuy(post={}){
+ return curveEvent({id:"observed-buy",sequence:0,kind:"CURVE_BUY_EXECUTED",provenance:"observed_chain",payload:{quote_amount_base_units:"100",token_amount_base_units:"900",post_curve_state:{virtual_token_reserves_base_units:"999100",virtual_quote_reserves_base_units:"1000100",real_token_reserves_base_units:"499100",real_quote_reserves_base_units:"100",complete:false,...post}}});
+}
+test("recorded reserve audit reports consistent token movement separately from quote or fee parity",()=>{
+ const r=replayCurveEvents(initialCurve(),[recordedBuy()]);
+ assert.equal(r.recorded_reserve_audit.status,"RECORDED_TOKEN_MOVEMENTS_MATCH");
+ assert.equal(r.recorded_reserve_audit.quote_fee_parity,"NOT_CHECKED");
+ assert.equal(r.recorded_reserve_audit.source_attestation,"UNKNOWN");
+});
+test("contradictory recorded token movement is diagnosed without replacing source reserves",()=>{
+ const r=replayCurveEvents(initialCurve(),[recordedBuy({real_token_reserves_base_units:"499101"})]);
+ assert.equal(r.recorded_reserve_audit.status,"REVIEW_REQUIRED");
+ assert.equal(r.state.real_token_reserves_base_units,"499101");
+ assert.ok(r.recorded_reserve_audit.checks[0].issues.some(x=>x.field==="real_token_reserves_base_units"));
+});
+test("null required post reserve is rejected",()=>{
+ assert.throws(()=>replayCurveEvents(initialCurve(),[recordedBuy({real_token_reserves_base_units:null})]),/missing real_token_reserves/);
+});
+test("null snapshot reserve remains UNKNOWN instead of copying replayed value",()=>{
+ const initial=initialCurve();
+ const snapshot=curveEvent({id:"null-snapshot",sequence:0,kind:"CURVE_STATE_SNAPSHOT",payload:{state:{...initial,real_token_reserves_base_units:null}}});
+ const r=replayCurveEvents(initial,[snapshot]);assert.equal(r.reconciliations[0].status,"UNKNOWN");assert.deepEqual(r.reconciliations[0].missing_fields,["real_token_reserves_base_units"]);
+});
+test("explicitly different curve accounts cannot be replayed together",()=>{
+ const initial=initialCurve();initial.market.curve_account="curve-a";
+ const e=recordedBuy();e.market={...e.market,curve_account:"curve-b"};
+ assert.throws(()=>replayCurveEvents(initial,[e]),/different market/);
+});
+test("recorded completion flag inconsistent with token reserve is diagnosed",()=>{
+ const r=replayCurveEvents(initialCurve(),[recordedBuy({complete:true})]);assert.equal(r.recorded_reserve_audit.status,"REVIEW_REQUIRED");assert.ok(r.recorded_reserve_audit.checks[0].issues.some(x=>x.code==="COMPLETION_FLAG_MISMATCH"));
+});
