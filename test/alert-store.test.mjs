@@ -47,8 +47,14 @@ test("concurrent alert writers publish complete journal versions",async()=>{
  }finally{await rm(dir,{recursive:true,force:true});}
 });
 
-test("alert journal refuses a symbolic-link journal path",async()=>{
+test("alert journal refuses a symbolic-link journal path",{skip:process.platform==="win32"},async()=>{
  const dir=await mkdtemp(join(tmpdir(),"cook-alert-link-")),path=join(dir,"alerts.jsonl"),target=join(dir,"outside.jsonl");
  try{await writeFile(target,"");await symlink(target,path);await assert.rejects(()=>createAlertStore(path).audit(),/FILE_INVALID_OR_TOO_LARGE/);}
+ finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test("alert journal enforces the configured byte cap on reads",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-alert-limit-")),path=join(dir,"alerts.jsonl");
+ try{await writeFile(path,Buffer.alloc(17,0x20));await assert.rejects(()=>createAlertStore(path,{maxBytes:16}).audit(),/FILE_INVALID_OR_TOO_LARGE/);}
  finally{await rm(dir,{recursive:true,force:true});}
 });
