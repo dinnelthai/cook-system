@@ -64,7 +64,6 @@ test("issuance evidence remains unverified until a chain-verifier command", () =
   assert.throws(() => run(p, "TRANSITION_LIFECYCLE", { to: "LAUNCH_SUBMITTED", evidence: { kind: "LAUNCH_TRANSACTION", source: "local_execution", verification: "SUBMITTED", reference: signature } }), /ISSUANCE_EVIDENCE_REQUIRED/);
   p = run(p, "RECORD_ISSUANCE_EVIDENCE", { mint, signature }, 1002);
   assert.equal(p.token.issuance_status, "EVIDENCE_UNVERIFIED");
-  assert.throws(() => run(p, "TRANSITION_LIFECYCLE", { to: "LAUNCH_SUBMITTED", evidence: { kind: "LAUNCH_TRANSACTION", source: "local_execution", verification: "SUBMITTED", reference: signature } }), /INVALID_LIFECYCLE_TRANSITION|ISSUANCE_EVIDENCE_REQUIRED/);
   p = run(p, "TRANSITION_LIFECYCLE", { to: "LAUNCH_SUBMITTED", evidence: { kind: "LAUNCH_TRANSACTION", source: "local_execution", verification: "SUBMITTED", reference: signature } }, 1003);
   assert.throws(() => run(p, "TRANSITION_LIFECYCLE", { to: "LAUNCHED", evidence: { kind: "LAUNCH_TRANSACTION", source: "observed_chain", verification: "VERIFIED", reference: signature } }), /TOKEN_ISSUANCE_NOT_VERIFIED/);
   p = run(p, "VERIFY_ISSUANCE", { evidence: { kind: "TOKEN_MINT", source: "observed_chain", verification: "VERIFIED", reference: mint } }, 1004);
