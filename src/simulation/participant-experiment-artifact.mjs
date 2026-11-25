@@ -1,6 +1,6 @@
 import {createHash} from "node:crypto";
 import {canonicalJson} from "../core/canonical-json.mjs";
-import {summarizeImportedParticipantValidation,compareImportedParticipantValidation} from "../../web/participant-validation-view.mjs";
+import {summarizeImportedParticipantValidation,compareImportedParticipantValidation} from "../core/participant-validation-contract.mjs";
 const hash=v=>createHash("sha256").update(canonicalJson(v),"utf8").digest("hex");
 /** Local QA artifact integrity only. A recomputable digest is not source authentication. */
 export function verifyParticipantExperiment(report){

@@ -1,5 +1,5 @@
 import {auditRecordedSyntheticBatch,assertRawSyntheticBatch} from "../src/core/synthetic-batch-audit.mjs";
-const names={accounting:"资产账簿",posting_order_balances:"分录顺序余额",record_counts:"记录数量",generator_identity:"生成器身份",event_order:"事件顺序",fee_attribution:"手续费归属",historical_calibration:"历史校准",market_behavior_validity:"行为真实性"};
+const names={accounting:"资产账簿",posting_order_balances:"分录顺序余额",record_counts:"记录数量",generator_identity:"生成器身份",event_order:"事件顺序",record_numeric_consistency:"成交数值一致性",fee_attribution:"手续费归属",historical_calibration:"历史校准",market_behavior_validity:"行为真实性"};
 /** Recompute from original synthetic inputs; presentation only. */
 export function reviewSyntheticBatchInput(input){
  assertRawSyntheticBatch(input);

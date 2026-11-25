@@ -508,7 +508,7 @@ function render(){
   try{if(file.size>4*1024*1024)throw Error("FILE_TOO_LARGE");
    const raw=JSON.parse(await file.text());if(ticket!==comparisonTicket||!validationComparison.isConnected||base!==validationBase)return;
    const v=compareImportedParticipantValidation(base,raw);
-   validationComparison.innerHTML=note("声明版本比较："+v.status+" · 来源未认证")+table(["测试组","案例数","基线通过","候选通过","变化"],v.groups)+table(["测试组","案例","变化"],v.changed_cases.map(c=>[c.group,c.case_id,c.change]));
+   validationComparison.innerHTML=note("声明版本比较："+v.status+" · 来源未认证")+table(["测试组","案例数","基线通过","候选通过","变化"],v.groups)+table(["测试组","案例","变化"],v.changed_cases.map(c=>[c.group,c.case_id,c.change]))+table(["测试组","案例","子检查","变化"],v.changed_subchecks.map(c=>[c.group,c.case_id,c.check_id,c.change]));
   }catch{if(ticket===comparisonTicket&&validationComparison.isConnected)validationComparison.textContent="版本报告无效，无法比较。";}
  };
  let experiment=null;

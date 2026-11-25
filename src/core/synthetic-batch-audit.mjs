@@ -25,7 +25,7 @@ export function auditRecordedSyntheticBatch(reports){
  });
  const summary={report_count:results.length,consistent_count:results.filter(r=>r.status==="INTERNALLY_CONSISTENT").length,
  review_required_count:results.filter(r=>r.status==="REVIEW_REQUIRED").length,rejected_count:results.filter(r=>r.status==="REJECTED").length};
- const checkIds=["accounting","posting_order_balances","record_counts","generator_identity","event_order","fee_attribution","historical_calibration","market_behavior_validity"];
+ const checkIds=["accounting","posting_order_balances","record_counts","generator_identity","event_order","record_numeric_consistency","fee_attribution","historical_calibration","market_behavior_validity"];
  const comparison=checkIds.map(id=>{
   const row={id,pass:0,review_required:0,unknown:0,not_evaluated:0};
   for(const r of results){

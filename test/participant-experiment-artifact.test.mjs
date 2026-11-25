@@ -19,7 +19,7 @@ test("artifact digest detects changed payload, and matched experiments can be co
 });
 test("changed case outcomes and incomparable configurations are reported",()=>{
  const a=fixture(),b=structuredClone(a);
- b.paths[0].passed=false;b.groups[0].passed_count=0;b.status="REVIEW_REQUIRED";rehash(b);
+ b.paths[0].checks.find(c=>c.id==="per_account_ledger").passed=false;b.paths[0].passed=false;b.groups[0].passed_count=0;b.status="REVIEW_REQUIRED";rehash(b);
  const v=compareParticipantExperiments(a,b);
  assert.equal(v.status,"DECLARED_REGRESSION");assert.equal(v.changed_cases.length,1);
  b.configuration.steps=121;rehash(b);

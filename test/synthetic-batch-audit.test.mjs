@@ -64,3 +64,10 @@ test("duplicate scenarios remain not evaluated in comparison and rejection count
  assert.ok(r.comparison.every(x=>x.not_evaluated===2&&x.pass===0));
  assert.deepEqual(r.issue_counts,[{code:"DUPLICATE_SCENARIO_ID",report_count:2}]);
 });
+
+test("batch exposes numeric evidence audit instead of hiding it in the issue list",()=>{
+ const a=report("a"),b=report("b");
+ b.detector_input.events.find(e=>e.event_kind.startsWith("CURVE_")).payload.execution_price_decimal="0";
+ const v=auditRecordedSyntheticBatch([a,b]);
+ assert.deepEqual(v.comparison.find(x=>x.id==="record_numeric_consistency"),{id:"record_numeric_consistency",pass:1,review_required:1,unknown:0,not_evaluated:0});
+});
