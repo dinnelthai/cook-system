@@ -51,3 +51,20 @@ test("stalled read calls are bounded and do not leave the portfolio permanently 
   const r=await service.snapshot();assert.equal(r.balance_status,"PARTIAL");assert.equal(r.total_sol_balance_lamports,null);assert.equal(r.token_holdings_status,"PARTIAL");
  }
 });
+
+test("failed and unknown local receipts never expose instruction amounts as executed transfers",async()=>{
+ const walletStore={list:async()=>[{address:a}]};
+ const tx={transaction:{message:{instructions:[{program:"system",parsed:{type:"transfer",info:{source:a,destination:b,lamports:100}}}]}},meta:{err:{InstructionError:[0,"fixture"]},fee:5000}};
+ const connectionFactory=()=>({getGenesisHash:async()=>genesis,getBalance:async()=>0,getParsedTokenAccountsByOwner:async()=>({value:[]}),
+ getSignaturesForAddress:async()=>[{signature,err:null},{signature:"2".repeat(64),err:null}],getParsedTransactions:async()=>[tx,{transaction:tx.transaction}]});
+ const r=await createLocalWalletPortfolio({endpoint:"http://127.0.0.1:8899",expectedGenesis:genesis,walletStore,connectionFactory}).snapshot();
+ const [failed,unknown]=r.wallets[0].recent_transactions;
+ assert.equal(failed.status,"FAILED");assert.equal(failed.fee_lamports,"5000");assert.deepEqual(failed.transfers,[]);
+ assert.equal(unknown.status,"UNKNOWN");assert.deepEqual(unknown.transfers,[]);assert.equal(r.wallets[0].history_status,"PARTIAL");
+});
+test("same token account returned for multiple managed wallets is not double counted",async()=>{
+ const walletStore={list:async()=>[{address:a},{address:b}]};
+ const connectionFactory=()=>({getGenesisHash:async()=>genesis,getBalance:async()=>0,getParsedTokenAccountsByOwner:async(owner,filter)=>({value:filter.programId.toBase58()===program?[row("11111111111111111111111111111115","500")]:[]}),getSignaturesForAddress:async()=>[]});
+ const r=await createLocalWalletPortfolio({endpoint:"http://127.0.0.1:8899",expectedGenesis:genesis,walletStore,connectionFactory}).snapshot();
+ assert.equal(r.token_account_scope_conflict,true);assert.equal(r.token_holdings_status,"PARTIAL");assert.equal(r.token_holdings[0].amount_base_units,"500");
+});

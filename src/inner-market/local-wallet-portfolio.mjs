@@ -8,11 +8,11 @@ function transferRows(tx){
  const rows=[...(tx?.transaction?.message?.instructions??[]),...(tx?.meta?.innerInstructions??[]).flatMap(x=>x.instructions??[])],out=[];
  for(const ix of rows){
   const p=ix?.parsed,info=p?.info;if(!info||typeof p.type!=="string")continue;
-  if(ix.program==="system"&&p.type==="transfer"&&typeof info.source==="string"&&typeof info.destination==="string"&&(typeof info.lamports==="number"||validAmount(info.lamports))){
+  if(ix.program==="system"&&p.type==="transfer"&&typeof info.source==="string"&&typeof info.destination==="string"&&((Number.isSafeInteger(info.lamports)&&info.lamports>=0)||validAmount(info.lamports))){
    out.push({asset:"SOL",from:info.source,to:info.destination,amount_base_units:String(info.lamports),decimals:9});
   }else if(["spl-token","spl-token-2022"].includes(ix.program)&&["transfer","transferChecked"].includes(p.type)&&typeof info.source==="string"&&typeof info.destination==="string"){
    const amount=info.tokenAmount?.amount??info.amount,decimals=info.tokenAmount?.decimals??null;
-   if(validAmount(String(amount))&&(decimals===null||Number.isInteger(decimals)))out.push({asset:"TOKEN",mint:typeof info.mint==="string"?info.mint:null,from:info.source,to:info.destination,amount_base_units:String(amount),decimals});
+   if(validAmount(amount)&&(decimals===null||(Number.isInteger(decimals)&&decimals>=0&&decimals<=18)))out.push({asset:"TOKEN",mint:typeof info.mint==="string"?info.mint:null,from:info.source,to:info.destination,amount_base_units:String(amount),decimals});
   }
  }
  return out;
@@ -54,8 +54,10 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
    const parsed=signatures.length?await call(()=>connection.getParsedTransactions(signatures.map(x=>x.signature),{commitment:"confirmed",maxSupportedTransactionVersion:0})):[];
    if(!Array.isArray(parsed)||parsed.length!==signatures.length)throw Error("INVALID_PARSED_TRANSACTION_RESPONSE");
    history=signatures.map((s,i)=>{
-    const tx=parsed[i],failed=Boolean(s.err??tx?.meta?.err);
-    return {signature:s.signature,block_time:Number.isSafeInteger(s.blockTime)?s.blockTime:null,status:failed?"FAILED":tx?"CONFIRMED":"UNKNOWN",fee_lamports:Number.isSafeInteger(tx?.meta?.fee)?String(tx.meta.fee):null,transfers:tx?transferRows(tx):[]};
+    const tx=parsed[i],failed=s.err!=null||tx?.meta?.err!=null;
+    const known=tx?.meta!=null&&Object.hasOwn(tx.meta,"err");
+    const status=failed?"FAILED":known?"CONFIRMED":"UNKNOWN";
+    return {signature:s.signature,block_time:Number.isSafeInteger(s.blockTime)?s.blockTime:null,status,fee_lamports:Number.isSafeInteger(tx?.meta?.fee)&&tx.meta.fee>=0?String(tx.meta.fee):null,transfers:status==="CONFIRMED"?transferRows(tx):[],transfer_evidence:status==="CONFIRMED"?"PARSED_INSTRUCTIONS_ONLY":failed?"FAILED_NOT_EXECUTED":"UNKNOWN"};
    });
    historyStatus=history.some(x=>x.status==="UNKNOWN")?"PARTIAL":"AVAILABLE";
   }catch{}
@@ -82,10 +84,10 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
    if(genesis!==expectedGenesis)throw Error("GENESIS_MISMATCH");
    const wallets=[];for(const wallet of rows)wallets.push(await walletSnapshot(connection,wallet,limit,call));
    let total=0n;for(const w of wallets)if(w.balance_lamports!==null)total+=BigInt(w.balance_lamports);
-   const holdings=new Map();
-   for(const w of wallets)for(const a of w.token_accounts){const old=holdings.get(a.mint);if(old&&old.decimals!==a.decimals)throw Error("TOKEN_DECIMALS_CONFLICT");holdings.set(a.mint,{mint:a.mint,decimals:a.decimals,amount_base_units:(BigInt(old?.amount_base_units??"0")+BigInt(a.amount_base_units)).toString(),account_count:(old?.account_count??0)+1});}
+   const holdings=new Map(),accountOwners=new Map();let accountConflict=false;
+   for(const w of wallets)for(const a of w.token_accounts){if(accountOwners.has(a.token_account)){accountConflict=true;continue;}accountOwners.set(a.token_account,w.address);const old=holdings.get(a.mint);if(old&&old.decimals!==a.decimals)throw Error("TOKEN_DECIMALS_CONFLICT");holdings.set(a.mint,{mint:a.mint,decimals:a.decimals,amount_base_units:(BigInt(old?.amount_base_units??"0")+BigInt(a.amount_base_units)).toString(),account_count:(old?.account_count??0)+1});}
    const balanceComplete=wallets.every(w=>w.balance_status==="AVAILABLE");
-   return {schema_version:"cook-local-wallet-portfolio.1",network:"localnet",genesis_hash:expectedGenesis,read_only:true,execution_enabled:false,as_of:new Date().toISOString(),wallet_count:wallets.length,total_sol_balance_lamports:balanceComplete?total.toString():null,balance_status:balanceComplete?"AVAILABLE":"PARTIAL",wallets,token_holdings_status:wallets.every(w=>w.token_accounts_status==="AVAILABLE")?"AVAILABLE":"PARTIAL",snapshot_consistency:"NON_ATOMIC_OBSERVATION",deadline_reached:controller.signal.aborted||performance.now()>=deadline,token_holdings:[...holdings.values()]};
+   return {schema_version:"cook-local-wallet-portfolio.1",network:"localnet",genesis_hash:expectedGenesis,read_only:true,execution_enabled:false,as_of:new Date().toISOString(),wallet_count:wallets.length,total_sol_balance_lamports:balanceComplete?total.toString():null,balance_status:balanceComplete?"AVAILABLE":"PARTIAL",wallets,token_holdings_status:!accountConflict&&wallets.every(w=>w.token_accounts_status==="AVAILABLE")?"AVAILABLE":"PARTIAL",token_account_scope_conflict:accountConflict,snapshot_consistency:"NON_ATOMIC_OBSERVATION",deadline_reached:controller.signal.aborted||performance.now()>=deadline,token_holdings:[...holdings.values()]};
   }finally{clearTimeout(overall);controller.abort();busy=false}
  }};
 }
