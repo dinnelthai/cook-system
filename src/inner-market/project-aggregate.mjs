@@ -232,7 +232,7 @@ function assertUniqueWallets(groups) {
 }
 
 export function createProjectAggregate(input, { idFactory = randomUUID, now = () => Date.now() } = {}) {
-  exactKeys(input, ["project_id", "profile", "network", "token", "limits"], "INVALID_PROJECT_INPUT");
+  exactKeys(input, ["project_id", "profile", "network", "token", "limits", "wallet_group"], "INVALID_PROJECT_INPUT");
   const createdAt = timestamp(now());
   const aggregate = {
     schema_version: PROJECT_SCHEMA_VERSION,
@@ -241,7 +241,7 @@ export function createProjectAggregate(input, { idFactory = randomUUID, now = ()
     profile: normalizeProfile(input.profile),
     network: normalizeNetwork(input.network ?? { cluster: "localnet" }),
     token: normalizeToken(input.token ?? {}),
-    wallet_groups: [], markets: [],
+    wallet_groups: input.wallet_group == null ? [] : [normalizeWalletGroup(input.wallet_group)], markets: [],
     limits: normalizeLimits(input.limits ?? {}),
     lifecycle: { stage: "DRAFT", operational_status: "HALTED", stage_changed_at_ms: createdAt, evidence_ref: null },
     execution_policy: { mode: "DISABLED", enabled: false, requires_risk_approval: true, unknown_blocks_execution: true },
@@ -369,6 +369,35 @@ export function applyProjectCommand(current, command, { now = () => Date.now() }
       if (!["DRAFT", "READY"].includes(project.lifecycle.stage) && nextProfile.symbol !== project.profile.symbol) fail("PROJECT_SYMBOL_LOCKED");
       project.profile = nextProfile;
       eventPayload = { profile: nextProfile };
+      break;
+    }
+    case "UPDATE_DRAFT_CONFIGURATION": {
+      exactKeys(payload, ["profile", "network", "token", "wallet_group"], "INVALID_PROJECT_COMMAND_PAYLOAD");
+      if (project.lifecycle.stage !== "DRAFT" || project.token.mint !== null) fail("PROJECT_DRAFT_CONFIGURATION_LOCKED");
+      const profile = normalizeProfile(payload.profile);
+      const network = normalizeNetwork(payload.network);
+      exactKeys(payload.token, ["supply_base_units", "decimals", "creator_wallet_address"], "INVALID_PROJECT_TOKEN_CONFIGURATION");
+      const token = normalizeToken({ ...project.token, ...payload.token }, { persisted: true });
+      let walletGroups = project.wallet_groups.filter(group => group.group_id !== "dev-wallets");
+      if (payload.wallet_group !== null) {
+        const group = normalizeWalletGroup(payload.wallet_group);
+        if (group.group_id !== "dev-wallets" || group.purpose !== "DEV" ||
+            !token.creator_wallet_address ||
+            !group.members.some(member => member.wallet_address === token.creator_wallet_address && member.role === "DEV" && member.enabled)) {
+          fail("PROJECT_DEV_WALLET_GROUP_MISMATCH");
+        }
+        if (walletGroups.some(existing => existing.members.some(member => group.members.some(next => next.wallet_address === member.wallet_address)))) {
+          fail("WALLET_ASSIGNED_TO_MULTIPLE_GROUPS");
+        }
+        walletGroups.push(group);
+      } else if (token.creator_wallet_address) {
+        fail("PROJECT_DEV_WALLET_REQUIRED");
+      }
+      project.profile = profile;
+      project.network = network;
+      project.token = token;
+      project.wallet_groups = walletGroups;
+      eventPayload = { profile, network, token, wallet_groups: walletGroups };
       break;
     }
     case "SET_NETWORK_IDENTITY": {
