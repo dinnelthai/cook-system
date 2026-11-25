@@ -33,3 +33,7 @@ A bounded priority queue now processes offline observation arrivals at irregular
 ## V2H — SIM-C1: retrospective numeric evidence audit
 
 A separate pure audit checks existing synthetic records for duplicate transaction references, exact represented price arithmetic, the declared embedded fee convention, positive intermediate reserves and closing reserve parity. The unified synthetic review and validation suite now include this check. Price and fee corruption tests demonstrate that balanced cash/token postings alone are insufficient. The audit does not calculate prospective quotes or validate real protocol fee attribution or the full market invariant. Unknown generator versions do not receive a numeric PASS. Data integration and empirical validation remain deferred.
+
+## V2I — SIM-D1: participant asset coverage
+
+Four fixed passive-account fixtures check empty accounts, mixed balance shapes, integer balances above JavaScript safe-number range and the maximum supported population (256 participants plus pool). Each checks exact balances, account counts, shape counts, no inferred activity, ledger/checkpoint recomputation and UNKNOWN numeric trade evidence for empty histories. The unified suite runs these checks within each seed-path case; the four top-level group counts remain unchanged. This is heterogeneous accounting coverage, not heterogeneous trading behavior, fitted participant wealth, ownership inference or a market optimization tool. No actual data is required.

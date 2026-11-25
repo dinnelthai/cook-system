@@ -9,6 +9,7 @@ import {runParticipantEnvironmentSuite} from "./participant-environment-stress.m
 import {runParticipantObservationSuite} from "./participant-observation-stress.mjs";
 import {runHeldOutDefensiveEvaluation} from "./defensive-evaluation.mjs";
 import {assessHistoricalCalibrationReadiness} from "./participant-calibration-readiness.mjs";
+import {runParticipantAssetCoverage} from "./participant-asset-coverage.mjs";
 const hash=v=>createHash("sha256").update(canonicalJson(v),"utf8").digest("hex");
 const result=(id,passed)=>({id,passed:passed===true});
 /** Offline regression only. Distinct seed paths, fixed faults, and fixed
@@ -30,7 +31,9 @@ export function runParticipantValidationSuite({base,seeds=[701,702,703,704,705],
   bad.agent_states[0].quote_balance_base_units=(BigInt(bad.agent_states[0].quote_balance_base_units)+1n).toString();
   bad.detector_input.events.reverse();
   const badState=reviewParticipantStates(bad);
+  const assetCoverage=runParticipantAssetCoverage({seed});
   const checks=[
+   result("passive_asset_coverage",assetCoverage.status==="SYNTHETIC_REGRESSION_PASS"),
    result("per_account_ledger",ledger.status==="INTERNALLY_CONSISTENT"),
    result("record_numeric_consistency",ledger.numeric_audit.status==="PASS"),
    result("asset_state_replay",states.status==="INTERNALLY_CONSISTENT"&&states.endpoint_checked),
@@ -41,7 +44,7 @@ export function runParticipantValidationSuite({base,seeds=[701,702,703,704,705],
    result("reproducible_fixture",hash(report)===hash(runParticipantSimulation({scenarioId:"validation-qa-"+seed,seed,steps})))
   ];
   paths.push({seed,fixture_digest:hash(report),event_count:report.summary.event_count,account_count:ledger.observed_record_counts.agent_count+1,
-   checks,passed:checks.every(c=>c.passed)});
+   asset_coverage:assetCoverage,checks,passed:checks.every(c=>c.passed)});
  }
  const groups=[
   {id:"seed_path_integrity",case_count:paths.length,passed_count:paths.filter(p=>p.passed).length},
