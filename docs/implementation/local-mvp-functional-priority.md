@@ -11,3 +11,7 @@ Acceptance: compare immutable receipts with replay output, reconcile independent
 ## Deferred work
 
 See [post-local MVP engineering backlog](deferred-engineering-backlog.md). Security and production infrastructure expansion are deferred; existing local protections and correctness requirements remain unchanged. Current work is functional and mathematical acceptance first.
+
+## Historical transaction arithmetic correction
+
+The Pump/PumpSwap receipt balance extraction no longer treats unavailable balance arrays, unsafe JS numbers, or absent network fees as zero. Token-account addresses are not substituted for missing owners. Owner aggregates are withheld if attribution or token identity is incomplete; account counts count distinct accounts rather than pre/post rows. A recorded absence in an available token array is still a provisional zero for the observed delta, not proof of creation or closure. Historical consumers must inspect `balance_evidence_status` and reconcile against retained receipts. This is a read-only accounting correction, not an execution or strategy change.

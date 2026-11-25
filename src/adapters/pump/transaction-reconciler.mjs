@@ -21,111 +21,70 @@ function accountKeys(transaction) {
   ];
 }
 
-function tokenBalanceMap(balances = [], keys = []) {
-  const result = new Map();
-  for (const item of balances) {
-    const owner = item.owner ?? keys[item.accountIndex] ?? null;
-    if (!owner || typeof item.mint !== "string") continue;
-    const key = `${owner}:${item.mint}`;
-    const amount = BigInt(item.uiTokenAmount?.amount ?? "0");
-    const decimals = item.uiTokenAmount?.decimals ?? null;
-    const previous = result.get(key);
-    result.set(key, {
-      owner,
-      mint: item.mint,
-      amount: (previous?.amount ?? 0n) + amount,
-      decimals: previous?.decimals ?? decimals,
-      account_count: (previous?.account_count ?? 0) + 1,
-    });
-  }
-  return result;
+const U64_MAX=(1n<<64n)-1n;
+function unsigned(value,name){
+ const n=asBigInt(value,name);
+ if(n<0n||n>U64_MAX)throw new RangeError(name+" outside u64");
+ return n;
 }
-
-function tokenAccountBalanceMap(balances = [], keys = []) {
-  const result = new Map();
-  for (const item of balances) {
-    const address = keys[item.accountIndex] ?? null;
-    if (!address || typeof item.mint !== "string") continue;
-    const amount = BigInt(item.uiTokenAmount?.amount ?? "0");
-    result.set(address, {
-      address,
-      mint: item.mint,
-      owner: item.owner ?? null,
-      amount,
-      decimals: item.uiTokenAmount?.decimals ?? null,
-    });
-  }
-  return result;
+function tokenAccountBalanceMap(balances,keys){
+ if(!Array.isArray(balances))return null;
+ const result=new Map();
+ for(const item of balances){
+  const address=Number.isSafeInteger(item?.accountIndex)&&item.accountIndex>=0?keys[item.accountIndex]:null;
+  if(typeof address!=="string"||!address||typeof item.mint!=="string"||!item.mint||result.has(address)||
+     !Number.isInteger(item.uiTokenAmount?.decimals)||item.uiTokenAmount.decimals<0||item.uiTokenAmount.decimals>255||
+     typeof item.uiTokenAmount?.amount!=="string")return null;
+  let amount;try{amount=unsigned(item.uiTokenAmount.amount,"token balance");}catch{return null;}
+  result.set(address,{address,mint:item.mint,owner:typeof item.owner==="string"&&item.owner?item.owner:null,amount,decimals:item.uiTokenAmount.decimals});
+ }
+ return result;
 }
-
 export function extractTransactionBalanceDeltas(transaction) {
-  const meta = transaction?.meta;
-  if (!meta) throw new TypeError("transaction metadata is required for balance reconciliation");
-  const keys = accountKeys(transaction);
-  const preBalances = meta.preBalances ?? [];
-  const postBalances = meta.postBalances ?? [];
-  const lamports = [];
-  const count = Math.max(keys.length, preBalances.length, postBalances.length);
-  for (let index = 0; index < count; index += 1) {
-    if (!keys[index]) continue;
-    const pre = BigInt(preBalances[index] ?? 0);
-    const post = BigInt(postBalances[index] ?? 0);
-    lamports.push({
-      address: keys[index],
-      pre_lamports: pre.toString(),
-      post_lamports: post.toString(),
-      delta_lamports: (post - pre).toString(),
-    });
+ const meta=transaction?.meta;
+ if(!meta)throw new TypeError("transaction metadata is required for balance reconciliation");
+ const keys=accountKeys(transaction),issues=[],lamports=[],tokens=[],tokenAccounts=[];
+ let fee=null;try{fee=unsigned(meta.fee,"network fee").toString();}catch{issues.push("NETWORK_FEE_UNKNOWN");}
+ const nativeArrays=Array.isArray(meta.preBalances)&&Array.isArray(meta.postBalances)&&meta.preBalances.length===keys.length&&meta.postBalances.length===keys.length;
+ if(!nativeArrays)issues.push("NATIVE_BALANCE_ARRAY_INCOMPLETE");
+ else for(let i=0;i<keys.length;i++){
+  if(typeof keys[i]!=="string"||!keys[i]){issues.push("NATIVE_ACCOUNT_UNKNOWN");continue;}
+  try{
+   const pre=unsigned(meta.preBalances[i],"pre balance"),post=unsigned(meta.postBalances[i],"post balance");
+   lamports.push({address:keys[i],pre_lamports:pre.toString(),post_lamports:post.toString(),delta_lamports:(post-pre).toString()});
+  }catch{issues.push("NATIVE_BALANCE_UNKNOWN");}
+ }
+ const pre=tokenAccountBalanceMap(meta.preTokenBalances,keys),post=tokenAccountBalanceMap(meta.postTokenBalances,keys);
+ if(!pre||!post)issues.push("TOKEN_BALANCE_METADATA_INCOMPLETE");
+ else{
+  const owners=new Map(),decimalsByMint=new Map();let ownerIncomplete=false;
+  function addOwner(row,side){
+   if(!row)return;
+   if(!row.owner){ownerIncomplete=true;return;}
+   const key=JSON.stringify([row.owner,row.mint]);
+   const aggregate=owners.get(key)??{owner:row.owner,mint:row.mint,decimals:row.decimals,pre:0n,post:0n,accounts:new Set()};
+   aggregate[side]+=row.amount;aggregate.accounts.add(row.address);owners.set(key,aggregate);
   }
-
-  const preTokens = tokenBalanceMap(meta.preTokenBalances ?? [], keys);
-  const postTokens = tokenBalanceMap(meta.postTokenBalances ?? [], keys);
-  const preTokenAccounts = tokenAccountBalanceMap(meta.preTokenBalances ?? [], keys);
-  const postTokenAccounts = tokenAccountBalanceMap(meta.postTokenBalances ?? [], keys);
-  const tokenKeys = new Set([...preTokens.keys(), ...postTokens.keys()]);
-  const tokens = [];
-  for (const key of tokenKeys) {
-    const before = preTokens.get(key);
-    const after = postTokens.get(key);
-    const owner = before?.owner ?? after?.owner;
-    const mint = before?.mint ?? after?.mint;
-    const pre = before?.amount ?? 0n;
-    const post = after?.amount ?? 0n;
-    tokens.push({
-      owner,
-      mint,
-      pre_amount_base_units: pre.toString(),
-      post_amount_base_units: post.toString(),
-      delta_base_units: (post - pre).toString(),
-      decimals: before?.decimals ?? after?.decimals ?? null,
-      account_count: (before?.account_count ?? 0) + (after?.account_count ?? 0),
-    });
+  for(const address of new Set([...pre.keys(),...post.keys()])){
+   const before=pre.get(address),after=post.get(address),row=before??after;
+   for(const r of [before,after]){
+    if(!r)continue;
+    if(decimalsByMint.has(r.mint)&&decimalsByMint.get(r.mint)!==r.decimals){ownerIncomplete=true;issues.push("TOKEN_DECIMALS_CONFLICT");}
+    decimalsByMint.set(r.mint,r.decimals);
+   }
+   if(before&&after&&(before.mint!==after.mint||before.decimals!==after.decimals)){
+    ownerIncomplete=true;issues.push("TOKEN_ACCOUNT_IDENTITY_CHANGED");continue;
+   }
+   const a=before?.amount??0n,z=after?.amount??0n;
+   // A missing row in an available array is a recorded absence, not proof of account creation/closure.
+   tokenAccounts.push({address,mint:row.mint,owner:before&&after?(before.owner===after.owner?before.owner:null):row.owner,
+    pre_amount_base_units:a.toString(),post_amount_base_units:z.toString(),delta_base_units:(z-a).toString(),decimals:row.decimals});
+   addOwner(before,"pre");addOwner(after,"post");
   }
-
-  const tokenAccountKeys = new Set([...preTokenAccounts.keys(), ...postTokenAccounts.keys()]);
-  const tokenAccounts = [];
-  for (const address of tokenAccountKeys) {
-    const before = preTokenAccounts.get(address);
-    const after = postTokenAccounts.get(address);
-    const pre = before?.amount ?? 0n;
-    const post = after?.amount ?? 0n;
-    tokenAccounts.push({
-      address,
-      mint: before?.mint ?? after?.mint ?? null,
-      owner: before?.owner ?? after?.owner ?? null,
-      pre_amount_base_units: pre.toString(),
-      post_amount_base_units: post.toString(),
-      delta_base_units: (post - pre).toString(),
-      decimals: before?.decimals ?? after?.decimals ?? null,
-    });
-  }
-
-  return {
-    fee_lamports: String(meta.fee ?? 0),
-    lamports,
-    tokens,
-    token_accounts: tokenAccounts,
-  };
+  if(ownerIncomplete)issues.push("TOKEN_OWNER_AGGREGATION_INCOMPLETE");
+  else for(const x of owners.values())tokens.push({owner:x.owner,mint:x.mint,pre_amount_base_units:x.pre.toString(),post_amount_base_units:x.post.toString(),delta_base_units:(x.post-x.pre).toString(),decimals:x.decimals,account_count:x.accounts.size});
+ }
+ return {fee_lamports:fee,lamports,tokens,token_accounts:tokenAccounts,balance_evidence_status:issues.length?"PARTIAL":"RECORDED_DELTAS",balance_evidence_issues:[...new Set(issues)]};
 }
 
 function transactionInstructions(transaction) {
@@ -180,7 +139,7 @@ export function reconcilePumpTradesWithTransaction({
   const walletLamports = balances.lamports.find((item) => item.address === actor);
   const rawLamportDelta = walletLamports ? BigInt(walletLamports.delta_lamports) : null;
   const feePayer = accountKeys(transaction)[0] ?? null;
-  const adjustedLamportDelta = rawLamportDelta === null
+  const adjustedLamportDelta = rawLamportDelta === null || (feePayer === actor && balances.fee_lamports === null)
     ? null
     : rawLamportDelta + (feePayer === actor ? BigInt(balances.fee_lamports) : 0n);
   const expectedTokenDelta = side === "buy" ? expectedToken : -expectedToken;
