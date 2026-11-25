@@ -1,4 +1,4 @@
-import {mkdir,open,rename,unlink} from "node:fs/promises";
+import {mkdir,open,rename,unlink,rmdir} from "node:fs/promises";
 import {readBoundedRegularFile} from "../core/bounded-private-file.mjs";
 import {dirname,join} from "node:path";
 import {randomUUID} from "node:crypto";
@@ -50,17 +50,28 @@ export function evaluateQuotePlan({market,portfolio,policy,riskState=null,nowMs}
    max_order_notional_base_units:maxOrder.toString(),max_drawdown_bps:policy.max_drawdown_bps},
   paper_only:true,execution_enabled:false,transaction_signing_enabled:false,transaction_submission_enabled:false};
 }
-export function createEmergencyHaltController({readState,writeState}={}){
+export function createEmergencyHaltController({readState,writeState,withWriteLock=fn=>fn()}={}){
  if(typeof readState!=="function"||typeof writeState!=="function")throw Error("HALT_STORAGE_ADAPTER_REQUIRED");
+ let pending=Promise.resolve();
+ const serialize=fn=>{const task=pending.then(()=>withWriteLock(fn));pending=task.catch(()=>{});return task;};
+ async function current(){try{return await readState();}catch{return null;}}
  return {
   async load(){try{const s=await readState();if(!s||s.schema_version!=="cook-emergency-halt.1"||typeof s.halted!=="boolean"||typeof s.reason!=="string"||!s.reason.trim()||!Number.isSafeInteger(s.at_ms)||s.at_ms<0||(!s.halted&&s.operator_confirmed!==true))return {halted:true,reason:"HALT_STATE_INVALID"};return s;}catch{return {halted:true,reason:"HALT_STATE_UNAVAILABLE"};}},
-  async halt({reason,atMs}){if(typeof reason!=="string"||!reason.trim()||!Number.isSafeInteger(atMs)||atMs<0)throw Error("INVALID_HALT_REQUEST");const s={schema_version:"cook-emergency-halt.1",halted:true,reason,at_ms:atMs};await writeState(s);return s;},
-  async resume({operatorConfirmed,reason,atMs}){if(operatorConfirmed!==true)throw Error("EXPLICIT_OPERATOR_CONFIRMATION_REQUIRED");if(typeof reason!=="string"||!reason.trim()||!Number.isSafeInteger(atMs)||atMs<0)throw Error("INVALID_RESUME_REQUEST");const s={schema_version:"cook-emergency-halt.1",halted:false,reason,at_ms:atMs,operator_confirmed:true};await writeState(s);return s;}
+  async halt({reason,atMs}){if(typeof reason!=="string"||!reason.trim()||!Number.isSafeInteger(atMs)||atMs<0)throw Error("INVALID_HALT_REQUEST");const s={schema_version:"cook-emergency-halt.1",halted:true,reason,at_ms:atMs};return serialize(async()=>{const old=await current();if(Number.isSafeInteger(old?.at_ms)&&old.at_ms>=s.at_ms){if(old.at_ms===Number.MAX_SAFE_INTEGER)throw Error("HALT_STATE_VERSION_EXHAUSTED");s.at_ms=old.at_ms+1;}await writeState(s);return s;});},
+  async resume({operatorConfirmed,reason,atMs}){if(operatorConfirmed!==true)throw Error("EXPLICIT_OPERATOR_CONFIRMATION_REQUIRED");if(typeof reason!=="string"||!reason.trim()||!Number.isSafeInteger(atMs)||atMs<0)throw Error("INVALID_RESUME_REQUEST");const s={schema_version:"cook-emergency-halt.1",halted:false,reason,at_ms:atMs,operator_confirmed:true};return serialize(async()=>{const old=await current();if(old?.schema_version!=="cook-emergency-halt.1"||old.halted!==true||!Number.isSafeInteger(old.at_ms)||old.at_ms<0||s.at_ms<=old.at_ms)throw Error("HALT_STATE_STALE_OR_UNVERIFIED");await writeState(s);return s;});}
  };
 }
 export function createFileHaltStorage(path){
  if(typeof path!=="string"||!path.trim())throw Error("HALT_FILE_PATH_REQUIRED");
+ const lock=path+".lock";
  return {
+  async withWriteLock(fn){
+   await mkdir(dirname(path),{recursive:true,mode:0o700});
+   let held=false;
+   for(let i=0;i<80;i++){try{await mkdir(lock,{mode:0o700});held=true;break;}catch(e){if(e.code!=="EEXIST")throw e;await new Promise(resolve=>setTimeout(resolve,25));}}
+   if(!held)throw Error("HALT_STATE_LOCK_TIMEOUT");
+   try{return await fn();}finally{await rmdir(lock);}
+  },
   async readState(){const bytes=await readBoundedRegularFile(path,16384);return JSON.parse(bytes.toString("utf8"));},
   async writeState(state){await mkdir(dirname(path),{recursive:true,mode:0o700});const temp=join(dirname(path),"."+randomUUID()+".halt.tmp"),f=await open(temp,"wx",0o600);
    try{await f.writeFile(JSON.stringify(state)+"\n","utf8");await f.sync();}finally{await f.close();}

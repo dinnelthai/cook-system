@@ -2,7 +2,7 @@ import {Connection,PublicKey} from "@solana/web3.js";
 import {publicKey} from "./local-faucet.mjs";
 const TOKEN_PROGRAMS=["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA","TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"];
 const CLUSTER_GENESIS=/^(5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp|EtWTRABZaYq6iMfeYKouRu166VU2xqa1|4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z)/;
-const validAmount=v=>typeof v==="string"&&/^\d+$/.test(v);
+const validAmount=v=>typeof v==="string"&&v.length<=39&&/^(0|[1-9][0-9]*)$/.test(v);
 const asKey=v=>{if(typeof v!=="string")throw Error("PORTFOLIO_DATA_INVALID");return publicKey(v)};
 function transferRows(tx){
  const rows=[...(tx?.transaction?.message?.instructions??[]),...(tx?.meta?.innerInstructions??[]).flatMap(x=>x.instructions??[])],out=[];
@@ -28,7 +28,7 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
   const owner=new PublicKey(asKey(wallet.address));
   let balance=null,balanceStatus="UNAVAILABLE";
   try{const n=await connection.getBalance(owner,"confirmed");if(Number.isSafeInteger(n)&&n>=0){balance=String(n);balanceStatus="AVAILABLE";}}catch{}
-  const tokenAccounts=[];let tokenSuccess=0;
+  const tokenAccounts=[],seenAccounts=new Set();let tokenSuccess=0,invalidAccounts=0;
   for(const program of TOKEN_PROGRAMS){
    try{
     const response=await connection.getParsedTokenAccountsByOwner(owner,{programId:new PublicKey(program)},"confirmed");
@@ -36,12 +36,16 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
     tokenSuccess++;
     for(const row of response.value){
      const info=row?.account?.data?.parsed?.info,amount=info?.tokenAmount;
-     if(typeof info?.mint!=="string"||!validAmount(amount?.amount)||!Number.isInteger(amount?.decimals)||amount.decimals<0||amount.decimals>18)continue;
-     tokenAccounts.push({token_account:row.pubkey.toBase58(),mint:info.mint,amount_base_units:amount.amount,decimals:amount.decimals});
+     try{
+       if(!validAmount(amount?.amount)||!Number.isInteger(amount?.decimals)||amount.decimals<0||amount.decimals>18)throw Error("INVALID_TOKEN_ROW");
+       const address=asKey(row.pubkey.toBase58()),mint=asKey(info.mint);
+       if(seenAccounts.has(address))throw Error("DUPLICATE_TOKEN_ACCOUNT");
+       seenAccounts.add(address);tokenAccounts.push({token_account:address,mint,amount_base_units:amount.amount,decimals:amount.decimals});
+      }catch{invalidAccounts++;}
     }
    }catch{}
   }
-  const tokenStatus=tokenSuccess===TOKEN_PROGRAMS.length?"AVAILABLE":tokenSuccess?"PARTIAL":"UNAVAILABLE";
+  const tokenStatus=tokenSuccess===TOKEN_PROGRAMS.length&&invalidAccounts===0?"AVAILABLE":tokenSuccess?"PARTIAL":"UNAVAILABLE";
   let history=[],historyStatus="UNAVAILABLE";
   try{
    const signatures=await connection.getSignaturesForAddress(owner,{limit},"confirmed");
@@ -54,7 +58,7 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
    });
    historyStatus="AVAILABLE";
   }catch{}
-  return {address:wallet.address,created_at:wallet.created_at??null,balance_lamports:balance,balance_status:balanceStatus,token_accounts_status:tokenStatus,token_accounts:tokenAccounts,history_status:historyStatus,recent_transactions:history};
+  return {address:wallet.address,created_at:wallet.created_at??null,balance_lamports:balance,balance_status:balanceStatus,token_accounts_status:tokenStatus,invalid_token_account_count:invalidAccounts,token_accounts:tokenAccounts,history_status:historyStatus,recent_transactions:history};
  }
  return {async snapshot({limit=5}={}){
   if(!Number.isSafeInteger(limit)||limit<1||limit>20)throw Error("INVALID_PORTFOLIO_LIMIT");
@@ -71,7 +75,7 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
    const holdings=new Map();
    for(const w of wallets)for(const a of w.token_accounts){const old=holdings.get(a.mint);if(old&&old.decimals!==a.decimals)throw Error("TOKEN_DECIMALS_CONFLICT");holdings.set(a.mint,{mint:a.mint,decimals:a.decimals,amount_base_units:(BigInt(old?.amount_base_units??"0")+BigInt(a.amount_base_units)).toString(),account_count:(old?.account_count??0)+1});}
    const balanceComplete=wallets.every(w=>w.balance_status==="AVAILABLE");
-   return {schema_version:"cook-local-wallet-portfolio.1",network:"localnet",genesis_hash:expectedGenesis,read_only:true,execution_enabled:false,as_of:new Date().toISOString(),wallet_count:wallets.length,total_sol_balance_lamports:balanceComplete?total.toString():null,balance_status:balanceComplete?"AVAILABLE":"PARTIAL",wallets,token_holdings:[...holdings.values()]};
+   return {schema_version:"cook-local-wallet-portfolio.1",network:"localnet",genesis_hash:expectedGenesis,read_only:true,execution_enabled:false,as_of:new Date().toISOString(),wallet_count:wallets.length,total_sol_balance_lamports:balanceComplete?total.toString():null,balance_status:balanceComplete?"AVAILABLE":"PARTIAL",wallets,token_holdings_status:wallets.every(w=>w.token_accounts_status==="AVAILABLE")?"AVAILABLE":"PARTIAL",snapshot_consistency:"NON_ATOMIC_OBSERVATION",token_holdings:[...holdings.values()]};
   }finally{busy=false}
  }};
 }

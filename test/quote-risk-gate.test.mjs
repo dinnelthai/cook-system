@@ -86,3 +86,11 @@ test("paper prices that collapse at fixed precision fail closed",()=>{
  assert.equal(r.status,"BLOCKED");assert.ok(r.reasons.includes("PAPER_PRICE_PRECISION_INVALID"));
  assert.equal(r.quote.buy.enabled,false);assert.equal(r.quote.sell.enabled,false);
 });
+
+test("a stale resume cannot overwrite a more recent halt",async()=>{
+ let stored=null;const c=createEmergencyHaltController({readState:async()=>stored,writeState:async s=>{stored=s;}});
+ await c.halt({reason:"initial",atMs:10});
+ await c.halt({reason:"newer stop",atMs:30});
+ await assert.rejects(()=>c.resume({operatorConfirmed:true,reason:"stale",atMs:20}),/HALT_STATE_STALE_OR_UNVERIFIED/);
+ assert.equal((await c.load()).halted,true);
+});

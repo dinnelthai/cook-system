@@ -31,3 +31,14 @@ test("partial RPC failures remain unknown and are never converted to zero",async
  const result=await createLocalWalletPortfolio({endpoint:"http://127.0.0.1:8899",expectedGenesis:genesis,walletStore,connectionFactory}).snapshot();
  assert.equal(result.balance_status,"PARTIAL");assert.equal(result.total_sol_balance_lamports,null);assert.equal(result.wallets[0].balance_lamports,null);assert.equal(result.wallets[0].token_accounts_status,"UNAVAILABLE");assert.equal(result.wallets[0].history_status,"UNAVAILABLE");
 });
+
+test("malformed token rows cannot be reported as a complete portfolio",async()=>{
+ const walletStore={list:async()=>[{address:a}]};
+ const connectionFactory=()=>({getGenesisHash:async()=>genesis,getBalance:async()=>0,
+ getParsedTokenAccountsByOwner:async()=>({value:[row("invalid","500")]}),getSignaturesForAddress:async()=>[]});
+ const result=await createLocalWalletPortfolio({endpoint:"http://127.0.0.1:8899",expectedGenesis:genesis,walletStore,connectionFactory}).snapshot();
+ assert.equal(result.token_holdings_status,"PARTIAL");
+ assert.equal(result.wallets[0].invalid_token_account_count,2);
+ assert.equal(result.snapshot_consistency,"NON_ATOMIC_OBSERVATION");
+ assert.deepEqual(result.token_holdings,[]);
+});
