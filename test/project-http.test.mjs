@@ -52,6 +52,10 @@ test("Project HTTP API creates, reads, mutates and verifies a persisted project"
   assert.equal(created.execution_policy.enabled, false);
   assert.equal(JSON.stringify(created).includes("private_key"), false);
 
+  const config = await (await fetch(base + "/api/projects/config")).json();
+  assert.equal(config.network.cluster, "localnet");
+  assert.equal(config.execution_enabled, false);
+
   const listResponse = await fetch(base + "/api/projects");
   assert.equal(listResponse.status, 200);
   assert.equal((await listResponse.json()).projects.length, 1);
