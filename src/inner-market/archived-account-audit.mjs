@@ -1,4 +1,4 @@
-import {isLocalHistoricalNetwork} from "../core/source-provenance.mjs";
+import {isLocalHistoricalNetwork} from "../core/historical-network-label.mjs";
 import {parseBaseUnits,U64_MAX} from "../core/integer.mjs";
 
 const label=(v,name)=>{if(typeof v!=="string"||!v.trim()||v!==v.trim()||v.length>256)throw new TypeError("invalid "+name);return v;};

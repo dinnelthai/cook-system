@@ -51,11 +51,13 @@ test("localhost server serves terminal shell, modules and explicit report bridge
   assert.match(response.headers.get("content-type")??"",/javascript/);
   const source=await response.text();
   for(const match of source.matchAll(imports)){
-   assert.match(match[1],/^\.\.?\//,"non-relative browser import: "+match[1]);
+   assert.match(match[1],/^\.\.?\//,"non-relative browser import in "+new URL(url).pathname+": "+match[1]);
    queue.push(new URL(match[1],url).href);
   }
  }
  assert.ok(visited.has(base+"/src/core/participant-model-contract.mjs"));
+ assert.ok(visited.has(base+"/src/core/historical-network-label.mjs"));
+ assert.ok(!visited.has(base+"/src/core/source-provenance.mjs"));
  assert.ok(visited.has(base+"/web/project-request-recovery.mjs"));
  assert.equal((await fetch(base+"/src/simulation/participant-model-contract.mjs")).status,404);
  assert.equal((await fetch(base+"/web/project-client.mjs")).status,200);
