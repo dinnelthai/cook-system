@@ -111,12 +111,21 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   await cdp.call("Page.reload");
   await wait("project-selection-reload",'window.__cookSelectionReload!==true&&document.querySelector("#terminal-project-select")?.value==='+JSON.stringify(project.project_id));
   assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
+  await wait("operator-after-reload",'document.querySelector(".operator-task-grid")');
+  await evaluate('(()=>{const s=document.querySelector("#operator-view-mode");s.value="AUDIT";s.dispatchEvent(new Event("change"));})()');
+  assert.equal(await evaluate('document.querySelector("#main").dataset.viewMode==="AUDIT"&&document.querySelector("details.audit-detail").open'),true);
+  const pageChecks=[["wallet",'document.querySelector("#asset-interval")'],["dashboard",'document.querySelector("#scoped-review-interval")'],["projects",'document.querySelector("#workspace-export")'],["participants",'document.querySelector("#run-experiment")'],["logs",'document.querySelector("#log-download")'],["create",'document.querySelector("#project-budget-form")'],["terminal",'document.querySelector(".operator-task-grid")']];
+  for(const [id,condition] of pageChecks){
+   await evaluate('document.querySelector('+JSON.stringify('[data-page="'+id+'"]')+').click()');
+   await wait("navigation-"+id,'document.querySelector("#main").dataset.page==='+JSON.stringify(id)+'&&'+condition);
+  }
+  assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
   const events=await (await fetch(url+"/api/projects/"+encodeURIComponent(project.project_id)+"/events",{signal:AbortSignal.timeout(3000)})).json();
   assert.equal(events.events.length,1);
   const directory=await (await fetch(url+"/api/projects",{signal:AbortSignal.timeout(3000)})).json();
   assert.equal(directory.projects.length,1);
   assert.equal(directory.projects[0].execution_policy.enabled,false);
-  return {status:"BROWSER_RECOVERY_PASS",scope:"DISPOSABLE_METADATA_RECOVERY",execution_enabled:false,full_browser_e2e_validated:false};
+  return {status:"BROWSER_RECOVERY_PASS",scope:"DISPOSABLE_METADATA_RECOVERY_AND_PRIMARY_NAVIGATION",execution_enabled:false,full_browser_e2e_validated:false};
  }catch(error){
   let state=null;
   if(cdp)try{

@@ -22,3 +22,13 @@ export function candleTimeLayout(points,intervalMs,left=48,right=548){
  const width=Math.max(0.5,Math.min(12,(right-left)*0.65/Math.max(1,span/intervalMs)));
  return {positions:times.map(t=>span?left+(right-left)*(t-start)/span:(left+right)/2),width,missing_intervals:span/intervalMs+1-times.length};
 }
+
+export function candleEvidenceRows(points){
+ return points.map(c=>[new Date(c.interval_start_ms).toISOString(),c.open_price,c.high_price,c.low_price,c.close_price,c.quote_volume_base_units]);
+}
+// The server/browser shared closed-market audit is authoritative, not the chart.
+export function marketQualityRows(q){
+ const safe=q?.source_attestation==="UNKNOWN"&&q.live_state===false&&q.execution_enabled===false?q:null;
+ const descriptive=safe?.status==="DESCRIPTIVE_ONLY"||safe?.status==="NO_EXECUTIONS";
+ return [["证据状态",safe?.status??"UNKNOWN"],["记录数",descriptive?safe.event_count??"未知":"未知"],["事件顺序",safe?.ordering_status??"UNKNOWN"],["数据质量警报",descriptive?safe.data_quality_alert_count??"未知":"未知"],["独立来源认证","未知"],["实时市场质量","未核验"]];
+}
