@@ -47,6 +47,10 @@ The first core slice currently includes:
 - [Multi-Agent Inner Market Game Model — V1](docs/research/multi-agent-inner-market-game-model-v1.md)
 - [Agent Impact Attribution & Counterfactual Replay — V1](docs/research/agent-impact-counterfactual-replay-v1.md)
 
+## Business completeness baseline
+
+- [Cook System Business Completeness Review & MVP Acceptance Baseline](docs/implementation/BUSINESS-COMPLETENESS-REVIEW.md)
+
 ## Implementation contracts
 
 - [Canonical Schema Contract — V1](docs/implementation/canonical-schema-contract-v1.md)
