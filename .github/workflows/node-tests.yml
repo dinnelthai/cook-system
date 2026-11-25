@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           package-manager-cache: false
+      - name: Refresh npm 11 optional-platform lock metadata (temporary)
+        if: matrix.node-version == 24
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Install pinned reference SDK and Solana client
         run: npm ci --no-audit --no-fund
       - name: Run unified code acceptance
@@ -37,7 +40,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cook-system-unified-acceptance-node-${{ matrix.node-version }}
-          path: .cook-system/acceptance/*.json
+          path: |
+            .cook-system/acceptance/*.json
+            package-lock.json
           if-no-files-found: warn
           include-hidden-files: true
           retention-days: 14
