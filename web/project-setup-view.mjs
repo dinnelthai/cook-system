@@ -60,6 +60,8 @@ export function mountProjectSetup(container, {
     const options = projects.map(x => '<option value="' + esc(x.project_id) + '"' +
       (x.project_id === activeProjectId ? " selected" : "") + '>' +
       esc(x.profile.name + " · " + x.profile.symbol + " · " + x.lifecycle.stage) + '</option>').join("");
+    const issuanceOptions = projects.filter(x => ["READY", "LAUNCH_SUBMITTED"].includes(x.lifecycle.stage)).map(x => '<option value="' + esc(x.project_id) + '"' +
+      '>' + esc(x.profile.name + " · " + x.profile.symbol + " · " + x.lifecycle.stage) + '</option>').join("");
     let legacyCount = 0;
     try { legacyCount = projectRegistry?.list?.().length ?? 0; } catch {}
     const currentSupply = !current || current.token.supply_base_units === null ? "1000000000" :
@@ -100,7 +102,7 @@ export function mountProjectSetup(container, {
         '<button id="project-legacy-export" ' + (legacyCount ? "" : "disabled") + '>导出旧版浏览器台账 (' + legacyCount + ')</button></div>' +
         '<div class="row"><button id="project-mark-ready" ' + (readyAllowed ? "" : "disabled") + '>配置完成 → READY</button>' +
         '<button id="project-launch-submitted" ' + (launchSubmitAllowed ? "" : "disabled") + '>登记为已提交发行</button></div>') +
-      panel("发行证据登记", '<form id="issuance-evidence-form"><label>所属项目</label><select name="project_id" required><option value="">选择项目</option>' + options + '</select>' +
+      panel("发行证据登记", '<form id="issuance-evidence-form"><label>所属项目</label><select name="project_id" required><option value="">选择项目</option>' + issuanceOptions + '</select>' +
         '<label>Token Mint 地址</label><input name="mint" required maxlength="44" placeholder="已发行 Token 的 Mint 地址">' +
         '<label>交易签名</label><input name="signature" required minlength="64" maxlength="88" placeholder="链上交易 Signature">' +
         '<div class="row"><button type="submit" ' + (projects.length ? "" : "disabled") + '>登记发行证据（UNVERIFIED）</button></div></form>' +
