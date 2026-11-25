@@ -17,3 +17,10 @@ Run npm test and npm run accept:all. Review actual CI status for this commit; do
 The project review now consumes canonical treasury/market archive outputs at exact link and digest scope; it preserves closed-interval inventory amounts as base-unit strings, distinguishes missing and zero, validates financial audit count summaries and participant record counts, and withholds numbers when evidence conflicts. It exposes canonical participant model limitations, not calibrated behavior or trading policy. No cross-interval totals, no live depth or independent demand estimates. The existing terminal displays the scoped results; findings flow to the overall review status. Five regression tests cover exact values, malformed amounts, count contradictions, empty records and foreign-project isolation.
 
 M30–M36 remain partial: historical output integration is not live inventory, behavioral calibration, empirical market demand, or actual market-quality operational acceptance. M50–M52 remain deferred. M26 and remaining M37–M49 work are still open. No real data, trading or automated intervention added.
+
+
+## Third batch — M37–M45 continuity and cross-review consistency
+
+Compare canonical treasury and close outputs for the same report link and digest: cash difference, token inventory, creator receivable, other assets and liabilities. Compare creator cash receipts and receivable balances with the existing subledger, not accrual or pool fee buckets. Missing values remain unknown. Historical milestone declarations with conflicting signatures/slots or backwards slots surface review findings; no stage transition or inferred financial continuity. Findings propagate to the existing business status and cross-module risk status, with separately labeled counts. Terminal displays scoped checks. Five regression tests added.
+
+M37/M42/M43/M44/M45 partially advanced. M38–M41 remain open beyond previously delivered evidence review; there is no LP health calculation, new strategy or execution, migration financial parity, real settlement or live data. M46–M49 and remaining earlier tasks are open. M50–M52 remain deferred. Verify CI separately.
