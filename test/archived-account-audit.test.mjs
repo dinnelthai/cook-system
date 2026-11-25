@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {auditArchivedAccountInterval,normalizeArchivedReceipt} from "../src/inner-market/archived-account-audit.mjs";
+import {auditArchivedAccountInterval,normalizeArchivedReceipt,reviewUncertainLocalReceipt} from "../src/inner-market/archived-account-audit.mjs";
 const g="local-fixture",wallet="wallet",tokenAccount="token-account",mint="mint";
 const scope={mode:"READ_ONLY",network:"localnet",genesisHash:g,wallet,tokenAccount,mint,openingSlot:10,closingSlot:20};
 const snapshot=(slot,lamports,tokenAmount)=>({slot,genesisHash:g,wallet,tokenAccount,mint,lamports,tokenAmount});
@@ -59,4 +59,23 @@ test("local read-only archive audit accepts the existing local_sim label without
  assert.equal(i.scope.network,"local_sim");
  i.scope={...i.scope,mode:"EXECUTION"};
  assert.throws(()=>auditArchivedAccountInterval(i),/LOCALNET_READ_ONLY_REQUIRED/);
+});
+
+test("uncertain local receipts remain unknown without archived evidence or identity",()=>{
+ for(const [signature,receipt,code] of [[null,null,"SIGNATURE_UNAVAILABLE"],["a",null,"RECEIPT_NOT_OBSERVED"],["a",{...fixture().receipts[1],finality:"CONFIRMED"},"RECEIPT_NOT_FINALIZED"]]){
+  const r=reviewUncertainLocalReceipt({scope,signature,receipt});
+  assert.equal(r.status,"UNKNOWN");assert.ok(r.issues.includes(code));assert.equal(r.retry_authorized,false);
+  assert.equal(r.execution_enabled,false);assert.equal(r.recorded_fee_lamports,null);
+ }
+});
+test("archived outcome review separates fee evidence and contradictions from retry authority",()=>{
+ const i=fixture();
+ const r=reviewUncertainLocalReceipt({scope,signature:"b",receipt:i.receipts[0]});
+ assert.equal(r.status,"RECORDED_RECEIPT_CONSISTENT");assert.equal(r.recorded_outcome,"FAILED");
+ assert.equal(r.recorded_fee_lamports,"5");assert.equal(r.source_attestation,"UNKNOWN");assert.equal(r.retry_authorized,false);
+ const bad=structuredClone(i.receipts[0]);bad.transaction.meta.postBalances[0]+=1;
+ assert.equal(reviewUncertainLocalReceipt({scope,signature:"b",receipt:bad}).status,"REVIEW_REQUIRED");
+ assert.equal(reviewUncertainLocalReceipt({scope,signature:"a",receipt:i.receipts[0]}).status,"REVIEW_REQUIRED");
+ bad.transaction.meta.err=false;
+ assert.throws(()=>normalizeArchivedReceipt(bad,g),/INVALID_RECEIPT_OUTCOME/);
 });

@@ -51,6 +51,7 @@ export function normalizeArchivedReceipt(record,expectedGenesis){
   const identity=a??b;
   tokens.push({address:keys[i],mint:identity.mint,owner:identity.owner,decimals:identity.decimals,before:a?.amount??0n,after:b?.amount??0n});
  }
+ if(meta.err!==null&&!(typeof meta.err==="string"&&meta.err.trim())&&!(typeof meta.err==="object"&&!Array.isArray(meta.err)&&Object.keys(meta.err).length))fail("INVALID_RECEIPT_OUTCOME");
  const outcome=meta.err===null?"SUCCESS":"FAILED";
  const issues=[];
  if(native.reduce((sum,r)=>sum+r.after-r.before,0n)!==-fee)issues.push("NATIVE_CONSERVATION_MISMATCH");
@@ -111,4 +112,25 @@ export function auditArchivedAccountInterval(input){
   native:{opening_lamports:a.native.toString(),replayed_closing_lamports:native.toString(),observed_closing_lamports:b.native.toString(),difference_lamports:(b.native-native).toString()},
   token:{opening_base_units:a.token.toString(),replayed_closing_base_units:token.toString(),observed_closing_base_units:b.token.toString(),difference_base_units:(b.token-token).toString()},
   observed_network_fees_lamports:fees.toString(),observed_failed_tx_fees_lamports:failedFees.toString(),issues,settlement_allowed:false,execution_enabled:false};
+}
+
+/** Review only caller-supplied archived evidence for an uncertain local receipt.
+ * No recovery of signing material, network calls, or permission to retry.
+ * An absent receipt is not evidence that a transaction failed. */
+export function reviewUncertainLocalReceipt({scope,signature,receipt=null}={}){
+ if(!isLocalHistoricalNetwork(scope?.network)||scope?.mode!=="READ_ONLY")fail("LOCALNET_READ_ONLY_REQUIRED");
+ const genesis=label(scope.genesisHash,"genesis");
+ const result=(status,issues,extra={})=>({status,issues,recorded_outcome:null,recorded_fee_lamports:null,
+  ...extra,source_attestation:"UNKNOWN",settlement_allowed:false,retry_authorized:false,execution_enabled:false});
+ if(signature==null)return result("UNKNOWN",["SIGNATURE_UNAVAILABLE"]);
+ label(signature,"signature");
+ if(receipt==null)return result("UNKNOWN",["RECEIPT_NOT_OBSERVED"]);
+ if(receipt.signature!==signature)return result("REVIEW_REQUIRED",["SIGNATURE_MISMATCH"]);
+ if(receipt.genesisHash!==genesis)return result("REVIEW_REQUIRED",["GENESIS_MISMATCH"]);
+ if(receipt.finality!=="FINALIZED")return result("UNKNOWN",["RECEIPT_NOT_FINALIZED"]);
+ let r;
+ try{r=normalizeArchivedReceipt(receipt,genesis);}
+ catch{return result("REVIEW_REQUIRED",["RECEIPT_EVIDENCE_INVALID"]);}
+ return result(r.issues.length?"REVIEW_REQUIRED":"RECORDED_RECEIPT_CONSISTENT",r.issues,
+  {recorded_outcome:r.outcome,recorded_fee_lamports:r.fee.toString()});
 }

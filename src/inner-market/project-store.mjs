@@ -1,3 +1,4 @@
+import {eventHash,decodeEvent} from "./project-event-codec.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
 import { lstatSync, mkdirSync, openSync, closeSync, realpathSync } from "node:fs";
@@ -40,25 +41,6 @@ function privateDatabasePath(path) {
   if (!file.isFile() || file.isSymbolicLink()) throw Error("UNSAFE_PROJECT_STORE_FILE");
   if (process.platform !== "win32" && (file.mode & 0o077) !== 0) throw Error("PROJECT_STORE_FILE_NOT_PRIVATE");
   return target;
-}
-function eventCore(event) {
-  return {
-    event_id: event.event_id, project_id: event.project_id, revision: event.revision,
-    event_type: event.event_type, occurred_at_ms: event.occurred_at_ms,
-    actor_id: event.actor_id, source: event.source, payload: event.payload,
-    request_digest: event.request_digest, previous_hash: event.previous_hash
-  };
-}
-function eventHash(event) { return hash(canonicalJson(eventCore(event))); }
-function decodeEvent(row) {
-  let payload;
-  try { payload = JSON.parse(row.payload_json); } catch { throw Error("PROJECT_EVENT_PAYLOAD_CORRUPT"); }
-  return {
-    event_id: row.event_id, project_id: row.project_id, revision: row.revision,
-    event_type: row.event_type, occurred_at_ms: row.occurred_at_ms,
-    actor_id: row.actor_id, source: row.source, payload,
-    request_digest: row.request_digest, previous_hash: row.previous_hash, event_hash: row.event_hash
-  };
 }
 function actor(value) {
   if (typeof value !== "string" || !value.trim() || value.length > 128) throw Error("INVALID_PROJECT_ACTOR");
