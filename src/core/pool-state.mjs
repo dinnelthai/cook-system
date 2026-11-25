@@ -124,7 +124,7 @@ function applyPoolFeeMovement(state, event) {
 
 function applyVaultDeltas(state, event) {
   const delta = event.payload?.pool_vault_deltas;
-  if (!delta || delta.base_delta_base_units === null || delta.quote_delta_base_units === null) {
+  if (!delta || delta.base_delta_base_units == null || delta.quote_delta_base_units == null) {
     return { state, status: "UNKNOWN", reason: "pool_vault_token_account_deltas_unavailable" };
   }
   const base = addNonNegative(
@@ -210,9 +210,14 @@ export function replayPumpSwapPoolEvents(initialState, events) {
       }
     }
 
-    const deltaEvent = group.events.find((event) => event.payload?.pool_vault_deltas);
+    const deltaEvents = group.events.filter((event) => event.payload?.pool_vault_deltas);
+    const deltaEvent = deltaEvents[0];
+    const deltaFields=["base_delta_base_units","quote_delta_base_units"];
+    const deltaConflict=deltaEvents.some(e=>deltaFields.some(f=>e.payload.pool_vault_deltas[f]!==deltaEvent.payload.pool_vault_deltas[f])||
+      (e.payload.pool_vault_deltas.source_signature!=null&&e.payload.pool_vault_deltas.source_signature!==group.signature));
+    if(deltaConflict)reconciliations.push({signature:group.signature,status:"FAIL",reason:"conflicting_transaction_vault_delta_evidence"});
     let deltaResult = { state, status: "UNKNOWN", reason: "pool_vault_token_account_deltas_unavailable" };
-    if (deltaEvent) deltaResult = applyVaultDeltas(state, deltaEvent);
+    if (deltaEvent && !deltaConflict) deltaResult = applyVaultDeltas(state, deltaEvent);
     state = deltaResult.state;
 
     for (const event of group.events) {
@@ -374,9 +379,14 @@ export function reconcilePumpSwapPoolSnapshot({
     const actual = String(observed);
     if (expected !== actual) mismatches.push({ field, replayed: expected, observed: actual });
   }
-  const effectiveQuote = nonNegative(quoteVault?.amount_base_units ?? "0", "quote vault amount") +
-    toBigInt(data.virtual_quote_reserves_base_units ?? "0", "virtual quote reserves");
-  if (effectiveQuote < 0n || effectiveQuote > ((1n << 64n) - 1n)) {
+  const slots=[decodedPool.context_slot,baseVault?.context_slot,quoteVault?.context_slot];
+  const invalidSlot=slots.some(v=>v!=null&&(!Number.isSafeInteger(v)||v<0));
+  const knownSlots=slots.filter(v=>v!=null);
+  const slotConflict=invalidSlot||new Set(knownSlots).size>1;
+  const slotStatus=slotConflict?"NOT_COMPARABLE":knownSlots.length===3?"SAME_REPORTED_SLOT":"UNKNOWN";
+  const effectiveQuote=slotConflict||quoteVault?.amount_base_units==null||data.virtual_quote_reserves_base_units==null?null:
+    nonNegative(quoteVault.amount_base_units,"quote vault amount")+toBigInt(data.virtual_quote_reserves_base_units,"virtual quote reserves");
+  if (effectiveQuote!==null&&(effectiveQuote < 0n || effectiveQuote > ((1n << 64n) - 1n))) {
     mismatches.push({
       field: "effective_quote_reserves_base_units",
       replayed: "non-negative u64",
@@ -384,10 +394,11 @@ export function reconcilePumpSwapPoolSnapshot({
     });
   }
   return {
-    status: mismatches.length ? "FAIL" : missing.length ? "UNKNOWN" : "PASS",
+    status: slotConflict ? "UNKNOWN" : mismatches.length ? "FAIL" : missing.length ? "UNKNOWN" : "PASS",
     mismatches,
     missing_fields: missing,
-    snapshot_slot: decodedPool.context_slot ?? baseVault?.context_slot ?? quoteVault?.context_slot ?? null,
-    effective_quote_reserves_base_units: effectiveQuote.toString(),
+    snapshot_slot: slotStatus==="SAME_REPORTED_SLOT"?knownSlots[0]:null,
+    snapshot_slot_status:slotStatus,
+    effective_quote_reserves_base_units: effectiveQuote?.toString()??null,
   };
 }
