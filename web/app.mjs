@@ -1,3 +1,4 @@
+import {mountHistoricalDirectionReview} from "./historical-direction-review.mjs";
 import {historicalReportDigest,linkedReportMatches} from "./project-integrity-view.mjs";
 import {readProjectSelection,writeProjectSelection,projectStageStrip,projectReviewTasks,riskEvidenceRows,operatorTaskStatus} from "./operator-workspace.mjs";
 import {mountScopedProjectReview} from "./project-review-dashboard.mjs";
@@ -156,7 +157,7 @@ function mountMemeDesk(){
  const shell=document.createElement("div");shell.className="meme-desk";
  const center=document.createElement("div");center.className="meme-center";
  const side=document.createElement("aside");side.className="meme-control";side.setAttribute("aria-label","项目运营与发行准备");
- side.innerHTML='<div class="meme-mode" role="group" aria-label="工作模式"><button data-desk-mode="operations">运营</button><button data-desk-mode="launch">发行准备</button></div><div id="meme-live-summary" aria-label="项目核算与风险"></div><div id="meme-control-body"></div><div id="meme-launch-host" hidden></div>';
+ side.innerHTML='<div class="meme-mode" role="group" aria-label="工作模式"><button data-desk-mode="operations">运营</button><button data-desk-mode="launch">发行准备</button></div><div id="meme-bundle-review" aria-label="捆绑买卖历史复核"></div><div id="meme-live-summary" aria-label="项目核算与风险"></div><div id="meme-control-body"></div><div id="meme-launch-host" hidden></div>';
  shell.append(center,side);
  const reportArea=main.querySelector("#terminal-report-area"),placeholder=main.querySelector("#terminal-scoped-placeholder");
  const wallet=document.createElement("section");wallet.className="pro-pane meme-wallet";wallet.innerHTML='<h3>项目钱包 / Wallets</h3>'+emptyState("未选择项目","从左侧选择 Meme 查看登记钱包。");
@@ -174,6 +175,7 @@ function mountMemeDesk(){
  main.insertBefore(shell,main.querySelector("#launch-dialog"));
  let selected=null,projects=[],loaded=false,failed=false;
  const controls=side.querySelector("#meme-control-body"),summary=side.querySelector("#meme-live-summary"),list=rail.querySelector("#meme-list"),launchHost=side.querySelector("#meme-launch-host");
+ const bundleHost=side.querySelector("#meme-bundle-review"),bundleReview=mountHistoricalDirectionReview(bundleHost,{esc,table,quoteAmount});
  let launchMounted=false,launchProjectId=activeProjectId;
  function mountLaunch(){
   if(launchMounted)return;launchMounted=true;
@@ -197,7 +199,7 @@ function mountMemeDesk(){
  }
  rail.querySelector("#meme-search").oninput=e=>{memeFilter=e.target.value;drawList();};
  function drawControls(){
-  summary.hidden=memeMode!=="operations";
+  summary.hidden=memeMode!=="operations";bundleHost.hidden=memeMode!=="operations";
   controls.hidden=memeMode!=="operations";launchHost.hidden=memeMode!=="launch";
   side.querySelectorAll("[data-desk-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.deskMode===memeMode)));
   const button=(action,label,disabled=false)=>'<button type="button" data-desk-action="'+action+'"'+(disabled?" disabled":"")+'>'+label+'</button>';
@@ -226,9 +228,10 @@ function mountMemeDesk(){
   if(current)wallet.innerHTML='<div class="meme-rail-head"><h3>项目钱包 / Wallets</h3><button id="meme-wallet-assets" type="button">资产详情</button></div><p class="muted">登记钱包 · 非实时余额 · 归属未独立核验</p>'+table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(current));
   else wallet.innerHTML='<h3>项目钱包 / Wallets</h3>'+emptyState("未选择项目","选择左侧 Meme 查看登记钱包。");
   const b=wallet.querySelector("#meme-wallet-assets");if(b)b.onclick=()=>go("wallet");
- },error(){failed=true;drawList();summaryState("项目目录不可用，未显示资产与风险。");},
-  pending(){summaryState("读取项目核算与风险…");},
-  unavailable(){summaryState("项目复核不可用，请刷新。");},
+ },error(){failed=true;drawList();bundleReview.clear("项目目录不可用。");summaryState("项目目录不可用，未显示资产与风险。");},
+  pending(){bundleReview.clear("等待项目历史报告身份与摘要核对。");summaryState("读取项目核算与风险…");},
+  historicalTrades(input){if(selected&&input.scope?.projectId===selected.project_id&&input.scope?.tokenMint===selected.token?.mint)bundleReview.show(input);},
+  unavailable(){bundleReview.clear("项目复核不可用。");summaryState("项目复核不可用，请刷新。");},
   showReview(v,model,treasury){
    if(!selected||v.project_id!==selected.project_id||v.project_revision!==selected.revision)return;
    const kv=rows=>'<div class="meme-kv">'+rows.map(([label,value])=>"<span>"+esc(label)+"</span><strong>"+esc(value??"未知")+"</strong>").join("")+"</div>";
@@ -330,6 +333,7 @@ function renderTerminal(){
          const digest=await historicalReportDigest(data);
          if(!businessCurrent()||ticket!==businessTicket)return;
          if(linkedReportMatches(v,digest,data.scope)){
+           if(report.source_mode==="ARCHIVED_HISTORICAL"&&report.status==="REPORT_READY")memeDesk.historicalTrades(data);
           reportArea.hidden=false;reportArea.removeAttribute("inert");reportArea.style.removeProperty("display");placeholder.hidden=true;
           main.querySelector("#terminal-context-notice").innerHTML=note("历史报告身份与已关联摘要一致；仅内部证据匹配，不代表独立认证或结算许可。");
          }else{
