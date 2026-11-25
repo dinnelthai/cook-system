@@ -261,6 +261,7 @@
           "type": "string",
           "enum": [
             "HALTED",
+            "ACTIVE",
             "REVIEW_REQUIRED"
           ]
         },
