@@ -43,3 +43,5 @@ export function riskEvidenceRows(findings,severity="ALL"){
   Array.isArray(f.references)&&f.references.length?f.references.join(" / "):"未提供引用"
  ]);
 }
+
+export function operatorTaskStatus(status){return ({CONFIGURATION_INCOMPLETE:"配置不完整",DECLARATIONS_PRESENT:"声明齐备",MISSING:"证据缺失",UNKNOWN:"未知",NOT_RUN:"未验收",REVIEW_REQUIRED:"待复核",DECLARED_MATCH:"声明一致",DECLARED_ENDPOINT_PRESENT:"声明期末数据齐备",DECLARED_ENDPOINTS_PRESENT:"声明期末数据齐备",DECLARED_EVIDENCE_PRESENT:"声明证据存在",OBSERVED_NOT_ATTESTED:"已记录，未认证",REGISTRATION_OR_EVIDENCE_INCOMPLETE:"登记或证据不完整",INCOMPLETE:"证据不完整",WARNING:"警告",EVIDENCE_INCOMPLETE:"证据不足"})[status]??"状态待核对";}

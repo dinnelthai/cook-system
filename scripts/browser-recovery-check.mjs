@@ -84,7 +84,9 @@ export async function checkBrowserRecovery({browser,dir,env,url,previewDir=null}
    if(!previewDir)return;
    assert.ok(["wallet","dashboard","projects","participants","logs","create","terminal"].includes(page));
    assert.ok(["desktop","narrow"].includes(viewport));
-   const dimensions=await evaluate('({viewport_width:innerWidth,viewport_height:innerHeight,document_width:document.documentElement.scrollWidth,main_width:Math.round(document.querySelector("#main").getBoundingClientRect().width),page:document.querySelector("#main").dataset.page})');
+   await evaluate('window.scrollTo({top:0,left:0,behavior:"instant"})');
+   await wait("preview-at-top-"+viewport+"-"+page,'scrollY===0');
+   const dimensions=await evaluate('({viewport_width:innerWidth,viewport_height:innerHeight,document_width:document.documentElement.scrollWidth,main_width:Math.round(document.querySelector("#main").getBoundingClientRect().width),scroll_y:scrollY,page:document.querySelector("#main").dataset.page})');
    assert.equal(dimensions.page,page);
    const result=await cdp.call("Page.captureScreenshot",{format:"png",fromSurface:true,captureBeyondViewport:false});
    const png=Buffer.from(result.data??"","base64");
@@ -129,6 +131,8 @@ export async function checkBrowserRecovery({browser,dir,env,url,previewDir=null}
   await evaluate('(()=>{const s=document.querySelector("#operator-view-mode");s.value="AUDIT";s.dispatchEvent(new Event("change"));})()');
   assert.equal(await evaluate('document.querySelector("#main").dataset.viewMode==="AUDIT"&&document.querySelector("details.audit-detail").open'),true);
   const pageChecks=[["wallet",'document.querySelector("#asset-interval")'],["dashboard",'document.querySelector("#scoped-review-interval")'],["projects",'document.querySelector("#workspace-export")'],["participants",'document.querySelector("#run-experiment")'],["logs",'document.querySelector("#log-download")'],["create",'document.querySelector("#project-budget-form")'],["terminal",'document.querySelector(".operator-task-grid")']];
+  // Capture the default operator presentation, not expanded engineering audit mode.
+  await evaluate('(()=>{const s=document.querySelector("#operator-view-mode");s.value="OPERATOR";s.dispatchEvent(new Event("change"));})()');
   if(previewDir)await cdp.call("Emulation.setDeviceMetricsOverride",{width:1440,height:900,deviceScaleFactor:1,mobile:false});
   async function navigatePrimaryPages(viewport){
    for(const [id,condition] of pageChecks){

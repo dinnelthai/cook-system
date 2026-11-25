@@ -1,5 +1,5 @@
 import {historicalReportDigest,linkedReportMatches} from "./project-integrity-view.mjs";
-import {readProjectSelection,writeProjectSelection,projectStageStrip,projectReviewTasks,riskEvidenceRows} from "./operator-workspace.mjs";
+import {readProjectSelection,writeProjectSelection,projectStageStrip,projectReviewTasks,riskEvidenceRows,operatorTaskStatus} from "./operator-workspace.mjs";
 import {mountScopedProjectReview} from "./project-review-dashboard.mjs";
 import {experimentDisplayRows} from "./experiment-display.mjs";
 import {mountProjectAssets} from "./project-assets-view.mjs";
@@ -241,8 +241,8 @@ function renderTerminal(){
          '<div class="row operator-links"><button id="project-show-risk">风险与证据</button><button id="project-show-setup">项目配置</button><button data-project-nav="assets">资产中心</button><button data-project-nav="review">项目复盘</button><button data-project-nav="market">市场证据</button><button data-project-nav="orders">订单复核</button></div>'+
          '<details><summary>登记钱包与归属状态</summary>'+table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(selected))+'</details>'+
          (v.global_risk.findings.some(f=>f.severity==="CRITICAL")?'<section class="notice" role="status"><strong>严重证据风险 · '+esc(model.counts.critical)+'</strong>'+table(["类别","风险原因"],v.global_risk.findings.filter(f=>f.severity==="CRITICAL").slice(0,5).map(f=>[f.category,f.code]))+'<p>完整风险见风险与证据；不代表实时市场风险。</p></section>':"")+
-         '<section class="operator-task-section"><h3>项目准备与证据待办</h3><p class="muted">状态来自当前运行快照；登记齐备不代表已认证或允许执行。</p><div class="operator-task-grid">'+projectReviewTasks(v.runtime).map(x=>'<div class="operator-task"><div><strong>'+esc(x.label)+'</strong><small>'+esc(x.status)+'</small></div><button data-project-nav="'+x.target+'">查看</button></div>').join("")+'</div></section>'+
          '<div class="project-interval-head"><h3>历史资产区间</h3>'+(v.runtime_context_id&&model.intervals.length?'<label>选择区间 <select id="runtime-interval"><option value="">请选择区间</option>'+model.intervals.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.label)+'</option>').join("")+'</select></label>':'<span class="muted">暂无关联区间</span>')+'</div><div id="runtime-interval-detail" role="status">'+assetCards(null)+note("请选择一个历史区间。未选择时不显示金额；不代表当前可用资产。")+'</div>'+
+         '<section class="operator-task-section"><h3>项目准备与证据待办</h3><p class="muted">状态来自当前运行快照；登记齐备不代表已认证或允许执行。</p><div class="operator-task-grid">'+projectReviewTasks(v.runtime).map(x=>'<div class="operator-task"><div><strong>'+esc(x.label)+'</strong><small>'+esc(operatorTaskStatus(x.status))+'</small></div><button data-project-nav="'+x.target+'">查看</button></div>').join("")+'</div></section>'+
          '<div class="project-work-grid"><div><span>历史市场证据</span><strong>'+esc(model.market.status)+'</strong></div><div><span>内盘报告区间 / 外盘快照</span><strong>'+esc(model.market.interval_count+" / "+model.market.pool_count)+'</strong></div><div><span>当前市场</span><strong>未知</strong></div></div>'+
          '<details class="project-secondary audit-detail"'+(operatorMode==="AUDIT"?" open":"")+'><summary>运行记录与审计明细</summary>'+
          (v.runtime?.market?.curve_intervals?'<details><summary>统一历史市场状态</summary>'+table(["历史区间","市场证据状态"],v.runtime.market.curve_intervals.map(i=>[i.opening_cutoff+" → "+i.closing_cutoff,i.status]))+table(["迁移阶段","状态"],v.runtime.market.migration_milestones.map(x=>[x.stage,x.status]))+table(["外盘历史快照","状态","Slot"],v.runtime.market.historical_pools.map(x=>[x.pool_address??"—",x.status,x.snapshot_slot??"—"]))+note("各阶段保留独立时间边界；没有统一实时快照")+'</details>':"")+
@@ -447,7 +447,9 @@ function renderTerminal(){
 }
 function render(){
  if(reviewInput!==data){reviewInput=data;reviewStage="REVIEW";metadata=null;reviewPaused=false;workflowMessage="";}
+ const pageChanged=main.dataset.page!==page;
  main.dataset.page=page;
+ if(pageChanged)window.scrollTo({top:0,left:0,behavior:"instant"});
  main.dataset.viewMode=operatorMode;
  const mode=document.querySelector("#operator-view-mode");
  mode.value=operatorMode;
@@ -455,7 +457,7 @@ function render(){
  renderGlobalContext();
  document.querySelector(".tag").textContent=activeProjectId?"PROJECT REVIEW":offlineReview?"OFFLINE REVIEW":"LOCALNET";
  nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+((page===id||id==="market"&&["lab","create"].includes(page))?"active":"")+'"'+(page===id?' aria-current="page"':'')+'><span class="nav-num" aria-hidden="true">'+label.slice(0,2)+'</span><span>'+esc(label.slice(3))+'</span></button>').join("");
- nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.page;record("page.open",{page});render()});
+ nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.page;record("page.open",{page});render();if(innerWidth<=700) b.isConnected||nav.querySelector('[aria-current="page"]')?.scrollIntoView({block:"nearest",inline:"nearest"});});
  const a=report.accounting,m=report.market_history;
  const links=(items)=>'<div class="row subnav">'+items.map(([id,label])=>'<button data-subpage="'+id+'">'+esc(label)+'</button>').join("")+'</div>';
  const context=()=>note("数据来源："+report.source_mode+" · 离线区间报告；Localnet 实时接口尚未接入。未知值不作估算。");

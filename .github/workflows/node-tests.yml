@@ -32,6 +32,13 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Run unified code acceptance
         run: npm run accept:all
+      - name: Install CJK font for visual QA
+        if: matrix.node-version == 22
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-match "Noto Sans CJK SC"
+          test -n "$(fc-list :lang=zh family | head -n 1)"
       - name: Isolated Chromium metadata recovery acceptance
         if: matrix.node-version == 22
         timeout-minutes: 3

@@ -34,3 +34,7 @@ COOK_BROWSER_BINARY="/path/to/chromium" npm run accept:browser-recovery -- --cap
 ```
 
 Look in `.cook-system/acceptance/browser-preview-*/` for the manifest and PNG files. The manifest reports document overflow measurements instead of claiming visual quality. A missing screenshot or a failed navigation is not a visual pass.
+
+## Screenshot review of baseline 715c67e
+
+Reviewed all fourteen viewport PNGs from [CI 45624340508](https://github.com/dinnelthai/cook-system/actions/runs/45624340508). Manifest: zero document-level horizontal overflow in all fourteen captures. Visible defects: missing Chinese glyphs in the runner; narrow captures inheriting a previous page's scroll offset; operator task list pushing historical asset indicators below the desktop first viewport; narrow desktop navigation and overly small labels. These are real rendered fixture screenshots, not a live operator environment. The follow-up installs the OS CJK font in the screenshot runner (no bundled font), resets navigation and capture scroll, captures operator mode, moves asset indicators ahead of tasks, translates task statuses and improves desktop readability. New screenshots and CI must be verified before closing the defects. Table-local horizontal scrolling and below-fold content still require inspection.
