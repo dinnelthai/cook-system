@@ -215,7 +215,7 @@ function mountMemeDesk(){
   bundleHost.hidden=memeMode!=="operations";
   controls.hidden=memeMode!=="operations";launchHost.hidden=memeMode!=="launch";
   side.querySelectorAll("[data-desk-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.deskMode===memeMode)));
-  controls.innerHTML=memeMode==="operations"?'<div class="meme-execution-note"><strong>交易执行未接入</strong><p>仅显示已关联的历史成交、资金与风险证据。实时余额和执行结果不可用。</p></div>':"";
+  controls.replaceChildren();controls.hidden=true;
 
  }
  side.querySelectorAll("[data-desk-mode]").forEach(b=>b.onclick=()=>{
@@ -224,7 +224,7 @@ function mountMemeDesk(){
   memeMode=next;drawControls();mountLaunch();
  });
  drawControls();if(memeMode==="launch")mountLaunch();
- return {selectLowerTab,update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();
+ return {selectLowerTab,update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();bundleReview.setProject(current);
   if(current)wallet.innerHTML='<div class="meme-rail-head"><h3>钱包 / Wallets</h3><button id="meme-wallet-assets" type="button">钱包资产</button></div><p class="muted">已登记钱包 · 实时余额、持仓未接入 · 归属未独立核验</p>'+table(["钱包地址","角色","SOL 余额","Token 持仓","声明额度","登记状态"],projectWalletRegistrationRows(current).map(r=>[r[2],r[3],"—","—",r[5],r[4]]));
   else wallet.innerHTML='<h3>钱包 / Wallets</h3>'+emptyState("未选择项目","选择左侧 Meme 查看登记钱包。");
   const b=wallet.querySelector("#meme-wallet-assets");if(b)b.onclick=()=>selectLowerTab("assets");

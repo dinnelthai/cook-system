@@ -30,35 +30,41 @@ export function historicalTradePosition(input){
  };
 }
 export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
- let side="BUY",filter="ALL",input=null,state="请选择 Meme，并关联已核对的历史报告。";
+ let side="BUY",filter="ALL",input=null,state="请选择 Meme",draft={BUY:"",SELL:""},settingsOpen=false,positionOpen=false,project=null;
  const fmt=v=>v==null?"—":esc(quoteAmount(v,"SOL_LAMPORTS"));
- const metric=(label,value)=>'<div><small>'+esc(label)+'</small><strong>'+value+'</strong></div>';
  const kv=(label,value)=>'<span>'+esc(label)+'</span><strong>'+value+'</strong>';
  const row=(label,value)=>kv(label,value==null?"—":esc(value));
+ const heading=(title,extra="")=>'<div class="trade-heading"><h3>'+title+'</h3>'+extra+'</div>';
  function draw(){
-  const summary=historicalDirectionSummary(input,side);
   const buy=historicalDirectionSummary(input,"BUY"),sell=historicalDirectionSummary(input,"SELL");
   const position=buy&&sell?historicalTradePosition(input):null;
   const trades=buy&&sell?input.market.trades.filter(t=>["BUY","SELL"].includes(t.side)&&t.status==="FINALIZED"&&t.reconciliation==="PASS"&&(filter==="ALL"||t.side===filter)):null;
-  host.innerHTML='<section class="meme-control-section bundle-review"><div class="meme-rail-head"><h3>Bundle Buy / Sell</h3><span class="bundle-mode-label">历史复核 · 执行未接入</span></div>'+
-   '<div class="bundle-direction" role="group" aria-label="历史成交方向"><button data-direction="BUY" aria-pressed="'+(side==="BUY")+'">Bundle Buy</button><button data-direction="SELL" aria-pressed="'+(side==="SELL")+'">Bundle Sell</button></div>'+
-   '<div class="bundle-metrics">'+metric("已对账成交笔数",summary?esc(summary.count):"—")+metric(side==="BUY"?"历史买入名义额":"历史卖出名义额",fmt(summary?.total_base_units))+'</div>'+
-   '<p role="status" class="muted">'+esc(summary?"已关联历史区间 · 非实时 · 未独立认证 · Bundle 归属未知":state)+'</p>'+
-   '<h3>Execution Preview / 执行预览</h3><div class="meme-kv">'+row("实时钱包余额",null)+row("预计成交 / 回收",null)+row("费用 / 滑点 / 价格冲击",null)+row("预计交易数量 / 时长",null)+'</div>'+
-   '<button class="bundle-submit" type="button" disabled>'+(side==="BUY"?"Buy":"Sell")+' · 执行未接入</button></section>'+
-   '<section class="meme-control-section"><div class="meme-rail-head"><h3>Position / 持仓与损益</h3><span class="bundle-mode-label">历史区间</span></div>'+
-   '<div class="meme-kv">'+kv("历史买入成本",fmt(position?.buy_cost))+kv("历史卖出净回收",fmt(position?.net_sell_proceeds))+row("期末 Token（base units）",position?.token_balance)+kv("剩余库存成本",fmt(position?.remaining_cost))+kv("已实现交易损益",fmt(position?.realized_pnl))+row("未实现损益",null)+'</div>'+
-   '<p class="muted">仅显示同区间且库存对账匹配的声明值；不是实时余额或会话收益。</p></section>'+
-   '<section class="meme-control-section"><div class="meme-rail-head"><h3>Exit / 持仓退出</h3><span class="bundle-mode-label">未接入</span></div>'+
-   '<div class="meme-kv">'+row("当前可售数量",null)+row("预计净回收",null)+row("预计退出损益",null)+'</div><button type="button" class="bundle-submit" disabled>退出 · 执行未接入</button></section>'+
-   '<section class="meme-control-section trade-log"><div class="meme-rail-head"><h3>Trades Log / 成交记录</h3><small>仅当前 Meme</small></div>'+
-   '<div class="row" role="group" aria-label="成交记录筛选">'+["ALL","BUY","SELL"].map(k=>'<button type="button" data-trade-filter="'+k+'" aria-pressed="'+(filter===k)+'">'+({ALL:"全部",BUY:"买入",SELL:"卖出"}[k])+'</button>').join("")+'</div>'+
-   (trades?table(["方向","记录","序号","名义金额"],trades.slice(-12).reverse().map(t=>[t.side,t.id,t.sequence,quoteAmount(t.quoteNotionalBaseUnits,"SOL_LAMPORTS")])):'<div class="trade-log-empty">暂无已核对成交记录</div>')+
-   (trades?'<p class="muted">符合筛选条件 '+esc(trades.length)+' 笔 · 最近最多 12 笔</p>':"")+'</section>'+
-   '<section class="meme-control-section"><h3>Execution Settings / 执行设置</h3><div class="meme-kv">'+row("费用支付方",null)+row("交易保护",null)+row("滑点配置",null)+'</div><p class="muted">实时交易服务未接入；不保存或应用执行参数。</p></section>';
+  host.innerHTML='<div class="trade-ticket" data-side="'+side+'">'+
+   '<div class="trade-instrument"><div><strong>'+esc(project?.profile?.symbol||"未选择 Meme")+'</strong><small>'+esc(project?.profile?.name||"从左侧选择 Meme")+'</small></div><span class="trade-network">SOL</span></div>'+
+   '<div class="trade-block">'+heading("Trade",'<small>执行未接入</small>')+
+   '<div class="bundle-direction" role="group" aria-label="买卖方向"><button type="button" data-direction="BUY" aria-pressed="'+(side==="BUY")+'">Buy / 买入</button><button type="button" data-direction="SELL" aria-pressed="'+(side==="SELL")+'">Sell / 卖出</button></div>'+
+   '<div class="trade-field"><label for="trade-amount">'+(side==="BUY"?"买入金额":"卖出数量")+'</label><div class="trade-input"><input id="trade-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="'+esc(draft[side])+'"><span>'+(side==="BUY"?"SOL":"Token")+'</span></div></div>'+
+   '<div class="trade-kv">'+row("可用余额",null)+row("预计成交 / 回收",null)+row("费用 / 价格冲击",null)+'</div>'+
+   '<button class="trade-cta" type="button" disabled>'+(side==="BUY"?"Buy / 买入":"Sell / 卖出")+'</button><p class="trade-hint">交易服务未接入，金额仅为界面草稿。</p></div>'+
+   '<div class="trade-block">'+heading("Exit / 持仓退出")+
+   '<div class="trade-kv">'+row("当前可售 Token",null)+row("预计净回收",null)+row("预计退出损益",null)+'</div><button class="trade-cta trade-exit" type="button" disabled>Sell position / 退出持仓</button></div>'+
+   '<details class="trade-block trade-detail" data-position'+(positionOpen?" open":"")+'><summary>Position / 历史持仓与损益</summary>'+
+   '<div class="trade-kv">'+kv("历史买入成本",fmt(position?.buy_cost))+kv("历史卖出净回收",fmt(position?.net_sell_proceeds))+row("期末 Token（base units）",position?.token_balance)+kv("剩余库存成本",fmt(position?.remaining_cost))+kv("已实现交易损益",fmt(position?.realized_pnl))+'</div><p class="trade-hint">'+esc(position?"已核对历史区间，非实时资产":state)+'</p></details>'+
+   '<div class="trade-block trade-log">'+heading("Trades Log",'<small>当前 Meme · 历史</small>')+
+   '<div class="trade-filters" role="group" aria-label="成交记录筛选">'+["ALL","BUY","SELL"].map(k=>'<button type="button" data-trade-filter="'+k+'" aria-pressed="'+(filter===k)+'">'+({ALL:"全部",BUY:"买入",SELL:"卖出"}[k])+'</button>').join("")+'</div>'+
+   (trades&&trades.length?table(["方向","记录","序号","金额"],trades.slice(-12).reverse().map(t=>[t.side,t.id,t.sequence,quoteAmount(t.quoteNotionalBaseUnits,"SOL_LAMPORTS")])):'<div class="trade-log-empty">暂无成交记录</div>')+
+   (trades&&trades.length?'<p class="trade-hint">'+esc(trades.length)+' 笔 · 显示最近最多 12 笔</p>':"")+'</div>'+
+   '<details class="trade-block trade-detail" data-settings'+(settingsOpen?" open":"")+'><summary>Execution Settings / 执行设置</summary><div class="trade-kv">'+row("手续费支付方",null)+row("交易保护",null)+row("滑点配置",null)+'</div><p class="trade-hint">等待交易服务提供配置。</p></details></div>';
   host.querySelectorAll("[data-direction]").forEach(b=>b.onclick=()=>{side=b.dataset.direction;draw();});
   host.querySelectorAll("[data-trade-filter]").forEach(b=>b.onclick=()=>{filter=b.dataset.tradeFilter;draw();});
+  host.querySelector("#trade-amount").oninput=e=>{draft[side]=e.target.value;};
+  host.querySelector("[data-position]").ontoggle=e=>{positionOpen=e.target.open;};
+  host.querySelector("[data-settings]").ontoggle=e=>{settingsOpen=e.target.open;};
  }
  draw();
- return {clear(message){input=null;filter="ALL";side="BUY";state=message;draw();},show(next){input=next;state="当前报告缺少可用的成交金额证据。";draw();}};
+ return {
+  setProject(next){const changed=project?.project_id!==next?.project_id;if(changed){draft={BUY:"",SELL:""};side="BUY";filter="ALL";input=null;state="等待当前 Meme 历史记录";}project=next;draw();},
+  clear(message){input=null;filter="ALL";state=message;draw();},
+  show(next){input=next;state="当前报告缺少可用的成交金额证据。";draw();}
+ };
 }
