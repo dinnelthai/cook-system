@@ -21,6 +21,9 @@ export function auditSyntheticRecordNumbers(report){
  if(known&&!feeKnown)issues.push("INVALID_DECLARED_FEE_RATE");
  for(const e of trades){
   const p=e.payload??{},id=e.event_id,buy=e.event_kind==="CURVE_BUY_EXECUTED";
+  if(!["CURVE_BUY_EXECUTED","CURVE_SELL_EXECUTED"].includes(e.event_kind)){
+   issues.push("UNSUPPORTED_NUMERIC_EVENT:"+id);invalidReservePath=true;continue;
+  }
   const cash=amount(p.quote_amount_base_units,true),token=amount(p.token_amount_base_units,true);
   if(cash===null||token===null){issues.push("INVALID_NUMERIC_TRADE:"+id);continue;}
   if(typeof p.signature!=="string"||!p.signature.trim()||signatures.has(p.signature))issues.push("INVALID_OR_DUPLICATE_TRADE_SIGNATURE:"+id);

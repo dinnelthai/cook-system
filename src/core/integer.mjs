@@ -14,6 +14,13 @@ export function parseBaseUnits(value, { name = "value", max = U64_MAX } = {}) {
   if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value)) {
     throw new TypeError(`${name} must be a canonical unsigned integer string`);
   }
+  if (typeof max !== "bigint" || max < 0n) {
+    throw new TypeError("max must be a non-negative bigint");
+  }
+  // Reject oversized canonical decimals before allocating a BigInt.
+  if (value.length > max.toString(10).length) {
+    throw new RangeError(`${name} is outside the supported unsigned range`);
+  }
   const parsed = BigInt(value);
   assertUnsignedBigInt(parsed, name, max);
   return parsed;
