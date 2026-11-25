@@ -28,6 +28,10 @@ export function assessPortfolioRisk({positions,account,marketSnapshots,limits,no
  const snapshots=new Map();
  for(const snapshot of marketSnapshots){if(!snapshot?.market_id||snapshots.has(snapshot.market_id))throw Error("DUPLICATE_OR_INVALID_MARKET_SNAPSHOT");snapshots.set(snapshot.market_id,snapshot);}
  for(const [marketId,exposure] of byMarket){
+  // Concentration is computable from declared positions even when market observations are missing.
+  const marketShare=ratio(exposure,totalExposure);
+  if(totalExposure>0n&&exposure*10000n>BigInt(limits.max_market_exposure_bps)*totalExposure)
+   findings.push({code:"SINGLE_MARKET_CONCENTRATION",severity:"BLOCK",market_id:marketId,share:marketShare});
   const snapshot=snapshots.get(marketId);
   if(!snapshot){findings.push({code:"MARKET_SNAPSHOT_MISSING",severity:"UNKNOWN",market_id:marketId});continue;}
   if(!Number.isSafeInteger(snapshot.observed_at_ms)||snapshot.observed_at_ms<0||snapshot.observed_at_ms>nowMs||nowMs-snapshot.observed_at_ms>limits.max_data_age_ms)
@@ -42,9 +46,7 @@ export function assessPortfolioRisk({positions,account,marketSnapshots,limits,no
    if(exposure*10000n>BigInt(limits.max_liquidation_depth_ratio_bps)*BigInt(depth))
     findings.push({code:"LIQUIDATION_DEPTH_LIMIT",severity:"BLOCK",market_id:marketId,exposure_to_depth_bps:utilization});
   }
-  const marketShare=ratio(exposure,totalExposure);
-  if(totalExposure>0n&&exposure*10000n>BigInt(limits.max_market_exposure_bps)*totalExposure)
-   findings.push({code:"SINGLE_MARKET_CONCENTRATION",severity:"BLOCK",market_id:marketId,share:marketShare});
+
  }
  const blocked=findings.some(x=>x.severity==="BLOCK"),unknown=findings.some(x=>x.severity==="UNKNOWN");
  return {schema_version:"cook-portfolio-risk.1",status:blocked?"BLOCKED":unknown?"UNKNOWN":"WITHIN_CONFIGURED_LIMITS",

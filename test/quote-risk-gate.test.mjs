@@ -68,3 +68,21 @@ test("file-backed halt treats a symbolic-link state file as unavailable and stay
   const c=createEmergencyHaltController(createFileHaltStorage(path));const state=await c.load();assert.equal(state.halted,true);assert.equal(state.reason,"HALT_STATE_UNAVAILABLE");
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test("paper inventory guard rejects a nominal spend exceeding remaining declared capacity",()=>{
+ const i=input();i.portfolio.inventory_value_quote_base_units="990";
+ const r=evaluateQuotePlan({...i,nowMs:2000});
+ assert.equal(r.quote.buy.enabled,false);assert.equal(r.quote.buy.notional_base_units,"0");
+ assert.equal(r.quote.buy.nominal_limit_status,"WOULD_EXCEED_DECLARED_LIMIT");
+ assert.equal(r.execution_enabled,false);
+ i.portfolio.inventory_value_quote_base_units="750";
+ assert.equal(evaluateQuotePlan({...i,nowMs:2000}).quote.buy.enabled,true);
+ i.portfolio.inventory_value_quote_base_units="751";
+ assert.equal(evaluateQuotePlan({...i,nowMs:2000}).quote.buy.enabled,false);
+});
+test("paper prices that collapse at fixed precision fail closed",()=>{
+ const i=input();i.market.mid_price_decimal="0.000000000001";
+ const r=evaluateQuotePlan({...i,nowMs:2000});
+ assert.equal(r.status,"BLOCKED");assert.ok(r.reasons.includes("PAPER_PRICE_PRECISION_INVALID"));
+ assert.equal(r.quote.buy.enabled,false);assert.equal(r.quote.sell.enabled,false);
+});

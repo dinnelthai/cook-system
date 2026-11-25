@@ -36,3 +36,12 @@ test("duplicate declared position IDs and out-of-domain percent limits are rejec
  assert.throws(()=>assessPortfolioRisk(i),/DUPLICATE_OR_INVALID_POSITION_ID/);
  const j=base();j.limits.max_drawdown_bps=10001;assert.throws(()=>assessPortfolioRisk(j),/INVALID_PORTFOLIO_PERCENT_LIMIT/);
 });
+
+test("missing market snapshots do not suppress known concentration violations",()=>{
+ const i=base();i.marketSnapshots=[];i.limits.max_market_exposure_bps=5000;
+ const r=assessPortfolioRisk(i);
+ assert.equal(r.status,"BLOCKED");
+ assert.ok(r.findings.some(f=>f.code==="SINGLE_MARKET_CONCENTRATION"&&f.severity==="BLOCK"));
+ assert.ok(r.findings.some(f=>f.code==="MARKET_SNAPSHOT_MISSING"&&f.severity==="UNKNOWN"));
+ assert.equal(r.execution_enabled,false);
+});

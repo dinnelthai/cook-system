@@ -34,13 +34,17 @@ export function evaluateQuotePlan({market,portfolio,policy,riskState=null,nowMs}
  const inventoryFraction=maxInventory===0n?10000n:(inventory*10000n/maxInventory>10000n?10000n:inventory*10000n/maxInventory);
  const skew=Number(BigInt(policy.max_inventory_skew_bps)*inventoryFraction/10000n),reservation=mid*BigInt(10000-skew)/10000n,half=BigInt(Math.floor(spread/2));
  const bid=reservation*(10000n-half)/10000n,ask=reservation*(10000n+half)/10000n;
- const buyAllowed=reasons.length===0&&inventory<maxInventory&&quoteBalance>0n&&maxOrder>0n;
- const sellAllowed=reasons.length===0&&baseInventory>0n&&maxBaseOrder>0n;
+ // Reject invalid fixed-precision paper prices rather than silently displaying them as usable.
+ if(bid<=0n||ask<=bid)reasons.push("PAPER_PRICE_PRECISION_INVALID");
  const buyNotional=quoteBalance<maxOrder?quoteBalance:maxOrder,sellBase=baseInventory<maxBaseOrder?baseInventory:maxBaseOrder;
+ // A nominal spend check is a necessary paper-only bound, not a post-fill valuation.
+ const buyWithinNominalLimit=inventory<=maxInventory&&buyNotional<=maxInventory-inventory;
+ const buyAllowed=reasons.length===0&&inventory<maxInventory&&buyNotional>0n&&buyWithinNominalLimit;
+ const sellAllowed=reasons.length===0&&baseInventory>0n&&maxBaseOrder>0n;
  return {schema_version:"cook-paper-quote-plan.1",status:reasons.length?"BLOCKED":buyAllowed||sellAllowed?"PAPER_PLAN_READY":"NO_QUOTE_CAPACITY",
   market_id:market.market_id??null,observed_at_ms:observed??null,age_ms:Number.isSafeInteger(observed)?nowMs-observed:null,
   quote:{bid_price_decimal:format(bid),ask_price_decimal:format(ask),spread_bps:spread,inventory_skew_bps:skew,
-   buy:{enabled:buyAllowed,notional_base_units:buyAllowed?buyNotional.toString():"0"},
+   buy:{enabled:buyAllowed,notional_base_units:buyAllowed?buyNotional.toString():"0",nominal_limit_status:buyWithinNominalLimit?"WITHIN_DECLARED_LIMIT":"WOULD_EXCEED_DECLARED_LIMIT"},
    sell:{enabled:sellAllowed,base_amount_base_units:sellAllowed?sellBase.toString():"0"}},
   reasons,limits:{max_inventory_value_quote_base_units:maxInventory.toString(),inventory_value_quote_base_units:inventory.toString(),
    max_order_notional_base_units:maxOrder.toString(),max_drawdown_bps:policy.max_drawdown_bps},
