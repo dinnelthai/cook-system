@@ -18,7 +18,9 @@
     "analyze:market-quality": "node scripts/analyze-market-quality.mjs",
     "audit:alerts": "node scripts/audit-alert-store.mjs",
     "evaluate:defensive": "node scripts/run-heldout-defensive-evaluation.mjs",
-    "accept:local-read": "node scripts/accept-local-read.mjs"
+    "accept:local-read": "node scripts/accept-local-read.mjs",
+    "audit:repo": "node scripts/audit-repository-hygiene.mjs",
+    "accept:all": "node scripts/run-unified-acceptance.mjs"
   },
   "devDependencies": {
     "@pump-fun/pump-sdk": "4.3.1",
