@@ -142,6 +142,10 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(typeof listReportCandidates!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         send(res,200,listReportCandidates(store.get(projectId)));return true;
       }
+      if(action==="business-review"){
+        if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        send(res,200,store.getBusinessReview(projectId));return true;
+      }
       if(action==="risk-review"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         send(res,200,store.getRiskReview(projectId));return true;

@@ -127,3 +127,10 @@ export async function reviewProjectMarketEvidence(projectId,revision,archiveId){
  if(r.review?.project_id!==projectId||r.review.project_revision!==revision||r.review.report_link_archive_id!==archiveId||r.review.execution_enabled!==false||r.review.live_market_assessed!==false||r.review.settlement_allowed!==false)throw Error("PROJECT_MARKET_EVIDENCE_SCOPE_MISMATCH");
  return r;
 }
+
+export async function getProjectBusinessReview(projectId,revision){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/business-review");
+ if(r.schema_version!=="cook-project-business-review.1"||r.project_id!==projectId||r.project_revision!==revision||r.execution_enabled!==false||
+ r.settlement_allowed!==false||r.lifecycle_mutated!==false||r.source_attestation!=="UNKNOWN"||!Array.isArray(r.intervals)||!Array.isArray(r.findings)||!Array.isArray(r.data_integration?.gates))throw Error("PROJECT_BUSINESS_REVIEW_SCOPE_MISMATCH");
+ return r;
+}

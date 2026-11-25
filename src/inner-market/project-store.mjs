@@ -9,6 +9,7 @@ import { buildProjectAuditBundle } from "./project-audit-bundle.mjs";
 import { createProjectAggregate, applyProjectCommand, assertProjectAggregate } from "./project-aggregate.mjs";
 import { replayProjectEvents } from "./project-event-replay.mjs";
 import { describeProjectLifecycleEvidence } from "./project-lifecycle-evidence.mjs";
+import { buildProjectBusinessReview } from "./project-business-review.mjs";
 import { describeRecordedProjectTimeline, describeLifecycleExceptions } from "./project-lifecycle-timeline.mjs";
 
 const MAX_AGGREGATE_BYTES = 1024 * 1024;
@@ -309,6 +310,9 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         db.exec("COMMIT");return bundle;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
+    function getBusinessReview(projectId){
+      return readSnapshot(()=>buildProjectBusinessReview(current(projectId).aggregate,listArchive(projectId),orderReview.list(projectId)));
+    }
     function getLifecycleReview(projectId){
       return readSnapshot(()=>{
         const latest=current(projectId),project=latest.aggregate,archives=listArchive(projectId),orders=orderReview.list(projectId);
@@ -366,7 +370,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
           original_database_replaced:false,source_attestation:"UNKNOWN",execution_enabled:false};
       }finally{copy.close();}
     }
-    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, close: () => db.close() };
+    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, getBusinessReview, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

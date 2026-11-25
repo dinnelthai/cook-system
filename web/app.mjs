@@ -23,7 +23,7 @@ import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-
 import {summarizeImportedParticipantValidation,compareImportedParticipantValidation} from "./participant-validation-view.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
-import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview,reviewProjectMarketEvidence} from "./project-client.mjs";
+import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview,reviewProjectMarketEvidence,getProjectBusinessReview} from "./project-client.mjs";
 import {treasuryReviewSections} from "./treasury-review-view.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
@@ -140,6 +140,7 @@ function renderTerminal(){
  main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>项目操作台</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
  '<div id="terminal-project-context" class="pro-statebar">正在读取 Project 数据…</div>'+
  '<div id="terminal-context-notice" role="status"></div>'+ 
+ '<section id="terminal-business-review" class="pro-pane" hidden></section>'+
  '<section id="terminal-market-evidence" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-risk-review" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-lifecycle-evidence" class="pro-pane" hidden></section>'+ 
@@ -170,6 +171,25 @@ function renderTerminal(){
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
     if(selected){
+      const businessArea=main.querySelector("#terminal-business-review");businessArea.hidden=false;
+      const businessCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&businessArea.isConnected;
+      let businessTicket=0;
+      async function refreshBusiness(){
+       const ticket=++businessTicket;businessArea.textContent="读取统一项目复核…";
+       try{
+        const v=await getProjectBusinessReview(selected.project_id,selected.revision);
+        if(!businessCurrent()||ticket!==businessTicket)return;
+        businessArea.innerHTML="<h3>项目统一复核 · v"+esc(v.project_revision)+"</h3>"+note(v.status+" · 区间历史证据 · 实时资产与执行不可用")+
+         table(["模块","状态","记录数"],[["资金与库存",v.treasury.status,v.treasury.review_count],["市场证据",v.market.status,v.market.review_count],["财务关闭",v.close.status,v.close.review_count],["订单复核","未充分复核 "+v.orders.unresolved_count,v.orders.record_count]])+
+         table(["区间开始","区间结束","关联复核数"],v.intervals.map(x=>[x.opening_cutoff,x.closing_cutoff,x.reviews.length]))+
+         table(["证据冲突","引用"],v.findings.map(x=>[x.code,x.reference??"—"]))+
+         table(["接入验收条件","状态"],v.data_integration.gates.map(g=>[g.id,g.status]))+
+         '<button id="business-refresh">刷新统一复核</button><button id="business-export">导出复核 JSON</button>';
+        businessArea.querySelector("#business-refresh").onclick=refreshBusiness;
+        businessArea.querySelector("#business-export").onclick=()=>download("project-business-review.json",JSON.stringify(v,null,2));
+       }catch(err){if(businessCurrent()&&ticket===businessTicket){businessArea.textContent="统一复核不可用："+errorKind(err);const retry=document.createElement("button");retry.textContent="重新读取";retry.onclick=refreshBusiness;businessArea.append(retry);}}
+      }
+      void refreshBusiness();
       const marketArea=main.querySelector("#terminal-market-evidence");marketArea.hidden=false;
       const marketCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&marketArea.isConnected;
       marketArea.innerHTML="<h3>历史行情证据审计</h3>"+note("仅复核已关联历史报告；不提供实时行情或交易信号。")+
@@ -207,6 +227,7 @@ function renderTerminal(){
       async function refreshRisk(){
        const own=++riskTicket;
        riskArea.textContent="读取项目历史风险与证据…";
+       void refreshBusiness();
        try{
         const r=await getProjectRiskReview(selected.project_id,selected.revision);
         if(!riskCurrent()||own!==riskTicket)return;

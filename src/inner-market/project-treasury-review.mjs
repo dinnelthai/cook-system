@@ -48,6 +48,8 @@ export function buildProjectTreasuryReview(projectInput,input){
     remaining_cost_base_units:f.assets.remaining_inventory_cost_base_units,
     supplied_historical_value_base_units:f.assets.closing_inventory_supplied_value_base_units}),
   realized_pnl:show(f.realized_pnl),creator_receivables:show(f.creator_receivables),
+  other_assets_and_liabilities:show({closing_other_assets_base_units:f.assets.closing_other_assets_base_units,
+    closing_liabilities_base_units:f.assets.closing_liabilities_base_units,reporting_basis:"SUPPLIED_HISTORICAL_ENDPOINT_ONLY"}),
   historical_valuation:show({status:f.valuation_status,closing_nav_base_units:f.assets.closing_nav_base_units,
     capital_adjusted_nav_change_base_units:f.assets.capital_adjusted_nav_change_base_units,
     closing_inventory_value_minus_cost_base_units:f.assets.closing_inventory_unrealized_value_minus_cost_base_units,

@@ -44,7 +44,12 @@ export function describeProjectRiskReview(projectInput,archives=[],orders=[]){
  }
  const allOrders=orders.filter(o=>o.project_id===p.project_id);
  for(const o of allOrders){
-  if(!current(p,o)){add("ORDER","STALE_ORDER_REVISION","WARNING",o.order_id);continue;}
+  if(!current(p,o)){
+   add("ORDER","STALE_ORDER_REVISION","WARNING",o.order_id);
+   if(o.status==="REVIEW_REQUIRED")add("ORDER","HISTORICAL_ORDER_OUTCOME_CONFLICT","CRITICAL",o.order_id);
+   else if(!knownOutcome.has(o.status))add("ORDER","HISTORICAL_ORDER_OUTCOME_UNKNOWN","UNKNOWN",o.order_id);
+   continue;
+  }
   if(o.status==="REVIEW_REQUIRED")add("ORDER","ORDER_OUTCOME_CONFLICT","CRITICAL",o.order_id);
   else if(!knownOutcome.has(o.status))add("ORDER","ORDER_OUTCOME_UNKNOWN","UNKNOWN",o.order_id);
   else if(o.status==="REPORTED_FAILURE")add("ORDER","REPORTED_TRANSACTION_FAILURE","WARNING",o.order_id);

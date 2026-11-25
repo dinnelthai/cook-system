@@ -33,10 +33,11 @@ export function reviewProjectMarketEvidence(projectInput,input){
  const attributed=complete.filter(t=>typeof t.actorAddress==="string"&&t.actorAddress.trim()===t.actorAddress&&t.actorAddress.length>0);
  const participantCoverage={record_count:trades.length,reconciled_record_count:complete.length,declared_address_record_count:attributed.length,
   missing_address_record_count:complete.length-attributed.length,
-  status:complete.length!==trades.length?"REVIEW_REQUIRED":attributed.length!==complete.length?"PARTIAL":"DECLARED_COMPLETE",
+  status:!trades.length?"NO_RECORDS":complete.length!==trades.length?"REVIEW_REQUIRED":attributed.length!==complete.length?"PARTIAL":"DECLARED_COMPLETE",
   independent_participant_count:null,ownership_attestation:"UNKNOWN"};
  if(participantCoverage.status==="REVIEW_REQUIRED")issues.push("UNRECONCILED_TRADE_RECORDS");
  if(participantCoverage.status==="PARTIAL")unknown.push("TRADE_ADDRESS_LABEL_COVERAGE_INCOMPLETE");
+ if(participantCoverage.status==="NO_RECORDS")unknown.push("TRADE_ACTIVITY_EVIDENCE_UNAVAILABLE");
  const reserveKeys=["real_quote_reserves_base_units","virtual_quote_reserves_base_units","real_token_reserves_base_units","virtual_token_reserves_base_units"];
  const missingFields=reserveKeys.filter(k=>m.snapshot[k]===null||m.snapshot[k]===undefined);
  const reserveEvidence={status:m.snapshot.status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":missingFields.length?"PARTIAL":"DECLARED_FIELDS_PRESENT",

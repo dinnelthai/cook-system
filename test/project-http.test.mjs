@@ -256,3 +256,14 @@ test("lifecycle endpoint returns a recorded timeline and exception review withou
  assert.equal(v.execution_enabled,false);assert.equal(v.exception_review.settlement_allowed,false);
  assert.equal((await (await fetch(root+"/timeline-http")).json()).project.revision,1);
 });
+
+test("unified business review is read-only and explicitly distinguishes pending data gates",async t=>{
+ const base=await setup(t),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"business-http",profile:{name:"Business",symbol:"BIZ"}})).status,201);
+ const url=root+"/business-http/business-review",r=await fetch(url);assert.equal(r.status,200);
+ const v=await r.json();assert.equal(v.project_revision,1);assert.equal(v.treasury.live_balance,null);
+ assert.equal(v.orders.record_count,0);assert.equal(v.data_integration.status,"EXTERNAL_ACCEPTANCE_PENDING");
+ assert.equal(v.execution_enabled,false);assert.equal(v.settlement_allowed,false);
+ assert.equal((await json(url,"POST",{})).status,405);
+ assert.equal((await (await fetch(root+"/business-http")).json()).project.revision,1);
+});
