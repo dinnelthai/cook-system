@@ -85,3 +85,9 @@ test("project report area is gated by linked archive digest, not identity alone"
  assert.match(app,/linkedReportMatches\(v,digest,data.scope\)/);
  assert.match(app,/terminal-settle"\)\.onclick=\(\)=>\{if\(activeProjectId\)return/);
 });
+
+test("operator workspace groups historical assets separately from evidence and task navigation",async()=>{
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");
+ assert.match(app,/class="operator-workspace"/);assert.match(app,/class="operator-treasury"/);assert.match(app,/class="operator-sidebar"/);assert.match(app,/class="operator-risk-counts"/);
+ assert.match(app,/projectIntervalMetrics\(row\)/);
+});

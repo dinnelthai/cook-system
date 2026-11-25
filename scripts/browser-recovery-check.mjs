@@ -128,6 +128,7 @@ export async function checkBrowserRecovery({browser,dir,env,url,previewDir=null}
   await wait("project-selection-reload",'window.__cookSelectionReload!==true&&document.querySelector("#terminal-project-select")?.value==='+JSON.stringify(project.project_id));
   assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
   await wait("operator-after-reload",'document.querySelector(".operator-task-grid")');
+  assert.equal(await evaluate('document.querySelectorAll(".operator-treasury .asset-metric").length===12&&document.querySelector(".operator-sidebar .operator-task-grid").children.length===7'),true);
   await evaluate('(()=>{const s=document.querySelector("#operator-view-mode");s.value="AUDIT";s.dispatchEvent(new Event("change"));})()');
   assert.equal(await evaluate('document.querySelector("#main").dataset.viewMode==="AUDIT"&&document.querySelector("details.audit-detail").open'),true);
   const pageChecks=[["wallet",'document.querySelector("#asset-interval")'],["dashboard",'document.querySelector("#scoped-review-interval")'],["projects",'document.querySelector("#workspace-export")'],["participants",'document.querySelector("#run-experiment")'],["logs",'document.querySelector("#log-download")'],["create",'document.querySelector("#project-budget-form")'],["terminal",'document.querySelector(".operator-task-grid")']];
@@ -152,6 +153,7 @@ export async function checkBrowserRecovery({browser,dir,env,url,previewDir=null}
   await cdp.call("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:false});
   await wait("narrow-viewport",'innerWidth===390&&document.querySelector(".operator-task-grid")');
   assert.equal(await evaluate('document.querySelector("#main").getBoundingClientRect().width<=innerWidth+1'),true);
+  assert.equal(await evaluate('document.querySelector(".operator-sidebar").getBoundingClientRect().top>=document.querySelector(".operator-treasury").getBoundingClientRect().bottom'),true);
   if(previewDir)await navigatePrimaryPages("narrow");
   await cdp.call("Emulation.clearDeviceMetricsOverride");
   await evaluate('sessionStorage.setItem("cook.project.selection.v1","missing-qa-project");window.__cookMissingReload=true');
