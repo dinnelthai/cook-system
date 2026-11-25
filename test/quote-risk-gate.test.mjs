@@ -41,3 +41,23 @@ test("invalid persisted halt timestamps default to halted",async()=>{
  const c=createEmergencyHaltController({readState:async()=>({schema_version:"cook-emergency-halt.1",halted:false,reason:"test",operator_confirmed:true,at_ms:-1}),writeState:async()=>{}});
  assert.equal((await c.load()).halted,true);
 });
+
+test("missing, malformed or extreme volatility cannot silently produce a quote",()=>{
+ for(const volatility_bps of [undefined,null,-1,10001,1.5]){
+  const i=input();if(volatility_bps===undefined)delete i.market.volatility_bps;else i.market.volatility_bps=volatility_bps;
+  const r=evaluateQuotePlan({...i,nowMs:2000});assert.equal(r.status,"BLOCKED");assert.ok(r.reasons.includes("MARKET_VOLATILITY_INVALID"));
+  assert.equal(r.quote.buy.enabled,false);assert.equal(r.quote.sell.enabled,false);
+ }
+});
+test("inventory skew and drawdown policies cannot produce zero or nonsensical reservation prices",()=>{
+ const i=input();i.policy.max_inventory_skew_bps=10000;
+ assert.throws(()=>evaluateQuotePlan({...i,nowMs:2000}),/INVALID_SPREAD_POLICY/);
+ const j=input();j.policy.max_drawdown_bps=10001;
+ assert.throws(()=>evaluateQuotePlan({...j,nowMs:2000}),/INVALID_SPREAD_POLICY/);
+});
+test("unbounded numeric strings are rejected before BigInt parsing",()=>{
+ const i=input();i.portfolio.quote_balance_base_units="9".repeat(10000);
+ assert.throws(()=>evaluateQuotePlan({...i,nowMs:2000}),/invalid quote balance/);
+ const j=input();j.market.mid_price_decimal="9".repeat(10000);
+ assert.throws(()=>evaluateQuotePlan({...j,nowMs:2000}),/invalid price/);
+});

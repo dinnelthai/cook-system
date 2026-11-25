@@ -21,3 +21,5 @@ COOK_LOCAL_FAUCET=1
 The offline server also applies bounded HTTP header/request timeouts, keep-alive limits and a per-process connection cap. These controls reduce accidental resource exhaustion; they are not a substitute for OS-level isolation.
 
 The local HTTP API now measures request bodies in bytes (not UTF-16 characters), drains oversized requests without retaining them, enforces the 4 KiB body cap, and rejects malformed UTF-8. Request/header timeouts bound slow-client resource use.
+
+The paper quote gate now blocks when volatility evidence is missing, malformed or outside its accepted basis-point range instead of silently substituting zero volatility. Inventory skew is strictly below 10000 bps so the reservation price cannot collapse to zero; maximum drawdown policy is capped at 10000 bps. Numeric strings are length-bounded before BigInt parsing to prevent pathological inputs. These are paper-risk controls only; no live order path was added.
