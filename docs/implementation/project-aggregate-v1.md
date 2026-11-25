@@ -102,7 +102,7 @@ Command requests include command_id, type, payload and expected_revision. The HT
 
 ## 8. Explicitly not implemented in this slice
 
-- browser UI / API integration;
+- deeper browser integration beyond the Project Setup page (the Project Setup page now uses the canonical API);
 - migration from web/project-registry.mjs localStorage;
 - migration of historical workspace records into Project;
 - Project-aware wallet store and trade adapters;
