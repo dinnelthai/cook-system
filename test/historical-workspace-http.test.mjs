@@ -1,0 +1,30 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {createServer} from "node:http";
+import {once} from "node:events";
+import {mkdtempSync,realpathSync,rmSync,readFileSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
+import {createHistoricalWorkspaceHandler} from "../src/inner-market/historical-workspace-http.mjs";
+import {requestHistoricalWorkspace} from "../web/historical-workspace-client.mjs";
+import {createHistoricalProjectCatalogue} from "../src/inner-market/historical-project-catalogue.mjs";
+import {exportHistoricalWorkspace} from "../src/inner-market/historical-project-workspace.mjs";
+test("HTTP workspace round trip, conflict and revision listing preserve original data",async t=>{
+ const dir=mkdtempSync(join(tmpdir(),"cook-workspace-http-"));
+ const handler=createHistoricalWorkspaceHandler({path:join(realpathSync(dir),"workspace.sqlite"),readRequestJson:async req=>{const parts=[];for await(const p of req)parts.push(p);return Buffer.concat(parts).toString("utf8");}});
+ const server=createServer(handler);server.listen(0,"127.0.0.1");await once(server,"listening");
+ t.after(async()=>{await new Promise(resolve=>server.close(resolve));rmSync(dir,{recursive:true,force:true});});
+ const base="http://127.0.0.1:"+server.address().port,fetcher=(path,options)=>fetch(base+path,options);
+ const c=createHistoricalProjectCatalogue();c.add(JSON.parse(readFileSync(new URL("../fixtures/synthetic/inner-market-mvp.json",import.meta.url),"utf8")));
+ const workspace=exportHistoricalWorkspace(c);
+ assert.equal((await requestHistoricalWorkspace({fetcher})).revision,0);
+ const saved=await requestHistoricalWorkspace({fetcher,method:"POST",expectedRevision:0,workspace});assert.equal(saved.revision,1);
+ await assert.rejects(requestHistoricalWorkspace({fetcher,method:"POST",expectedRevision:0,workspace}),/WORKSPACE_REVISION_CONFLICT/);
+ assert.deepEqual((await requestHistoricalWorkspace({fetcher})).workspace,workspace);
+ assert.equal((await requestHistoricalWorkspace({fetcher,revisions:true})).revisions.length,1);
+ const bad=await fetcher("/api/historical-workspace",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});assert.equal(bad.status,400);
+ assert.equal((await requestHistoricalWorkspace({fetcher})).revision,1);
+});
+test("workspace client makes only one request on ambiguous failure",async()=>{
+ let calls=0;await assert.rejects(requestHistoricalWorkspace({method:"POST",workspace:{},expectedRevision:0,fetcher:async()=>{calls++;throw Error("network lost");}}),/network lost/);assert.equal(calls,1);
+});

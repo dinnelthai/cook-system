@@ -16,7 +16,7 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  t.after(()=>rm(reportDir,{recursive:true,force:true}));await copyFile(fixture,report);
  const home=await mkdtemp(join(tmpdir(),"cook-server-home-"));t.after(()=>rm(home,{recursive:true,force:true}));
  const script=fileURLToPath(new URL("../scripts/serve-offline-mvp.mjs",import.meta.url));
- const child=spawn(process.execPath,[script],{env:{...process.env,HOME:home,PORT:String(port),COOK_TERMINAL_REPORT:report,COOK_LOCAL_RPC_URL:"",COOK_LOCAL_FAUCET:"1",COOK_LOCAL_TRANSFER:"0",COOK_LOCAL_TRADING:"0",COOK_PUMP_LAB_URL:""},stdio:["ignore","pipe","pipe"]});
+ const child=spawn(process.execPath,[script],{env:{...process.env,HOME:home,PORT:String(port),COOK_TERMINAL_REPORT:report,COOK_LOCAL_RPC_URL:"",COOK_LOCAL_FAUCET:"1",COOK_LOCAL_TRANSFER:"0",COOK_LOCAL_TRADING:"0",COOK_PUMP_LAB_URL:"",COOK_HISTORICAL_WORKSPACE:"0"},stdio:["ignore","pipe","pipe"]});
  t.after(()=>{if(child.exitCode===null)child.kill();});
  await new Promise((resolve,reject)=>{
   let output="";
@@ -42,6 +42,8 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  assert.equal((await fetch(base+"/src/inner-market/terminal-candles.mjs")).status,200);
  assert.equal((await fetch(base+"/src/inner-market/historical-risk.mjs")).status,200);
  assert.equal((await fetch(base+"/src/inner-market/unified-historical-report.mjs")).status,200);
+ const disabled=await fetch(base+"/api/historical-workspace");assert.equal(disabled.status,503);assert.equal((await disabled.json()).code,"WORKSPACE_DISABLED");
+ assert.equal((await fetch(base+"/api/historical-workspace",{headers:{origin:"https://example.invalid"}})).status,403);
  const response=await fetch(base+"/api/terminal/report");assert.equal(response.status,200);assert.equal((await response.json()).sourceMode,"SYNTHETIC");
  const health=await fetch(base+"/api/terminal/health");assert.equal(health.status,200);assert.deepEqual(await health.json(),{report_bridge:"CONFIGURED",rpc:{status:"NOT_CONFIGURED",network_verified:false},execution_enabled:false});
  const trade=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:"{}"});assert.equal(trade.status,400);assert.equal((await trade.json()).code,"TRADE_DISABLED");

@@ -13,6 +13,7 @@ import {reviewSyntheticLedgerInput} from "./synthetic-ledger-view.mjs";
 import {reviewSyntheticBatchInput} from "./synthetic-batch-view.mjs";
 import {createHistoricalProjectCatalogue} from "../src/inner-market/historical-project-catalogue.mjs";
 import {listHistoricalProjects,exportHistoricalWorkspace,restoreHistoricalWorkspace,WORKSPACE_MAX_BYTES} from "../src/inner-market/historical-project-workspace.mjs";
+import {requestHistoricalWorkspace} from "./historical-workspace-client.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 // Session storage retains diagnostics across refreshes in the same tab, without cross-tab writers.
 const diagnostics=createDiagnosticLog({storage:(()=>{try{return window.sessionStorage;}catch{return null;}})()});
@@ -44,6 +45,7 @@ const fixture=await (async()=>{
 })();
 const original=structuredClone(fixture);
 let projectCatalogue=createHistoricalProjectCatalogue(),catalogueSelection=null;
+let workspaceRevision=null,workspaceBusy=false,workspaceMessage="尚未读取数据库；文件导入导出仍可使用。",workspaceVersions=[];
 let data=structuredClone(fixture),report,page="terminal",importTicket=0;
 const importCurrent=(ticket,startPage)=>ticket===importTicket&&page===startPage;
 try{report=auditedReport(data)}catch(e){startupFailure(e);throw e;}
@@ -156,8 +158,9 @@ function render(){
  }else if(page==="projects"){
  const catalogue=projectCatalogue.list(),projects=listHistoricalProjects(projectCatalogue);
  main.innerHTML=screenHeading("项目档案","项目实体 · 独立历史区间 · 工作区文件")+
- note("档案仅供历史审阅，不改变操作台、默认 Token 或钱包。最多 8 份；刷新前请导出工作区文件，重新导入即可恢复。仅导入脱敏报告，不包含凭据或私钥。")+
+ note("档案仅供历史审阅，不改变操作台、默认 Token 或钱包。最多 8 份；可显式保存至已启用的本地数据库，或导出工作区文件；未保存的修改在刷新后丢失。仅导入脱敏报告，不包含凭据或私钥。")+
  panel("项目工作区",table(["项目","Token","网络","身份","区间数","待复核"],projects.map(p=>[p.project_id,p.token_mint,p.network,p.identity_status,p.record_count,p.review_required_count]))+'<button id="workspace-export">保存工作区 JSON</button> <label for="workspace-import">合并工作区 JSON</label><input id="workspace-import" type="file" accept=".json"><p class="muted">只保存原始输入；恢复时重新审计。冲突则整批不变。</p>')+
+ panel("本地数据库版本",note(workspaceMessage)+table(["当前已知版本","状态"],[[workspaceRevision??"未知",workspaceBusy?"请求中":"显式保存"]])+ '<button id="workspace-db-load">读取数据库工作区</button> <button id="workspace-db-save">保存当前工作区到数据库</button> <button id="workspace-db-versions">查看版本记录</button>'+table(["版本","字节","摘要"],workspaceVersions.map(v=>[v.revision,v.bytes,v.digest])))+
  panel("当前报告",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status]])+'<button id="catalogue-add">将当前报告加入档案</button>')+
  panel("历史档案",'<label for="catalogue-file">导入历史报告输入 JSON</label><input id="catalogue-file" type="file" accept=".json"><p id="catalogue-message" role="status"></p>'+
  table(["项目","Token","来源","起始","结束","审计"],catalogue.map(r=>[r.projectId,r.tokenMint,r.source_mode,r.openingCutoff,r.closingCutoff,r.audit_status]))+
@@ -173,6 +176,33 @@ function render(){
   }catch{detail.textContent="档案复核失败"}
  }
  select.onchange=showCatalogue;showCatalogue();
+ const dbLoad=main.querySelector("#workspace-db-load"),dbSave=main.querySelector("#workspace-db-save"),dbVersions=main.querySelector("#workspace-db-versions");
+ dbLoad.disabled=workspaceBusy;dbSave.disabled=workspaceBusy||workspaceRevision===null;dbVersions.disabled=workspaceBusy;
+ for(const id of ["workspace-import","catalogue-add","catalogue-file","catalogue-select"])main.querySelector("#"+id).disabled=workspaceBusy;
+ if(workspaceBusy)removeButton.disabled=true;
+ async function databaseAction(action){
+  if(workspaceBusy)return;
+  if(action==="load"&&projectCatalogue.list().length&&!window.confirm("读取数据库将替换当前会话档案。请先导出未保存记录。继续？"))return;
+  if(action==="save"&&(workspaceRevision===null||!window.confirm("将当前脱敏工作区保存为数据库新版本？")))return;
+  importTicket++;workspaceBusy=true;workspaceMessage="数据库请求中";render();
+  try{
+   if(action==="load"){
+    const result=await requestHistoricalWorkspace();
+    const next=restoreHistoricalWorkspace(result.workspace);
+    projectCatalogue=next;catalogueSelection=null;workspaceRevision=result.revision;workspaceVersions=[];workspaceMessage="数据库工作区已读取，版本 "+result.revision;
+   }else if(action==="save"){
+    const result=await requestHistoricalWorkspace({method:"POST",workspace:exportHistoricalWorkspace(projectCatalogue),expectedRevision:workspaceRevision});
+    workspaceRevision=result.revision;workspaceVersions=[];workspaceMessage="保存结果："+result.status+" · 版本 "+result.revision;
+   }else{
+    const result=await requestHistoricalWorkspace({revisions:true});workspaceVersions=result.revisions;workspaceMessage="数据库版本记录已读取";
+   }
+  }catch(err){
+   if(action==="save")workspaceRevision=null;
+   const reason=({WORKSPACE_REVISION_CONFLICT:"版本冲突",WORKSPACE_DISABLED:"数据库功能未启用",WORKSPACE_STORAGE_LIMIT:"版本存储已满",WORKSPACE_INTEGRITY_FAILURE:"数据完整性检查失败",WORKSPACE_VALIDATION_FAILED:"报告校验失败",WORKSPACE_UNAVAILABLE:"数据库不可用"})[err.message]??errorKind(err);
+   workspaceMessage="数据库操作未确认："+reason+"。当前会话记录保留；保存失败后请先导出，再重新读取版本，不要盲目重试。";
+  }finally{workspaceBusy=false;if(page==="projects")render();}
+ }
+ dbLoad.onclick=()=>databaseAction("load");dbSave.onclick=()=>databaseAction("save");dbVersions.onclick=()=>databaseAction("versions");
  main.querySelector("#workspace-export").onclick=()=>download("historical-project-workspace.json",JSON.stringify(exportHistoricalWorkspace(projectCatalogue)));
  main.querySelector("#workspace-import").onchange=async e=>{const ticket=++importTicket,file=e.target.files[0];if(!file)return;
   try{if(file.size>WORKSPACE_MAX_BYTES)throw Error("FILE_TOO_LARGE");const bundle=JSON.parse(await file.text());if(!importCurrent(ticket,"projects"))return;

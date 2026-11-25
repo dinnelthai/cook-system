@@ -16,6 +16,9 @@ const types={".html":"text/html; charset=utf-8",".mjs":"text/javascript; charset
 const reportPath=process.env.COOK_TERMINAL_REPORT;
 const localFeatures=resolveLocalFeatureFlags();
 const maxReportBytes=16*1024*1024;
+const workspaceEnabled=process.env.COOK_HISTORICAL_WORKSPACE==="1";
+const workspacePath=process.env.COOK_HISTORICAL_WORKSPACE_DB??resolve(root,".cook-system","historical-workspace","workspace.sqlite");
+const workspaceHandler=workspaceEnabled?(await import("../src/inner-market/historical-workspace-http.mjs")).createHistoricalWorkspaceHandler({path:workspacePath,readRequestJson}):null;
 async function readRequestJson(req,maxBytes){
  const chunks=[];let total=0,tooLarge=false;
  for await(const part of req){const chunk=Buffer.isBuffer(part)?part:Buffer.from(part);total+=chunk.length;if(total>maxBytes){tooLarge=true;chunks.length=0;continue;}if(!tooLarge)chunks.push(chunk);}
@@ -32,6 +35,10 @@ const server=createServer(async(req,res)=>{
  try{
   const requestHost=req.headers.host,requestOrigin=req.headers.origin;
   if(!["127.0.0.1:"+port,"localhost:"+port].includes(requestHost)||req.headers["sec-fetch-site"]==="cross-site"||(requestOrigin&&requestOrigin!=="http://"+requestHost)){res.writeHead(403,{"Cache-Control":"no-store","Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"FORBIDDEN"}));return;}
+  if(["/api/historical-workspace","/api/historical-workspace/revisions"].includes(req.url)){
+   if(!workspaceHandler){res.writeHead(503,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"WORKSPACE_DISABLED"}));return;}
+   await workspaceHandler(req,res);return;
+  }
   if(["/api/local-wallet/balance","/api/local-wallet/airdrop","/api/local-wallet/list","/api/local-wallet/create","/api/local-wallet/transfer","/api/local-wallet/market","/api/local-wallet/market-data","/api/local-wallet/trade"].includes(req.url)){
    const send=(status,body)=>{res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify(body))};
    const host=req.headers.host,origin=req.headers.origin;
