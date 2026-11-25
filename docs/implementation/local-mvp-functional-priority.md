@@ -39,3 +39,7 @@ The existing offline participant simulator now emits an aggregate opening/closin
 ## F08 — historical risk reporting consistency
 
 Historical risk summaries now include independent closing-account-set and trade-evidence review findings. The cash crosscheck's nested ledger difference and arithmetic identity are checked with exact integers even when the top-level summary claims consistency. Missing differences remain unknown. Four regressions cover these cases. Current liquidity, independent ownership, asset valuation and live risk are not inferred from closed-interval accounting. No order sizing, execution policy or forward liquidity model is changed.
+
+## F09 — historical dashboard integration
+
+The review dashboard renders the same backend risk alerts and check evidence as the terminal, including closing account set and trade evidence. A distinct input-record export supports later reimport; the existing derived report export remains separate. Historical cash/NAV labels no longer imply a current spendable balance. The dashboard labels its data as offline; diagnostic retention text matches session storage behavior. Tests cover the presentation contract, not a real browser interaction. No transaction controls or live strategy logic are added.
