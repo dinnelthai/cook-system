@@ -16,7 +16,7 @@ function fill(select,rows){
 export async function mountWalletSelector(host,onManage){
  host.innerHTML='<div class="row wallet-picker"><span>当前钱包</span><select aria-label="当前钱包" disabled></select><button type="button">钱包管理</button></div><small data-state role="status"></small>';
  const sel=host.querySelector("select"),state=host.querySelector("[data-state]");host.querySelector("button").onclick=onManage;
- sel.onchange=()=>{choose(sel.value);if(q("[data-target]").value===sel.value){const other=[...q("[data-target]").options].find(o=>o.value!==sel.value);q("[data-target]").value=other?.value||"";}state.textContent="当前钱包已切换";};
+ sel.onchange=()=>{choose(sel.value);state.textContent="当前钱包已切换";};
  try{const {wallets}=await api("list",{});fill(sel,wallets);sel.disabled=!wallets.length;if(!wallets.length)state.textContent="请先创建钱包"}catch{state.textContent="钱包服务不可用"}
 }
 export function mountLocalFaucet(host){

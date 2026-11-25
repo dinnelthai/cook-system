@@ -161,3 +161,5 @@ End with one of:
 - `REVIEW_REQUIRED`
 
 Do not claim production readiness. Return the report and JSON artifact to the project owner. Wait for the owner to pass findings back for implementation; this baseline pass is review-only.
+
+Additional browser check: change the active-wallet selector in the top header and the wallet-management page independently. Each selector must update the stored active address without throwing a browser-console error or mutating another form's destination field.
