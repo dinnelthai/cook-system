@@ -245,3 +245,14 @@ test("market evidence endpoint validates archive scope and rejects client-suppli
  assert.equal((await json(url,"POST",{expected_revision:2,archive_id:"missing"})).status,409);
  assert.equal((await json(url,"POST",{expected_revision:1,archive_id:"missing"})).status,404);
 });
+
+test("lifecycle endpoint returns a recorded timeline and exception review without mutating project",async t=>{
+ const base=await setup(t),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"timeline-http",profile:{name:"Timeline",symbol:"TIME"}})).status,201);
+ const response=await fetch(root+"/timeline-http/lifecycle-evidence");assert.equal(response.status,200);
+ const v=await response.json();assert.equal(v.project_revision,1);
+ assert.deepEqual(v.recorded_timeline.stages.map(x=>x.stage),["DRAFT"]);
+ assert.equal(v.exception_review.status,"EVIDENCE_INCOMPLETE");
+ assert.equal(v.execution_enabled,false);assert.equal(v.exception_review.settlement_allowed,false);
+ assert.equal((await (await fetch(root+"/timeline-http")).json()).project.revision,1);
+});

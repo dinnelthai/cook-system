@@ -213,3 +213,20 @@ test("database inspection does not treat corrupt archive as a healthy project",t
   assert.throws(()=>r.createVerifiedBackup(join(path,"..","bad-copy.sqlite")),/PROJECT_BACKUP_REVIEW_REQUIRED/);
  }finally{r.close();}
 });
+
+test("lifecycle, risk and audit export use one recorded project revision",t=>{
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000});
+ try{
+  const p=s.create(base);
+  s.append(p.project_id,{command_id:"group-qa",type:"UPSERT_WALLET_GROUP",payload:{group:group()}},{expected_revision:1});
+  s.append(p.project_id,{command_id:"ready-qa",type:"TRANSITION_LIFECYCLE",payload:{to:"READY"}},{expected_revision:2});
+  s.append(p.project_id,{command_id:"hold-qa",type:"SET_OPERATIONAL_STATUS",payload:{status:"REVIEW_REQUIRED"}},{expected_revision:3});
+  const v=s.getLifecycleReview(p.project_id),b=s.exportAuditBundle(p.project_id,4);
+  assert.equal(v.project_revision,4);assert.equal(v.recorded_stage,"READY");
+  assert.deepEqual(v.recorded_timeline.stages.map(x=>x.stage),["DRAFT","READY"]);
+  assert.equal(v.recorded_timeline.explicit_operational_events.at(-1).status,"REVIEW_REQUIRED");
+  assert.equal(v.exception_review.status,"REVIEW_REQUIRED");assert.equal(v.exception_review.independent_recovery_verified,false);
+  assert.deepEqual(v.recorded_timeline,b.recorded_timeline);assert.deepEqual(v.exception_review,b.exception_review);
+  assert.equal(b.settlement_allowed,false);assert.equal(s.get(p.project_id).revision,4);
+ }finally{s.close();}
+});

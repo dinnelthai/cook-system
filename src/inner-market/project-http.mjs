@@ -1,6 +1,5 @@
 import {describeProjectRiskReview} from "./project-risk-review.mjs";
-import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs";
-import {reviewProjectGraduationEvidence} from "./project-graduation-evidence.mjs";
+ import {reviewProjectGraduationEvidence} from "./project-graduation-evidence.mjs";
 const ROOT = "/api/projects";
 // This public operator boundary is not a chain verifier or an internal auditor.
 const OPERATOR_COMMANDS = new Set([
@@ -204,9 +203,7 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
       }
       if(action==="lifecycle-evidence"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
-        const project=store.get(projectId),archive=store.listArchive(projectId),orders=store.orderReview.list(projectId);
-        if(store.get(projectId).revision!==project.revision)throw Error("PROJECT_REVISION_CONFLICT");
-        send(res,200,describeProjectLifecycleEvidence(project,archive,orders));return true;
+        send(res,200,store.getLifecycleReview(projectId));return true;
       }
       if(action==="order-import"){
         if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}

@@ -16,12 +16,16 @@ export function reviewProjectCloseEvidence(projectInput,input,orders=[],archives
  const unresolved=all.filter(o=>o.stale||!["REPORTED_SUCCESS","REPORTED_FAILURE"].includes(o.status));
  if(unresolved.length)blockers.push("ORDER_RECORDS_UNRESOLVED");
  const matching=all.filter(o=>!unresolved.includes(o));
- const reviewArchives=archives.filter(a=>a.kind==="ORDER_RECEIPT_REVIEW"&&a.project_id===p.project_id&&a.project_revision===p.revision&&!a.stale&&a.payload?.source_attestation==="UNKNOWN");
+ const reviewArchives=archives.filter(a=>a.kind==="ORDER_RECEIPT_REVIEW"&&a.project_id===p.project_id&&a.project_revision===p.revision&&a.stale===false&&a.payload?.project_id===p.project_id&&a.payload?.project_revision===p.revision&&a.payload?.source_attestation==="UNKNOWN"&&a.payload.execution_enabled===false);
+ const receiptConflicts=[];
  const unmatched=matching.filter(o=>{
   const rows=reviewArchives.filter(a=>a.payload.order_id===o.order_id&&a.payload.order_revision===o.revision&&a.payload.order_head_hash===o.head_hash&&a.payload.signature===o.signature);
-  return !rows.some(a=>a.payload.status==="INTERNAL_MATCH"&&a.payload.rpc_observation?.status==="DECLARED_SAMPLE_MATCH")||rows.some(a=>a.payload.status==="REVIEW_REQUIRED"||a.payload.rpc_observation?.status==="REVIEW_REQUIRED");
+  const conflict=rows.some(a=>a.payload.status==="REVIEW_REQUIRED"||a.payload.rpc_observation?.status==="REVIEW_REQUIRED");
+  if(conflict)receiptConflicts.push(o.order_id);
+  return !rows.some(a=>a.payload.status==="INTERNAL_MATCH"&&a.payload.rpc_observation?.status==="DECLARED_SAMPLE_MATCH")||conflict;
  });
  if(unmatched.length)unknown.push("ORDER_RECEIPT_REVIEW_INCOMPLETE");
+ if(receiptConflicts.length)blockers.push("ORDER_RECEIPT_REVIEW_CONFLICT");
  if(!all.length)unknown.push("ORDER_COVERAGE_UNATTESTED");
  if(f.status==="REVIEW_REQUIRED")blockers.push("FINANCIAL_REPORT_REVIEW_REQUIRED");
  if(f.cash_flow.closing_cash_difference_base_units===null)unknown.push("CASH_DIFFERENCE_UNKNOWN");
@@ -40,7 +44,7 @@ export function reviewProjectCloseEvidence(projectInput,input,orders=[],archives
  unknown.push("INDEPENDENT_SOURCE_OWNERSHIP_AND_VALUATION_UNATTESTED","PROJECT_WIDE_ACCOUNT_COVERAGE_UNATTESTED");
  return {schema_version:"cook-project-close-evidence.1",project_id:p.project_id,project_revision:p.revision,report_digest:sha(input),recorded_stage:p.lifecycle.stage,status:blockers.length?"REVIEW_REQUIRED":"PARTIAL",
   financial_status:f.status,scope:f.scope,cash_difference_base_units:f.cash_flow.closing_cash_difference_base_units,
-  residuals,orders:{recorded:all.length,unresolved:unresolved.length,review_incomplete:unmatched.length},
+  residuals,orders:{recorded:all.length,unresolved:unresolved.length,review_incomplete:unmatched.length,receipt_conflict_count:receiptConflicts.length},
   blockers,unknown,source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",settlement_allowed:false,lifecycle_mutated:false,execution_enabled:false};
 }
 export function createProjectCloseReviewer({path,enabled}={}){

@@ -2,6 +2,7 @@ import {createHash} from "node:crypto";
 import {canonicalJson} from "../core/canonical-json.mjs";
 import {describeProjectRiskReview} from "./project-risk-review.mjs";
 import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs";
+import {describeRecordedProjectTimeline,describeLifecycleExceptions} from "./project-lifecycle-timeline.mjs";
 const digest=x=>createHash("sha256").update(canonicalJson(x),"utf8").digest("hex");
 export const PROJECT_AUDIT_BUNDLE_MAX_BYTES=32*1024*1024;
 /** Export of internally checked local records, not a source attestation,
@@ -14,8 +15,10 @@ export function buildProjectAuditBundle({project,integrity,events,archives,order
   ...orders.filter(o=>o.order.stale||["RECORDED","OUTCOME_UNKNOWN","REVIEW_REQUIRED"].includes(o.order.status)).map(o=>({category:"ORDER",code:o.order.stale?"STALE_ORDER_REVISION":o.order.status,order_id:o.order.order_id})),
   ...archives.filter(a=>a.stale||a.payload.status==="REVIEW_REQUIRED"||a.payload.rpc_observation?.status==="REVIEW_REQUIRED").map(a=>({category:"ARCHIVE",code:a.stale?"STALE_ARCHIVE_REVISION":"EVIDENCE_CONFLICT",archive_id:a.archive_id}))
  ];
+ const recorded_timeline=describeRecordedProjectTimeline(project,events);
+ const exception_review=describeLifecycleExceptions(project,lifecycle,risk);
  const content={schema_version:"cook-project-audit-bundle.1",project_id:project.project_id,project_revision:project.revision,
-  project,integrity:{...integrity,status:"INTERNAL_HASH_CHAIN_CHECKED"},events,archives,orders,lifecycle,risk,exceptions,
+  project,integrity:{...integrity,status:"INTERNAL_HASH_CHAIN_CHECKED"},events,archives,orders,lifecycle,risk,exceptions,recorded_timeline,exception_review,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",
   original_report_bytes_included:false,settlement_allowed:false,lifecycle_mutated:false,execution_enabled:false};
  if(Buffer.byteLength(canonicalJson(content))>PROJECT_AUDIT_BUNDLE_MAX_BYTES)throw Error("PROJECT_AUDIT_BUNDLE_SIZE_LIMIT");

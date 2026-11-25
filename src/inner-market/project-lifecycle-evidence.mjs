@@ -38,7 +38,7 @@ export function describeProjectLifecycleEvidence(projectInput,archive,orders=[])
   return {stage,status,archive_ids:rows.map(m=>m.archive_id)};
  });
  const closeReviews=scoped.filter(a=>a.kind==="PROJECT_CLOSE_REVIEW");
- const closeEvidence={status:closeReviews.some(a=>a.payload.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":closeReviews.length?"PARTIAL":"MISSING",
+ const closeEvidence={status:closeReviews.some(a=>a.payload.status==="REVIEW_REQUIRED"||(Array.isArray(a.payload.blockers)&&a.payload.blockers.length>0))?"REVIEW_REQUIRED":closeReviews.length?"PARTIAL":"MISSING",
   archive_ids:closeReviews.map(a=>a.archive_id),blockers:[...new Set(closeReviews.flatMap(a=>a.payload.blockers??[]))],unknown:[...new Set(closeReviews.flatMap(a=>a.payload.unknown??[]))]};
  const allOrders=orders.filter(o=>o.project_id===p.project_id);
  const currentOrders=allOrders.filter(o=>o.project_revision===p.revision&&o.stale===false);

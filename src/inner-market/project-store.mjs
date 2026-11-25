@@ -8,6 +8,8 @@ import { describeProjectRiskReview } from "./project-risk-review.mjs";
 import { buildProjectAuditBundle } from "./project-audit-bundle.mjs";
 import { createProjectAggregate, applyProjectCommand, assertProjectAggregate } from "./project-aggregate.mjs";
 import { replayProjectEvents } from "./project-event-replay.mjs";
+import { describeProjectLifecycleEvidence } from "./project-lifecycle-evidence.mjs";
+import { describeRecordedProjectTimeline, describeLifecycleExceptions } from "./project-lifecycle-timeline.mjs";
 
 const MAX_AGGREGATE_BYTES = 1024 * 1024;
 const hash = value => createHash("sha256").update(value, "utf8").digest("hex");
@@ -307,6 +309,15 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         db.exec("COMMIT");return bundle;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
+    function getLifecycleReview(projectId){
+      return readSnapshot(()=>{
+        const latest=current(projectId),project=latest.aggregate,archives=listArchive(projectId),orders=orderReview.list(projectId);
+        const lifecycle=describeProjectLifecycleEvidence(project,archives,orders);
+        const risk=describeProjectRiskReview(project,archives,orders);
+        return {...lifecycle,recorded_timeline:describeRecordedProjectTimeline(project,latest.events),
+          exception_review:describeLifecycleExceptions(project,lifecycle,risk)};
+      });
+    }
     function getRiskReview(projectId){
       db.exec("BEGIN");
       try{
@@ -355,7 +366,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
           original_database_replaced:false,source_attestation:"UNKNOWN",execution_enabled:false};
       }finally{copy.close();}
     }
-    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, close: () => db.close() };
+    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;
