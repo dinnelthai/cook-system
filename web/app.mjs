@@ -11,6 +11,8 @@ import {createDiagnosticLog,errorKind} from "./diagnostic-log.mjs";
 import {historicalReviewRows} from "./historical-review-view.mjs";
 import {buildProjectFinancialCloseReview} from "../src/inner-market/project-financial-close-review.mjs";
 import {financialCloseRows} from "./financial-close-view.mjs";
+import {buildCreatorFeeLedgerReport} from "../src/inner-market/creator-fee-ledger-report.mjs";
+import {creatorFeeLedgerRows} from "./creator-fee-ledger-view.mjs";
 import {reviewSyntheticLedgerInput} from "./synthetic-ledger-view.mjs";
 import {reviewSyntheticBatchInput} from "./synthetic-batch-view.mjs";
 import {createHistoricalProjectCatalogue} from "../src/inner-market/historical-project-catalogue.mjs";
@@ -18,6 +20,7 @@ import {listHistoricalProjects,exportHistoricalWorkspace,restoreHistoricalWorksp
 import {requestHistoricalWorkspace,queryHistoricalWorkspace} from "./historical-workspace-client.mjs";
 import {mountSavedProjectReview} from "./saved-project-review.mjs";
 import {mountGraduationReview} from "./graduation-review-view.mjs";
+import {mountProjectLifecycleReview} from "./project-lifecycle-review-view.mjs";
 import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-workflow.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
@@ -50,7 +53,7 @@ const fixture=await (async()=>{
  catch(e){record("fixture.failed",{error_kind:errorKind(e)},"ERROR");startupFailure(e);throw e;}
 })();
 const original=structuredClone(fixture);
-let projectCatalogue=createHistoricalProjectCatalogue(),catalogueSelection=null,graduationReview=null;
+let projectCatalogue=createHistoricalProjectCatalogue(),catalogueSelection=null,graduationReview=null,lifecycleReview=null;
 const projectRegistry=createProjectRegistry();
 let activeProjectId=null,projectMessage="";
 let workspaceRevision=null,workspaceBusy=false,workspaceMessage="尚未读取数据库；文件导入导出仍可使用。",workspaceVersions=[];
@@ -109,13 +112,16 @@ function renderTerminal(){
  const isSynthetic=d.source_mode==="SYNTHETIC",isSample=!offlineReview&&isSynthetic;
  const workflow=describeProjectReviewWorkflow({state:d,loaded:!isSample,metadata,reviewStage});
  const money=x=>isSample?"—":quoteAmount(x,scope.quoteAsset);
- const tabs=[["trades","成交记录"],["cash","资金流水"],["inventory","库存"],["liquidity","流动性"],["finance","财务结算复核"],["risk","风险与审计"],["logs","运行日志"]];
+ const tabs=[["trades","成交记录"],["cash","资金流水"],["inventory","库存"],["liquidity","流动性"],["finance","财务结算复核"],["creator-fees","Creator Fee"],["risk","风险与审计"],["logs","运行日志"]];
  const trades=isSample?[]:data.market.trades.filter(x=>x.status==="FINALIZED"&&x.reconciliation==="PASS");
  const snapshots=ready&&!isSample?d.performance.observations:[];
  let closeReview=null;
  const getCloseReview=()=>closeReview??=buildProjectFinancialCloseReview(data);
+ let feeReview=null;
+ const getFeeReview=()=>feeReview??=buildCreatorFeeLedgerReport({scope:data.scope,creator:data.creator,cash:data.cash});
  const rows={
  finance:()=>{const review=getCloseReview(),groups=financialCloseRows(review);return note("历史区间复核 · "+review.status+" · 来源、归属、估值未独立认证。不是退出执行或真实结算。")+table(["项目","来源","起始","结束"],[[scope.projectId,review.source_mode,scope.openingCutoff,scope.closingCutoff]])+groups.map(g=>'<h3>'+esc(g.label)+'</h3>'+table(["指标","值"],g.rows.map(([label,value,unit])=>[label,unit==="quote"?money(value):value??"未知"]))).join("")+table(["检查","状态","证据"],review.review_checks.map(c=>[c.id,c.status,c.evidence.join(" / ")]))+'<button id="financial-close-export">导出财务复核报告</button>';},
+ creator-fees:()=>{const r=getFeeReview();return note("Creator Fee 子账 · "+r.status+" · 应收不等于到账，PumpSwap Fee Bucket 不等于钱包收入。")+creatorFeeLedgerRows(r).map(g=>"<h3>"+esc(g.label)+"</h3>"+table(g.headers,g.rows)).join("")+details("审计限制",r.notes)+'<button id="creator-fee-export">导出 Creator Fee 子账</button>';},
  trades:()=>table(["事件","序号","方向","名义金额","状态"],data.market.trades.map(x=>[x.id,x.sequence,x.side,money(x.quoteNotionalBaseUnits),x.status])),
  cash:()=>table(["事件","类型","金额","对账"],data.cash.entries.map(x=>[x.id,x.kind,money(x.amountBaseUnits),x.reconciliation])),
  inventory:()=>metrics([["期末库存（base units）",isSample?null:a.closing_token_balance_base_units],["库存成本",money(a.remaining_cost_basis_base_units)]])+table(["事件","方向","数量","成本","净收入"],(ready?data.inventory.ledger.position_journal:[]).map(x=>[x.event_id,x.side,x.token_amount_base_units,money(x.cash_cost_quote_base_units),money(x.net_quote_proceeds_base_units)]))+emptyState("逐钱包持仓未接入","当前仅有项目级库存证据"),
@@ -147,6 +153,7 @@ function renderTerminal(){
  main.querySelector("#workflow-cash").onclick=()=>{terminalTab="cash";reviewPaused=false;render()};
  main.querySelector("#workflow-finance").onclick=()=>{if(isSample)return;terminalTab="finance";reviewPaused=false;render()};
  const closeExport=main.querySelector("#financial-close-export");if(closeExport)closeExport.onclick=()=>{if(!isSample)download("project-financial-close-review.json",JSON.stringify(getCloseReview(),null,2));};
+ const feeExport=main.querySelector("#creator-fee-export");if(feeExport)feeExport.onclick=()=>{if(!isSample)download("creator-fee-ledger.json",JSON.stringify(getFeeReview(),null,2));};
  main.querySelector("#workflow-risk").onclick=()=>{terminalTab="risk";reviewPaused=false;render()};
  main.querySelector("#workflow-graduation").onclick=()=>{importTicket++;page="projects";record("page.open",{page});render();};
  main.querySelector("#workflow-save").onclick=()=>{try{if(isSample||workspaceBusy)return;catalogueSelection=projectCatalogue.add(data).key;workflowMessage="报告已加入会话档案；请到项目档案保存数据库版本。";render()}catch(e){workflowMessage="档案添加失败："+errorKind(e);render()}};
@@ -185,6 +192,7 @@ function render(){
  panel("本地数据库版本",note(workspaceMessage)+table(["当前已知版本","状态"],[[workspaceRevision??"未知",workspaceBusy?"请求中":"显式保存"]])+ '<button id="workspace-db-load">读取数据库工作区</button> <button id="workspace-db-save">保存当前工作区到数据库</button> <button id="workspace-db-versions">查看版本记录</button>'+table(["版本","字节","摘要"],workspaceVersions.map(v=>[v.revision,v.bytes,v.digest])))+
  panel("已保存项目复盘",'<div id="saved-project-review"></div>')+
  panel("毕业与 PumpSwap 历史审阅",'<div id="graduation-review"></div>')+
+ panel("项目全生命周期复盘",'<div id="project-lifecycle-review"></div>')+
  panel("当前报告",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status]])+'<button id="catalogue-add">将当前报告加入档案</button>')+
  panel("历史档案",'<label for="catalogue-file">导入历史报告输入 JSON</label><input id="catalogue-file" type="file" accept=".json"><p id="catalogue-message" role="status"></p>'+
  table(["项目","Token","来源","起始","结束","审计"],catalogue.map(r=>[r.projectId,r.tokenMint,r.source_mode,r.openingCutoff,r.closingCutoff,r.audit_status]))+
@@ -192,6 +200,7 @@ function render(){
  const msg=main.querySelector("#catalogue-message"),detail=main.querySelector("#catalogue-detail"),select=main.querySelector("#catalogue-select"),exportButton=main.querySelector("#catalogue-export"),removeButton=main.querySelector("#catalogue-remove");
  mountSavedProjectReview(main.querySelector("#saved-project-review"),{query:queryHistoricalWorkspace,revision:workspaceRevision});
  mountGraduationReview(main.querySelector("#graduation-review"),{download,initial:graduationReview,onReview:value=>{graduationReview=value;}});
+ mountProjectLifecycleReview(main.querySelector("#project-lifecycle-review"),{download,initial:lifecycleReview,onReview:value=>{lifecycleReview=value;}});
  const openReview=main.querySelector("#catalogue-open");
  let selected=null;
  function showCatalogue(){

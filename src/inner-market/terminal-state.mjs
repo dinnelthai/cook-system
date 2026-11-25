@@ -10,7 +10,7 @@ export const REVIEW_STAGES=Object.freeze(["REVIEW","SETTLED","ARCHIVED"]);
 
 /** Read-only closed-interval state. No live trading or issuer action recommendations. */
 export function computeTerminalState(input){
- const {dashboard:d,report,nav:n,cash,fees,projectPnl}=computeHistoricalDashboard(input);
+ const {dashboard:d,report,nav:n}=computeHistoricalDashboard(input);
  const evidence=auditTerminalEvidence(input);
  const candles=buildTerminalCandles(input);
  const marketState=describeHistoricalMarket({input,market:d.market,candles});
@@ -44,7 +44,7 @@ export function computeTerminalState(input){
   performance:{closing_nav_base_units:endpointReady?n.closing_nav_base_units:null,capital_adjusted_nav_change_base_units:endpointReady?n.capital_adjusted_nav_change_base_units:null,time_weighted_return_bps:pathReady?n.time_weighted_return_bps:null,observations:pathReady?n.observations:[],valuation_attestation:"UNKNOWN",endpoint_status:navEndpoints.status},
   checks,candles,archived_evidence:evidence,risk:assessHistoricalRisk({reportChecks:checks,sourceMode:input.sourceMode,accountAudit:evidence.account_audit,cashAudit:evidence.cash_audit}),settlement_scope:input.sourceMode==="SYNTHETIC"?"SYNTHETIC_ONLY":"UNATTESTED_HISTORICAL",
   settlement_allowed:trust.dimensions.settlement_eligibility==="SYNTHETIC_TEST_ONLY",execution_enabled:false};
- return {state,report,cash,fees,projectPnl,nav:n};
+ return {state,report};
 }
 export function buildTerminalState(input){return computeTerminalState(input).state;}
 export function advanceReview(stage,action,state){

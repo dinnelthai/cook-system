@@ -35,6 +35,12 @@ test("missing or contradictory accounting never exposes final totals as valid",(
  const r=buildProjectFinancialCloseReview(i);assert.equal(r.status,"REVIEW_REQUIRED");
  assert.ok(Object.values(r.cash_flow).every(v=>v===null));assert.ok(Object.values(r.realized_pnl).every(v=>v===null));assert.ok(Object.values(r.assets).every(v=>v===null));assert.equal(r.synthetic_test_settlement_allowed,false);
 });
+test("contradictory NAV endpoint arithmetic withholds all endpoint valuations",()=>{
+ const i=endpoints(fixture());i.nav.endpointEvidence.closing.inventoryValueBaseUnits="91";
+ const r=buildProjectFinancialCloseReview(i);assert.equal(r.status,"REVIEW_REQUIRED");
+ assert.equal(r.assets.closing_inventory_supplied_value_base_units,null);assert.equal(r.assets.closing_inventory_unrealized_value_minus_cost_base_units,null);
+ assert.equal(r.assets.interval_inventory_unrealized_change_base_units,null);assert.equal(r.assets.closing_nav_base_units,null);assert.equal(r.valuation_status,"REVIEW_REQUIRED");
+});
 test("archived reports remain provisional and cannot enter actual or synthetic settlement",()=>{
  const i=endpoints(fixture());i.sourceMode="ARCHIVED_HISTORICAL";const r=buildProjectFinancialCloseReview(i);
  assert.equal(r.actual_settlement_allowed,false);assert.equal(r.synthetic_test_settlement_allowed,false);assert.equal(r.source_attestation,"UNKNOWN");assert.equal(r.ownership_attestation,"UNKNOWN");

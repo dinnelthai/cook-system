@@ -9,10 +9,10 @@ export function buildProjectFinancialCloseReview(input){
  const shown=v=>ready?v??null:null;
  const endpoints=ready&&state.performance.endpoint_status==="INTERNALLY_CONSISTENT";
  const opening=endpoints?input.nav.endpointEvidence.opening:null,closing=endpoints?input.nav.endpointEvidence.closing:null;
- const closingValue=closing?.inventoryValueBaseUnits??null,openingValue=opening?.inventoryValueBaseUnits??null;
+ const closingValue=endpoints?closing?.inventoryValueBaseUnits??null:null,openingValue=endpoints?opening?.inventoryValueBaseUnits??null:null;
  const closingUnrealized=diff(closingValue,a.remaining_cost_basis_base_units),openingUnrealized=opening?diff(openingValue,input.inventory.opening.costBasis):null;
  const closingNav=endpoints?nav.closing_nav_base_units:null,openingNav=endpoints?nav.opening_nav_base_units:null;
- const valuationStatus=endpoints?"SUPPLIED_ENDPOINT_ARITHMETIC_CONSISTENT":"UNAVAILABLE";
+ const valuationStatus=endpoints?"SUPPLIED_ENDPOINT_ARITHMETIC_CONSISTENT":state.performance.endpoint_status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":"UNAVAILABLE";
  const cashFlow={
   opening_cash_base_units:shown(cash.opening_cash_base_units),
   external_capital_in_base_units:shown(t.CAPITAL_IN),
