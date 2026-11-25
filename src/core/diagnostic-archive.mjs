@@ -1,16 +1,11 @@
 import {createHash,randomUUID} from "node:crypto";
 import {mkdir,open,link,unlink} from "node:fs/promises";
-import {constants} from "node:fs";
+import {readBoundedRegularFile} from "./bounded-private-file.mjs";
 import {join} from "node:path";
 import {sanitizeDiagnosticSnapshot} from "../../web/diagnostic-log.mjs";
 const maxBytes=8*1024*1024;
 const hash=v=>createHash("sha256").update(v).digest("hex");
-async function readBounded(path){
- const f=await open(path,constants.O_RDONLY|(constants.O_NOFOLLOW??0));
- try{const s=await f.stat();if(!s.isFile()||s.size>maxBytes)throw Error("DIAGNOSTIC_FILE_LIMIT");
-  const b=await f.readFile();if(b.length>maxBytes)throw Error("DIAGNOSTIC_FILE_LIMIT");return b;
- }finally{await f.close();}
-}
+const readBounded=path=>readBoundedRegularFile(path,maxBytes);
 export async function archiveDiagnosticSnapshot({inputPath,directory}){
  if(typeof directory!=="string"||!directory.trim())throw Error("DIAGNOSTIC_DIRECTORY_REQUIRED");
  const snapshot=sanitizeDiagnosticSnapshot(JSON.parse((await readBounded(inputPath)).toString("utf8")));

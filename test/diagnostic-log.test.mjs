@@ -35,3 +35,10 @@ test("project metadata diagnostics accept known event names but do not retain id
  assert.ok(log.snapshot().entries.every(row=>Object.keys(row.detail).length===0));
  assert.ok(!JSON.stringify(log.snapshot()).includes("private-"));
 });
+
+test("new review diagnostics preserve only recognized codes from structured and string issues",()=>{
+ const log=createDiagnosticLog();
+ log.record("report.failed",{issues:[{code:"AMBIGUOUS_CREATOR_RECEIPT_TRANSACTION",id:"private-transaction"},"NEGATIVE_INTERMEDIATE_CASH:private-account",{code:"PORTFOLIO_REQUEST_TIMEOUT",url:"private-url"},{code:"PRIVATE_UNKNOWN"}]},"WARN");
+ const snapshot=log.snapshot();assert.deepEqual(snapshot.entries[0].detail.issues,["AMBIGUOUS_CREATOR_RECEIPT_TRANSACTION","NEGATIVE_INTERMEDIATE_CASH","PORTFOLIO_REQUEST_TIMEOUT","OTHER_ISSUE"]);
+ assert.ok(!JSON.stringify(snapshot).includes("private-"));
+});

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {mkdtemp,rm,writeFile,readFile} from "node:fs/promises";
+import {mkdtemp,rm,writeFile,readFile,symlink} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {createDiagnosticLog} from "../web/diagnostic-log.mjs";
@@ -17,5 +17,17 @@ test("invalid exported event or sequence cannot be archived",async()=>{
  const dir=await mkdtemp(join(tmpdir(),"cook-diag-bad-")),inputPath=join(dir,"input.json");
  try{const log=createDiagnosticLog();log.record("app.start");const s=log.snapshot();s.entries[0].event="private-value";await writeFile(inputPath,JSON.stringify(s));
   await assert.rejects(()=>archiveDiagnosticSnapshot({inputPath,directory:join(dir,"private")}),/INVALID_DIAGNOSTIC_ROW/);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test("diagnostic archive rejects oversized inputs and symbolic links through the shared bounded reader",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-diag-limit-")),inputPath=join(dir,"input.json"),directory=join(dir,"private");
+ try{
+  await writeFile(inputPath,Buffer.alloc(8*1024*1024+1,0x20));
+  await assert.rejects(()=>archiveDiagnosticSnapshot({inputPath,directory}),/FILE_INVALID_OR_TOO_LARGE/);
+  if(process.platform!=="win32"){
+   await writeFile(inputPath,"{}");const link=join(dir,"link.json");await symlink(inputPath,link);
+   await assert.rejects(()=>archiveDiagnosticSnapshot({inputPath:link,directory}),/FILE_INVALID_OR_TOO_LARGE/);
+  }
  }finally{await rm(dir,{recursive:true,force:true});}
 });
