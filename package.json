@@ -18,6 +18,7 @@
     "simulate:observation-stress": "node scripts/run-participant-observation-suite.mjs",
     "simulate:participant-coverage": "node scripts/run-participant-coverage.mjs",
     "simulate:environment-stress": "node scripts/run-participant-environment-suite.mjs",
+    "simulate:participant-state": "node scripts/run-participant-state-review.mjs",
     "analyze:market-quality": "node scripts/analyze-market-quality.mjs",
     "audit:alerts": "node scripts/audit-alert-store.mjs",
     "evaluate:defensive": "node scripts/run-heldout-defensive-evaluation.mjs",
