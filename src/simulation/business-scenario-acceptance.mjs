@@ -17,9 +17,10 @@ export function runBusinessScenarioAcceptance(base){
  add("missing_history_blocks_test_settlement",missing.status==="REVIEW_REQUIRED"&&missing.settlement_allowed===false);
  const stage=advanceReview(advanceReview("REVIEW","settle",state),"archive",state);
  add("synthetic_report_archive_roundtrip",restoreReviewArchive(makeReviewArchive(base,null,stage)).stage==="ARCHIVED");
- const riskInput={positions:[{position_id:"fixture-position",market_id:"fixture-market",exposure_quote_base_units:"20",evidence_status:"VERIFIED"}],
-  account:{drawdown_bps:100,daily_loss_quote_base_units:"2"},marketSnapshots:[{market_id:"fixture-market",observed_at_ms:1000,data_completeness:"complete",source_status:"SYNTHETIC_ONLY",liquidation_depth_quote_base_units:"1000"}],
-  limits:{max_total_exposure_quote_base_units:"100",max_daily_loss_quote_base_units:"10",max_market_exposure_bps:10000,max_drawdown_bps:1000,max_data_age_ms:100,max_liquidation_depth_ratio_bps:1000},nowMs:1000};
+ const valuation_scope={network:"synthetic",genesis_hash:"fixture",quote_asset:"SOL_LAMPORTS",quote_decimals:9};
+ const riskInput={valuationScope:valuation_scope,positions:[{valuation_scope,position_id:"fixture-position",market_id:"fixture-market",exposure_quote_base_units:"20",evidence_status:"VERIFIED"}],
+  account:{valuation_scope,drawdown_bps:100,daily_loss_quote_base_units:"2"},marketSnapshots:[{valuation_scope,market_id:"fixture-market",observed_at_ms:1000,data_completeness:"complete",source_status:"SYNTHETIC_ONLY",liquidation_depth_quote_base_units:"1000"}],
+  limits:{valuation_scope,max_total_exposure_quote_base_units:"100",max_daily_loss_quote_base_units:"10",max_market_exposure_bps:10000,max_drawdown_bps:1000,max_data_age_ms:100,max_liquidation_depth_ratio_bps:1000},nowMs:1000};
  const normal=assessPortfolioRisk(riskInput),stale=assessPortfolioRisk({...riskInput,nowMs:1200});
  const unknown=assessPortfolioRisk({...riskInput,marketSnapshots:[]});
  add("portfolio_configured_limits",normal.status==="WITHIN_CONFIGURED_LIMITS"&&normal.execution_enabled===false);
