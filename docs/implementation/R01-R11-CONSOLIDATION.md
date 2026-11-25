@@ -1,0 +1,7 @@
+# R01–R11 consolidation — first implementation
+
+Baseline 48cefdb. Runtime projection uses current persisted project identity and exact linked historical treasury intervals; cash, inventory, receivables, PnL and NAV stay separate per interval. Contradictions suppress the interval; no latest-selection or live assets. Existing business endpoint/export includes runtime. Terminal displays work items and assets before collapsed detailed review.
+
+R02/R07/R08: fixed synthetic scenario acceptance calls existing terminal report/settlement test workflow, portfolio risk engine and canonical stress fixture; no paper or live order workflow. R05: synthetic LP statement arithmetic checks units, fee receivable and cash posting; does not assume pool reserve ownership or executable position valuation. R06: existing market binding and historical pool evidence exposed. R09: business overview first. R10: regression includes fixture archive roundtrip and risk failures, not real browser/localnet acceptance. R03: existing participant suite preserved, no new decision model. R11: this matrix records gaps; final independent review remains open.
+
+Open: actual project lifecycle execution, participant behavioral validation, real LP position accounting/valuation, full portfolio risk inputs, operational E2E, real browser and independent data. R01–R11 are not all complete. M50–M52 remain deferred. No signing, submission or market intervention added.

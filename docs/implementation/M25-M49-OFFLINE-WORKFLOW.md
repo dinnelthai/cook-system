@@ -43,3 +43,5 @@ Retain bounded pool replay/snapshot statuses from the canonical graduation revie
 Run the existing participant validation suite and digest/manifest summary alongside six fixed PumpSwap reserve-evidence fault cases using canonical snapshot reconciliation. Cover exact integers, missing vault, slot mismatch, reserve contradiction, fee bucket contradiction and invalid effective reserve. Separate synthetic result groups; no empirical accuracy, LP position valuation or profit forecasting. CLI uses the existing synthetic fixture, bounded seeds/steps and exclusive output creation. Three regression tests and an explicit accept:all command.
 
 M33/M39/M40 remain partial: this is defensive QA, not behavioral calibration, LP accounting ownership or full operational strategy evaluation. No real data or transaction capability. M50–M52 deferred. CI separately verified.
+
+See [R01–R11 consolidation](R01-R11-CONSOLIDATION.md) for runtime and remaining gaps.
