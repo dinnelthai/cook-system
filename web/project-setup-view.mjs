@@ -150,30 +150,24 @@ export function mountProjectSetup(container, {
         };
         const token = { supply_base_units: supplyBaseUnits.toString(), decimals, creator_wallet_address: creator };
         let project;
+        const walletGroup = creator ? {
+          group_id: "dev-wallets", name: "Dev Wallets", purpose: "DEV",
+          members: [{ wallet_address: creator, role: "DEV", enabled: true, allocation_limit_base_units: null }]
+        } : null;
         if (activeProjectId) {
           project = await getProject(activeProjectId);
-          if (project.lifecycle.stage !== "DRAFT") throw Error("PROJECT_TOKEN_CONFIGURATION_LOCKED");
+          if (project.lifecycle.stage !== "DRAFT") throw Error("PROJECT_DRAFT_CONFIGURATION_LOCKED");
           if (project.token.creator_wallet_address && !creator) throw Error("PROJECT_DEV_WALLET_REQUIRED");
-          project = await append(project, "UPDATE_PROFILE", { profile });
           const network = {
             ...project.network,
             genesis_hash: project.network.genesis_hash ?? config?.network?.genesis_hash ?? null
           };
-          project = await append(project, "SET_NETWORK_IDENTITY", { network });
-          project = await append(project, "SET_TOKEN_CONFIGURATION", token);
+          project = await append(project, "UPDATE_DRAFT_CONFIGURATION", { profile, network, token, wallet_group: walletGroup });
         } else {
           const network = config?.network ?? {
             chain_id: "solana", cluster: "localnet", genesis_hash: null, quote_mint: WRAPPED_SOL_MINT
           };
-          project = await createProject({ profile, network, token });
-        }
-        if (creator) {
-          project = await append(project, "UPSERT_WALLET_GROUP", {
-            group: {
-              group_id: "dev-wallets", name: "Dev Wallets", purpose: "DEV",
-              members: [{ wallet_address: creator, role: "DEV", enabled: true, allocation_limit_base_units: null }]
-            }
-          });
+          project = await createProject({ profile, network, token, wallet_group: walletGroup });
         }
         projects = await listProjects();
         setActive(project.project_id);
