@@ -8,6 +8,7 @@ export function buildUnifiedSyntheticReview(report){
  const issues=[...audit.issues],checks=[];
  function check(id,status,evidence=[]){checks.push({id,status,evidence});if(status==="REVIEW_REQUIRED")issues.push(...evidence);}
  check("accounting",audit.status==="INTERNALLY_CONSISTENT"?"PASS":"REVIEW_REQUIRED");
+ check("posting_order_balances",audit.process_check.status,audit.process_check.issues);
  const observed={event_count:events.length,trade_count:ledger_input.entries.length/2,agent_count:ledger_input.opening.length-1};
  const countIssues=Object.keys(observed).filter(k=>report.summary?.[k]!==observed[k]).map(k=>"SUMMARY_COUNT_MISMATCH:"+k);
  check("record_counts",countIssues.length?"REVIEW_REQUIRED":"PASS",countIssues);

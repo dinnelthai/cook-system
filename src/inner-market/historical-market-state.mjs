@@ -23,7 +23,7 @@ export function assertHistoricalReportScope(input){
   }
  }
  if(input.sourceMode==="SYNTHETIC"&&declared.has("network")&&declared.get("network")!=="synthetic")throw Error("HISTORICAL_REPORT_SCOPE_MISMATCH:network");
- return {source_attestation:"UNKNOWN",identity_complete:core.concat(["network","genesisHash"]).every(k=>valid(s[k]))};
+ return {source_attestation:"UNKNOWN",declared_identity:Object.fromEntries(declared),identity_complete:core.concat(["network","genesisHash"]).every(k=>valid(s[k]))};
 }
 
 /** A single presentation contract, not a live state, quote engine, or execution gate. */

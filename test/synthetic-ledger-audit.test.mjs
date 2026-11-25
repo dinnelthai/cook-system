@@ -23,3 +23,10 @@ test("cross-scenario records, duplicate entries and malformed amounts cannot be 
   const i=input();change(i);assert.throws(()=>auditSyntheticLedger(i));
  }
 });
+
+test("endpoint equality does not hide negative intermediate balance in supplied posting order",()=>{
+ const i=input();i.entries=[entry("x","a","-110","1"),entry("y","b","110","-1"),entry("z","a","100","0"),entry("w","b","-100","0")];
+ const r=auditSyntheticLedger(i);assert.equal(r.status,"INTERNALLY_CONSISTENT");
+ assert.equal(r.process_check.status,"REVIEW_REQUIRED");
+ assert.deepEqual(r.process_check.issues,["NEGATIVE_INTERMEDIATE_BALANCE:a"]);
+});

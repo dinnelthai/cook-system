@@ -33,3 +33,17 @@ test("identical interval labels on distinct declared networks or genesis hashes 
  assert.equal(new Set([a.key,b.key,d.key]).size,3);
  assert.equal(c.list().length,3);assert.equal(c.get(b.key).input.scope.genesisHash,"genesis-b");
 });
+
+test("catalogue duplicate comparison ignores object key order",()=>{
+ const c=createHistoricalProjectCatalogue(),a=fixture(),b=Object.fromEntries(Object.entries(a).reverse());
+ c.add(a);assert.equal(c.add(b).status,"ALREADY_PRESENT");
+});
+test("catalogue indexes consistent nested declared identity without rewriting input",()=>{
+ const c=createHistoricalProjectCatalogue(),a=fixture();
+ a.sourceMode="ARCHIVED_HISTORICAL";a.cash.scope.network="localnet";a.cash.scope.genesisHash="example-genesis";
+ const first=c.add(a);
+ assert.equal(c.list()[0].network,"localnet");assert.equal(c.list()[0].declared_identity_complete,true);
+ assert.equal(c.get(first.key).input.scope.network,undefined);
+ const b=structuredClone(a);b.scope.network="localnet";b.scope.genesisHash="example-genesis";
+ assert.throws(()=>c.add(b),/CONFLICTING_CLOSED_INTERVAL/);assert.equal(c.list().length,1);
+});

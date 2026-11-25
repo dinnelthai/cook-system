@@ -20,3 +20,13 @@ test("derived batch exports and non-synthetic data are not accepted as source",(
  assert.throws(()=>reviewSyntheticBatchInput(v.audit.results));
  assert.throws(()=>reviewSyntheticBatchInput([{sourceMode:"ARCHIVED_HISTORICAL"}]));
 });
+
+test("CLI and browser raw batch boundary agree on invalid arrays",async()=>{
+ const {assertRawSyntheticBatch}=await import("../src/core/synthetic-batch-audit.mjs");
+ for(const bad of [[null],[{}],[{sourceMode:"ARCHIVED_HISTORICAL"}]]){
+  assert.throws(()=>assertRawSyntheticBatch(bad),/RAW_SYNTHETIC_REPORT_ARRAY_REQUIRED/);
+  assert.throws(()=>reviewSyntheticBatchInput(bad),/RAW_SYNTHETIC_REPORT_ARRAY_REQUIRED/);
+ }
+ const malformed=[{schema_version:"cook-participant-simulation.1"}];
+ assert.deepEqual(reviewSyntheticBatchInput(malformed).audit,auditRecordedSyntheticBatch(assertRawSyntheticBatch(malformed)));
+});

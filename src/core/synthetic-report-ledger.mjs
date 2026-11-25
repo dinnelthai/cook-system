@@ -1,3 +1,4 @@
+import {canonicalJson} from "./canonical-json.mjs";
 import {auditSyntheticLedger} from "./synthetic-ledger-audit.mjs";
 /** Retrospective accounting of existing offline simulator output only.
  * Uses recorded gross-buy/net-sell cash movements; pool fees are already
@@ -6,6 +7,9 @@ export function reviewRecordedSyntheticSimulation(report){
  if(report?.schema_version!=="cook-participant-simulation.1"||report.status!=="SYNTHETIC_ONLY"||report.execution_enabled!==false||report.live_rpc_enabled!==false||report.transaction_signing_enabled!==false)throw Error("SYNTHETIC_REPORT_REQUIRED");
  const d=report.detector_input,s=d?.scenario_id;
  if(d?.market?.network!=="synthetic"||d.execution_enabled!==false||!Array.isArray(d.events)||d.events.length>11000||!Array.isArray(report.opening_agent_states)||!Array.isArray(report.agent_states))throw Error("MISSING_SYNTHETIC_LEDGER_EVIDENCE");
+ const marketFields=["chain_id","network","token_mint","quote_mint","curve_program_id","market_phase"];
+ if(marketFields.some(k=>typeof d.market?.[k]!=="string"||!d.market[k].trim())||d.market.market_phase!=="bonding_curve")throw Error("INVALID_RECORDED_MARKET_IDENTITY");
+ const marketIdentity=canonicalJson(d.market);
  const row=(id,q,t)=>({scenario_id:s,account_id:id,quote_base_units:q,token_base_units:t});
  const agentRows=rows=>rows.map(a=>{if(typeof a.agent_id!=="string"||!a.agent_id.trim())throw Error("INVALID_AGENT_ID");return row("agent:"+a.agent_id,a.quote_balance_base_units,a.token_balance_base_units)});
  const opening=[row("pool",d.initial_state?.quote_reserves_base_units,d.initial_state?.token_reserves_base_units),...agentRows(report.opening_agent_states)];
@@ -13,7 +17,7 @@ export function reviewRecordedSyntheticSimulation(report){
  const entries=[],seen=new Set();
  const positive=v=>{if(typeof v!=="string"||!/^[1-9][0-9]*$/.test(v)||v.length>39)throw Error("INVALID_RECORDED_TRADE_AMOUNT");return BigInt(v)};
  for(const e of d.events){
-  if(e?.provenance!=="synthetic"||e.synthetic_metadata?.scenario_id!==s||e.synthetic_metadata?.random_seed!==d.seed||e.market?.network!=="synthetic"||e.market?.token_mint!==d.market.token_mint||e.market?.quote_mint!==d.market.quote_mint||typeof e.event_id!=="string"||!e.event_id.trim()||seen.has(e.event_id))throw Error("INVALID_OR_DUPLICATE_SIMULATION_EVENT");
+  if(e?.provenance!=="synthetic"||e.synthetic_metadata?.scenario_id!==s||e.synthetic_metadata?.random_seed!==d.seed||canonicalJson(e.market)!==marketIdentity||typeof e.event_id!=="string"||!e.event_id.trim()||seen.has(e.event_id))throw Error("INVALID_OR_DUPLICATE_SIMULATION_EVENT");
   seen.add(e.event_id);
   if(e.event_kind==="PUBLIC_INFORMATION")continue;
   if(!["CURVE_BUY_EXECUTED","CURVE_SELL_EXECUTED"].includes(e.event_kind))throw Error("UNSUPPORTED_RECORDED_EVENT");

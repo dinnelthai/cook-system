@@ -24,3 +24,10 @@ test("caller supplied audit claims cannot hide actual endpoint discrepancy",()=>
  const v=buildUnifiedSyntheticReview(r);
  assert.equal(v.status,"REVIEW_REQUIRED");assert.equal(v.accounting.status,"REVIEW_REQUIRED");
 });
+
+test("synthetic ledger rejects mixed protocol, phase and explicit curve identity",()=>{
+ for(const [key,value] of [["curve_program_id","other"],["market_phase","post_graduation"],["curve_account","other"],["pool_account","other"]]){
+  const r=fixture();r.detector_input.events[0].market={...r.detector_input.events[0].market,[key]:value};
+  assert.throws(()=>buildUnifiedSyntheticReview(r),/INVALID_OR_DUPLICATE_SIMULATION_EVENT/);
+ }
+});

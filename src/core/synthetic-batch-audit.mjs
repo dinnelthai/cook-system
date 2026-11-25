@@ -1,4 +1,9 @@
 import {buildUnifiedSyntheticReview} from "./unified-synthetic-review.mjs";
+/** Shared raw-input boundary for CLI and browser. Derived exports are not evidence. */
+export function assertRawSyntheticBatch(input){
+ if(!Array.isArray(input)||!input.some(r=>r?.schema_version==="cook-participant-simulation.1"))throw Error("RAW_SYNTHETIC_REPORT_ARRAY_REQUIRED");
+ return input;
+}
 /** Review completed offline reports independently; never generate market actions. */
 export function auditRecordedSyntheticBatch(reports){
  if(!Array.isArray(reports)||reports.length<1||reports.length>100)throw Error("INVALID_REPORT_BATCH");
@@ -20,7 +25,7 @@ export function auditRecordedSyntheticBatch(reports){
  });
  const summary={report_count:results.length,consistent_count:results.filter(r=>r.status==="INTERNALLY_CONSISTENT").length,
  review_required_count:results.filter(r=>r.status==="REVIEW_REQUIRED").length,rejected_count:results.filter(r=>r.status==="REJECTED").length};
- const checkIds=["accounting","record_counts","generator_identity","event_order","fee_attribution","historical_calibration","market_behavior_validity"];
+ const checkIds=["accounting","posting_order_balances","record_counts","generator_identity","event_order","fee_attribution","historical_calibration","market_behavior_validity"];
  const comparison=checkIds.map(id=>{
   const row={id,pass:0,review_required:0,unknown:0,not_evaluated:0};
   for(const r of results){

@@ -21,13 +21,14 @@ export function auditSyntheticLedger({sourceMode,scenarioId,opening,closing,entr
   return map;
  };
  const initial=read(opening),end=read(closing),running=new Map([...initial].map(([k,v])=>[k,{...v}]));
- const seen=new Set(),issues=[];
+ const seen=new Set(),issues=[],negativeAccounts=new Set();
  let netQ=0n,netT=0n;
  for(const e of entries){
   if(e?.scenario_id!==scenarioId||!id(e.entry_id)||seen.has(e.entry_id)||!running.has(e.account_id))throw Error("INVALID_OR_DUPLICATE_LEDGER_ENTRY");
   seen.add(e.entry_id);
   const q=signed(e.quote_delta_base_units),t=signed(e.token_delta_base_units);
   const row=running.get(e.account_id);row.quote+=q;row.token+=t;netQ+=q;netT+=t;
+  if(row.quote<0n||row.token<0n)negativeAccounts.add(e.account_id);
  }
  const rows=[];
  for(const [account,value] of running){
@@ -41,6 +42,7 @@ export function auditSyntheticLedger({sourceMode,scenarioId,opening,closing,entr
  if(netQ!==0n||netT!==0n)issues.push("CLOSED_LEDGER_NET_MOVEMENT_NONZERO");
  return {source_mode:"SYNTHETIC",scenario_id:scenarioId,status:issues.length?"REVIEW_REQUIRED":"INTERNALLY_CONSISTENT",
   account_count:initial.size,entry_count:seen.size,issues,accounts:rows,
+   process_check:{status:negativeAccounts.size?"REVIEW_REQUIRED":"PASS",scope:"SUPPLIED_POSTING_ORDER_ONLY",issues:[...negativeAccounts].sort().map(a=>"NEGATIVE_INTERMEDIATE_BALANCE:"+a)},
   net_quote_delta_base_units:netQ.toString(),net_token_delta_base_units:netT.toString(),
   real_market_validated:false,execution_enabled:false,
   limitation:"Checks closed synthetic recorded postings and endpoint differences only; no economic attribution or trade validity inferred."};
