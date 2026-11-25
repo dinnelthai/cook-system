@@ -10,6 +10,7 @@ export function matchProjectReport(project, input) {
   if (!scope.identity_complete || !project.token?.mint || !project.network?.genesis_hash) return result("UNKNOWN", ["IDENTITY_INCOMPLETE"]);
   const expectedNetwork = project.network.cluster === "localnet" ? "local_sim" : project.network.cluster;
   const expected = { projectId: project.project_id, tokenMint: project.token.mint, network: expectedNetwork, genesisHash: project.network.genesis_hash, quoteAsset: "SOL_LAMPORTS" };
-  const mismatches = Object.keys(expected).filter(k => input.scope[k] !== expected[k]);
+  const mismatches = Object.keys(expected).filter(k => k==="network"&&project.network.cluster==="localnet"
+    ? !["localnet","local_sim"].includes(input.scope[k]) : input.scope[k] !== expected[k]);
   return mismatches.length ? result("BLOCKED", mismatches.map(k => "IDENTITY_MISMATCH:" + k)) : result("DECLARED_MATCH", []);
 }

@@ -184,3 +184,13 @@ test("order review endpoint exposes read-only project scope",async t=>{
  assert.deepEqual(result.orders,[]);assert.equal(result.execution_enabled,false);assert.equal(result.settlement_allowed,false);
  assert.equal((await json(route,"POST",{type:"REGISTER_OBSERVATION"})).status,405);
 });
+
+test("order receipt review rejects unregistered orders and caller-supplied financial assertions",async t=>{
+ const base=await setup(t,{reviewOrderReceipt:async()=>assert.fail("unexpected invocation")}),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"receipt-http",profile:{name:"Receipt",symbol:"REC"}})).status,201);
+ const url=root+"/receipt-http/order-receipt-review";
+ const body={order_id:"o",archive_id:"a",expected_revision:1,expected_order_revision:1};
+ assert.equal((await json(url,"POST",{...body,outcome:"SUCCESS"})).status,400);
+ assert.equal((await json(url,"POST",body)).status,404);
+ assert.equal((await fetch(url)).status,405);
+});

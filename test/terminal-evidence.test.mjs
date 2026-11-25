@@ -106,3 +106,15 @@ test("matching aggregate token and cash balances do not hide per-receipt trade q
  assert.equal(s.treasury.realized_project_pnl_base_units,null);
  assert.equal(s.settlement_allowed,false);
 });
+
+test("historical order review matches archived receipt and cash posting without settlement",async()=>{
+ const {reviewOrderReceipt}=await import("../src/inner-market/order-receipt-review.mjs");
+ const i=fixture(),p={project_id:i.scope.projectId,revision:1,token:{mint:i.scope.tokenMint},network:{cluster:"localnet",genesis_hash:i.scope.genesisHash}};
+ const o={order_id:"o",project_id:p.project_id,project_revision:1,revision:2,source_mode:"ARCHIVED_HISTORICAL",signature:i.cash.entries[0].signature,reported_outcome:"SUCCESS",reported_slot:11,status:"REPORTED_SUCCESS"};
+ const r=reviewOrderReceipt(p,o,i);assert.equal(r.status,"INTERNAL_MATCH");assert.equal(r.posting_references[0].posting_id,i.cash.entries[0].id);assert.equal(r.source_attestation,"UNKNOWN");assert.equal(r.settlement_allowed,false);
+ assert.equal(reviewOrderReceipt(p,{...o,reported_slot:12},i).status,"REVIEW_REQUIRED");
+ assert.equal(reviewOrderReceipt(p,{...o,signature:"missing"},i).status,"UNKNOWN");
+ assert.equal(reviewOrderReceipt(p,{...o,project_revision:2},i).status,"REVIEW_REQUIRED");
+ assert.equal(reviewOrderReceipt(p,{...o,status:"REVIEW_REQUIRED"},i).status,"REVIEW_REQUIRED");
+ delete i.archivedEvidence;assert.equal(reviewOrderReceipt(p,o,i).status,"UNKNOWN");
+});
