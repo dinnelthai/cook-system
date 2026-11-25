@@ -174,26 +174,43 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         event.occurred_at_ms, event.actor_id, event.source, payload, event.request_digest,
         event.previous_hash, event.event_hash);
     }
-    function create(input, { actor_id = "operator" } = {}) {
+    function create(input, { actor_id = "operator", create_request_id } = {}) {
+      const actorId = actor(actor_id);
+      const keyed=create_request_id!==undefined;
+      if(keyed&&(typeof create_request_id!=="string"||!create_request_id.trim()||
+        create_request_id.trim()!==create_request_id||create_request_id.length>128))throw Error("INVALID_PROJECT_CREATE_REQUEST_ID");
+      // The immutable creation event itself carries the idempotency key and
+      // request digest. No new table or reinterpretation of existing events.
+      const eventId=keyed?"create:"+hash(canonicalJson([actorId,create_request_id])):null;
+      const keyedDigest=keyed?hash(canonicalJson({event_type:"PROJECT_CREATED",input,actor_id:actorId})):null;
+      db.exec("BEGIN IMMEDIATE");
+      try {
+      if(keyed){
+        const prior=eventById.get(eventId);
+        if(prior){
+          if(prior.event_type!=="PROJECT_CREATED"||prior.revision!==1||prior.request_digest!==keyedDigest)
+            throw Error("PROJECT_IDEMPOTENCY_KEY_CONFLICT");
+          const latest=current(prior.project_id);
+          db.exec("COMMIT");
+          return clone(latest.aggregate);
+        }
+      }
       const aggregate = createProjectAggregate(input, { idFactory: makeId, now });
-      const eventId = textId(makeId());
-      const actorId = actor(actor_id), at = aggregate.created_at_ms;
+      const at = aggregate.created_at_ms;
       const payload = { aggregate };
-      const requestDigest = hash(canonicalJson({ event_type: "PROJECT_CREATED", payload, actor_id: actorId }));
+      const requestDigest = keyedDigest??hash(canonicalJson({ event_type: "PROJECT_CREATED", payload, actor_id: actorId }));
       const event = makeEvent({
-        eventId, projectId: aggregate.project_id, revision: 1, type: "PROJECT_CREATED",
+        eventId: eventId??textId(makeId()), projectId: aggregate.project_id, revision: 1, type: "PROJECT_CREATED",
         payload, actorId, at, previousHash: null, requestDigest
       });
       const content = canonicalJson(aggregate);
       if (Buffer.byteLength(content) > MAX_AGGREGATE_BYTES) throw Error("PROJECT_AGGREGATE_SIZE_LIMIT");
-      db.exec("BEGIN IMMEDIATE");
-      try {
         if (snapshotGet.get(aggregate.project_id)) throw Error("PROJECT_ALREADY_EXISTS");
         insertSnapshot.run(aggregate.project_id, aggregate.revision, content, hash(content), aggregate.updated_at_ms);
         writeEvent(event);
         db.exec("COMMIT");
+        return clone(aggregate);
       } catch (error) { try { db.exec("ROLLBACK"); } catch {} throw error; }
-      return clone(aggregate);
     }
     function append(projectId, command, { expected_revision, actor_id = "operator" } = {}) {
       if (typeof projectId !== "string" || !projectId) throw Error("INVALID_PROJECT_ID");

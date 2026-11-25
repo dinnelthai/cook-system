@@ -308,3 +308,16 @@ test("report archive mutations require the rendered revision before resolving ev
  const stale=await json(url,"POST",{expected_revision:2});assert.equal(stale.status,409);
  assert.equal(calls,0);
 });
+
+test("project create retries through HTTP reuse the same persisted draft",async t=>{
+ const base=await setup(t);
+ const url=base+"/api/projects";
+ const input={create_request_id:"http-create-qa",profile:{name:"Retry",symbol:"QA"}};
+ const first=await json(url,"POST",input),again=await json(url,"POST",input);
+ assert.equal(first.status,201);assert.equal(again.status,201);
+ const a=(await first.json()).project,b=(await again.json()).project;
+ assert.equal(a.project_id,b.project_id);
+ const conflict=await json(url,"POST",{...input,profile:{name:"Changed",symbol:"QA"}});
+ assert.equal(conflict.status,409);
+ assert.equal((await (await fetch(url)).json()).projects.length,1);
+});

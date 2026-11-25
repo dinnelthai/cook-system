@@ -277,3 +277,20 @@ test("order head changes from a separate connection invalidate captured evidence
   assert.notEqual(a.getEvidenceSnapshot(id).evidence_snapshot_digest,current.evidence_snapshot_digest);
  }finally{b.close();a.close();}
 });
+
+test("keyed creation is durable across reopen and rejects changed request bytes",t=>{
+ const path=setup(t);
+ const input={profile:{name:"Retry QA",symbol:"QA"}};
+ let a=openProjectStore(path,{now:()=>1000});
+ const created=a.create(input,{create_request_id:"create-qa"});
+ assert.equal(a.list().length,1);
+ a.close();a=openProjectStore(path,{now:()=>2000});
+ try{
+  const retry=a.create(input,{create_request_id:"create-qa"});
+  assert.deepEqual(retry,created);
+  assert.equal(a.list().length,1);assert.equal(a.events(created.project_id).length,1);
+  assert.throws(()=>a.create({...input,profile:{name:"Changed",symbol:"QA"}},{create_request_id:"create-qa"}),/PROJECT_IDEMPOTENCY_KEY_CONFLICT/);
+  assert.throws(()=>a.create(input,{create_request_id:null}),/INVALID_PROJECT_CREATE_REQUEST_ID/);
+  assert.equal(a.verify(created.project_id).status,"VERIFIED");
+ }finally{a.close();}
+});

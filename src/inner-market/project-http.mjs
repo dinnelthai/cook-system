@@ -93,7 +93,8 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         }
         if (req.method !== "POST") { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }
         const input = await bodyJson(req, readRequestJson, maxBodyBytes);
-        const project = store.create(input, { actor_id: "operator" });
+        const {create_request_id,...projectInput}=input;
+        const project = store.create(projectInput, { actor_id: "operator",create_request_id });
         send(res, 201, { project });
         return true;
       }

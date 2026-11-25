@@ -11,15 +11,25 @@ export function mountProjectSetup(container, {
 } = {}) {
   let projects = [], config = null, activeProjectId = initialProjectId, message = initialMessage;
   let loading = true, loadError = "", viewVersion = 0;
+  // Retry the same immutable request after an uncertain acknowledgement.
+  // Bound this cache to the current mounted view; do not retry automatically.
+  const pendingCommands=new Map();
+  let pendingCreate=null;
 
   function setActive(id) {
     activeProjectId = id;
     onActiveProjectId(id);
   }
   async function append(project, type, payload) {
+    const key=JSON.stringify([project.project_id,project.revision,type,payload]);
+    if(!pendingCommands.has(key)){
+      if(pendingCommands.size>=64)throw Error("PROJECT_PENDING_REQUEST_LIMIT");
+      pendingCommands.set(key,commandId());
+    }
     const result = await appendProjectCommand(project.project_id, {
-      command_id: commandId(), type, payload
+      command_id: pendingCommands.get(key), type, payload
     }, project.revision);
+    pendingCommands.delete(key);
     return result.aggregate;
   }
   function renderLoading() {
@@ -237,7 +247,12 @@ export function mountProjectSetup(container, {
           const network = config?.network ?? {
             chain_id: "solana", cluster: "localnet", genesis_hash: null, quote_mint: WRAPPED_SOL_MINT
           };
-          project = await createProject({ profile, network, token, wallet_group: walletGroup });
+          const draft={profile,network,token,wallet_group:walletGroup};
+          const key=JSON.stringify(draft);
+          if(pendingCreate&&pendingCreate.key!==key)throw Error("PROJECT_CREATE_UNCONFIRMED_RELOAD_REQUIRED");
+          pendingCreate??={key,id:commandId()};
+          project = await createProject({...draft,create_request_id:pendingCreate.id});
+          pendingCreate=null;
         }
         // The mutation succeeded. A subsequent list failure must not invite a duplicate create.
         if (!isActive() || version !== viewVersion) return;
@@ -254,7 +269,10 @@ export function mountProjectSetup(container, {
         button.disabled = false;
       }
     };
-    container.querySelector("#project-new").onclick = () => { setActive(null); message = "新建 Project 草稿"; render(); };
+    container.querySelector("#project-new").onclick = () => {
+      if(pendingCreate){message="上一笔创建尚未确认，请重试原表单或重新读取项目列表。";const status=container.querySelector("#project-status");if(status)status.textContent=message;return;}
+      setActive(null); message = "新建 Project 草稿"; render();
+    };
     container.querySelector("#project-open").onclick = () => {
       const id = container.querySelector("#project-open-select").value;
       if (!id) return;
