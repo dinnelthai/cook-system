@@ -126,7 +126,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       const aggregate = createProjectAggregate(input, { idFactory: makeId, now });
       const eventId = textId(makeId());
       const actorId = actor(actor_id), at = aggregate.created_at_ms;
-      const payload = { project_id: aggregate.project_id, profile: aggregate.profile, network: aggregate.network };
+      const payload = { aggregate };
       const requestDigest = hash(canonicalJson({ event_type: "PROJECT_CREATED", payload, actor_id: actorId }));
       const event = makeEvent({
         eventId, projectId: aggregate.project_id, revision: 1, type: "PROJECT_CREATED",
