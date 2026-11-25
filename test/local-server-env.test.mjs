@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {buildLocalServerEnvironment} from "../src/inner-market/local-server-env.mjs";
 test("remote-localnet launcher keeps every money-moving capability disabled by default",()=>{
  const env=buildLocalServerEnvironment({PATH:"/usr/bin"},{port:4183});
- assert.equal(env.PORT,"4183");assert.equal(env.COOK_LOCAL_RPC_URL,"http://127.0.0.1:18899");
+ assert.equal(env.PORT,"4183");assert.equal(env.COOK_LOCAL_RPC_URL,"http://127.0.0.1:18899/");
  assert.equal(env.COOK_LOCAL_FAUCET,"0");assert.equal(env.COOK_LOCAL_TRANSFER,"0");assert.equal(env.COOK_LOCAL_TRADING,"0");
  assert.equal(env.PATH,"/usr/bin");
 });

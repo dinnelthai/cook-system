@@ -21,9 +21,13 @@ jobs:
           node-version: 22
       - name: Install pinned reference SDK and Solana client
         run: npm ci --no-audit --no-fund
-      - name: Run tests
-        run: npm test
-      - name: Validate JSON Schema registry
-        run: npm run validate:schemas
-      - name: Run held-out defensive regression cases
-        run: node scripts/run-heldout-defensive-evaluation.mjs /tmp/cook-heldout-defensive-evaluation.json 901,902,903
+      - name: Run unified code acceptance
+        run: npm run accept:all
+      - name: Upload machine-readable acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cook-system-unified-acceptance
+          path: .cook-system/acceptance/*.json
+          if-no-files-found: warn
+          retention-days: 14
