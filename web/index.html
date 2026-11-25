@@ -185,6 +185,50 @@ nav:has(.meme-rail)>button[data-page=terminal],nav:has(.meme-rail)>button[data-p
 .bundle-metrics>div{min-width:0;padding:7px;background:var(--surface2);border:1px solid var(--line);border-radius:5px;display:grid;gap:3px}
 .bundle-metrics strong{font:600 15px var(--mono);overflow-wrap:anywhere}
 .bundle-review .scroll{max-height:190px}.bundle-review .muted{font-size:10px}
+
+/* Compact Meme desk: only current-token operations in the three primary panes. */
+body:has(main[data-page=terminal]){--bg:#101212;--surface:#151a1a;--surface2:#131818;--line:#304544;--cyan:#83b7b5;--text:#e9eded;--muted:#a4afae}
+body:has(main[data-page=terminal]) header{background:#101515;height:46px;padding:0 14px}
+body:has(main[data-page=terminal]) .brand-sub,body:has(main[data-page=terminal]) .build{display:none}
+body:has(main[data-page=terminal]) nav{top:46px;height:calc(100vh - 46px);display:flex;flex-direction:column;padding:10px;background:#101414}
+.layout:has(main[data-page=terminal]){grid-template-columns:220px minmax(0,1fr)}
+.meme-rail{display:flex;flex:1;min-height:0;flex-direction:column;border:0;margin:0;padding:0}
+.meme-rail #meme-list{flex:1;max-height:none;overflow:auto}
+.meme-rail label[for=meme-search]{position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden}
+.meme-rail #meme-search{margin:8px 0 5px}
+nav button#meme-create-footer{justify-content:center;background:#244443;border:1px solid #4d7673;color:#d8eeeb;min-height:36px;margin:10px 0 0}
+.meme-other-workspaces{position:relative;color:var(--muted);font-size:11px}
+.meme-other-workspaces summary{cursor:pointer}.meme-other-workspaces[open]{background:var(--surface);padding:6px;position:absolute;right:110px;top:12px;z-index:30;border:1px solid var(--line);border-radius:5px}
+.meme-other-workspaces button{display:block;width:100%;text-align:left;margin:4px 0}.meme-other-workspaces button[data-page=terminal],.meme-other-workspaces button[data-page=create]{display:none}
+.meme-desk{padding:10px;gap:10px;grid-template-columns:minmax(0,1fr) minmax(310px,390px)}
+.meme-center{gap:8px}.meme-center #terminal-project-context{padding:8px 10px}
+.meme-center #terminal-project-context>.row .meme-context-select,.meme-center #terminal-project-context>details{display:none}
+.meme-chart-toolbar{padding:1px 0}.meme-center .pro-chart,.meme-chart-empty{min-height:330px}
+.meme-lower{min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--surface2);padding:0 10px 10px}
+.meme-lower-tabs{display:flex;overflow-x:auto;border-bottom:1px solid var(--line);margin:0 0 9px;gap:5px}
+main[data-page=terminal] .meme-lower-tabs button{border:0;background:transparent;border-radius:0;white-space:nowrap;padding:10px 8px;color:var(--muted);border-bottom:2px solid transparent}
+main[data-page=terminal] .meme-lower-tabs button[aria-pressed=true]{color:var(--text);border-bottom-color:var(--cyan)}
+.meme-lower .meme-wallet{border:0;padding:0;margin:0;background:transparent}
+.meme-lower [hidden],#meme-live-summary[hidden]{display:none!important}
+#meme-live-summary[data-meme-tab=assets]>.meme-control-section:not(:first-child){display:none}
+#meme-live-summary[data-meme-tab=risk]>.meme-control-section:first-child{display:none}
+#meme-treasury-host .project-asset-grid{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+.meme-control{top:56px;padding:10px;max-height:calc(100vh - 68px);background:#131616;gap:10px}
+.meme-control .meme-mode{padding:5px;background:#1a2020;gap:4px}
+main[data-page=terminal] .meme-mode button{font-size:13px;padding:11px 6px;border:0}
+.meme-control .meme-control-section{padding:14px 4px;border-color:var(--line);gap:10px}
+.meme-control .bundle-direction{background:#1a2020;padding:5px;border-radius:7px}
+.meme-control .bundle-direction button{border:0;padding:10px 5px;font-size:12px}
+.meme-control .bundle-direction button[data-direction=BUY][aria-pressed=true]{background:#1e3824;color:#b3d6b2}
+.meme-control .bundle-direction button[data-direction=SELL][aria-pressed=true]{background:#46302f;color:#efc0bb}
+.meme-control .bundle-metrics>div{padding:10px;background:#1a2020}
+.meme-control .bundle-submit{min-height:39px;background:#20312a;border:0;color:#a5b7a8}
+.meme-execution-note{font-size:11px;color:var(--muted);padding:8px 5px;border-top:1px solid var(--line)}.meme-execution-note p{margin:4px 0}
+.trade-log-empty{padding:24px 8px;text-align:center;color:var(--muted);font-size:11px}
+#meme-launch-host .setup-secondary .setup-summary{font-size:12px}
+@media(max-width:1200px){.layout:has(main[data-page=terminal]){grid-template-columns:185px minmax(0,1fr)}.meme-desk{grid-template-columns:minmax(0,1fr) minmax(260px,320px)}}
+@media(max-width:980px){.meme-desk{grid-template-columns:1fr}.meme-control{position:static;max-height:none}}
+@media(max-width:700px){.layout:has(main[data-page=terminal]){display:block}body:has(main[data-page=terminal]) nav{height:auto;max-height:44vh}.meme-rail #meme-list{max-height:24vh}}
 </style></head>
 <body><a class="skip-link" href="#main">跳转到主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="页面导航" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
