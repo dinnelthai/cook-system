@@ -7,7 +7,7 @@ const MAX_REPORT_BYTES=16*1024*1024;
 const hash=bytes=>createHash("sha256").update(bytes).digest("hex");
 const label=v=>typeof v==="string"&&v.trim()===v&&v.length>0&&v.length<=256;
 const wrappedSol="So11111111111111111111111111111111111111112";
-function prepare(bytes){
+export function deriveReportEventLink(bytes){
  if(!Buffer.isBuffer(bytes)||bytes.length===0||bytes.length>MAX_REPORT_BYTES)throw Error("INVALID_REPORT_BYTES");
  const input=JSON.parse(bytes.toString("utf8"));
  const report=buildUnifiedHistoricalReport(input);
@@ -37,13 +37,13 @@ function prepare(bytes){
 /** Link exact raw report bytes to the exact normalized candle event batch.
  * Integrity only; not proof of completeness, provenance or financial accuracy. */
 export async function archiveReportEventLink(bytes,store){
- const {batchInput,expected,manifest}=prepare(bytes);
+ const {batchInput,expected,manifest}=deriveReportEventLink(bytes);
  const saved=await store.put(batchInput);
  if(saved.batch_id!==expected.batch_id)throw Error("STORE_BATCH_MISMATCH");
  return manifest;
 }
 export async function verifyReportEventLink(bytes,manifest,store){
- const {expected,manifest:derived}=prepare(bytes);
+ const {expected,manifest:derived}=deriveReportEventLink(bytes);
  if(!isDeepStrictEqual(manifest,derived))throw Error("REPORT_MANIFEST_MISMATCH");
  const saved=await store.get(derived.event_batch_id);
  if(!isDeepStrictEqual(saved,expected))throw Error("STORE_BATCH_MISMATCH");
