@@ -1,0 +1,3 @@
+# B10 — portable project lifecycle archive
+
+The project dossier can be exported as a portable archive containing both original financial and Pump history inputs plus a derived review snapshot. Restore recomputes B05/B06/B07/B08 from the raw inputs and ignores the cached derived review. This prevents a modified or stale report snapshot from being treated as authoritative. The UI supports restore and re-audit. The archive remains an offline evidence package; it does not attest authenticity, ownership, valuation or permit settlement. Browser acceptance and real chain fixture parity remain operator gates.

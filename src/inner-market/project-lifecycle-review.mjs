@@ -55,3 +55,19 @@ export function buildProjectLifecycleReview({financialInput,graduationHistory}){
   issues:[...new Set(issues)],source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",actual_settlement_allowed:false,execution_enabled:false,
   notes:["A project dossier correlates explicit token, network and mint identity; quote asset symbol and quote mint remain separate.","A PumpSwap creator-fee bucket is not evidence of creator wallet receipt.","Historical financial consistency is not independent source, ownership or valuation attestation.","No launch, swap, withdrawal, liquidation or settlement action is performed."]};
 }
+
+/** Portable archive containing original inputs and a derived snapshot.
+ * Restore always recomputes from raw inputs and ignores the cached review. */
+export function createProjectLifecycleArchiveBundle({financialInput,graduationHistory,metadata=null}){
+ const review=buildProjectLifecycleReview({financialInput,graduationHistory});
+ return {schema_version:"cook-project-lifecycle-archive.1",metadata:metadata==null?null:structuredClone(metadata),
+  financial_input:structuredClone(financialInput),graduation_history:structuredClone(graduationHistory),
+  derived_review:structuredClone(review),execution_enabled:false};
+}
+export function restoreProjectLifecycleArchiveBundle(bundle){
+ if(bundle?.schema_version!=="cook-project-lifecycle-archive.1"||!bundle.financial_input||!bundle.graduation_history)throw Error("INVALID_PROJECT_LIFECYCLE_ARCHIVE");
+ const financialInput=structuredClone(bundle.financial_input),graduationHistory=structuredClone(bundle.graduation_history);
+ const review=buildProjectLifecycleReview({financialInput,graduationHistory});
+ return {financialInput,graduationHistory,metadata:bundle.metadata==null?null:structuredClone(bundle.metadata),review,
+  restore_status:"RECOMPUTED_FROM_RAW_INPUTS",cached_review_ignored:bundle.derived_review!=null,execution_enabled:false};
+}

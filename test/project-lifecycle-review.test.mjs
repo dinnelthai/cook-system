@@ -65,3 +65,19 @@ test("localnet accounting label maps only to the explicitly equivalent local_sim
  const r=buildProjectLifecycleReview({financialInput:i,graduationHistory:graduation()});
  assert.equal(r.project_identity.identity_checks.find(x=>x.id==="NETWORK_MATCH").status,"PASS");
 });
+
+test("lifecycle archive preserves raw inputs and restore recomputes rather than trusting cached review",async()=>{
+ const financialInput=financial(),graduationHistory=graduation();
+ const {createProjectLifecycleArchiveBundle,restoreProjectLifecycleArchiveBundle}=await import("../src/inner-market/project-lifecycle-review.mjs");
+ const bundle=createProjectLifecycleArchiveBundle({financialInput,graduationHistory,metadata:{label:"archive-test"}});
+ assert.equal(bundle.schema_version,"cook-project-lifecycle-archive.1");assert.equal(bundle.execution_enabled,false);
+ bundle.derived_review.status="INTERNAL_CHECKS_CONSISTENT";
+ const restored=restoreProjectLifecycleArchiveBundle(bundle);
+ assert.equal(restored.restore_status,"RECOMPUTED_FROM_RAW_INPUTS");assert.equal(restored.cached_review_ignored,true);
+ assert.equal(restored.review.status,"PARTIAL");assert.equal(restored.metadata.label,"archive-test");
+ assert.deepEqual(restored.financialInput,financialInput);assert.deepEqual(restored.graduationHistory,graduationHistory);
+});
+test("lifecycle archive rejects unsupported or incomplete bundles",async()=>{
+ const {restoreProjectLifecycleArchiveBundle}=await import("../src/inner-market/project-lifecycle-review.mjs");
+ assert.throws(()=>restoreProjectLifecycleArchiveBundle({schema_version:"wrong"}),/INVALID_PROJECT_LIFECYCLE_ARCHIVE/);
+});
