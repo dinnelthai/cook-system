@@ -16,3 +16,7 @@ The SQLite mode creates and removes its own private temporary metadata fixture. 
 - Legacy history without explicit network and valuation evidence remains unverified.
 - Canonical instruction-level receipt identity remains a separate source-data contract.
 - Local test transfer reconciliation, HTTP organization and diagnostic export require separate acceptance.
+
+## Alert journal benchmark
+
+`node scripts/benchmark-alert-store.mjs 100` measures synthetic open, acknowledge and resolve writes and a fresh-store full replay. Uses an isolated temporary journal, not operator records. The benchmark does not claim long-duration soak or production throughput.
