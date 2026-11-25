@@ -1,6 +1,6 @@
 import {mountProjectAssets} from "./project-assets-view.mjs";
 import {lifecycleLabel,operationalLabel,projectWalletRegistrationRows} from "./project-operator-view.mjs";
-import {historicalSeriesRange} from "./terminal-display.mjs";
+import {historicalSeriesRange,candleTimeLayout} from "./terminal-display.mjs";
 import {projectOverviewModel,projectIntervalMetrics} from "./project-overview-view.mjs";
 import {mountLocalFaucet} from "./local-faucet.mjs";
 import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-report.mjs";
@@ -106,13 +106,15 @@ function candleChart(result){
  if(vals.some(n=>!Number.isFinite(n)||n<=0))return emptyState("图表超出显示精度","原始价格保留在数据中");
  const lo=Math.min(...vals),hi=Math.max(...vals),span=hi-lo||hi*.01||1;
  const vols=points.map(c=>Number(c.quote_volume_base_units)),maxVol=Math.max(1,...vols);
- const X=i=>48+i*500/Math.max(1,points.length-1),Y=n=>155-(n-lo)/span*120;
- const width=Math.max(2,Math.min(12,480/points.length));
+ const layout=candleTimeLayout(points,candleInterval);
+ if(!layout)return emptyState("时间轴数据无效","无法验证历史区间顺序");
+ const X=i=>layout.positions[i],Y=n=>155-(n-lo)/span*120;
+ const width=layout.width;
  let svg='<svg class="ohlcv-chart" viewBox="0 0 600 215" role="img" aria-label="历史成交 K 线和成交量">';
  for(const f of [0,.5,1]){const y=Y(lo+span*f);svg+='<path d="M36 '+y+' H550" stroke="#263449"/><text x="598" y="'+(y+3)+'" fill="#92a6c0" font-size="9" text-anchor="end">'+esc((lo+span*f).toPrecision(5))+'</text>';}
  points.forEach((c,i)=>{const o=Number(c.open_price),cl=Number(c.close_price),x=X(i),color=cl>=o?"#42dfb1":"#ff8293",y=Math.min(Y(o),Y(cl));svg+='<path d="M'+x+' '+Y(Number(c.high_price))+' V'+Y(Number(c.low_price))+'" stroke="'+color+'"/><rect x="'+(x-width/2)+'" y="'+y+'" width="'+width+'" height="'+Math.max(1,Math.abs(Y(o)-Y(cl)))+'" fill="'+color+'"/><rect x="'+(x-width/2)+'" y="'+(193-vols[i]/maxVol*28)+'" width="'+width+'" height="'+(vols[i]/maxVol*28)+'" fill="'+color+'" opacity=".55"/>';});
  svg+='<text x="36" y="210" font-size="9" fill="#92a6c0">'+esc(new Date(points[0].interval_start_ms).toISOString())+'</text><text x="550" y="210" text-anchor="end" font-size="9" fill="#92a6c0">'+esc(new Date(points.at(-1).interval_start_ms).toISOString())+'</text></svg>';
- return svg+'<p class="muted">历史成交 · UTC · 价格按来源口径 · 图表原始数值 · 图形为近似显示，原始数值保持精确。</p>';
+ return svg+'<p class="muted">历史成交 · UTC · 时间轴按实际间隔 · 图中缺少 K 线的周期：'+esc(layout.missing_intervals)+'（无成交或缺数据，不补造） · 价格按来源口径 · 图形为近似显示。</p>';
 }
 function renderTerminal(){
  const d=report.terminal_state,a=d.treasury,m=d.market,scope=d.scope;
