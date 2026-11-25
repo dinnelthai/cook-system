@@ -34,7 +34,11 @@ async function main(){
  add("node_runtime",nodeMajor>=22?"PASS":"FAIL",nodeMajor>=22?"Node.js 22+ detected":"Node.js 22+ is required",{node_version:process.versions.node});
  const pkg=JSON.parse(await (await import("node:fs/promises")).readFile(join(root,"package.json"),"utf8"));
  const lock=JSON.parse(await (await import("node:fs/promises")).readFile(join(root,"package-lock.json"),"utf8"));
- add("package_lock",lock.lockfileVersion===3?"PASS":"FAIL",lock.lockfileVersion===3?"npm lockfile v3 present":"Expected package-lock v3",{lockfile_version:lock.lockfileVersion});
+ const rootLock=lock.packages?.[""];
+ const declared=JSON.stringify(Object.entries(pkg.devDependencies??{}).sort());
+ const pinned=JSON.stringify(Object.entries(rootLock?.devDependencies??{}).sort());
+ const lockConsistent=lock.lockfileVersion===3&&Boolean(rootLock)&&declared===pinned;
+ add("package_lock",lockConsistent?"PASS":"FAIL",lockConsistent?"npm lockfile v3 and direct development dependency declarations match":"Package lock version or dependency declarations differ",{lockfile_version:lock.lockfileVersion});
  const missing=[];for(const name of ["@solana/web3.js","@pump-fun/pump-sdk/swap","bn.js","ws"]){try{require.resolve(name)}catch{missing.push(name)}}
  add("runtime_dependencies",missing.length?"FAIL":"PASS",missing.length?"Missing installed dependencies; run npm ci":"Pinned runtime dependencies resolve",{missing});
  const flags=resolveLocalFeatureFlags({});
@@ -50,7 +54,14 @@ async function main(){
   const countsValid=test.ok&&counts.tests!==null&&counts.passed===counts.tests&&counts.failed===0&&counts.skipped===0;
   add("test_count",countsValid?"PASS":"FAIL",countsValid?"All tests passed with no skips":"Test summary missing or contains failures/skips",counts);
  command("json_schema_registry",["scripts/validate-json-schemas.mjs"]);
- command("bounded_project_replay_benchmark",["scripts/benchmark-project-replay.mjs","1000","3"],{timeout:30000});
+ const benchmark=command("bounded_project_replay_benchmark",["scripts/benchmark-project-replay.mjs","1000","3"],{timeout:30000});
+ if(benchmark.ok){
+  try{
+   const b=JSON.parse(benchmark.out);
+   const valid=b.status==="PASS"&&b.runs.length===3&&b.runs.every(r=>r.matched===true&&Number.isSafeInteger(r.rss_bytes)&&r.rss_bytes>0)&&b.resources?.memory_leak_attested===false&&b.production_capacity_validated===false;
+   add("bounded_replay_resource_evidence",valid?"PASS":"FAIL","Observed replay resource samples; not a production capacity or memory leak claim",{resources:b.resources,runs:b.runs});
+  }catch{add("bounded_replay_resource_evidence","FAIL","Replay resource report unavailable");}
+ }
  const businessRegression=command("project_business_regression",["--test","--test-reporter=tap","test/project-store.test.mjs","test/project-business-review.test.mjs","test/project-runtime.test.mjs","test/project-runtime-context.test.mjs","test/project-overview-view.test.mjs","test/project-risk-review.test.mjs","test/project-http.test.mjs","test/terminal-evidence.test.mjs","test/project-storage-regression.test.mjs","test/synthetic-reserve-product-diagnostic.test.mjs","test/project-financial-close-review.test.mjs","test/market-quality-engine.test.mjs","test/synthetic-batch-audit.test.mjs"]);
  const businessCounts={tests:parseCount(businessRegression.out,"tests"),passed:parseCount(businessRegression.out,"pass"),failed:parseCount(businessRegression.out,"fail"),skipped:parseCount(businessRegression.out,"skipped")};
  add("business_regression_count",businessRegression.ok&&businessCounts.tests!==null&&businessCounts.tests===businessCounts.passed&&businessCounts.failed===0&&businessCounts.skipped===0?"PASS":"FAIL","Project storage, evidence, API and synthetic numerical diagnostic regression; not external acceptance",businessCounts);

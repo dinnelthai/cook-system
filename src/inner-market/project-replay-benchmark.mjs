@@ -11,11 +11,13 @@ export function benchmarkProjectReplay({revisions=1000,repeats=3}={}){
   const r=applyProjectCommand(p,{type:"UPDATE_PROFILE",payload:{profile:{description:"metadata revision "+i}}},{now:()=>i});p=r.aggregate;
   events.push({event_type:r.event_type,project_id:p.project_id,revision:p.revision,source:"application",occurred_at_ms:i,payload:r.payload});
  }
- const runs=[];
+ const runs=[];const memoryBefore=process.memoryUsage();let observedPeakRss=memoryBefore.rss;
  for(let i=0;i<repeats;i++){
   const start=performance.now(),result=replayProjectEvents(events);
-  runs.push({elapsed_ms:Math.round((performance.now()-start)*1000)/1000,matched:canonicalJson(result.aggregate)===canonicalJson(p)});
+  const elapsed=performance.now()-start,matched=canonicalJson(result.aggregate)===canonicalJson(p);
+  const memory=process.memoryUsage();observedPeakRss=Math.max(observedPeakRss,memory.rss);
+  runs.push({elapsed_ms:Math.round(elapsed*1000)/1000,matched,heap_used_bytes:memory.heapUsed,rss_bytes:memory.rss});
  }
  return {schema_version:"cook-project-replay-benchmark.1",status:runs.every(r=>r.matched)?"PASS":"REVIEW_REQUIRED",revisions,repeats,runs,
-  fixture_bytes:Buffer.byteLength(canonicalJson(events)),sqlite_io_measured:false,production_capacity_validated:false,execution_enabled:false};
+  fixture_bytes:Buffer.byteLength(canonicalJson(events)),resources:{baseline_rss_bytes:memoryBefore.rss,baseline_heap_used_bytes:memoryBefore.heapUsed,observed_peak_rss_bytes:observedPeakRss,sampling_scope:"REPLAY_BOUNDARIES_ONLY",memory_leak_attested:false},sqlite_io_measured:false,production_capacity_validated:false,execution_enabled:false};
 }
