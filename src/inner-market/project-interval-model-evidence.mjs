@@ -67,7 +67,7 @@ export function reviewIntervalModelEvidence(project,intervals,archives){
     if(r?.status==="REVIEW_REQUIRED")bad("RESERVE_EVIDENCE_REVIEW_REQUIRED");
     else if(r?.status!=="DECLARED_FIELDS_PRESENT")absent("RESERVE_EVIDENCE_INCOMPLETE");
     if(v.candle_evidence_status==="REVIEW")bad("CANDLE_EVIDENCE_CONFLICT");
-    else if(v.candle_evidence_status!=="PASS")absent("CANDLE_EVIDENCE_NOT_VERIFIED");
+    else if(!["CONSISTENT","EMPTY"].includes(v.candle_evidence_status))absent("CANDLE_EVIDENCE_NOT_VERIFIED");
     row.participant_coverage_status=status(c?.status);
     row.record_count=count(c?.record_count)?c.record_count:null;
     row.reserve_evidence_status=status(r?.status);

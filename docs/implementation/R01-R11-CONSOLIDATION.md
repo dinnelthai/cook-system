@@ -10,3 +10,7 @@ Open: actual project lifecycle execution, participant behavioral validation, rea
 ## R01 — revision and evidence-pinned runtime selection
 
 GET /api/projects/:id/runtime reads one verified local snapshot. POST to the same route is a read-only selection, requiring expected_revision, expected_context_id, and report_link_archive_id. The context digest includes every archive hash (including close reviews), order head and project aggregate, so new evidence at the same revision invalidates a stale selection. Existing business review includes the same context ID. Terminal offers an explicit historical interval selector, guarded against stale responses and context changes. No default interval, cross-interval aggregation or mutation. Correct work-item status distinguishes market registration from evidence and incomplete financial endpoints. Two new tests cover API and SQLite context invalidation. This is R01 offline read-context delivery; workflow execution and external evidence validation remain outside the implemented scope. R02 onward are not claimed complete.
+
+## R02 — mathematical business call paths
+
+See [R02-MATH-BUSINESS-CALL-PATHS.md](R02-MATH-BUSINESS-CALL-PATHS.md). R01 CI passed (45594148766). R02 corrects candle consumer status vocabulary and adds a regression. R03 remains next; no empirical or operational model completion claim.

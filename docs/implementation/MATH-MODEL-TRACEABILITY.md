@@ -28,3 +28,7 @@ Run npm test and npm run accept:all. The dedicated regression group includes fin
 - Command: node scripts/review-math-models.mjs <validation.json> <new-output.json> [historical-inputs.json]. Financial input in CLI is the existing synthetic fixture, not live balances. No original data source or causal model is calibrated. No execution logic, predictive intervention or manipulation model is added.
 
 Open research: empirical participant behavior calibration, historical source parity, independence/ownership attribution, causality and full protocol invariant verification. This batch is not implementation of every research hypothesis.
+
+## R02 business call-path audit
+
+See [R02 mathematical business call paths](R02-MATH-BUSINESS-CALL-PATHS.md) for the inspected canonical owner/caller matrix, remaining gaps and the candle status contract correction.

@@ -34,3 +34,25 @@ test("inconsistent participant counts and foreign records cannot upgrade coverag
  assert.equal(v.status,"REVIEW_REQUIRED");assert.equal(v.model_evidence.intervals[0].evidence.length,1);
  assert.ok(v.findings.some(x=>x.code==="PARTICIPANT_COVERAGE_COUNT_CONFLICT"));
 });
+
+test("canonical candle producer states are interpreted correctly by the project projection",()=>{
+ const coverage={status:"DECLARED_COMPLETE",record_count:1,reconciled_record_count:1,declared_address_record_count:1,missing_address_record_count:0,independent_participant_count:null};
+ const evaluate=status=>{
+  const a=market(coverage);
+  a.payload.reserve_evidence={status:"DECLARED_FIELDS_PRESENT"};
+  a.payload.candle_evidence_status=status;
+  return buildProjectBusinessReview(p,[link(),a]).model_evidence;
+ };
+ for(const status of ["CONSISTENT","EMPTY"]){
+  const v=evaluate(status);
+  assert.equal(v.intervals[0].evidence[0].status,"DECLARED_FIELDS_PRESENT");
+  assert.ok(!v.unknown.some(x=>x.code==="CANDLE_EVIDENCE_NOT_VERIFIED"));
+  assert.equal(v.real_market_validated,false);
+ }
+ for(const status of ["UNAVAILABLE","PASS",undefined]){
+  const v=evaluate(status);
+  assert.equal(v.intervals[0].evidence[0].status,"PARTIAL");
+  assert.ok(v.unknown.some(x=>x.code==="CANDLE_EVIDENCE_NOT_VERIFIED"));
+ }
+ assert.equal(evaluate("REVIEW").status,"REVIEW_REQUIRED");
+});
