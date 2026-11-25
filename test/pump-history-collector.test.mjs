@@ -7,7 +7,7 @@ import { SPL_TOKEN_PROGRAM_ID } from "../src/adapters/pump/pump-account-codec.mj
 import { derivePumpBondingCurveAddress, fetchPumpMintHistory } from "../src/adapters/pump/pump-history-collector.mjs";
 
 const ZERO_KEY = "11111111111111111111111111111111";
-const MINT = "So11111111111111111111111111111111111111112";
+const MINT = "SysvarRent111111111111111111111111111111111";
 const USER = "Vote111111111111111111111111111111111111111";
 const SIGNATURE = "history-fixture-signature";
 
@@ -189,4 +189,17 @@ test("historical collection records inconsistent archived receipt identity as a 
   assert.equal(r.signature_coverage.fetched_transactions,0);
   assert.equal(r.historical_read_evidence.status,"PARTIAL");
  }
+});
+
+test("conflicting receipt precision against account metadata remains a reported historical gap",async()=>{
+ const curve=derivePumpBondingCurveAddress(MINT),tx=transactionFixture();
+ tx.meta.postTokenBalances[0].uiTokenAmount.decimals=9;
+ const rpc={
+  async getAccountInfo(address){return address===MINT?mintAccountInfo():bondingCurveAccountInfo();},
+  async getSignaturesForAddress(address){assert.equal(address,curve);return [{signature:SIGNATURE,slot:100,err:null}];},
+  async getTransaction(){return tx;},async getBlock(){return {transactions:[{transaction:{signatures:[SIGNATURE]}}]};}
+ };
+ const r=await fetchPumpMintHistory({rpc,mint:MINT,maxSignatures:10});
+ assert.equal(r.events.length,0);assert.ok(r.data_gaps.some(g=>g.status==="RECEIPT_TOKEN_DECIMALS_CONFLICT"));
+ assert.equal(r.historical_read_evidence.status,"PARTIAL");
 });

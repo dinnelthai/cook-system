@@ -139,6 +139,7 @@ function mergeSignatureCollections(collections) {
 
 function attachTransactionReconciliation(parsed, transaction) {
   const balanceDeltas = parsed.balance_deltas;
+  if(!balanceDeltas)return parsed;
   const curveTrades = parsed.events.filter((event) =>
     event.event_kind === "CURVE_BUY_EXECUTED" || event.event_kind === "CURVE_SELL_EXECUTED"
   );
@@ -473,6 +474,9 @@ export async function fetchPumpMintHistory({
       sourceType: "rpc",
     });
     attachTransactionReconciliation(parsed, item.transaction);
+    if(!parsed.balance_deltas){
+      dataGaps.push({signature:item.signature,slot:item.transaction.slot,source_addresses:item.source_addresses,status:parsed.unresolved_events[0]?.status??"RECEIPT_EVIDENCE_UNKNOWN"});
+    }
     parsedTransactions.push({
       signature: item.signature,
       slot: item.transaction.slot,
@@ -656,7 +660,7 @@ export async function fetchPumpMintHistory({
   const allPoolsComplete = hasMigration
     ? poolReplays.length > 0 && poolReplays.every((pool) => pool.replay_status === "REPLAYED_FULL_POOL_HISTORY")
     : poolReplays.length === 0 || poolReplays.every((pool) => pool.replay_status === "REPLAYED_FULL_POOL_HISTORY");
-  const readEvidence = summarizeHistoricalReadEvidence({scans:signatureCollections,source:sourceProvenance,missingTransactionCount:allFetched.filter(item=>!item.transaction).length,candleAudit:candleIntegrityAudit});
+  const readEvidence = summarizeHistoricalReadEvidence({scans:signatureCollections,source:sourceProvenance,missingTransactionCount:new Set([...allFetched.filter(item=>!item.transaction).map(item=>item.signature),...parsedTransactions.filter(item=>!item.parser_result?.balance_deltas).map(item=>item.signature)]).size,candleAudit:candleIntegrityAudit});
   const overallStatus = readEvidence.status === "REVIEW_REQUIRED" ? "HISTORICAL_EVIDENCE_REVIEW_REQUIRED" : curveReplayComplete && allPoolsComplete
     ? "REPLAYED_FULL_HISTORY"
     : curveReplayComplete && hasMigration && poolReplays.length === 0
