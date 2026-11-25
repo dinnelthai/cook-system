@@ -1,3 +1,4 @@
+import {auditDeclaredHistoricalIntervals} from "../core/declared-historical-intervals.mjs";
 import {archiveApplicable,evidenceApplicable} from "./project-evidence-scope.mjs";
 const hex=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v);
 const reviewKinds=["TREASURY_REVIEW","MARKET_EVIDENCE_REVIEW","PROJECT_CLOSE_REVIEW"];
@@ -7,7 +8,7 @@ export function indexProjectEvidence(p,archives,orders){
  const scoped=archives.filter(a=>archiveApplicable(p,a)),allOrders=orders.filter(o=>o.project_id===p.project_id);
  const findings=[],unknown=[];
  const add=(code,reference)=>findings.push({code,reference});
- const links=new Map();
+ const links=new Map(),linkScopes=new Map();
  for(const a of scoped.filter(x=>x.kind==="HISTORICAL_REPORT_LINK")){
   const v=a.payload,s=v.scope;
   if(v.status!=="DECLARED_MATCH"||!hex(v.report_digest)||!s||s.projectId!==p.project_id||!p.token.mint||s.tokenMint!==p.token.mint||
@@ -16,7 +17,9 @@ export function indexProjectEvidence(p,archives,orders){
     typeof s.openingCutoff!=="string"||!s.openingCutoff||typeof s.closingCutoff!=="string"||!s.closingCutoff||s.openingCutoff===s.closingCutoff){
    add("REPORT_LINK_SCOPE_CONFLICT",a.archive_id);continue;
   }
+  if(links.has(a.archive_id)){add("DUPLICATE_REPORT_LINK_ARCHIVE_ID",a.archive_id);continue;}
   links.set(a.archive_id,{archive_id:a.archive_id,report_digest:v.report_digest,opening_cutoff:s.openingCutoff,closing_cutoff:s.closingCutoff,reviews:[]});
+  linkScopes.set(a.archive_id,s);
  }
  for(const a of scoped.filter(x=>reviewKinds.includes(x.kind)||x.kind==="ORDER_RECEIPT_REVIEW")){
   const v=a.payload,link=links.get(a.kind==="ORDER_RECEIPT_REVIEW"?v.archive_id:v.report_link_archive_id);
@@ -47,6 +50,29 @@ export function indexProjectEvidence(p,archives,orders){
  for(const l of intervals){
   const key=JSON.stringify([l.opening_cutoff,l.closing_cutoff]);
   if(scopeDigests.get(key).size>1)add("MULTIPLE_REPORT_DIGESTS_FOR_INTERVAL",l.archive_id);
+ }
+ // Reuse the canonical slot interval audit. An overlap is not itself
+ // inconsistent accounting; overlapping reports must remain independent.
+ const coverage=auditDeclaredHistoricalIntervals(intervals.map(l=>linkScopes.get(l.archive_id)),{limit:256});
+ const overlapped=new Set();
+ for(const pair of coverage.pairs)if(pair.status==="OVERLAP"){
+  overlapped.add(pair.left_index);overlapped.add(pair.right_index);
+ }
+ for(const i of overlapped)unknown.push({code:"HISTORICAL_INTERVAL_OVERLAP_NOT_ADDITIVE",reference:intervals[i].archive_id});
+ for(const i of coverage.unknown_indices)unknown.push({code:"HISTORICAL_INTERVAL_ORDER_UNVERIFIED",reference:intervals[i].archive_id});
+ for(const issue of coverage.issues)add("HISTORICAL_INTERVAL_ORDER_CONFLICT",intervals[issue.index].archive_id);
+ // A single immutable digest cannot encode two different declared boundaries.
+ const byDigest=new Map();
+ for(const l of intervals){
+  if(!byDigest.has(l.report_digest))byDigest.set(l.report_digest,[]);
+  byDigest.get(l.report_digest).push(l);
+ }
+ for(const rows of byDigest.values())if(rows.length>1){
+  const boundaries=new Set(rows.map(l=>JSON.stringify([l.opening_cutoff,l.closing_cutoff])));
+  for(const l of rows){
+   if(boundaries.size>1)add("REPORT_DIGEST_BOUNDARY_CONFLICT",l.archive_id);
+   else unknown.push({code:"DUPLICATE_REPORT_LINK_NOT_ADDITIVE",reference:l.archive_id});
+  }
  }
  const receipts=allOrders.map(o=>{
   const stale=!evidenceApplicable(p,o);

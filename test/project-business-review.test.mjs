@@ -101,3 +101,38 @@ test("unrecognized treasury producer status does not expose historical operating
  assert.equal(r.runtime.asset_intervals[0].assets.realized_pnl,null);
  assert.equal(r.execution_enabled,false);
 });
+
+function scopedInterval(id,hex,opening,closing,cash){
+ const l=link();l.archive_id=id;l.payload.report_digest=hex.repeat(64);
+ l.payload.scope.openingCutoff=opening;l.payload.scope.closingCutoff=closing;
+ const t=treasury();t.archive_id=id+"-t";t.payload.report_link_archive_id=id;t.payload.report_digest=l.payload.report_digest;t.payload.cash_flow={observed_closing_cash_base_units:cash};
+ return [l,t];
+}
+test("overlapping slot intervals remain separately reviewable and are never additive",()=>{
+ const input=[...scopedInterval("a","a","slot:10","slot:100","10"),...scopedInterval("b","b","slot:20","slot:30","20"),...scopedInterval("c","c","slot:100","slot:110","30")];
+ const r=buildProjectBusinessReview(p,input);
+ assert.equal(r.status,"EVIDENCE_INCOMPLETE");
+ assert.deepEqual(r.unknown.filter(x=>x.code==="HISTORICAL_INTERVAL_OVERLAP_NOT_ADDITIVE").map(x=>x.reference).sort(),["a","b"]);
+ assert.deepEqual(r.runtime.asset_intervals.map(x=>x.assets.cash),["10","20","30"]);
+ assert.equal(r.treasury.project_wide_total,null);assert.equal(r.offline_workflow.cross_interval_totals,null);
+});
+test("reversed slot order and digest boundary conflicts mask only implicated historical amounts",()=>{
+ const input=[...scopedInterval("a","a","slot:100","slot:10","10"),...scopedInterval("b","b","slot:20","slot:30","20"),...scopedInterval("c","b","slot:40","slot:50","30"),...scopedInterval("d","d","slot:100","slot:110","40")];
+ const r=buildProjectBusinessReview(p,input);
+ assert.equal(r.status,"REVIEW_REQUIRED");
+ assert.ok(r.findings.some(x=>x.code==="HISTORICAL_INTERVAL_ORDER_CONFLICT"&&x.reference==="a"));
+ assert.deepEqual(r.findings.filter(x=>x.code==="REPORT_DIGEST_BOUNDARY_CONFLICT").map(x=>x.reference).sort(),["b","c"]);
+ assert.deepEqual(r.runtime.asset_intervals.map(x=>x.assets.cash),[null,null,null,"40"]);
+ assert.equal(r.execution_enabled,false);
+});
+test("duplicate report references and incomparable cutoffs never establish independent coverage",()=>{
+ const a=scopedInterval("a","a","fixture:start","fixture:end","10"),b=scopedInterval("b","a","fixture:start","fixture:end","10");
+ const r=buildProjectBusinessReview(p,[...a,...b]);
+ assert.equal(r.status,"EVIDENCE_INCOMPLETE");
+ assert.equal(r.unknown.filter(x=>x.code==="DUPLICATE_REPORT_LINK_NOT_ADDITIVE").length,2);
+ assert.equal(r.unknown.filter(x=>x.code==="HISTORICAL_INTERVAL_ORDER_UNVERIFIED").length,2);
+ assert.equal(r.treasury.project_wide_total,null);
+ const repeated=buildProjectBusinessReview(p,[...a,structuredClone(a[0])]);
+ assert.equal(repeated.runtime.asset_intervals[0].assets.cash,null);
+ assert.ok(repeated.findings.some(x=>x.code==="DUPLICATE_REPORT_LINK_ARCHIVE_ID"));
+});
