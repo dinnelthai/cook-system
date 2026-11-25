@@ -224,7 +224,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         source_attestation:"UNKNOWN",execution_enabled:false};
     }
     function recordArchive(projectId, kind, payload, expectedRevision) {
-      if (!["ISSUANCE_OBSERVATION","HISTORICAL_REPORT_LINK"].includes(kind) ||
+      if (!["ISSUANCE_OBSERVATION","MARKET_OBSERVATION","HISTORICAL_REPORT_LINK"].includes(kind) ||
           !payload || payload.project_id!==projectId || payload.project_revision!==expectedRevision ||
           payload.source_attestation!=="UNKNOWN" || payload.execution_enabled!==false) throw Error("INVALID_PROJECT_ARCHIVE");
       const content=canonicalJson(payload);

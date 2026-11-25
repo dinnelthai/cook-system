@@ -162,3 +162,16 @@ test("evidence archive accepts only server-produced observations and read-only G
  assert.equal((await json(url+"/archive","POST",{})).status,405);
  assert.equal((await json(url+"/report-links","POST",{})).status,503);
 });
+
+test("market observations and report candidates use server-side project scope",async t=>{
+ const base=await setup(t,{inspectMarket:async(p,id)=>({project_id:p.project_id,project_revision:p.revision,market_id:id,status:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false}),listReportCandidates:p=>({project_id:p.project_id,project_revision:p.revision,workspace_revision:0,records:[],execution_enabled:false})});
+ const root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"market-http",profile:{name:"Market",symbol:"MKT"}})).status,201);
+ const url=root+"/market-http";
+ assert.equal((await json(url+"/market-observation","POST",{market_id:"test",expected_revision:2})).status,409);
+ assert.equal((await json(url+"/market-observation","POST",{market_id:"test",expected_revision:1,status:"VERIFIED"})).status,400);
+ const res=await json(url+"/market-observation","POST",{market_id:"test",expected_revision:1});
+ assert.equal(res.status,200);assert.equal((await res.json()).archive.kind,"MARKET_OBSERVATION");
+ assert.equal((await (await fetch(url+"/report-candidates")).json()).project_revision,1);
+ assert.equal((await (await fetch(url)).json()).project.revision,1);
+});

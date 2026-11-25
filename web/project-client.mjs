@@ -51,6 +51,13 @@ export async function listProjectArchive(projectId){
   if(!Array.isArray(result.records)||result.execution_enabled!==false)throw Error("PROJECT_API_INVALID_RESPONSE");
   return result.records;
 }
-export async function linkProjectReport(projectId,workspaceRevision,recordKey){
-  return request("/api/projects/"+encodeURIComponent(projectId)+"/report-links",{method:"POST",body:{workspace_revision:workspaceRevision,record_key:recordKey}});
+export async function linkProjectReport(projectId,workspaceRevision,recordKey,expectedRevision){
+  return request("/api/projects/"+encodeURIComponent(projectId)+"/report-links",{method:"POST",body:{workspace_revision:workspaceRevision,record_key:recordKey,expected_revision:expectedRevision}});
+}
+
+export async function inspectProjectMarket(projectId,marketId,expectedRevision){
+ return request("/api/projects/"+encodeURIComponent(projectId)+"/market-observation",{method:"POST",body:{market_id:marketId,expected_revision:expectedRevision}});
+}
+export async function listProjectReportCandidates(projectId){
+ return request("/api/projects/"+encodeURIComponent(projectId)+"/report-candidates");
 }

@@ -26,3 +26,15 @@ export function createProjectWorkspaceResolver({path,enabled}={}){
     }finally{store.close();}
   };
 }
+
+export function createProjectWorkspaceCandidates({path,enabled}={}){
+ return function candidates(project){
+  if(!enabled)throw Error("WORKSPACE_DISABLED");
+  const store=openHistoricalWorkspaceStore(path);
+  try{
+   const snapshot=store.load(),catalogue=restoreHistoricalWorkspace(snapshot.workspace);
+   const records=catalogue.list().filter(row=>matchProjectReport(project,catalogue.get(row.key).input).status==="DECLARED_MATCH");
+   return {project_id:project.project_id,project_revision:project.revision,workspace_revision:snapshot.revision,workspace_digest:snapshot.digest,records,source_attestation:"UNKNOWN",execution_enabled:false};
+  }finally{store.close();}
+ };
+}

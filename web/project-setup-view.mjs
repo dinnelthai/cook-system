@@ -1,4 +1,4 @@
-import { listProjects, getProject, createProject, appendProjectCommand, getProjectConfig, inspectProjectEvidence, listProjectArchive } from "./project-client.mjs";
+import { listProjects, getProject, createProject, appendProjectCommand, getProjectConfig, inspectProjectEvidence, listProjectArchive, inspectProjectMarket, listProjectReportCandidates, linkProjectReport } from "./project-client.mjs";
 
 const U64_MAX = 18446744073709551615n;
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -108,7 +108,48 @@ export function mountProjectSetup(container, {
         '<div class="row"><button type="submit" ' + (projects.length ? "" : "disabled") + '>登记发行证据（UNVERIFIED）</button></div></form>' +
         '<p class="muted">手工登记只产生待核验记录。只有受信任的链上读取器完成核验，才能推进到 LAUNCHED。</p>') +
       panel("发行证据记录", table(["项目", "Mint", "交易签名", "状态", "核验证据"], issuanceRows) +
-        '<div class="row"><button id="project-inspect-evidence"' + (current?.token.mint ? "" : " disabled") + '>只读核验当前项目发行证据</button></div><p id="project-evidence-result" role="status" class="muted">观察结果不自动推进生命周期。</p><div id="project-evidence-archive"></div>');
+        '<div class="row"><button id="project-inspect-evidence"' + (current?.token.mint ? "" : " disabled") + '>只读核验当前项目发行证据</button></div><p id="project-evidence-result" role="status" class="muted">观察结果不自动推进生命周期。</p><div id="project-evidence-archive"></div>')+
+      panel("市场账户身份观察",table(["Market ID","Venue","账户","登记状态"],(current?.markets??[]).map(m=>[m.market_id,m.venue,m.market_account,m.verification_status]))+
+        '<select id="project-market-select">'+(current?.markets??[]).map(m=>'<option value="'+esc(m.market_id)+'">'+esc(m.market_id+" · "+m.venue)+'</option>').join("")+'</select><button id="project-market-inspect"'+(current?.markets?.length?"":" disabled")+'>只读核验并归档</button><p id="project-market-result" role="status" class="muted">仅检查已登记市场账户身份，不认证来源。</p>')+
+      panel("已保存历史报告关联",'<button id="project-report-candidates"'+(current?"":" disabled")+'>读取当前工作区匹配报告</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>关联所选报告</button><p id="project-report-result" role="status" class="muted">仅关联声明身份一致的已保存报告。</p>');
+    const marketButton=container.querySelector("#project-market-inspect");
+    marketButton.onclick=async()=>{
+      marketButton.disabled=true;
+      const target=container.querySelector("#project-market-result");
+      try{
+        const result=await inspectProjectMarket(current.project_id,container.querySelector("#project-market-select").value,current.revision);
+        if(!isActive()||version!==viewVersion)return;
+        target.textContent=result.observation.status+" · "+result.observation.checks.join(" / ")+" · 已归档；未独立认证。";
+        await loadEvidenceArchive();
+      }catch(error){if(isActive()&&version===viewVersion)target.textContent=errorKind(error);}
+      finally{if(isActive()&&version===viewVersion)marketButton.disabled=false;}
+    };
+    let candidates=null;
+    const candidateButton=container.querySelector("#project-report-candidates"),reportSelect=container.querySelector("#project-report-select"),linkButton=container.querySelector("#project-report-link"),reportResult=container.querySelector("#project-report-result");
+    candidateButton.onclick=async()=>{
+      candidateButton.disabled=true;linkButton.disabled=true;reportSelect.disabled=true;candidates=null;reportSelect.replaceChildren();
+      try{
+        const result=await listProjectReportCandidates(current.project_id);
+        if(!isActive()||version!==viewVersion)return;
+        if(result.project_revision!==current.revision)throw Error("PROJECT_REVISION_CONFLICT");
+        candidates=result;
+        for(const row of result.records)reportSelect.add(new Option(row.openingCutoff+" → "+row.closingCutoff+" · "+row.audit_status,row.key));
+        reportSelect.disabled=!result.records.length;linkButton.disabled=!result.records.length;
+        reportResult.textContent="工作区版本 "+result.workspace_revision+" · "+result.records.length+" 条声明身份匹配报告。";
+      }catch(error){if(isActive()&&version===viewVersion)reportResult.textContent=errorKind(error);}
+      finally{if(isActive()&&version===viewVersion)candidateButton.disabled=false;}
+    };
+    linkButton.onclick=async()=>{
+      if(!candidates||!reportSelect.value)return;
+      linkButton.disabled=true;candidateButton.disabled=true;reportSelect.disabled=true;
+      try{
+        await linkProjectReport(current.project_id,candidates.workspace_revision,reportSelect.value,current.revision);
+        if(!isActive()||version!==viewVersion)return;
+        reportResult.textContent="关联已归档 · 非实时数据，来源未独立认证。";
+        await loadEvidenceArchive();
+      }catch(error){if(isActive()&&version===viewVersion)reportResult.textContent=errorKind(error);}
+      finally{if(isActive()&&version===viewVersion){linkButton.disabled=false;candidateButton.disabled=false;reportSelect.disabled=false;}}
+    };
     async function loadEvidenceArchive(){
       if(!current)return;
       const target=container.querySelector("#project-evidence-archive");

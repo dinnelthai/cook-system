@@ -65,7 +65,7 @@ function errorResponse(error) {
 
 /** Loopback HTTP adapter for Project CRUD, versioned commands and audit reads.
  * Host/origin enforcement is performed by the parent local-only server. */
-export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence, resolveReportLink } = {}) {
+export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence, inspectMarket, resolveReportLink, listReportCandidates } = {}) {
   if (!store || typeof readRequestJson !== "function" || !Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1024) {
     throw Error("INVALID_PROJECT_HTTP_CONFIGURATION");
   }
@@ -124,6 +124,22 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         const archive=req.method==="POST"?store.recordArchive(projectId,"ISSUANCE_OBSERVATION",observation,project.revision):null;
         send(res, 200, { observation, archive }); return true;
       }
+      if(action==="market-observation"){
+        if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        if(typeof inspectMarket!=="function"){send(res,503,{code:"EVIDENCE_READER_UNAVAILABLE"});return true;}
+        const body=await bodyJson(req,readRequestJson,maxBodyBytes);
+        if(Object.keys(body).some(k=>!["market_id","expected_revision"].includes(k))||typeof body.market_id!=="string"||!Number.isSafeInteger(body.expected_revision))throw Error("INVALID_MARKET_OBSERVATION_REQUEST");
+        const project=store.get(projectId);
+        if(project.revision!==body.expected_revision)throw Error("PROJECT_REVISION_CONFLICT");
+        const observation=await inspectMarket(project,body.market_id);
+        const archive=store.recordArchive(projectId,"MARKET_OBSERVATION",observation,project.revision);
+        send(res,200,{observation,archive});return true;
+      }
+      if(action==="report-candidates"){
+        if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        if(typeof listReportCandidates!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
+        send(res,200,listReportCandidates(store.get(projectId)));return true;
+      }
       if(action==="archive"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         send(res,200,{records:store.listArchive(projectId),execution_enabled:false});return true;
@@ -133,7 +149,9 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(typeof resolveReportLink!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         const selection=await bodyJson(req,readRequestJson,maxBodyBytes);
         const project=store.get(projectId);
-        const link=resolveReportLink(project,selection);
+        if(selection.expected_revision!==undefined&&selection.expected_revision!==project.revision)throw Error("PROJECT_REVISION_CONFLICT");
+        const {expected_revision,...reference}=selection;
+        const link=resolveReportLink(project,reference);
         const archive=store.recordArchive(projectId,"HISTORICAL_REPORT_LINK",link,project.revision);
         send(res,200,{link,archive});return true;
       }
