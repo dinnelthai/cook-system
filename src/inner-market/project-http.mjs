@@ -61,7 +61,7 @@ function errorResponse(error) {
 
 /** Loopback HTTP adapter for Project CRUD, versioned commands and audit reads.
  * Host/origin enforcement is performed by the parent local-only server. */
-export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig } = {}) {
+export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence } = {}) {
   if (!store || typeof readRequestJson !== "function" || !Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1024) {
     throw Error("INVALID_PROJECT_HTTP_CONFIGURATION");
   }
@@ -106,6 +106,14 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if (req.method !== "GET") { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }
         send(res, 200, action === "events" ? { events: store.events(projectId) } : store.verify(projectId));
         return true;
+      }
+      if (action === "evidence-observation") {
+        if (req.method !== "GET") { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }
+        if (typeof inspectEvidence !== "function") { send(res, 503, { code: "EVIDENCE_READER_UNAVAILABLE" }); return true; }
+        const project = store.get(projectId);
+        const observation = await inspectEvidence(project);
+        if (store.get(projectId).revision !== project.revision) { send(res, 409, { code: "PROJECT_REVISION_CONFLICT" }); return true; }
+        send(res, 200, { observation }); return true;
       }
       if (action === "commands") {
         if (req.method !== "POST") { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }

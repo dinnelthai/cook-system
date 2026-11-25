@@ -23,6 +23,7 @@ import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
 import {listProjects} from "./project-client.mjs";
+import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 // Session storage retains diagnostics across refreshes in the same tab, without cross-tab writers.
 const diagnostics=createDiagnosticLog({storage:(()=>{try{return window.sessionStorage;}catch{return null;}})()});
@@ -161,7 +162,14 @@ function renderTerminal(){
     '<span>Execution: DISABLED</span></div>';
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
-    notice.innerHTML=note(selected?"当前 Project 尚未接入独立核验的市场及财务数据。为防止跨项目误用，历史报告已隔离；清除项目选择后可继续独立复盘。":"当前 Project 不存在或不可读取。历史报告保持隔离。");
+    const match=matchProjectReport(selected,data);
+    notice.innerHTML=note(match.status==="DECLARED_MATCH"?"当前报告与 Project 的声明身份一致（Project ID、Mint、网络、Genesis、SOL）。仅为历史复盘；未独立认证，不是实时余额或结算证据。":"历史报告保持隔离："+match.reasons.join(" / ")+"。清除项目选择后可继续独立复盘。");
+    if(match.status==="DECLARED_MATCH"){
+     const area=main.querySelector("#terminal-report-area");
+     area.hidden=false;area.removeAttribute("inert");area.style.removeProperty("display");
+     // The independent report viewer remains explicitly labelled as historical.
+     for(const id of ["workflow-sample","terminal-settle","terminal-archive","workflow-save"]){const control=main.querySelector("#"+id);if(control)control.disabled=true;}
+    }
     main.querySelector("#open-data").disabled=true;
    }else{
     notice.innerHTML=note("当前为独立历史复盘模式，不代表任何 Project 的实时资产或市场状态。");

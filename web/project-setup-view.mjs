@@ -1,4 +1,4 @@
-import { listProjects, getProject, createProject, appendProjectCommand, getProjectConfig } from "./project-client.mjs";
+import { listProjects, getProject, createProject, appendProjectCommand, getProjectConfig, inspectProjectEvidence } from "./project-client.mjs";
 
 const U64_MAX = 18446744073709551615n;
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -107,7 +107,21 @@ export function mountProjectSetup(container, {
         '<label>交易签名</label><input name="signature" required minlength="64" maxlength="88" placeholder="链上交易 Signature">' +
         '<div class="row"><button type="submit" ' + (projects.length ? "" : "disabled") + '>登记发行证据（UNVERIFIED）</button></div></form>' +
         '<p class="muted">手工登记只产生待核验记录。只有受信任的链上读取器完成核验，才能推进到 LAUNCHED。</p>') +
-      panel("发行证据记录", table(["项目", "Mint", "交易签名", "状态", "核验证据"], issuanceRows));
+      panel("发行证据记录", table(["项目", "Mint", "交易签名", "状态", "核验证据"], issuanceRows) +
+        '<div class="row"><button id="project-inspect-evidence"' + (current?.token.mint ? "" : " disabled") + '>只读核验当前项目发行证据</button></div><p id="project-evidence-result" role="status" class="muted">观察结果不自动推进生命周期。</p>');
+    const inspectButton = container.querySelector("#project-inspect-evidence");
+    inspectButton.onclick = async () => {
+      inspectButton.disabled = true;
+      const output = container.querySelector("#project-evidence-result");
+      output.textContent = "读取已固定的本地 RPC…";
+      try {
+        const result = await inspectProjectEvidence(current.project_id);
+        if (!isActive() || version !== viewVersion) return;
+        output.textContent = result.status + " · " + result.checks.join(" / ") + " · 来源未独立认证；不会变更发行状态。";
+      } catch (error) {
+        if (isActive() && version === viewVersion) output.textContent = "读取失败：" + errorKind(error);
+      } finally { if (isActive() && version === viewVersion) inspectButton.disabled = false; }
+    };
 
     const walletSelect = container.querySelector("#project-wallet");
     const walletStatus = container.querySelector("#project-wallet-status");

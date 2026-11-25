@@ -40,3 +40,9 @@ export async function getProjectConfig() {
   if (!result.network || result.execution_enabled !== false) throw Error("PROJECT_API_INVALID_RESPONSE");
   return result;
 }
+
+export async function inspectProjectEvidence(projectId) {
+  const result = await request("/api/projects/" + encodeURIComponent(projectId) + "/evidence-observation");
+  if (result.observation?.project_id !== projectId || result.observation.execution_enabled !== false || result.observation.lifecycle_mutated !== false) throw Error("PROJECT_API_INVALID_RESPONSE");
+  return result.observation;
+}
