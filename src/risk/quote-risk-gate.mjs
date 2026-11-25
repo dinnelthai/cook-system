@@ -1,4 +1,5 @@
-import {mkdir,readFile,open,rename,unlink} from "node:fs/promises";
+import {mkdir,open,rename,unlink} from "node:fs/promises";
+import {constants} from "node:fs";
 import {dirname,join} from "node:path";
 import {randomUUID} from "node:crypto";
 const SCALE=1000000000000n;
@@ -10,13 +11,13 @@ function price(v,n="price"){
 function format(v){const a=(v/SCALE).toString(),b=(v%SCALE).toString().padStart(12,"0").replace(/0+$/,"");return b?a+"."+b:a;}
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 /** Paper quote planner only. It cannot create, sign or submit orders. */
-export function evaluateQuotePlan({market,portfolio,policy,riskState={halted:false},nowMs}={}){
+export function evaluateQuotePlan({market,portfolio,policy,riskState=null,nowMs}={}){
  if(!market||!portfolio||!policy||!Number.isSafeInteger(nowMs)||nowMs<0)throw Error("INVALID_QUOTE_PLAN_INPUT");
  for(const k of ["max_market_age_ms","base_spread_bps","min_spread_bps","max_spread_bps","max_inventory_skew_bps","max_drawdown_bps"])
   if(!Number.isSafeInteger(policy[k])||policy[k]<0)throw Error("INVALID_QUOTE_POLICY:"+k);
  if(policy.min_spread_bps>policy.max_spread_bps||policy.base_spread_bps>10000||policy.max_spread_bps>10000||policy.max_inventory_skew_bps>10000)throw Error("INVALID_SPREAD_POLICY");
- const reasons=[],halted=riskState.halted!==false,mid=price(market.mid_price_decimal),observed=market.observed_at_ms;
- if(riskState.halted!==true&&riskState.halted!==false)reasons.push("HALT_STATE_UNKNOWN");
+ const reasons=[],halted=riskState?.halted!==false,mid=price(market.mid_price_decimal),observed=market.observed_at_ms;
+ if(riskState?.halted!==true&&riskState?.halted!==false)reasons.push("HALT_STATE_UNKNOWN");
  if(!Number.isSafeInteger(observed)||observed<0||observed>nowMs)reasons.push("MARKET_TIMESTAMP_INVALID");
  else if(nowMs-observed>policy.max_market_age_ms)reasons.push("MARKET_DATA_STALE");
  if(!["complete","synthetic"].includes(market.data_completeness))reasons.push("MARKET_DATA_NOT_COMPLETE");
@@ -47,7 +48,7 @@ export function evaluateQuotePlan({market,portfolio,policy,riskState={halted:fal
 export function createEmergencyHaltController({readState,writeState}={}){
  if(typeof readState!=="function"||typeof writeState!=="function")throw Error("HALT_STORAGE_ADAPTER_REQUIRED");
  return {
-  async load(){try{const s=await readState();if(!s||s.schema_version!=="cook-emergency-halt.1"||typeof s.halted!=="boolean"||typeof s.reason!=="string"||(!s.halted&&s.operator_confirmed!==true))return {halted:true,reason:"HALT_STATE_INVALID"};return s;}catch{return {halted:true,reason:"HALT_STATE_UNAVAILABLE"};}},
+  async load(){try{const s=await readState();if(!s||s.schema_version!=="cook-emergency-halt.1"||typeof s.halted!=="boolean"||typeof s.reason!=="string"||!s.reason.trim()||!Number.isSafeInteger(s.at_ms)||s.at_ms<0||(!s.halted&&s.operator_confirmed!==true))return {halted:true,reason:"HALT_STATE_INVALID"};return s;}catch{return {halted:true,reason:"HALT_STATE_UNAVAILABLE"};}},
   async halt({reason,atMs}){if(typeof reason!=="string"||!reason.trim()||!Number.isSafeInteger(atMs)||atMs<0)throw Error("INVALID_HALT_REQUEST");const s={schema_version:"cook-emergency-halt.1",halted:true,reason,at_ms:atMs};await writeState(s);return s;},
   async resume({operatorConfirmed,reason,atMs}){if(operatorConfirmed!==true)throw Error("EXPLICIT_OPERATOR_CONFIRMATION_REQUIRED");if(typeof reason!=="string"||!reason.trim()||!Number.isSafeInteger(atMs)||atMs<0)throw Error("INVALID_RESUME_REQUEST");const s={schema_version:"cook-emergency-halt.1",halted:false,reason,at_ms:atMs,operator_confirmed:true};await writeState(s);return s;}
  };
@@ -55,7 +56,7 @@ export function createEmergencyHaltController({readState,writeState}={}){
 export function createFileHaltStorage(path){
  if(typeof path!=="string"||!path.trim())throw Error("HALT_FILE_PATH_REQUIRED");
  return {
-  async readState(){return JSON.parse(await readFile(path,"utf8"));},
+  async readState(){const f=await open(path,constants.O_RDONLY|(constants.O_NOFOLLOW??0));try{const info=await f.stat();if(!info.isFile()||info.size>16384)throw Error("INVALID_HALT_FILE");const bytes=await f.readFile();if(bytes.length>16384)throw Error("INVALID_HALT_FILE");return JSON.parse(bytes.toString("utf8"));}finally{await f.close();}},
   async writeState(state){await mkdir(dirname(path),{recursive:true,mode:0o700});const temp=join(dirname(path),"."+randomUUID()+".halt.tmp"),f=await open(temp,"wx",0o600);
    try{await f.writeFile(JSON.stringify(state)+"\n","utf8");await f.sync();}finally{await f.close();}
    try{await rename(temp,path);}finally{await unlink(temp).catch(e=>{if(e.code!=="ENOENT")throw e;});}

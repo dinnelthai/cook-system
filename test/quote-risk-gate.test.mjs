@@ -4,7 +4,7 @@ import {mkdtemp,rm} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {evaluateQuotePlan,createEmergencyHaltController,createFileHaltStorage} from "../src/risk/quote-risk-gate.mjs";
-const input=()=>({market:{market_id:"paper-market",mid_price_decimal:"1.25",observed_at_ms:1000,data_completeness:"synthetic",source_status:"SYNTHETIC_ONLY",volatility_bps:100},
+const input=()=>({riskState:{halted:false},market:{market_id:"paper-market",mid_price_decimal:"1.25",observed_at_ms:1000,data_completeness:"synthetic",source_status:"SYNTHETIC_ONLY",volatility_bps:100},
  portfolio:{inventory_value_quote_base_units:"100",max_inventory_value_quote_base_units:"1000",quote_balance_base_units:"500",base_inventory_base_units:"1000",current_drawdown_bps:50},
  policy:{max_market_age_ms:5000,base_spread_bps:100,min_spread_bps:50,max_spread_bps:500,max_inventory_skew_bps:200,max_order_notional_base_units:"250",max_base_order_base_units:"500",max_drawdown_bps:500}});
 test("paper quote plan is bounded, inventory-aware and never executable",()=>{
@@ -29,4 +29,15 @@ test("file-backed emergency halt persists and fails closed after corrupt state",
   await c.halt({reason:"test stop",atMs:10});assert.equal((await c.load()).halted,true);
   await c.resume({operatorConfirmed:true,reason:"manual review",atMs:20});assert.equal((await c.load()).halted,false);
  }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test("missing or malformed paper halt state cannot authorize a paper plan",()=>{
+ const i=input();delete i.riskState;
+ for(const riskState of [undefined,null,{}, {halted:"false"}]){
+  const r=evaluateQuotePlan({...i,riskState,nowMs:2000});assert.equal(r.status,"BLOCKED");assert.ok(r.reasons.includes("HALT_STATE_UNKNOWN"));
+ }
+});
+test("invalid persisted halt timestamps default to halted",async()=>{
+ const c=createEmergencyHaltController({readState:async()=>({schema_version:"cook-emergency-halt.1",halted:false,reason:"test",operator_confirmed:true,at_ms:-1}),writeState:async()=>{}});
+ assert.equal((await c.load()).halted,true);
 });

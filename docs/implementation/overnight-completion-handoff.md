@@ -59,3 +59,7 @@ Optional closingAccountEvidence binds a supplied closed account set to the repor
 ## Reliability follow-up
 
 The local alert journal publishes a complete fsynced temporary file with atomic rename under its existing writer lock instead of appending a potentially partial tail. A truncated/corrupt existing journal is rejected unchanged; backwards per-alert timestamps are rejected. Crash-orphaned locks require operator review; there is no automatic lock breaking, directory fsync guarantee or distributed writer support. Browser diagnostics persist in sessionStorage across refresh in one tab, with validation and re-sanitization at restore, bounded entries, and in-memory fallback on storage failure. Closing the tab can discard the session. This is not durable server logging. No live execution or halt integration was changed.
+
+## Reliability closeout
+
+Explicit offline diagnostic export archiving is available with `node scripts/archive-diagnostics.mjs <export.json> <private-directory>`. It validates and re-sanitizes browser exports, publishes immutable content-addressed files, and rejects conflicting existing content. This is an operator-driven archive, not automatic server logging. Paper-only halt checks now default blocked for missing state; persisted state requires a valid timestamp and bounded regular-file read. No live execution integration was added. Stale alert locks still require manual review after verifying no writer remains.

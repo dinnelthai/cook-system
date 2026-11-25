@@ -43,3 +43,22 @@ export function createDiagnosticLog({limit=1000,clock=()=>new Date(),storage=nul
  function clear(){entries=[];dropped=0;record("log.cleared")}
  return {record,snapshot,clear};
 }
+
+/** Revalidate an exported diagnostic snapshot at the offline archive boundary.
+ * Only the existing diagnostic allowlist is retained. */
+export function sanitizeDiagnosticSnapshot(snapshot){
+ if(!snapshot||snapshot.schema_version!=="cook-diagnostics.1"||snapshot.app!=="cook-system"||snapshot.mode!=="OFFLINE"||!Array.isArray(snapshot.entries)||snapshot.entries.length>10000||!Number.isSafeInteger(snapshot.dropped_count)||snapshot.dropped_count<0)throw Error("INVALID_DIAGNOSTIC_SNAPSHOT");
+ const time=v=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(v)&&Number.isFinite(Date.parse(v));
+ if(!time(snapshot.session_started_at)||!time(snapshot.exported_at))throw Error("INVALID_DIAGNOSTIC_TIME");
+ let previous=0;
+ for(const r of snapshot.entries){
+  if(!r||!Number.isSafeInteger(r.seq)||r.seq<=previous||!time(r.time)||!EVENTS.has(r.event)||!["INFO","WARN","ERROR"].includes(r.level))throw Error("INVALID_DIAGNOSTIC_ROW");
+  previous=r.seq;
+ }
+ const saved=JSON.stringify({schema_version:"cook-diagnostic-storage.1",started:snapshot.session_started_at,seq:previous,dropped:snapshot.dropped_count,entries:snapshot.entries});
+ if(saved.length>8*1024*1024)throw Error("DIAGNOSTIC_SNAPSHOT_LIMIT");
+ const log=createDiagnosticLog({limit:10000,clock:()=>new Date(snapshot.exported_at),storage:{getItem:()=>saved,setItem:()=>{}}});
+ const restored=log.snapshot();
+ if(restored.persistence_status!=="AVAILABLE"||restored.entries.length!==snapshot.entries.length)throw Error("DIAGNOSTIC_RESTORE_FAILED");
+ return {...restored,persistence_status:"OFFLINE_ARCHIVE"};
+}
