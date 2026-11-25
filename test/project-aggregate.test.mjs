@@ -88,6 +88,37 @@ test("symbol cannot be changed after launch", () => {
   assert.throws(() => run(p, "UPDATE_PROFILE", { profile: { symbol: "OTHER" } }), /PROJECT_SYMBOL_LOCKED/);
   assert.equal(p.token.mint, mint);
 });
+test("initial Dev wallet group can be created with the Project aggregate", () => {
+  const project = createProjectAggregate({ ...base, wallet_group: group }, { now: () => 1000 });
+  assert.equal(project.wallet_groups.length, 1);
+  assert.equal(project.wallet_groups[0].members[0].wallet_address, wallet);
+});
+test("draft configuration updates profile, network, token and Dev wallet atomically", () => {
+  let p = createProjectAggregate({ project_id: "atomic-draft", profile: base.profile }, { now: () => 1000 });
+  const result = applyProjectCommand(p, {
+    type: "UPDATE_DRAFT_CONFIGURATION",
+    payload: {
+      profile: base.profile,
+      network: base.network,
+      token: { supply_base_units: "1000000000", decimals: 6, creator_wallet_address: wallet },
+      wallet_group: group
+    }
+  }, { now: () => 1001 });
+  p = result.aggregate;
+  assert.equal(p.revision, 2);
+  assert.equal(p.network.genesis_hash, wallet);
+  assert.equal(p.token.supply_base_units, "1000000000");
+  assert.equal(p.wallet_groups.length, 1);
+  assert.equal(result.event_type, "UPDATE_DRAFT_CONFIGURATION");
+  assert.throws(() => applyProjectCommand(p, {
+    type: "UPDATE_DRAFT_CONFIGURATION",
+    payload: {
+      profile: base.profile, network: base.network,
+      token: { supply_base_units: "1000000000", decimals: 6, creator_wallet_address: wallet },
+      wallet_group: { ...group, members: [{ ...group.members[0], wallet_address: mint }] }
+    }
+  }, { now: () => 1002 }), /PROJECT_DRAFT_CONFIGURATION_LOCKED/);
+});
 test("network and token configuration can be set only before launch", () => {
   let p = createProjectAggregate({ project_id: "draft-config", profile: base.profile }, { now: () => 1000 });
   p = run(p, "SET_NETWORK_IDENTITY", { network: { cluster: "localnet", genesis_hash: wallet } });
