@@ -28,7 +28,8 @@ export function buildProjectTreasuryReview(projectInput,input){
  if(coverage.status!=="DECLARED_LABELS_MATCH")unknown.push("REGISTERED_ACCOUNT_LABEL_COVERAGE_INCOMPLETE");
  if(f.review_checks.find(x=>x.id==="archived_evidence")?.status!=="PASS")unknown.push("ARCHIVED_RECEIPT_EVIDENCE_INCOMPLETE");
  if(f.valuation_status!=="SUPPLIED_ENDPOINT_ARITHMETIC_CONSISTENT")unknown.push("HISTORICAL_VALUATION_UNAVAILABLE");
- const blocked=f.status==="REVIEW_REQUIRED"||a.status==="REVIEW_REQUIRED"||creator.status==="REVIEW_REQUIRED";
+ if(f.mathematical_audit.status==="REVIEW_REQUIRED")issues.push("FINANCIAL_IDENTITY_MISMATCH");
+ const blocked=f.status==="REVIEW_REQUIRED"||a.status==="REVIEW_REQUIRED"||creator.status==="REVIEW_REQUIRED"||f.mathematical_audit.status==="REVIEW_REQUIRED";
  // Budget is a project configuration, not a lifetime cash-flow or current exposure measure.
  // A closed interval can identify recorded gross capital inflow above the configured
  // budget but cannot prove available budget or total historical funding.
@@ -59,7 +60,7 @@ export function buildProjectTreasuryReview(projectInput,input){
   creator_fee_audit:{status:creator.status,summary:show(creator.summary),pool_fee_bucket_cash_equivalence:"NOT_ESTABLISHED",
     source_attestation:"UNKNOWN",wallet_attribution:"UNKNOWN"},budget_review:budgetCheck,
   account_set:{status:a.status,totals:show(a.totals),expected_account_count:a.expected_account_count??null,observed_account_count:a.observed_account_count??null,coverage},
-  issues:[...new Set(issues)],unknown:[...new Set(unknown)],project_wide_total:null,live_balance:null,available_to_trade:null,
+  mathematical_audit:f.mathematical_audit,issues:[...new Set(issues)],unknown:[...new Set(unknown)],project_wide_total:null,live_balance:null,available_to_trade:null,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",settlement_allowed:false,execution_enabled:false};
 }
 export function createProjectTreasuryReviewer({path,enabled}={}){

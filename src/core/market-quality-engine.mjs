@@ -13,8 +13,14 @@ const hash=v=>createHash("sha256").update(stable(v)).digest("hex");
 function concentration(rows){
  let total=0n;for(const x of rows.values())total+=x;
  if(total===0n)return {hhi:null,effective_count:null,top_share:null,total:"0"};
- let hhi=0,top=0;for(const x of rows.values()){const share=ratio(x,total);hhi+=share*share;if(share>top)top=share;}
- return {hhi,effective_count:hhi?1/hhi:null,top_share:top,total:total.toString()};
+ // Sum squares in integer space before rounding once for display.
+ // Effective count is derived directly from the exact rational reciprocal.
+ const scale=1000000000000000n;
+ let squares=0n,top=0n;for(const x of rows.values()){squares+=x*x;if(x>top)top=x;}
+ const denom=total*total;
+ return {hhi:Number(squares*scale/denom)/Number(scale),
+  effective_count:Number(denom*scale/squares)/Number(scale),
+  top_share:Number(top*scale/total)/Number(scale),total:total.toString()};
 }
 function add(map,key,amount){map.set(key,(map.get(key)??0n)+amount);}
 function alertRecord(type,severity,market,events,facts,unknowns,interpretation){
@@ -51,7 +57,8 @@ export function analyzeMarketQuality({events,intervalMs=60000,coverageStatus="UN
  }
  const gross=buy+sell,net=buy-sell,first=decimal(ordered[0].payload.execution_price_decimal),last=decimal(ordered.at(-1).payload.execution_price_decimal),scale=Math.max(first.scale,last.scale);
  const firstN=first.n*10n**BigInt(scale-first.scale),lastN=last.n*10n**BigInt(scale-last.scale);
- const returnBps=firstN===0n?null:Number((lastN-firstN)*10000n/firstN);
+ const exactReturn=firstN===0n?null:(lastN-firstN)*10000n/firstN;
+ const returnBps=exactReturn===null||exactReturn>BigInt(Number.MAX_SAFE_INTEGER)||exactReturn<BigInt(Number.MIN_SAFE_INTEGER)?null:Number(exactReturn);
  const buyConc=concentration(buyers),sellConc=concentration(sellers);
  let inventoryTotal=0n,inventoryUnknown=0n,unknownInventoryRows=0;const holderMap=new Map(),positionIds=new Set();
  for(const p of inventoryPositions){const amount=parse(p.token_amount_base_units);inventoryTotal+=amount;
@@ -70,7 +77,7 @@ export function analyzeMarketQuality({events,intervalMs=60000,coverageStatus="UN
   buyer_quote_hhi:unknownBuys?null:buyConc.hhi,buyer_effective_count:unknownBuys?null:buyConc.effective_count,buyer_top_share:unknownBuys?null:buyConc.top_share,
   seller_quote_hhi:unknownSells?null:sellConc.hhi,seller_effective_count:unknownSells?null:sellConc.effective_count,seller_top_share:unknownSells?null:sellConc.top_share,
   first_execution_price:ordered[0].payload.execution_price_decimal,last_execution_price:ordered.at(-1).payload.execution_price_decimal,
-  min_execution_price:minPrice,max_execution_price:maxPrice,price_return_bps:returnBps,
+  min_execution_price:minPrice,max_execution_price:maxPrice,price_return_bps:returnBps,price_return_exact_bps:exactReturn?.toString()??null,
   max_trade_to_virtual_quote_depth_bps:depthRatio,holder_token_hhi:unknownInventoryRows?null:holderConc.hhi,holder_effective_count:unknownInventoryRows?null:holderConc.effective_count,
   unknown_inventory_share:unknownInventoryShare,inventory_evidence_count:inventoryPositions.length};
  const alerts=[],divergence=gross>0n?ratio(net<0n?-net:net,gross):null;
@@ -87,7 +94,7 @@ export function analyzeMarketQuality({events,intervalMs=60000,coverageStatus="UN
  const dataCompleteness=coverageStatus==="PARTIAL"?"partial":coverageStatus==="STALE"?"stale":"unknown";for(const a of alerts)a.data_completeness=dataCompleteness;
  return {schema_version:"cook-market-quality.1",status:alerts.some(a=>a.severity==="high")?"REVIEW_REQUIRED":"DESCRIPTIVE_ONLY",
   market,window:{start_ms:windowStart,end_ms:windowEnd},metrics:alerts.some(a=>a.severity==="high")?null:metrics,candles:alerts.some(a=>a.severity==="high")?[]:candles,timeline_audit:timeline,
-  coverage_status:coverageStatus,coverage_attestation:"UNKNOWN",source_attestation:"UNKNOWN",inventory_ownership_attestation:"UNKNOWN",depth_evidence_status:"UNAVAILABLE",alerts,
+  coverage_status:coverageStatus,coverage_attestation:"UNKNOWN",source_attestation:"UNKNOWN",inventory_ownership_attestation:"UNKNOWN",depth_evidence_status:"UNAVAILABLE",numerical_contract:{concentration:"INTEGER_SUM_OF_SQUARES_ROUNDED_FOR_DISPLAY",unsafe_numeric_return_withheld:exactReturn!==null&&returnBps===null},alerts,
   limitations:["Address count is not independent-actor count.","Gross/net quote-flow is a proxy, not a complete inventory ledger.","No wallet intent or common-control conclusion is produced.","Historical metrics are not live market risk.","Concentration is limited to supplied evidence, not the entire market.","Closing reserve does not establish historical execution depth."],
   execution_enabled:false,is_trading_signal:false};
 }

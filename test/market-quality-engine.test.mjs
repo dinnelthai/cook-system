@@ -44,3 +44,17 @@ test("known quality contradiction withholds derived metrics and candles",()=>{
  const a=event("a","buy","wallet-a","100","1",1);a.quality.validation_status="warning";
  const r=analyzeMarketQuality({events:[a]});assert.equal(r.status,"REVIEW_REQUIRED");assert.equal(r.metrics,null);assert.deepEqual(r.candles,[]);
 });
+
+test("concentration uses exact aggregate squares, not per-address truncation",()=>{
+ const events=[event("a","buy","a","1","1",1),event("b","buy","b","1","1",2),event("c","buy","c","1","1",3)];
+ const r=analyzeMarketQuality({events});
+ assert.equal(r.metrics.buyer_effective_count,3);
+ assert.ok(Math.abs(r.metrics.buyer_quote_hhi-1/3)<1e-14);
+ assert.equal(r.numerical_contract.concentration,"INTEGER_SUM_OF_SQUARES_ROUNDED_FOR_DISPLAY");
+});
+test("extreme historical price ratio does not become an unsafe number",()=>{
+ const r=analyzeMarketQuality({events:[event("a","buy","a","1","0.00000000000000000001",1),event("b","buy","b","1","1",2)]});
+ assert.equal(r.metrics.price_return_bps,null);
+ assert.equal(r.metrics.price_return_exact_bps,((10n**20n-1n)*10000n).toString());
+ assert.equal(r.numerical_contract.unsafe_numeric_return_withheld,true);
+});

@@ -18,7 +18,7 @@ export function auditRecordedSyntheticBatch(reports){
   if(scenario!==null&&counts.get(scenario)>1)return {index,scenario_id:scenario,status:"REJECTED",reason:"DUPLICATE_SCENARIO_ID"};
   try{
    const review=buildUnifiedSyntheticReview(report);
-   return {index,scenario_id:review.scenario_id,status:review.status,audit:review.accounting,checks:review.checks,issues:review.issues,observed_record_counts:review.observed_record_counts};
+   return {index,scenario_id:review.scenario_id,status:review.status,audit:review.accounting,checks:review.checks,issues:review.issues,observed_record_counts:review.observed_record_counts,reserve_product_diagnostic:review.numeric_audit.reserve_product_diagnostic};
   }catch{
    return {index,scenario_id:scenario,status:"REJECTED",reason:"INVALID_OR_INCOMPLETE_REPORT"};
   }
@@ -37,11 +37,19 @@ export function auditRecordedSyntheticBatch(reports){
   }
   return row;
  });
+ const reserveDiagnostics={no_decrease_observed:0,review_required:0,unknown:0,not_evaluated:0};
+ for(const r of results){
+  const s=r.reserve_product_diagnostic?.status;
+  if(s==="NO_DECREASE_OBSERVED")reserveDiagnostics.no_decrease_observed++;
+  else if(s==="REVIEW_REQUIRED")reserveDiagnostics.review_required++;
+  else if(s==="UNKNOWN")reserveDiagnostics.unknown++;
+  else reserveDiagnostics.not_evaluated++;
+ }
  const issueReports=new Map();
  for(const r of results){
   const codes=new Set([...(r.issues??[]),...(r.reason?[r.reason]:[])].map(issue=>issue.split(":")[0]));
   for(const code of codes)issueReports.set(code,(issueReports.get(code)??0)+1);
  }
  const issue_counts=[...issueReports].sort(([a],[b])=>a<b?-1:a>b?1:0).map(([code,report_count])=>({code,report_count}));
- return {source_mode:"SYNTHETIC",status:summary.consistent_count===summary.report_count?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",summary,results,comparison,issue_counts,comparison_scope:"QA_EVIDENCE_ONLY",execution_enabled:false,real_market_validated:false,independent_market_paths_attested:false};
+ return {source_mode:"SYNTHETIC",status:summary.consistent_count===summary.report_count?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",summary,results,comparison,issue_counts,reserve_product_diagnostics:reserveDiagnostics,comparison_scope:"QA_EVIDENCE_ONLY",execution_enabled:false,real_market_validated:false,independent_market_paths_attested:false};
 }

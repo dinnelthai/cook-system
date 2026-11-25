@@ -71,3 +71,11 @@ test("batch exposes numeric evidence audit instead of hiding it in the issue lis
  const v=auditRecordedSyntheticBatch([a,b]);
  assert.deepEqual(v.comparison.find(x=>x.id==="record_numeric_consistency"),{id:"record_numeric_consistency",pass:1,review_required:1,unknown:0,not_evaluated:0});
 });
+
+test("batch exposes reserve-product diagnostic separately from accounting consistency",()=>{
+ const r=auditRecordedSyntheticBatch([report("a"),report("b")]);
+ assert.equal(r.results.length,2);
+ assert.equal(Object.values(r.reserve_product_diagnostics).reduce((a,b)=>a+b,0),2);
+ for(const row of r.results)assert.ok(["NO_DECREASE_OBSERVED","REVIEW_REQUIRED","UNKNOWN"].includes(row.reserve_product_diagnostic.status));
+ assert.equal(r.real_market_validated,false);
+});

@@ -9,7 +9,9 @@ test("browser review shares CLI audit and preserves unknown and rejected evidenc
  b.summary.event_count+=1;delete c.opening_agent_states;
  const input=[a,b,c],v=reviewSyntheticBatchInput(input);
  assert.deepEqual(v.audit,auditRecordedSyntheticBatch(input));
- assert.deepEqual(v.metrics,[["报告总数",3],["内部一致",1],["需复核",1],["拒绝",1]]);
+ assert.deepEqual(v.metrics.slice(0,4),[["报告总数",3],["内部一致",1],["需复核",1],["拒绝",1]]);
+ assert.equal(v.metrics[4][1],v.audit.reserve_product_diagnostics.review_required);
+ assert.equal(v.metrics[5][1],v.audit.reserve_product_diagnostics.unknown+v.audit.reserve_product_diagnostics.not_evaluated);
  assert.deepEqual(v.comparison.find(r=>r[0]==="历史校准"),["历史校准",0,0,2,1]);
  assert.ok(v.rows[1][4].includes("SUMMARY_COUNT_MISMATCH:event_count"));
  assert.equal(v.rows[2][2],"—");

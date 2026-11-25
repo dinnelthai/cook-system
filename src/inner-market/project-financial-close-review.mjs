@@ -1,3 +1,4 @@
+import {auditFinancialIdentities} from "./financial-identity-audit.mjs";
 import {computeTerminalState} from "./terminal-state.mjs";
 const diff=(a,b)=>a==null||b==null?null:(BigInt(a)-BigInt(b)).toString();
 /** Closed interval financial review, not a liquidation plan, execution quote,
@@ -62,11 +63,12 @@ export function buildProjectFinancialCloseReview(input){
   capital_adjusted_nav_change_base_units:endpoints?nav.capital_adjusted_nav_change_base_units:null
  };
  const residual=assets.capital_adjusted_nav_change_base_units==null||realized.project_cash_basis_realized_pnl_base_units==null||assets.interval_inventory_unrealized_change_base_units==null?null:(BigInt(assets.capital_adjusted_nav_change_base_units)-BigInt(realized.project_cash_basis_realized_pnl_base_units)-BigInt(assets.interval_inventory_unrealized_change_base_units)).toString();
- return {schema_version:"cook-project-financial-close-review.1",scope:structuredClone(state.scope),source_mode:state.source_mode,status:!ready?"REVIEW_REQUIRED":!endpoints?"ACCOUNTING_CONSISTENT_VALUATION_UNAVAILABLE":"SUPPLIED_ACCOUNTING_AND_ENDPOINTS_CONSISTENT",
+ const report={schema_version:"cook-project-financial-close-review.1",scope:structuredClone(state.scope),source_mode:state.source_mode,status:!ready?"REVIEW_REQUIRED":!endpoints?"ACCOUNTING_CONSISTENT_VALUATION_UNAVAILABLE":"SUPPLIED_ACCOUNTING_AND_ENDPOINTS_CONSISTENT",
   cash_flow:cashFlow,realized_pnl:realized,creator_receivables:receivables,assets,valuation_status:valuationStatus,
   nav_bridge:{unexplained_by_cash_basis_pnl_and_inventory_unrealized_change_base_units:residual,interpretation:"RESIDUAL_NOT_PROFIT_OR_RECONCILIATION_PROOF; MAY_INCLUDE_RECEIVABLES_OTHER_ASSETS_LIABILITIES_AND_COST_BASIS_ADJUSTMENTS"},
   review_checks:state.checks.map(({id,status,evidence})=>({id,status,evidence})),issues:state.issues,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",
   lifetime_funding_base_units:null,liquidation_value_base_units:null,actual_settlement_allowed:false,synthetic_test_settlement_allowed:sample&&state.settlement_allowed===true,execution_enabled:false,
   notes:["Opening cash is not lifetime funding. External capital is not profit.","Net trade receipts are not realized PnL; trade fees are already included in trade cash amounts.","Creator accruals and receivables are not cash receipts.","Inventory value is a supplied historical endpoint, not a realizable sale value. No independent valuation or source verification."]};
+ return {...report,mathematical_audit:auditFinancialIdentities(report)};
 }

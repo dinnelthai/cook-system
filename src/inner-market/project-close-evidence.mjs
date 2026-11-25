@@ -29,6 +29,7 @@ export function reviewProjectCloseEvidence(projectInput,input,orders=[],archives
  if(receiptConflicts.length)blockers.push("ORDER_RECEIPT_REVIEW_CONFLICT");
  if(!all.length)unknown.push("ORDER_COVERAGE_UNATTESTED");
  if(f.status==="REVIEW_REQUIRED")blockers.push("FINANCIAL_REPORT_REVIEW_REQUIRED");
+ if(f.mathematical_audit.status==="REVIEW_REQUIRED")blockers.push("FINANCIAL_IDENTITY_MISMATCH");
  if(f.cash_flow.closing_cash_difference_base_units===null)unknown.push("CASH_DIFFERENCE_UNKNOWN");
  else if(f.cash_flow.closing_cash_difference_base_units!=="0")blockers.push("CASH_DIFFERENCE_NONZERO");
  const residuals=[
@@ -46,7 +47,7 @@ export function reviewProjectCloseEvidence(projectInput,input,orders=[],archives
  return {schema_version:"cook-project-close-evidence.1",project_id:p.project_id,project_revision:p.revision,report_digest:sha(input),recorded_stage:p.lifecycle.stage,status:blockers.length?"REVIEW_REQUIRED":"PARTIAL",
   financial_status:f.status,scope:f.scope,cash_difference_base_units:f.cash_flow.closing_cash_difference_base_units,
   residuals,orders:{recorded:all.length,unresolved:unresolved.length,review_incomplete:unmatched.length,receipt_conflict_count:receiptConflicts.length},
-  blockers,unknown,source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",settlement_allowed:false,lifecycle_mutated:false,execution_enabled:false};
+  mathematical_audit:f.mathematical_audit,blockers,unknown,source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",settlement_allowed:false,lifecycle_mutated:false,execution_enabled:false};
 }
 export function createProjectCloseReviewer({path,enabled}={}){
  return (project,link,orders,archives)=>{

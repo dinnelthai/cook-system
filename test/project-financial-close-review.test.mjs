@@ -45,3 +45,19 @@ test("archived reports remain provisional and cannot enter actual or synthetic s
  const i=endpoints(fixture());i.sourceMode="ARCHIVED_HISTORICAL";const r=buildProjectFinancialCloseReview(i);
  assert.equal(r.actual_settlement_allowed,false);assert.equal(r.synthetic_test_settlement_allowed,false);assert.equal(r.source_attestation,"UNKNOWN");assert.equal(r.ownership_attestation,"UNKNOWN");
 });
+
+test("independent financial identities distinguish incomplete valuations from discrepancies",async()=>{
+ const {auditFinancialIdentities}=await import("../src/inner-market/financial-identity-audit.mjs");
+ const r=buildProjectFinancialCloseReview(endpoints(fixture()));
+ assert.equal(r.mathematical_audit.status,"ARITHMETIC_MATCH");
+ assert.equal(r.mathematical_audit.checks.length,11);
+ const incomplete=buildProjectFinancialCloseReview(fixture());
+ assert.equal(incomplete.mathematical_audit.status,"PARTIAL");
+ assert.equal(incomplete.mathematical_audit.checks.find(c=>c.id==="closing_nav").status,"UNKNOWN");
+ const bad=structuredClone(r);bad.creator_receivables.cash_received_base_units="8";
+ const audit=auditFinancialIdentities(bad);
+ assert.equal(audit.status,"REVIEW_REQUIRED");
+ assert.equal(audit.checks.find(c=>c.id==="creator_receivable").difference_base_units,"1");
+ assert.equal(audit.checks.find(c=>c.id==="creator_cash_crosscheck").difference_base_units,"1");
+ assert.equal(audit.execution_enabled,false);
+});
