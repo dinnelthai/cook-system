@@ -41,3 +41,19 @@ test("invalid profiles, checkpoints and noncanonical fixtures are rejected",()=>
  assert.throws(()=>reviewParticipantObservationCoverage(r,{checkpoints:[1,1]}),/INVALID_OBSERVER_CHECKPOINTS/);
  r.detector_input.events.reverse();assert.throws(()=>reviewParticipantObservationCoverage(r),/INVALID_CANONICAL_FIXTURE/);
 });
+
+test("irregular observation delivery preserves accounting and freshness",()=>{
+ const r=fixture(),end=r.detector_input.events.at(-1).event_time_ms;
+ const p=profiles(r,250,0).map(a=>({...a,delivery_jitter_ms:5000}));
+ const v=reviewParticipantObservationCoverage(r,{seed:8,profiles:p,checkpoints:[0,1000,3000,end,end+5250]});
+ assert.equal(v.observation_clock,"DISCRETE_EVENT_QUEUE");
+ for(const o of v.observers){
+  for(const s of o.samples){
+   assert.equal(s.oracle_record_count,s.received_record_count+s.not_yet_due_record_count+s.missing_after_due_count);
+   assert.ok(s.latest_observed_event_age_ms===null||s.latest_observed_event_age_ms>=0);
+  }
+  assert.equal(o.samples.at(-1).status,"MATCHED_TEST_ORACLE");
+  assert.equal(o.samples.at(-1).latest_observed_event_age_ms,5250);
+ }
+ assert.throws(()=>reviewParticipantObservationCoverage(r,{profiles:p.map(a=>({...a,delivery_jitter_ms:60001}))}),/INVALID_OBSERVER_PROFILE/);
+});
