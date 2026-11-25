@@ -16,6 +16,17 @@ import { describeRecordedProjectTimeline, describeLifecycleExceptions } from "./
 const MAX_AGGREGATE_BYTES = 1024 * 1024;
 const hash = value => createHash("sha256").update(value, "utf8").digest("hex");
 const clone = value => structuredClone(value);
+const requiredSchemaObjects={
+ table:["project_snapshot","project_event","project_archive","order_review_event"],
+ index:["project_event_project_revision","project_archive_project","order_review_project"],
+ trigger:["project_event_no_update","project_event_no_delete","project_archive_no_update","project_archive_no_delete","order_review_no_update","order_review_no_delete"]
+};
+function checkRequiredSchema(db){
+ const rows=db.prepare("SELECT type,name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'").all();
+ const names=new Set(rows.map(r=>r.type+":"+r.name));
+ const missing=Object.entries(requiredSchemaObjects).flatMap(([type,values])=>values.filter(name=>!names.has(type+":"+name)).map(name=>type+":"+name));
+ return {status:missing.length?"REVIEW_REQUIRED":"PASS",missing_objects:missing,definition_attestation:"UNKNOWN"};
+}
 function privateDatabasePath(path) {
   if (typeof path !== "string" || !path) throw Error("INVALID_PROJECT_STORE_PATH");
   const target = resolve(path), parent = dirname(target);
@@ -353,6 +364,8 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
     }
     function inspectDatabaseIntegrity() {
       return readSnapshot(()=>{
+        const schema=checkRequiredSchema(db);
+        if(schema.status!=="PASS")return {status:"REVIEW_REQUIRED",schema_check:schema,sqlite_quick_check:"NOT_RUN",foreign_key_violation_count:null,projects:[],source_attestation:"UNKNOWN",execution_enabled:false};
         const physical=db.prepare("PRAGMA quick_check").all();
         const foreign=db.prepare("PRAGMA foreign_key_check").all();
         const physicalPass=physical.length===1&&Object.values(physical[0])[0]==="ok";
@@ -367,7 +380,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
           }
         });
         return {status:physicalPass&&foreign.length===0&&projects.every(x=>x.status==="INTERNALLY_CONSISTENT")?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",
-          sqlite_quick_check:physicalPass?"PASS":"REVIEW_REQUIRED",foreign_key_violation_count:foreign.length,projects,source_attestation:"UNKNOWN",execution_enabled:false};
+          schema_check:schema,sqlite_quick_check:physicalPass?"PASS":"REVIEW_REQUIRED",foreign_key_violation_count:foreign.length,projects,source_attestation:"UNKNOWN",execution_enabled:false};
       });
     }
     // SQLite creates a consistent independent copy; never overwrite an existing
@@ -382,6 +395,12 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       // Failure leaves the reserved destination for diagnosis, never silently
       // removes or replaces any file. Use a fresh path for another attempt.
       db.prepare("VACUUM INTO ?").run(target);
+      // Check the untouched copy before any CREATE IF NOT EXISTS or migration.
+      // Read-only inspection checks named objects, not full schema authenticity.
+      const rawCopy=new DatabaseSync(target,{readOnly:true});
+      try{
+        if(checkRequiredSchema(rawCopy).status!=="PASS")throw Error("PROJECT_BACKUP_SCHEMA_REVIEW_REQUIRED");
+      }finally{rawCopy.close();}
       const copy=openProjectStore(target);
       try{
         const integrity=copy.inspectDatabaseIntegrity();

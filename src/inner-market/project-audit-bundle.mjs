@@ -1,6 +1,7 @@
 import {createHash} from "node:crypto";
 import {canonicalJson} from "../core/canonical-json.mjs";
 import {describeProjectRiskReview} from "./project-risk-review.mjs";
+import {evidenceApplicable} from "./project-evidence-scope.mjs";
 import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs";
 import {describeRecordedProjectTimeline,describeLifecycleExceptions} from "./project-lifecycle-timeline.mjs";
 const digest=x=>createHash("sha256").update(canonicalJson(x),"utf8").digest("hex");
@@ -12,8 +13,16 @@ export function buildProjectAuditBundle({project,integrity,events,archives,order
  const risk=describeProjectRiskReview(project,archives,orders.map(o=>o.order));
  const exceptions=[
   ...lifecycle.blockers.map(code=>({category:"LIFECYCLE",code})),
-  ...orders.filter(o=>o.order.stale||["RECORDED","OUTCOME_UNKNOWN","REVIEW_REQUIRED"].includes(o.order.status)).map(o=>({category:"ORDER",code:o.order.stale?"STALE_ORDER_REVISION":o.order.status,order_id:o.order.order_id})),
-  ...archives.filter(a=>a.stale||a.payload.status==="REVIEW_REQUIRED"||a.payload.rpc_observation?.status==="REVIEW_REQUIRED").map(a=>({category:"ARCHIVE",code:a.stale?"STALE_ARCHIVE_REVISION":"EVIDENCE_CONFLICT",archive_id:a.archive_id}))
+  ...orders.flatMap(({order:o})=>[
+   ...(!evidenceApplicable(project,o)?[{category:"ORDER",code:"STALE_ORDER_REVISION",order_id:o.order_id}]:[]),
+   ...(["RECORDED","OUTCOME_UNKNOWN","REVIEW_REQUIRED"].includes(o.status)?[{category:"ORDER",code:o.status,order_id:o.order_id}]:[])
+  ]),
+  ...archives.flatMap(a=>[
+   ...(!evidenceApplicable(project,a)?[{category:"ARCHIVE",code:"STALE_ARCHIVE_REVISION",archive_id:a.archive_id}]:[]),
+   ...(["STALE","UNKNOWN_LEGACY"].includes(a.evidence_snapshot_status)?[{category:"ARCHIVE",code:"CLOSE_EVIDENCE_SNAPSHOT_OUTDATED_OR_UNKNOWN",archive_id:a.archive_id}]:[]),
+   ...(a.payload.status==="REVIEW_REQUIRED"||a.payload.rpc_observation?.status==="REVIEW_REQUIRED"?[{category:"ARCHIVE",code:"EVIDENCE_CONFLICT",archive_id:a.archive_id}]:[])
+  ]),
+  ...risk.findings.filter(f=>f.category==="CROSS_MODULE").map(f=>({category:f.category,code:f.code,severity:f.severity,references:f.references}))
  ];
  const recorded_timeline=describeRecordedProjectTimeline(project,events);
  const exception_review=describeLifecycleExceptions(project,lifecycle,risk);
