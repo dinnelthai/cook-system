@@ -355,6 +355,73 @@ main[data-page=terminal] .meme-control .smith-trade h3{font-size:17px;font-weigh
 @media(min-width:1201px){.meme-desk:has(.smith-trade){grid-template-columns:minmax(0,1fr) minmax(365px,386px)}}
 @media(min-width:981px) and (max-width:1200px){.meme-desk:has(.smith-trade){grid-template-columns:minmax(0,1fr) minmax(320px,345px)}.smith-trade .smith-section{padding-left:16px;padding-right:16px}.smith-status{padding-left:16px;padding-right:16px}main[data-page=terminal] .meme-control .smith-trade h3{font-size:15px}.smith-wallet-count{padding:7px 8px;font-size:10px}}
 @media(max-width:400px){.smith-trade .smith-section{padding-left:12px;padding-right:12px}.smith-wallet-count{padding:6px;font-size:10px}main[data-page=terminal] .meme-control .smith-trade h3{font-size:15px}}
+
+/* Unified desktop terminal, based on Smithii's three-column workspace. */
+body:has(main[data-page=terminal]){background:#0c0e0e;color:#eff1f1}
+body:has(main[data-page=terminal])>header{background:#0e1111;border-color:#263c3d}
+body:has(main[data-page=terminal]) #nav{background:#0c0e0e;border-color:#294040;padding:18px 14px}
+main[data-page=terminal] .meme-desk{padding:0;gap:0;align-items:start;grid-template-columns:minmax(0,1fr) 386px}
+main[data-page=terminal] .meme-desk.desk-panel-hidden{grid-template-columns:minmax(0,1fr)}
+main[data-page=terminal] .meme-desk>.meme-control[hidden]{display:none!important}
+main[data-page=terminal] .meme-center{gap:0;padding:0 12px 16px}
+.desk-overview{display:grid;gap:12px;border-bottom:1px solid #294040;padding:0 0 16px;margin-bottom:16px}
+.desk-overview-title{display:flex;justify-content:space-between;align-items:center;gap:4px}.desk-overview-title strong{font-size:15px}.desk-overview-title span{font-size:10px;color:#9fbfb9;background:#182c2a;border:1px solid #304c4b;padding:4px 7px;border-radius:6px}
+.desk-balance,.desk-overview-stats>div{background:#101616;border:1px solid #294747;padding:10px;border-radius:7px;display:grid;gap:4px;min-width:0}
+.desk-balance small,.desk-overview-stats small{color:#a8b7b6;font-size:10px}.desk-balance strong{font-size:20px;font-weight:600}.desk-balance strong small{font-size:12px}
+.desk-overview-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}.desk-overview-stats strong{font-size:16px;font-variant-numeric:tabular-nums}
+#nav #desk-wallet-manage{margin:0;width:100%;justify-content:center;background:#132323;border:1px solid #315151;border-radius:6px;color:#bdd3d0;padding:7px;font-size:11px}
+#nav .meme-rail-head{padding:0}#nav .meme-rail #meme-search{background:#101616;border-color:#294747;border-radius:6px;margin:12px 0 8px}
+#nav button.meme-project{border-radius:7px;border-bottom-color:transparent}#nav button.meme-project.selected{background:#132b2b;border-color:#315354}
+#nav button#meme-create-footer{background:#193433;border-color:#315354;border-radius:7px}
+.meme-center #terminal-project-context{margin:10px 0;background:#101616;border:1px solid #263e3e;border-radius:6px;font-size:11px;padding:8px 10px}
+.desk-market-frame{min-width:0;display:grid;gap:0;border:1px solid #294040;border-radius:7px;background:#0c0e0e;overflow:hidden;order:1}
+.desk-market-frame [hidden]{display:none!important}
+.meme-chart-toolbar{padding:11px 13px;border-bottom:1px solid #243a3a;min-height:48px;gap:8px}
+.desk-market-title{display:flex;align-items:baseline;gap:8px;min-width:0}.desk-market-title strong{font-size:16px;color:#eff1f1}.desk-market-title small{color:#9ba9aa;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desk-market-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.desk-market-actions button,.desk-chart-tools button,.desk-wallet-actions button{background:#101616;border:1px solid #294747;border-radius:6px;color:#bccbca;font-size:11px;padding:6px 9px;min-height:30px}
+.desk-chart-tools{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:7px 11px;border-bottom:1px solid #263a3a;background:#0f1313}
+.desk-chart-tools .candle-controls{gap:4px;flex-wrap:wrap}.desk-chart-tools .candle-controls button{border:0;background:transparent;font-size:12px;min-height:26px;padding:4px 7px}
+.desk-chart-tools .candle-controls button[aria-pressed=true]{background:#193536;color:#b6ddda}.desk-chart-tools select{background:#101616;border-color:#294747}
+.meme-center .desk-market-frame .pro-chart,.meme-center .desk-market-frame .meme-chart-empty{margin:0;min-height:clamp(290px,43vh,450px);border:0;border-radius:0;background:#0c0e0e}
+.meme-center .desk-market-frame .meme-chart-empty{padding:0;background-image:linear-gradient(#1b2525 1px,transparent 1px),linear-gradient(90deg,#1b2525 1px,transparent 1px);background-size:100% 58px,76px 100%}
+.meme-center .desk-market-frame .meme-chart-empty .empty-state{min-height:clamp(290px,43vh,450px);display:grid;place-content:center;text-align:center;gap:8px}
+.meme-center .desk-market-frame .meme-chart-empty .empty-state strong{font-size:16px;color:#c7d0d0}
+.meme-center .desk-market-frame .pro-chart .pro-pane-head{padding:8px 12px;border-bottom-color:#243a3a}
+.meme-center .desk-market-frame .pro-chart-body{min-height:220px}
+.meme-center .desk-market-frame #terminal-report-area:not([hidden]){gap:0}
+.desk-market-frame .meme-report-extra{margin:0;border:0;border-top:1px solid #294040;border-radius:0;padding:8px 12px;background:#101616}
+.meme-chart-minimized .desk-chart-tools{display:none}
+.meme-center .meme-lower{order:2;margin-top:10px;background:#0c0e0e;border:1px solid #294040;border-radius:7px;padding:0 12px 12px}
+.meme-center.desk-wallet-first .meme-lower{order:0;margin-top:0;margin-bottom:10px}
+.meme-center #terminal-context-notice,.meme-center .meme-business-extra,.meme-center #terminal-project-details{order:3;margin-top:8px}
+.meme-center #terminal-context-notice .notice{background:#101616;border-color:#294040;font-size:10px}
+.meme-lower-tabs{gap:15px;margin:0 0 12px;border-bottom-color:#294040}
+main[data-page=terminal] .meme-lower-tabs button{font-size:12px;padding:12px 3px}
+main[data-page=terminal] .meme-lower-tabs button[aria-pressed=true]{border-bottom-color:#83b8b5;color:#f5f7f7}
+.desk-wallet-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:9px}
+.desk-wallet-toolbar h3{margin:0 0 3px;font-size:15px}.desk-wallet-toolbar small{font-size:10px}
+.desk-wallet-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.desk-wallet-empty{min-height:112px;display:grid;place-content:center;justify-items:center;gap:7px;text-align:center}
+.desk-wallet-empty strong{font-size:13px}.desk-wallet-empty span,.desk-wallet-foot{font-size:10px;color:#95a6a6}
+.desk-wallet-empty button{background:#132323;border:1px solid #315151;color:#bbd0ce;padding:7px 14px;border-radius:6px}
+.desk-wallet-foot{margin:8px 0 0}
+.meme-wallet .scroll{border:0;border-radius:0}
+.meme-wallet table th{background:#101616;color:#9baaaa;font-size:10px;white-space:nowrap;border-color:#294040}
+.meme-wallet table td{font-size:11px;border-color:#263535;max-width:180px;overflow-wrap:anywhere}
+main[data-page=terminal] .meme-control{top:var(--header-h);max-height:calc(100vh - var(--header-h));background:#0c0e0e;border:0;border-left:1px solid #294040;border-radius:0;padding:12px 0;gap:0}
+main[data-page=terminal] .meme-control .meme-mode{margin:0 16px 6px;background:#101616;padding:6px;border-radius:12px}
+main[data-page=terminal] .meme-mode button{border-radius:8px;color:#929999}
+main[data-page=terminal] .meme-mode button[aria-pressed=true]{background:#1a3535;color:#bad5d4}
+#meme-launch-host{padding:12px 20px;min-width:0}
+#meme-launch-host .terminal-heading{margin-bottom:10px}
+#meme-launch-host .terminal-heading h2{font-size:17px}
+#meme-launch-host .terminal-heading .eyebrow,#meme-launch-host .terminal-heading .source-chip{display:none}
+#meme-launch-host .panel{background:#101616;border-color:#294747;border-radius:8px;padding:13px}
+#meme-launch-host input,#meme-launch-host select,#meme-launch-host textarea{background:#0c0e0e;border-color:#315354;border-radius:6px}
+#meme-launch-host .form-section-title{border-color:#294040}
+@media(min-width:981px) and (max-width:1200px){main[data-page=terminal] .meme-desk{grid-template-columns:minmax(0,1fr) 330px}main[data-page=terminal] .meme-desk.desk-panel-hidden{grid-template-columns:minmax(0,1fr)}.meme-center .desk-market-title small{display:none}.meme-chart-toolbar{flex-wrap:wrap}}
+@media(max-width:980px){main[data-page=terminal] .meme-desk{grid-template-columns:minmax(0,1fr)}main[data-page=terminal] .meme-control{position:static;max-height:none;border-left:0;border-top:1px solid #294040}.desk-market-title small{max-width:100px}}
+@media(max-width:700px){body:has(main[data-page=terminal]) #nav{padding:12px;max-height:42vh}.desk-overview{gap:8px}.desk-balance{display:none}.desk-market-actions{gap:4px}.meme-center .desk-market-frame .meme-chart-empty,.meme-center .desk-market-frame .meme-chart-empty .empty-state{min-height:250px}}
 </style></head>
 <body><a class="skip-link" href="#main">跳转到主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="主导航"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="我的 Meme" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
