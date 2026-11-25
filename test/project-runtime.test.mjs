@@ -83,3 +83,38 @@ test("conflicting quality counts withhold interval market evidence",()=>{
  assert.equal(v.status,"REVIEW_REQUIRED");assert.equal(v.runtime.market.curve_intervals[0].records[0].event_count,null);
  assert.ok(v.findings.some(x=>x.code==="RUNTIME_MARKET_QUALITY_CONFLICT"));
 });
+
+test("mathematical audit count contradiction withholds linked assets and other financial projections",()=>{
+ const t=treasury("t","887");
+ t.payload.inventory={closing_quantity_base_units:"50",remaining_cost_base_units:"100",supplied_historical_value_base_units:"90"};
+ t.payload.mathematical_audit={status:"ARITHMETIC_MATCH",counts:{pass:2,review_required:0,unknown:0},checks:[{status:"PASS"}]};
+ const v=buildProjectBusinessReview(p,[link(),t]);
+ const row=v.runtime.asset_intervals[0];
+ assert.equal(v.status,"REVIEW_REQUIRED");assert.equal(row.status,"REVIEW_REQUIRED");
+ assert.ok(row.evidence_conflict_codes.includes("FINANCIAL_IDENTITY_COUNT_CONFLICT"));
+ assert.ok(Object.values(row.assets).every(x=>x===null));
+ assert.ok(Object.values(v.model_evidence.intervals[0].evidence[0].inventory).every(x=>x===null));
+ assert.ok(Object.values(v.operating_components.rows[0].components).every(x=>x===null));
+});
+test("conflicting report versions quarantine both intervals without suppressing unrelated interval",()=>{
+ const l=link(),b=link(),c=link();
+ b.archive_id="link2";b.payload.report_digest="b".repeat(64);
+ c.archive_id="link3";c.payload.report_digest="c".repeat(64);c.payload.scope={...c.payload.scope,openingCutoff:"end",closingCutoff:"later"};
+ const t=treasury("t","1"),u=treasury("u","2"),w=treasury("w","3");
+ u.payload.report_link_archive_id=b.archive_id;u.payload.report_digest=b.payload.report_digest;
+ w.payload.report_link_archive_id=c.archive_id;w.payload.report_digest=c.payload.report_digest;
+ const v=buildProjectBusinessReview(p,[l,b,c,t,u,w]);
+ for(const row of v.runtime.asset_intervals.slice(0,2)){
+  assert.equal(row.status,"REVIEW_REQUIRED");assert.ok(row.evidence_conflict_codes.includes("MULTIPLE_REPORT_DIGESTS_FOR_INTERVAL"));
+  assert.ok(Object.values(row.assets).every(x=>x===null));
+ }
+ assert.equal(v.runtime.asset_intervals[2].assets.cash,"3");
+ assert.equal(v.execution_enabled,false);
+});
+test("wrong review digest invalidates the referenced interval even if another review matches",()=>{
+ const t=treasury("t","1"),bad=treasury("bad","1");bad.payload.report_digest="b".repeat(64);
+ const v=buildProjectBusinessReview(p,[link(),t,bad]);
+ assert.equal(v.runtime.asset_intervals[0].status,"REVIEW_REQUIRED");
+ assert.equal(v.runtime.asset_intervals[0].assets.cash,null);
+ assert.ok(v.runtime.asset_intervals[0].evidence_conflict_codes.includes("INTERVAL_REPORT_DIGEST_CONFLICT"));
+});

@@ -36,7 +36,30 @@ export function buildProjectBusinessReview(projectInput,archives=[],orders=[]){
  const operational_evidence=describeOperationalEvidence(p,archives,receipts);
  findings.push(...operational_evidence.findings);
  unknown.push(...operational_evidence.unknown);
- const runtime=buildProjectRuntime(p,{archives,intervals,lifecycle,configuration,risk,findings,receipts,operational:operational_evidence});
+ // Route scoped evidence conflicts to the same interval that displays the
+ // canonical historical figures. A project-wide finding with no interval
+ // reference does not automatically invalidate unrelated intervals.
+ const intervalConflicts=new Map();
+ for(const i of intervals){
+  const references=new Set([i.archive_id,...i.reviews.map(r=>r.archive_id)]);
+  const codes=[...new Set(findings.filter(f=>references.has(f.reference)).map(f=>f.code))].sort();
+  if(codes.length)intervalConflicts.set(i.archive_id,codes);
+ }
+ const runtime=buildProjectRuntime(p,{archives,intervals,lifecycle,configuration,risk,findings,receipts,operational:operational_evidence,intervalConflicts});
+ const blockedIntervals=new Set(runtime.asset_intervals.filter(i=>i.status==="REVIEW_REQUIRED").map(i=>i.report_link_archive_id));
+ for(const row of operating_components.rows){
+  if(blockedIntervals.has(row.report_link_archive_id)){
+   row.status="REVIEW_REQUIRED";
+   for(const k of Object.keys(row.components))row.components[k]=null;
+  }
+ }
+ for(const row of model_evidence.intervals){
+  if(blockedIntervals.has(row.report_link_archive_id))for(const e of row.evidence){
+   e.status="REVIEW_REQUIRED";
+   if(e.inventory)for(const k of Object.keys(e.inventory))e.inventory[k]=null;
+   if("record_count" in e)e.record_count=null;
+  }
+ }
  findings.push(...runtime.issues);
  unknown.push(...runtime.unknown);
  const global_risk=consolidateProjectRisk({historical:risk,configuration,findings,unknown,runtime});

@@ -26,7 +26,10 @@ export function indexProjectEvidence(p,archives,orders){
    if(v.status==="REVIEW_REQUIRED"||v.rpc_observation?.status==="REVIEW_REQUIRED")add("LINKED_REVIEW_CONFLICT",a.archive_id);
    continue;
   }
-  if(v.report_digest!==link.report_digest){add("REVIEW_REPORT_LINK_CONFLICT",a.archive_id);continue;}
+  if(v.report_digest!==link.report_digest){
+   add("REVIEW_REPORT_LINK_CONFLICT",a.archive_id);
+   add("INTERVAL_REPORT_DIGEST_CONFLICT",link.archive_id);continue;
+  }
   if(a.kind==="PROJECT_CLOSE_REVIEW"&&["STALE","UNKNOWN_LEGACY"].includes(a.evidence_snapshot_status)){
    unknown.push({code:"CLOSE_EVIDENCE_SNAPSHOT_OUTDATED_OR_UNKNOWN",reference:a.archive_id});continue;
   }
@@ -40,8 +43,11 @@ export function indexProjectEvidence(p,archives,orders){
   if(!scopeDigests.has(key))scopeDigests.set(key,new Set());
   scopeDigests.get(key).add(l.report_digest);
  }
- const multipleVersions=[...scopeDigests.values()].filter(s=>s.size>1).length;
- if(multipleVersions)add("MULTIPLE_REPORT_DIGESTS_FOR_INTERVAL",null);
+ // Pin conflicts to every implicated interval, not only to project-wide risk.
+ for(const l of intervals){
+  const key=JSON.stringify([l.opening_cutoff,l.closing_cutoff]);
+  if(scopeDigests.get(key).size>1)add("MULTIPLE_REPORT_DIGESTS_FOR_INTERVAL",l.archive_id);
+ }
  const receipts=allOrders.map(o=>{
   const stale=!evidenceApplicable(p,o);
   const matches=scoped.filter(a=>a.kind==="ORDER_RECEIPT_REVIEW"&&a.payload.order_id===o.order_id&&a.payload.order_revision===o.revision&&a.payload.order_head_hash===o.head_hash&&a.payload.signature===o.signature);

@@ -19,14 +19,15 @@ const fields=[
 ];
 /** One explicitly linked closed interval per row. Historical accounting is
  * not live capital, availability, ownership or a trading decision. */
-export function buildProjectRuntime(project,{archives,intervals,lifecycle,configuration,risk,findings,receipts,operational}){
+export function buildProjectRuntime(project,{archives,intervals,lifecycle,configuration,risk,findings,receipts,operational,intervalConflicts=new Map()}){
  const byId=new Map(),duplicate=new Set();
  for(const a of archives.filter(a=>archiveApplicable(project,a))){if(byId.has(a.archive_id))duplicate.add(a.archive_id);else byId.set(a.archive_id,a)}
  const issues=[],unknown=[];
  const rows=intervals.map(i=>{
   const refs=i.reviews.filter(r=>r.kind==="TREASURY_REVIEW");
   const linked=refs.map(r=>byId.get(r.archive_id)).filter(a=>a&&a.kind==="TREASURY_REVIEW"&&!duplicate.has(a.archive_id)&&a.payload.report_link_archive_id===i.archive_id&&a.payload.report_digest===i.report_digest);
-  let conflict=linked.length!==refs.length||linked.some(a=>a.payload.status==="REVIEW_REQUIRED"||a.payload.mathematical_audit?.status==="REVIEW_REQUIRED");
+  const evidenceConflicts=intervalConflicts.get(i.archive_id)??[];
+  let conflict=evidenceConflicts.length>0||linked.length!==refs.length||linked.some(a=>a.payload.status==="REVIEW_REQUIRED"||a.payload.mathematical_audit?.status==="REVIEW_REQUIRED");
   const assets=Object.fromEntries(fields.map(([k])=>[k,null]));
   for(const [k,get,valid] of fields){
    const values=linked.map(a=>get(a.payload));
@@ -42,7 +43,7 @@ export function buildProjectRuntime(project,{archives,intervals,lifecycle,config
   const status=conflict?"REVIEW_REQUIRED":Object.values(assets).every(x=>x!==null)?"DECLARED_ENDPOINT_PRESENT":"INCOMPLETE";
   if(status==="INCOMPLETE")unknown.push({code:"RUNTIME_ASSET_COVERAGE_INCOMPLETE",reference:i.archive_id});
   return {report_link_archive_id:i.archive_id,report_digest:i.report_digest,opening_cutoff:i.opening_cutoff,closing_cutoff:i.closing_cutoff,
-   status,assets,account_coverage,lp_assets:null,asset_unit_contract:"TOKEN_BASE_UNITS_FOR_TOKEN_QUANTITY; SOL_LAMPORTS_FOR_OTHER_FIELDS",archive_ids:linked.map(a=>a.archive_id)};
+   status,assets,account_coverage,evidence_conflict_codes:evidenceConflicts,lp_assets:null,asset_unit_contract:"TOKEN_BASE_UNITS_FOR_TOKEN_QUANTITY; SOL_LAMPORTS_FOR_OTHER_FIELDS",archive_ids:linked.map(a=>a.archive_id)};
  });
  const market=describeRuntimeMarkets(project,{archives,intervals,lifecycle,operational});
  issues.push(...market.issues);unknown.push(...market.unknown);
