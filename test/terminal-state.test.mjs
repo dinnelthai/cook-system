@@ -209,3 +209,41 @@ test("known inventory contradiction remains visible when another valuation is ab
  const i=historicalWithEndpoints();i.nav.endpointEvidence.opening.inventoryValueBaseUnits="1";delete i.nav.endpointEvidence.opening.otherAssetsBaseUnits;
  const s=buildTerminalState(i);assert.ok(s.issues.includes("NAV_ENDPOINT_VALUE_WITHOUT_INVENTORY:OPENING"));assert.equal(s.status,"REVIEW_REQUIRED");
 });
+
+test("explicit trust dimensions distinguish historical arithmetic from independent verification",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const i=fixture();i.sourceMode="ARCHIVED_HISTORICAL";i.trust={dimensions:{source_verification:"PASS",settlement_eligibility:"AUTHORIZED"}};
+ const r=buildUnifiedHistoricalReport(i),d=r.trust.dimensions;
+ assert.equal(d.structure,"ACCEPTED_INPUT");
+ assert.equal(d.internal_consistency,"INTERNALLY_CONSISTENT");
+ assert.equal(d.evidence_completeness,"INCOMPLETE");
+ assert.equal(d.independent_coverage,"UNKNOWN");
+ assert.equal(d.source_verification,"UNKNOWN");
+ assert.equal(d.settlement_eligibility,"BLOCKED");
+ assert.equal(r.settlement_allowed,false);
+ assert.deepEqual(d,r.terminal_state.trust.dimensions);
+ const s=buildTerminalState(fixture());
+ assert.equal(s.trust.dimensions.settlement_eligibility,"SYNTHETIC_TEST_ONLY");
+ assert.equal(s.settlement_allowed,true);
+ i.market.historyComplete=false;
+ const bad=buildTerminalState(i);
+ assert.equal(bad.trust.dimensions.internal_consistency,"REVIEW_REQUIRED");
+ assert.equal(bad.trust.dimensions.evidence_completeness,"REVIEW_REQUIRED");
+ assert.equal(bad.settlement_allowed,false);
+});
+test("single-pass historical computations preserve public report/dashboard/terminal contracts",async()=>{
+ const {computeHistoricalMvp,buildHistoricalMvpReport}=await import("../src/inner-market/historical-mvp-report.mjs");
+ const {computeHistoricalDashboard,buildHistoricalDashboard}=await import("../src/inner-market/historical-dashboard.mjs");
+ const {computeTerminalState}=await import("../src/inner-market/terminal-state.mjs");
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ for(const input of [fixture(),historicalWithEndpoints()]){
+  const original=structuredClone(input),m=computeHistoricalMvp(input),d=computeHistoricalDashboard(input),t=computeTerminalState(input);
+  assert.deepEqual(m.report,buildHistoricalMvpReport(input));
+  assert.deepEqual(d.dashboard,buildHistoricalDashboard(input));
+  assert.deepEqual(t.state,buildTerminalState(input));
+  assert.deepEqual(t.report,m.report);
+  assert.deepEqual(d.nav,m.nav);
+  assert.deepEqual(buildUnifiedHistoricalReport(input).terminal_state,t.state);
+  assert.deepEqual(input,original);
+ }
+});

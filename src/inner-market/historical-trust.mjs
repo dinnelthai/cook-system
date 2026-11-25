@@ -5,11 +5,15 @@ export function describeHistoricalTrust({sourceMode,ready,checks,navEndpoints,tr
  const review=checks.filter(x=>x.status==="REVIEW").map(x=>x.id);
  const unknown=checks.filter(x=>x.status==="UNKNOWN"||x.status==="UNAVAILABLE").map(x=>x.id);
  const sample=sourceMode==="SYNTHETIC";
+ // Coverage refers only to supplied evidence checks; no independent authentication.
+ const evidenceChecks=checks.filter(c=>!["accounting","source_attestation","wallet_attribution","live_execution"].includes(c.id));
+ const evidenceStatus=evidenceChecks.some(c=>c.status==="REVIEW")?"REVIEW_REQUIRED":evidenceChecks.length===0||evidenceChecks.some(c=>c.status!=="PASS")?"INCOMPLETE":"SUPPLIED_CHECKS_PASS";
+ const dimensions={structure:"ACCEPTED_INPUT",internal_consistency:ready?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",evidence_completeness:evidenceStatus,independent_coverage:"UNKNOWN",source_verification:"UNKNOWN",wallet_attribution:"UNKNOWN",settlement_eligibility:sample&&ready?"SYNTHETIC_TEST_ONLY":"BLOCKED",live_execution:"UNAVAILABLE"};
  const group=(available,reasons)=>entry(!ready?"REVIEW_REQUIRED":!available?"UNAVAILABLE":sample?"SYNTHETIC_ONLY":"PROVISIONAL",reasons);
  return {schema_version:"cook-historical-trust.1",grade:ready?"D3":"D2",
   status:ready?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",
   source_mode:sourceMode,independent_attestation:"UNKNOWN",historical_settlement_certified:false,
-  review_checks:review,unresolved_checks:unknown,
+  review_checks:review,unresolved_checks:unknown,dimensions,
   metrics:{
    cash_balance:group(true,archivedEvidence.status==="INTERNALLY_CONSISTENT"?[]:["RECEIPT_EVIDENCE_INCOMPLETE"]),
    inventory_quantity:group(true,["OWNERSHIP_UNATTESTED"]),
