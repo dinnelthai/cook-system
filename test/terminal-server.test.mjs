@@ -54,6 +54,13 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  const cross=await fetch(base+"/api/local-wallet/trade",{method:"POST",headers:{"content-type":"application/json","sec-fetch-site":"cross-site"},body:"{}"});assert.equal(cross.status,403);
  const unicodeOversize=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({note:"界".repeat(1400)})});assert.equal(unicodeOversize.status,413);assert.equal((await unicodeOversize.json()).code,"BODY_TOO_LARGE");
  const invalidUtf8=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:Buffer.from([0x7b,0x22,0x78,0x22,0x3a,0x22,0xff,0x22,0x7d])});assert.equal(invalidUtf8.status,400);assert.equal((await invalidUtf8.json()).code,"INVALID_BODY_ENCODING");
+ const projectResponse=await fetch(base+"/api/projects",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({project_id:"server-project",profile:{name:"Server Project",symbol:"SERVER"},network:{cluster:"localnet",genesis_hash:"11111111111111111111111111111111"},token:{supply_base_units:"1000000000",decimals:6,creator_wallet_address:"11111111111111111111111111111111"}})});
+ assert.equal(projectResponse.status,201);const project=(await projectResponse.json()).project;assert.equal(project.revision,1);assert.equal(project.execution_policy.enabled,false);
+ const projectGroup={group_id:"dev-wallets",name:"Dev Wallets",purpose:"DEV",members:[{wallet_address:"11111111111111111111111111111111",role:"DEV",enabled:true,allocation_limit_base_units:null}]};
+ const projectCommand=await fetch(base+"/api/projects/server-project/commands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({command_id:"server-command-1",type:"UPSERT_WALLET_GROUP",payload:{group:projectGroup},expected_revision:1})});
+ assert.equal(projectCommand.status,200);assert.equal((await projectCommand.json()).aggregate.revision,2);
+ const projectVerify=await fetch(base+"/api/projects/server-project/verify");assert.equal(projectVerify.status,200);assert.equal((await projectVerify.json()).event_count,2);
+ assert.equal((await fetch(base+"/api/projects/server-project/events")).status,200);
  assert.equal((await fetch(base+"/api/terminal/report",{method:"POST"})).status,405);
  assert.equal((await fetch(base+"/api/terminal/report",{headers:{"sec-fetch-site":"cross-site"}})).status,403);
  if(process.platform!=="win32"){
