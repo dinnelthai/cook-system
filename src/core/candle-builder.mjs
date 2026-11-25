@@ -33,7 +33,7 @@ function compareDecimal(a, b) {
   return leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
 }
 
-function marketKey(market, provenance, scenarioId) {
+function marketKey(market, provenance, scenarioId, poolAddress) {
   return JSON.stringify({
     chain_id: market.chain_id,
     network: market.network,
@@ -41,6 +41,8 @@ function marketKey(market, provenance, scenarioId) {
     quote_mint: market.quote_mint,
     curve_program_id: market.curve_program_id,
     market_phase: market.market_phase,
+    curve_account: market.curve_account ?? null,
+    pool_address: poolAddress,
     provenance,
     scenario_id: scenarioId ?? null,
   });
@@ -77,8 +79,10 @@ export function buildRawCandles(events, intervalMs) {
     if (quoteAmount === 0n || tokenAmount === 0n) throw new RangeError("confirmed execution amounts must be positive");
 
     const scenarioId = event.synthetic_metadata?.scenario_id ?? null;
+    const poolAddress = event.event_kind.startsWith("POOL_") ? payload.pool_address ?? null : null;
+    if (poolAddress !== null && (typeof poolAddress !== "string" || !poolAddress.trim())) throw new TypeError("invalid pool address");
     const start = bucketStart(event.event_time_ms, intervalMs);
-    const key = `${marketKey(event.market, event.provenance, scenarioId)}:${start}`;
+    const key = `${marketKey(event.market, event.provenance, scenarioId, poolAddress)}:${start}`;
     const side = event.event_kind === "CURVE_BUY_EXECUTED" || event.event_kind === "POOL_BUY_EXECUTED" ? "buy" : "sell";
     let candle = candles.get(key);
 
@@ -86,6 +90,7 @@ export function buildRawCandles(events, intervalMs) {
       candle = {
         schema_version: "1.0.0",
         market: event.market,
+        ...(poolAddress === null ? {} : {pool_address: poolAddress}),
         interval_start_ms: start,
         interval_end_ms: start + intervalMs,
         open_price: price,
@@ -122,7 +127,7 @@ export function buildRawCandles(events, intervalMs) {
   }
 
   return [...candles.values()]
-    .sort((a, b) => a.interval_start_ms - b.interval_start_ms || a.market.token_mint.localeCompare(b.market.token_mint))
+    .sort((a, b) => a.interval_start_ms - b.interval_start_ms || a.market.token_mint.localeCompare(b.market.token_mint) || (a.market.curve_account??"").localeCompare(b.market.curve_account??"") || (a.pool_address??"").localeCompare(b.pool_address??""))
     .map((candle) => ({
       ...candle,
       quote_volume_base_units: formatBaseUnits(candle.quote_volume_base_units, { max: U128_MAX }),

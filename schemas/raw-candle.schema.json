@@ -27,6 +27,7 @@
   "properties": {
     "schema_version": { "const": "1.0.0" },
     "market": { "$ref": "market-identity.schema.json" },
+    "pool_address": { "type": "string", "minLength": 1 },
     "interval_start_ms": { "type": "integer", "minimum": 0 },
     "interval_end_ms": { "type": "integer", "minimum": 0 },
     "open_price": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
