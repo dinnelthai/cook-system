@@ -58,6 +58,7 @@ async function main(){
   const participant=command("participant_validation_suite",["scripts/run-participant-validation-suite.mjs",join(temp,"participant-validation.json")]);
   if(participant.ok)command("math_model_review",["scripts/review-math-models.mjs",join(temp,"participant-validation.json"),join(temp,"math-model-review.json")]);
   else add("math_model_review","FAIL","Participant artifact unavailable");
+  command("offline_risk_laboratory",["scripts/run-offline-risk-laboratory.mjs",join(temp,"offline-risk-laboratory.json")]);
   const evalPath=join(temp,"heldout.json");
   const heldout=command("heldout_synthetic_regression",["scripts/run-heldout-defensive-evaluation.mjs",evalPath,"901,902,903"]);
   if(heldout.ok){

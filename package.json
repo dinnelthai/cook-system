@@ -28,7 +28,8 @@
     "accept:local-read": "node scripts/accept-local-read.mjs",
     "audit:repo": "node scripts/audit-repository-hygiene.mjs",
     "benchmark:project-replay": "node scripts/benchmark-project-replay.mjs",
-    "accept:all": "node scripts/run-unified-acceptance.mjs"
+    "accept:all": "node scripts/run-unified-acceptance.mjs",
+    "simulate:offline-risk": "node scripts/run-offline-risk-laboratory.mjs"
   },
   "devDependencies": {
     "@pump-fun/pump-sdk": "4.3.1",

@@ -163,3 +163,5 @@ After `npm ci`, run `npm run accept:all`. It checks Node/runtime prerequisites, 
 ## Offline workflow integration
 
 See [M25–M49 first offline workflow batch](docs/implementation/M25-M49-OFFLINE-WORKFLOW.md) for static configuration audit and per-interval evidence coverage; this does not establish real-world operating readiness.
+
+Offline risk laboratory: `npm run simulate:offline-risk -- /tmp/cook-offline-risk.json` (new output file, fixed synthetic fixtures only).

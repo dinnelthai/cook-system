@@ -36,3 +36,10 @@ No actual launch selection or recommendation, independent demand measurement, ca
 ## Fifth batch — historical pool coverage and recovery regression
 
 Retain bounded pool replay/snapshot statuses from the canonical graduation reviewer; older archives without the new fields remain unknown. The unified business review displays pool coverage and unresolved retrospective receipt exceptions (retry prohibited). Its exact snapshot is included in the existing digest-checked audit export. Five tests include a real temporary SQLite close/reopen and export comparison with an unresolved order. No transaction submission, liquidity deployment, intervention or actual recovery proof. M38/M41/M48/M49 advanced within the offline review boundary; M39/M40 and empirical participant models remain open. External gates deferred. CI and actual browser acceptance remain distinct.
+
+
+## Sixth batch — M33/M39/M40 offline risk laboratory
+
+Run the existing participant validation suite and digest/manifest summary alongside six fixed PumpSwap reserve-evidence fault cases using canonical snapshot reconciliation. Cover exact integers, missing vault, slot mismatch, reserve contradiction, fee bucket contradiction and invalid effective reserve. Separate synthetic result groups; no empirical accuracy, LP position valuation or profit forecasting. CLI uses the existing synthetic fixture, bounded seeds/steps and exclusive output creation. Three regression tests and an explicit accept:all command.
+
+M33/M39/M40 remain partial: this is defensive QA, not behavioral calibration, LP accounting ownership or full operational strategy evaluation. No real data or transaction capability. M50–M52 deferred. CI separately verified.
