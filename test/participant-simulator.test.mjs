@@ -13,3 +13,14 @@ test("different seeds create different synthetic paths",()=>{
  const a=runParticipantSimulation({scenarioId:"test-run",seed:7,steps:100}),b=runParticipantSimulation({scenarioId:"test-run",seed:8,steps:100});
  assert.notDeepEqual(a.detector_input.events,b.detector_input.events);
 });
+
+test("offline simulation conserves aggregate quote and token balances across fixed seeds",()=>{
+ const quoteInitial=1000000000000n+24000000000n;
+ const tokenInitial=1000000000000n+350000000000n;
+ for(const seed of [7,8,701,702]){
+  const r=runParticipantSimulation({scenarioId:"conservation",seed,steps:240});
+  const final=r.detector_input.final_state;
+  assert.equal(r.agent_states.reduce((n,a)=>n+BigInt(a.quote_balance_base_units),BigInt(final.quote_reserves_base_units)),quoteInitial);
+  assert.equal(r.agent_states.reduce((n,a)=>n+BigInt(a.token_balance_base_units),BigInt(final.token_reserves_base_units)),tokenInitial);
+ }
+});

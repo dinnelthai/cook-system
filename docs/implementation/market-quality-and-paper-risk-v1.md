@@ -11,3 +11,7 @@ The quote planner computes bounded bid/ask proposals with a spread floor/cap, vo
 
 ## Acceptance limitations
 This is not a production market-making deployment. Live source authentication, independently verified completeness, execution adapters, wallet security review, operational alert delivery, and mainnet test evidence remain prerequisites. Do not treat simulated returns or paper quotes as expected profit.
+
+## Evidence-boundary hardening
+
+Synthetic scenario/seed/generator evidence must match before aggregation. Missing attribution suppresses whole-side concentration; holder concentration is only a description of supplied positions, with no independent ownership attestation. A closing reserve cannot support execution-depth inference and the legacy depth proxy is withheld. Explicit quality contradictions suppress derived metrics and candles. Source authentication remains UNKNOWN regardless of caller labels. Conservation tests cover several fixed synthetic seeds; this does not establish calibrated real-market performance. No live execution or strategy optimization is added.

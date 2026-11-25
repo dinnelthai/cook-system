@@ -21,3 +21,26 @@ test("unattributed actors and unknown coverage remain explicitly uncertain",()=>
  const r=analyzeMarketQuality({events:[e]});assert.equal(r.coverage_attestation,"UNKNOWN");
  assert.ok(r.alerts.some(a=>a.alert_type==="ATTRIBUTION_UNCERTAINTY"));
 });
+
+test("duplicate executions count once and mixed synthetic scenarios are rejected",()=>{
+ const a=event("a","buy","wallet-a","100","1",1),b=event("b","sell","wallet-b","90","1.1",2);
+ assert.equal(analyzeMarketQuality({events:[a,structuredClone(a),b]}).metrics.trade_count,2);
+ b.synthetic_metadata.scenario_id="other";assert.throws(()=>analyzeMarketQuality({events:[a,b]}),/MIXED_OR_MISSING_SYNTHETIC_SCENARIO/);
+});
+test("unknown attribution and caller supplied authentication do not become verified metrics",()=>{
+ const a=event("a","buy","wallet-a","100","1",1),b=event("b","buy"," ","100","1",2);
+ const r=analyzeMarketQuality({events:[a,b],sourceAttestation:"VERIFIED",inventoryPositions:[{owner:"a",attribution_status:"verified",token_amount_base_units:"50"},{owner:"b",token_amount_base_units:"50"}]});
+ assert.equal(r.source_attestation,"UNKNOWN");assert.equal(r.metrics.buyer_quote_hhi,null);assert.equal(r.metrics.holder_token_hhi,null);
+ assert.equal(r.inventory_ownership_attestation,"UNKNOWN");
+});
+test("closing reserves cannot establish historical depth and duplicate inventory rows are rejected",()=>{
+ const a=event("a","buy","wallet-a","100","1",1);
+ const r=analyzeMarketQuality({events:[a],marketState:{virtual_quote_reserves_base_units:"1000"}});
+ assert.equal(r.metrics.max_trade_to_virtual_quote_depth_bps,null);assert.equal(r.depth_evidence_status,"UNAVAILABLE");
+ const p={position_id:"p",owner:"a",attribution_status:"verified",token_amount_base_units:"1"};
+ assert.throws(()=>analyzeMarketQuality({events:[a],inventoryPositions:[p,p]}),/DUPLICATE_OR_INVALID_INVENTORY_POSITION/);
+});
+test("known quality contradiction withholds derived metrics and candles",()=>{
+ const a=event("a","buy","wallet-a","100","1",1);a.quality.validation_status="warning";
+ const r=analyzeMarketQuality({events:[a]});assert.equal(r.status,"REVIEW_REQUIRED");assert.equal(r.metrics,null);assert.deepEqual(r.candles,[]);
+});
