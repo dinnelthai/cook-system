@@ -1,3 +1,5 @@
+import {mountScopedProjectReview} from "./project-review-dashboard.mjs";
+import {experimentDisplayRows} from "./experiment-display.mjs";
 import {mountProjectAssets} from "./project-assets-view.mjs";
 import {lifecycleLabel,operationalLabel,projectWalletRegistrationRows} from "./project-operator-view.mjs";
 import {historicalSeriesRange,candleTimeLayout} from "./terminal-display.mjs";
@@ -65,7 +67,24 @@ const fixture=await (async()=>{
 const original=structuredClone(fixture);
 let projectCatalogue=createHistoricalProjectCatalogue(),catalogueSelection=null,graduationReview=null,lifecycleReview=null;
 const projectRegistry=createProjectRegistry();
-let activeProjectId=null,projectMessage="",terminalContextVersion=0;
+let activeProjectId=null,projectMessage="",terminalContextVersion=0,globalContextTicket=0;
+function renderGlobalContext(){
+ const host=document.querySelector("#global-project-context"),id=activeProjectId,ticket=++globalContextTicket;
+ if(!host)return;
+ host.replaceChildren();
+ const label=document.createElement("span");
+ label.textContent=id?"读取当前项目身份…":"独立工作区 · 未选项目";
+ host.append(label);
+ const button=document.createElement("button");button.type="button";button.textContent="项目操作台";
+ button.onclick=()=>{importTicket++;page="terminal";render();};host.append(button);
+ if(!id)return;
+ getProjectDirectory().then(({projects})=>{
+  if(ticket!==globalContextTicket||activeProjectId!==id)return;
+  const p=projects.find(x=>x.project_id===id);
+  label.textContent=p?p.profile.symbol+" · "+lifecycleLabel(p.lifecycle.stage)+" · v"+p.revision:"项目身份不可用 · 请核对选择";
+  label.title=p?p.profile.name+" / "+p.project_id:"项目身份不可用";
+ }).catch(()=>{if(ticket===globalContextTicket&&activeProjectId===id)label.textContent="项目身份读取失败 · 不使用其他项目替代";});
+}
 let workspaceRevision=null,workspaceBusy=false,workspaceMessage="尚未读取数据库；文件导入导出仍可使用。",workspaceVersions=[];
 let data=structuredClone(fixture),report,page="terminal",importTicket=0,offlineReview=false,workflowMessage="";
 const importCurrent=(ticket,startPage)=>ticket===importTicket&&page===startPage;
@@ -394,7 +413,8 @@ function renderTerminal(){
 function render(){
  if(reviewInput!==data){reviewInput=data;reviewStage="REVIEW";metadata=null;reviewPaused=false;workflowMessage="";}
  main.dataset.page=page;
- document.querySelector(".tag").textContent=offlineReview?"OFFLINE REVIEW":"LOCALNET";
+ renderGlobalContext();
+ document.querySelector(".tag").textContent=activeProjectId?"PROJECT REVIEW":offlineReview?"OFFLINE REVIEW":"LOCALNET";
  nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+((page===id||id==="market"&&["lab","create"].includes(page))?"active":"")+'"'+(page===id?' aria-current="page"':'')+'><span class="nav-num" aria-hidden="true">'+label.slice(0,2)+'</span><span>'+esc(label.slice(3))+'</span></button>').join("");
  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.page;record("page.open",{page});render()});
  const a=report.accounting,m=report.market_history;
@@ -483,7 +503,9 @@ function render(){
 
  }else if(page==="dashboard"){
  if(activeProjectId){
-  main.innerHTML=screenHeading("复盘分析","项目上下文与独立报告隔离")+note("当前已选择 Project；此独立报告工作区不会显示其他项目或合成样本。请返回操作台进行项目级复核，或明确退出项目上下文。")+'<div class="row"><button id="dashboard-return-project" class="primary">返回项目操作台</button><button id="dashboard-open-independent">退出项目上下文，打开独立复盘</button></div>';
+  main.innerHTML=screenHeading("复盘分析","当前 Project · 已归档历史区间")+note("项目级复盘不读取独立报告缓冲区。无证据时显示未知；不合并不同区间。")+'<div class="row"><button id="dashboard-return-project" class="primary">返回项目操作台</button><button id="dashboard-open-independent">退出项目上下文，打开独立复盘</button></div><section id="scoped-project-review" class="panel"></section>';
+  const reviewHost=main.querySelector("#scoped-project-review"),scope=activeProjectId;
+  mountScopedProjectReview(reviewHost,{projectId:scope,isActive:()=>page==="dashboard"&&activeProjectId===scope&&reviewHost.isConnected,esc,table,note,download});
   main.querySelector("#dashboard-return-project").onclick=()=>{importTicket++;page="terminal";render();};
   main.querySelector("#dashboard-open-independent").onclick=()=>{importTicket++;activeProjectId=null;render();};
  }else{
@@ -512,7 +534,7 @@ function render(){
   mountProjectSetup(main,{
    initialProjectId:activeProjectId,
    initialMessage:projectMessage,
-   onActiveProjectId:id=>{activeProjectId=id;},
+   onActiveProjectId:id=>{activeProjectId=id;renderGlobalContext();document.querySelector(".tag").textContent=id?"PROJECT REVIEW":offlineReview?"OFFLINE REVIEW":"LOCALNET";},
    isActive:()=>page==="create"&&importTicket===ticket,
    screenHeading,panel,note,table,esc,download,projectRegistry,record,errorKind
   });
@@ -580,7 +602,10 @@ function render(){
    record("experiment.started",{seed,runs});
    experiment=runParticipantExperiment({base:original,seed,runs});
    record("experiment.completed",{trial_count:experiment.total_trials,match_count:experiment.total_matches,duration_ms:Math.round(performance.now()-start)});
-   el.innerHTML='<div class="stats">'+stat("总实验数",experiment.total_trials)+stat("预期匹配",experiment.total_matches)+'</div>'+table(["角色","实验数","扰动次数","需复核次数","预期匹配"],experiment.summaries.map(s=>[s.role,s.runs,s.stress_trials,s.review_required,s.expected_outcome_matches]));
+   const rows=experimentDisplayRows(experiment);
+   el.innerHTML=note("合成 QA 覆盖率，不代表真实参与者概率、模型预测准确率或投资收益。")+'<div class="stats">'+stat("总实验数",experiment.total_trials)+stat("预期匹配",experiment.total_matches)+stat("未匹配",experiment.total_trials-experiment.total_matches)+'</div>'+
+    '<div class="qa-bars">'+rows.map(r=>'<div class="qa-bar"><strong>'+esc(r.role)+'</strong><label>预期匹配 '+esc(r.matches+" / "+r.runs)+'<progress max="'+r.runs+'" value="'+r.matches+'"></progress></label><label>需复核 '+esc(r.review+" / "+r.runs)+'<progress max="'+r.runs+'" value="'+r.review+'"></progress></label></div>').join("")+'</div>'+
+    table(["角色","实验数","扰动次数","需复核次数","预期匹配","回撤样本数","样本平均回撤（bps）"],rows.map(r=>[r.role,r.runs,r.stress,r.review,r.matches,r.drawdown_samples,r.mean_drawdown??"未知"]));
    exportButton.disabled=false;
   }catch(err){record("experiment.failed",{error_kind:errorKind(err)},"ERROR");experiment=null;exportButton.disabled=true;el.textContent=err.message}
  };

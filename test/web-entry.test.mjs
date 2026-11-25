@@ -65,3 +65,11 @@ test("single wallet route separates scoped historical assets from local wallet t
  assert.match(assets,/selectProjectRuntimeInterval\(projectId,project.revision,v.runtime_context_id,archiveId\)/);
  assert.doesNotMatch(assets,/mountLocalFaucet|sendTransaction|signTransaction/);
 });
+
+test("scoped review is reachable and independent from report buffer",async()=>{
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");
+ assert.match(app,/mountScopedProjectReview\(reviewHost/);assert.match(app,/renderGlobalContext\(/);
+ const view=await readFile(new URL("../web/project-review-dashboard.mjs",import.meta.url),"utf8");
+ assert.match(view,/selectProjectRuntimeInterval\(projectId,project.revision,v.runtime_context_id,id\)/);
+ assert.doesNotMatch(view,/sendTransaction|signTransaction/);
+});
