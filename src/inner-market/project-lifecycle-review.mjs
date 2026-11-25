@@ -31,6 +31,8 @@ export function buildProjectLifecycleReview({financialInput,graduationHistory}){
   {id:"PROJECT_CREATED",status:g.creation?"RECORDED":"UNKNOWN",evidence:g.creation},
   {id:"CURVE_COMPLETED",status:g.completion?"RECORDED":"UNKNOWN",evidence:g.completion},
   {id:"GRADUATION_MIGRATION",status:g.migration?(g.transaction_link==="MATCHED_DECLARED_TRANSACTION"?"LINKED":"REVIEW_REQUIRED"):"NOT_RECORDED",evidence:g.migration},
+  {id:"PUMPSWAP_POOL_CREATED",status:g.migration_pool_address?"RECORDED":"UNKNOWN",evidence:g.migration_pool_address?{pool_address:g.migration_pool_address,signature:g.migration?.signature??null,slot:g.migration?.slot??null}:null},
+  {id:"PUMPSWAP_POOL_REPLAY",status:graduation.pools.some(p=>p.snapshot_status==="PASS"&&p.replay_status==="PASS")?"REPLAY_AND_SNAPSHOT_MATCHED":g.migration_pool_address?"INCOMPLETE":"UNKNOWN",evidence:null},
   ...graduation.pools.map(p=>({id:"PUMPSWAP_POOL:"+p.pool_address,status:p.snapshot_status==="PASS"&&p.replay_status==="PASS"?"REPLAY_AND_SNAPSHOT_MATCHED":p.snapshot_status==="FAIL"||p.replay_status==="FAIL"?"REVIEW_REQUIRED":"INCOMPLETE",evidence:p.creation})),
   {id:"FINANCIAL_CLOSE",status:financial.status==="SUPPLIED_ACCOUNTING_AND_ENDPOINTS_CONSISTENT"?"ACCOUNTING_AND_ENDPOINTS_CONSISTENT":financial.status==="ACCOUNTING_CONSISTENT_VALUATION_UNAVAILABLE"?"ACCOUNTING_ONLY":financial.status,evidence:null},
   {id:"CREATOR_FEE_LEDGER",status:creatorFees.status,evidence:null}

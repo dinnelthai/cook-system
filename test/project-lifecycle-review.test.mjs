@@ -14,6 +14,8 @@ test("lifecycle dossier correlates project identity, graduation, finance and Cre
  assert.equal(r.status,"PARTIAL");assert.equal(r.project_identity.cross_source_identity_status,"MATCHED");
  assert.equal(r.lifecycle.recorded_phase,"MIGRATION_LINK_RECORDED");assert.equal(r.lifecycle.milestones[0].status,"RECORDED");
  assert.equal(r.lifecycle.milestones.find(x=>x.id==="GRADUATION_MIGRATION").status,"LINKED");
+ assert.equal(r.lifecycle.milestones.find(x=>x.id==="PUMPSWAP_POOL_CREATED").status,"RECORDED");
+ assert.equal(r.lifecycle.milestones.find(x=>x.id==="PUMPSWAP_POOL_REPLAY").status,"INCOMPLETE");
  assert.equal(r.creator_fee_ledger.summary.verified_cash_income_base_units,"7");assert.equal(r.actual_settlement_allowed,false);
  assert.equal(r.pool_fee_buckets.length,0);assert.equal(r.execution_enabled,false);
 });
