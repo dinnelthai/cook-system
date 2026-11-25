@@ -17,3 +17,22 @@ test("missing ownership or source evidence remains unknown",()=>{
  const a=base();a.positions[0].evidence_status="UNKNOWN";a.marketSnapshots[0].source_status="UNKNOWN";
  const r=assessPortfolioRisk(a);assert.equal(r.status,"UNKNOWN");assert.ok(r.findings.some(x=>x.severity==="UNKNOWN"));
 });
+
+test("zero stated exposure does not erase missing position evidence",()=>{
+ const i=base();i.positions[0].exposure_quote_base_units="0";i.positions[0].evidence_status="UNKNOWN";
+ const r=assessPortfolioRisk(i);assert.equal(r.status,"UNKNOWN");assert.equal(r.metrics.unknown_position_count,1);
+});
+test("risk comparisons use exact units rather than rounded displayed ratios",()=>{
+ const i=base();i.positions[0].exposure_quote_base_units="500001";i.marketSnapshots[0].liquidation_depth_quote_base_units="1000000";
+ i.limits.max_total_exposure_quote_base_units="10000000";i.limits.max_liquidation_depth_ratio_bps=5000;
+ assert.ok(assessPortfolioRisk(i).findings.some(f=>f.code==="LIQUIDATION_DEPTH_LIMIT"));
+ const j=base();j.positions=[{market_id:"m1",exposure_quote_base_units:"5000001",evidence_status:"VERIFIED"},{market_id:"m2",exposure_quote_base_units:"4999999",evidence_status:"VERIFIED"}];
+ j.marketSnapshots=[{...j.marketSnapshots[0],liquidation_depth_quote_base_units:"100000000"},{...j.marketSnapshots[0],market_id:"m2",liquidation_depth_quote_base_units:"100000000"}];
+ j.limits.max_total_exposure_quote_base_units="100000000";j.limits.max_market_exposure_bps=5000;
+ assert.ok(assessPortfolioRisk(j).findings.some(f=>f.code==="SINGLE_MARKET_CONCENTRATION"&&f.market_id==="m1"));
+});
+test("duplicate declared position IDs and out-of-domain percent limits are rejected",()=>{
+ const i=base();i.positions[0].position_id="p";i.positions.push({...i.positions[0]});
+ assert.throws(()=>assessPortfolioRisk(i),/DUPLICATE_OR_INVALID_POSITION_ID/);
+ const j=base();j.limits.max_drawdown_bps=10001;assert.throws(()=>assessPortfolioRisk(j),/INVALID_PORTFOLIO_PERCENT_LIMIT/);
+});

@@ -47,3 +47,7 @@ An explicitly pinned genesis must match before collector account/history reads; 
 ## Collector pagination follow-up
 
 Pump and Raydium use a shared bounded signature paginator. Malformed, oversized, duplicated, cyclic, or slot-inconsistent pages are rejected instead of being treated as exhaustion. Actual page cursor/signature metadata is returned, with explicit termination declaration and no completeness attestation. Both collectors emit a shared historical_read_evidence object and downgrade the overall replay label on a detected contradiction. Missing identity or receipts remain partial. Existing legacy internal replay labels do not certify provider history. No live dual-RPC validation was performed; this evidence is collector JSON output, not yet a terminal UI integration.
+
+## Historical financial and risk follow-up
+
+Added a standalone closed-account-set reconciliation for operator-supplied historical balance sheets. It rejects duplicate accounts, contradictory scope, missing evidence and consolidated total mismatches. It never discovers wallets, infers ownership, allocates positions or values assets independently. The risk evaluator now compares configured concentration/depth thresholds with exact integer arithmetic and retains unknown evidence even when the stated amount is zero. These are offline checks, not trading authorization. The account-set audit is not yet connected to the unified terminal or actual Validator receipts.
