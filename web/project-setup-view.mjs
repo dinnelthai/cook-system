@@ -1,3 +1,4 @@
+import {lifecycleLabel,operationalLabel,limitFields,budgetInputValue,parseBudgetDeclaration,projectWalletRegistrationRows} from "./project-operator-view.mjs";
 import {createProjectRequestRecovery} from "./project-request-recovery.mjs";
 import { lookupCreateRequest, listProjects, getProject, createProject, appendProjectCommand, getProjectConfig, inspectProjectEvidence, listProjectArchive, inspectProjectMarket, listProjectReportCandidates, linkProjectReport } from "./project-client.mjs";
 
@@ -69,7 +70,7 @@ export function mountProjectSetup(container, {
       x.profile.name, x.profile.symbol,
       x.token.supply_base_units === null ? "未配置" : x.token.supply_base_units + " base units / " + x.token.decimals + " decimals",
       x.token.creator_wallet_address || "未分配钱包",
-      x.lifecycle.stage + " · " + x.lifecycle.operational_status,
+      lifecycleLabel(x.lifecycle.stage) + " · " + operationalLabel(x.lifecycle.operational_status),
       x.token.issuance_status
     ]);
     const options = projects.map(x => '<option value="' + esc(x.project_id) + '"' +
@@ -118,6 +119,10 @@ export function mountProjectSetup(container, {
         '<button id="project-legacy-export" ' + (legacyCount ? "" : "disabled") + '>导出旧版浏览器台账 (' + legacyCount + ')</button></div>' +
         '<div class="row"><button id="project-mark-ready" ' + (readyAllowed ? "" : "disabled") + '>配置完成 → READY</button>' +
         '<button id="project-launch-submitted" ' + (launchSubmitAllowed ? "" : "disabled") + '>登记为已提交发行</button></div>') +
+      (current?panel("项目预算与风险声明",note("仅保存风险上限配置，不代表可用资金、交易许可或已通过风控。空白为未配置，0 为明确零额度。修改会产生项目新版本。")+
+        '<form id="project-budget-form"><div class="grid">'+limitFields.map(([k,label])=>'<label>'+esc(label)+'<input name="'+k+'" inputmode="decimal" maxlength="30" value="'+esc(budgetInputValue(current.limits[k]))+'"></label>').join("")+
+        '<label>最大回撤上限（bps，100 bps = 1%）<input name="max_drawdown_bps" inputmode="numeric" maxlength="5" value="'+esc(current.limits.max_drawdown_bps??"")+'"></label></div><button type="submit">保存风险上限声明</button><p id="project-budget-status" role="status"></p></form>')+
+        panel("项目登记钱包",table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(current))+note("仅为项目登记，不等于链上余额、资产归属或资金占用。")):"")+
       panel("发行证据登记", '<form id="issuance-evidence-form"><label>所属项目</label><select name="project_id" required><option value="">选择项目</option>' + issuanceOptions + '</select>' +
         '<label>Token Mint 地址</label><input name="mint" required maxlength="44" placeholder="已发行 Token 的 Mint 地址">' +
         '<label>交易签名</label><input name="signature" required minlength="64" maxlength="88" placeholder="链上交易 Signature">' +
@@ -297,6 +302,28 @@ export function mountProjectSetup(container, {
         const status = container.querySelector("#project-status");
         if (status) status.textContent = message;
         button.disabled = false;
+      }
+    };
+    const budgetForm=container.querySelector("#project-budget-form");
+    if(budgetForm)budgetForm.onsubmit=async event=>{
+      event.preventDefault();
+      if(!current||current.project_id!==activeProjectId)return;
+      const status=container.querySelector("#project-budget-status");
+      let limits;
+      try{limits=parseBudgetDeclaration(Object.fromEntries(new FormData(budgetForm)));}
+      catch(error){status.textContent="配置无效："+errorKind(error);return;}
+      if(JSON.stringify(limits)===JSON.stringify(current.limits)){status.textContent="配置未改变。";return;}
+      if(!window.confirm("保存风险上限声明？此操作将更新当前项目版本，但不会启用交易。"))return;
+      const button=budgetForm.querySelector("button");button.disabled=true;
+      try{
+        const updated=await append(current,"SET_BUDGET_LIMITS",{limits});
+        if(!isActive()||version!==viewVersion)return;
+        projects=projects.map(p=>p.project_id===updated.project_id?updated:p);
+        message="风险上限声明已保存；执行权限保持关闭。";render();
+      }catch(error){
+        if(!isActive()||version!==viewVersion)return;
+        status.textContent="保存未确认，请重新读取项目："+errorKind(error);
+        button.disabled=false;
       }
     };
     container.querySelector("#project-new").onclick = () => {

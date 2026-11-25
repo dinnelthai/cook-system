@@ -29,9 +29,9 @@ export function mountOrderReview(container,{project,isActive,esc,table,note,down
     table(["订单 ID","来源","Signature","状态","Slot","版本","复核原因"],shown.map(o=>[o.order_id,o.source_mode,o.signature,o.status,o.reported_slot??"—",o.revision+(o.stale?" · 旧项目版本":""),(o.review_reasons??[]).join(" / ")])):"")+
     '<p id="order-load-status" role="status" class="muted">'+(loaded?(orders.length?"已读取项目台账": "当前无已登记订单；未导入历史订单。"):"尚未读取台账")+'</p>'+
     '<div class="row"><label>订单 <select id="order-select"><option value="">选择记录</option>'+shown.map(o=>'<option value="'+esc(o.order_id)+'"'+(selected?.order_id===o.order_id?" selected":"")+'>'+esc(o.order_id+" · "+o.status)+'</option>').join("")+'</select></label><button id="order-events" disabled>查看事件</button></div>'+
-    '<div class="row"><label>已关联报告 <select id="order-report-select"><option value="">选择报告</option>'+links.map(a=>'<option value="'+esc(a.archive_id)+'">'+esc("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff)+'</option>').join("")+'</select></label><button id="order-import" disabled>导入报告交易回执</button><button id="order-receipt" disabled>只读回执复核并归档</button><button id="order-detail-export" disabled>导出复核明细</button></div><p id="order-detail-status" role="status"></p><pre id="order-detail" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+    '<div class="row"><label>已关联报告 <select id="order-report-select"><option value="">选择报告</option>'+links.map(a=>'<option value="'+esc(a.archive_id)+'">'+esc("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff)+'</option>').join("")+'</select></label><button id="order-import" disabled>导入报告交易回执</button><button id="order-receipt" disabled>只读回执复核并归档</button><button id="order-detail-export" disabled>导出复核明细</button></div><p id="order-detail-status" role="status"></p><div id="order-summary"></div><details><summary>原始复核证据 JSON</summary><pre id="order-detail" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>';
   const select=container.querySelector("#order-select"),linkSelect=container.querySelector("#order-report-select"),eventsButton=container.querySelector("#order-events"),receiptButton=container.querySelector("#order-receipt"),exportButton=container.querySelector("#order-detail-export");
-  function reset(){ticket++;detail=null;container.querySelector("#order-detail").textContent="";container.querySelector("#order-detail-status").textContent="";exportButton.disabled=true;}
+  function reset(){ticket++;detail=null;container.querySelector("#order-summary").replaceChildren();container.querySelector("#order-detail").textContent="";container.querySelector("#order-detail-status").textContent="";exportButton.disabled=true;}
   const importButton=container.querySelector("#order-import");
   importButton.onclick=async()=>{
    if(!linkSelect.value)return;
@@ -55,12 +55,18 @@ export function mountOrderReview(container,{project,isActive,esc,table,note,down
    if(!selected)return;
    const own=++ticket,o=selected,a=linkSelect.value;
    detail=null;exportButton.disabled=true;eventsButton.disabled=true;receiptButton.disabled=true;
+   container.querySelector("#order-summary").replaceChildren();
    container.querySelector("#order-detail").textContent="";
    const status=container.querySelector("#order-detail-status");status.textContent="读取证据…";
    try{
     const value=kind==="EVENTS"?await getOrderReviewEvents(project.project_id,project.revision,o):await getOrderReceiptReview(project.project_id,project.revision,o,a);
     if(!current()||own!==ticket)return;
     detail={kind,project_id:project.project_id,project_revision:project.revision,order_id:o.order_id,order_revision:o.revision,source_attestation:"UNKNOWN",execution_enabled:false,settlement_allowed:false,data:value};
+    const summary=container.querySelector("#order-summary");
+    summary.innerHTML=table(["订单","状态","签名","版本"],[[o.order_id,o.status,o.signature,o.revision]])+
+      (kind==="EVENTS"?table(["记录时间","事件版本","事件类型"],value.map(e=>[Number.isSafeInteger(e.recorded_at_ms)?new Date(e.recorded_at_ms).toISOString():"未知",e.revision,e.event?.type??"未知"])):
+      table(["检查","结果"],[["回执复核",value.status],["原因",value.reason],["Slot",value.receipt_slot??"未知"],["报告结果",value.reported_receipt_outcome??"未知"],["来源认证","未知"],["财务一致性认证","未建立"]])+
+      table(["资金记录","状态","对账","库存事件"],(value.posting_references??[]).map(p=>[p.posting_id,p.recorded_status,p.reconciliation,p.inventory_event_id??"未知"])));
     container.querySelector("#order-detail").textContent=JSON.stringify(detail,null,2);status.textContent="证据已读取；未独立认证。";exportButton.disabled=false;
    }catch(error){if(current()&&own===ticket)status.textContent="读取失败："+error.message;}
    finally{if(current()&&own===ticket)buttons();}

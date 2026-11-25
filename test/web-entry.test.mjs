@@ -49,3 +49,10 @@ test("project context does not silently show an independent review dashboard",as
  assert.match(app,/terminal-scoped-placeholder/);
  assert.match(app,/project-show-risk/);
 });
+
+test("operator workspace exposes declared budget and keeps raw order evidence secondary",async()=>{
+ const setup=await readFile(new URL("../web/project-setup-view.mjs",import.meta.url),"utf8");
+ assert.match(setup,/project-budget-form/);assert.match(setup,/SET_BUDGET_LIMITS/);
+ const order=await readFile(new URL("../web/order-review-view.mjs",import.meta.url),"utf8");
+ assert.match(order,/order-summary/);assert.match(order,/原始复核证据 JSON/);
+});

@@ -1,3 +1,4 @@
+import {lifecycleLabel,operationalLabel,projectWalletRegistrationRows} from "./project-operator-view.mjs";
 import {historicalSeriesRange} from "./terminal-display.mjs";
 import {projectOverviewModel,projectIntervalMetrics} from "./project-overview-view.mjs";
 import {mountLocalFaucet} from "./local-faucet.mjs";
@@ -171,7 +172,7 @@ function renderTerminal(){
    const selected=projects.find(x=>x.project_id===activeProjectId)||null;
    const options='<option value="">选择 Project</option>'+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
    projectContext.innerHTML='<div class="row"><label>当前 Project <select id="terminal-project-select">'+options+'</select></label>'+
-    (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(selected.lifecycle.stage)+'</span><span>Mint：'+esc(selected.token.mint||"未登记")+'</span><span>市场：'+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' 已核验</span>':'<span>尚未选择项目</span>')+
+    (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(lifecycleLabel(selected.lifecycle.stage))+'</span><span>运行登记：'+esc(operationalLabel(selected.lifecycle.operational_status))+'</span><span>Mint：'+esc(selected.token.mint||"未登记")+'</span><span>市场：'+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' 已核验</span>':'<span>尚未选择项目</span>')+
     '<span>Execution: DISABLED</span></div><details><summary>项目组合登记复核</summary>'+table(["项目","阶段","配置状态","登记重叠"],directory.projects.map(x=>[x.project_id,x.stage,x.configuration_status,x.registration_overlap_count]))+table(["登记异常","项目"],directory.findings.map(x=>[x.code,x.project_ids.join(", ")]))+note("登记重叠不等于共同控制，组合资金与 NAV 未核验")+'</details>';
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
@@ -189,8 +190,9 @@ function renderTerminal(){
         if(!businessCurrent()||ticket!==businessTicket)return;
         const model=projectOverviewModel(v);
         businessArea.innerHTML='<div class="project-overview-heading"><div><h3>项目运行概览 · v'+esc(v.project_revision)+'</h3><p class="muted">'+esc(model.status)+' · 历史声明数据 · 执行禁用</p></div><button id="business-refresh">刷新项目</button></div>'+
-         '<div class="project-overview-grid"><div class="project-stat"><span>登记阶段</span><strong>'+esc(model.stage)+'</strong></div><div class="project-stat"><span>严重 / 警告 / 未知</span><strong>'+esc([model.counts.critical,model.counts.warning,model.counts.unknown].join(" / "))+'</strong></div><div class="project-stat"><span>待核对订单</span><strong>'+esc(v.orders.unresolved_count)+'</strong></div><div class="project-stat"><span>实时资产 / 市场</span><strong>未接入</strong></div></div>'+
-         '<div class="row"><button id="project-show-risk">查看风险与证据</button></div>'+
+         '<div class="project-overview-grid"><div class="project-stat"><span>登记阶段</span><strong>'+esc(lifecycleLabel(model.stage))+'</strong></div><div class="project-stat"><span>严重 / 警告 / 未知</span><strong>'+esc([model.counts.critical,model.counts.warning,model.counts.unknown].join(" / "))+'</strong></div><div class="project-stat"><span>待核对订单</span><strong>'+esc(v.orders.unresolved_count)+'</strong></div><div class="project-stat"><span>实时资产 / 市场</span><strong>未接入</strong></div></div>'+
+         '<div class="row"><button id="project-show-risk">查看风险与证据</button><button id="project-show-setup">项目配置与风险上限</button></div>'+
+         '<details><summary>登记钱包与归属状态</summary>'+table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(selected))+'</details>'+
          (v.global_risk.findings.some(f=>f.severity==="CRITICAL")?'<section class="notice" role="status"><strong>严重证据风险 · '+esc(model.counts.critical)+'</strong>'+table(["类别","风险原因"],v.global_risk.findings.filter(f=>f.severity==="CRITICAL").slice(0,5).map(f=>[f.category,f.code]))+'<p>完整风险见风险与证据；不代表实时市场风险。</p></section>':"")+
          '<div class="project-work-grid">'+model.work.map(x=>'<div><span>'+esc(x.label)+'</span><strong>'+esc(x.status)+'</strong></div>').join("")+'</div>'+
          '<div class="project-interval-head"><h3>历史资产区间</h3>'+(v.runtime_context_id&&model.intervals.length?'<label>选择区间 <select id="runtime-interval"><option value="">请选择区间</option>'+model.intervals.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.label)+'</option>').join("")+'</select></label>':'<span class="muted">暂无关联区间</span>')+'</div><div id="runtime-interval-detail" role="status">'+assetCards(null)+note("请选择一个历史区间。未选择时不显示金额；不代表当前可用资产。")+'</div>'+
@@ -213,6 +215,7 @@ function renderTerminal(){
          '<button id="business-export">导出复核 JSON</button></details>';
         const gr=v.global_risk;
         riskArea.innerHTML="<h3>统一项目风险复核</h3>"+note("同一运行快照 · "+gr.status+" · 实时风险未评估")+table(["类别","级别","问题","记录引用数"],gr.findings.map(f=>[f.category,f.severity,f.code,f.references.length]))+'<button id="project-risk-export">导出风险清单</button>';
+        businessArea.querySelector("#project-show-setup").onclick=()=>{importTicket++;page="create";render();};
         businessArea.querySelector("#project-show-risk").onclick=()=>{main.querySelector("#terminal-project-details").open=true;riskArea.scrollIntoView({block:"start"});};
         riskArea.querySelector("#project-risk-export").onclick=()=>download("project-risk-review.json",JSON.stringify(gr,null,2));
         const intervalSelect=businessArea.querySelector("#runtime-interval");
