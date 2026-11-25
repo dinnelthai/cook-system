@@ -1,8 +1,8 @@
 import {auditSyntheticConservation} from "./synthetic-conservation.mjs";
 import {createFixtureRandomStream,shuffledFixtureRound} from "./fixture-random-stream.mjs";
 import {describeParticipantModel} from "./participant-model-contract.mjs";
-const ROLES=new Set(["issuer_dev","early_holder","fast_entry","independent_trader","retail","kol_broadcaster","arbitrage","mev_ordering","observer"]);
-const asBig=(v,n)=>{if(typeof v!=="string"||!/^(0|[1-9][0-9]*)$/.test(v))throw Error("invalid "+n);return BigInt(v);};
+import {validateSyntheticParticipantInputs,readFixtureAmount} from "./participant-input-contract.mjs";
+const asBig=readFixtureAmount;
 const decimalRatio=(n,d)=>{const q=n*1000000000000n/d,s=q.toString().padStart(13,"0"),fraction=s.slice(-12).replace(/0+$/,"");return fraction?s.slice(0,-12)+"."+fraction:s.slice(0,-12);};
 function defaultAgents(scenarioId){
  return [["issuer","issuer_dev","1000000000","100000000000",0.9,3600000],["holder","early_holder","1000000000","250000000000",0.7,1800000],
@@ -19,9 +19,8 @@ function defaultAgents(scenarioId){
 /** Deterministic offline simulation. Ground-truth labels are kept outside detector input.
  * No live RPC, wallet signing, self-trading, wash-trading or deceptive-volume logic. */
 export function runParticipantSimulation({scenarioId="offline-scenario",seed=42,steps=240,agents=null,initialQuoteReserve="1000000000000",initialTokenReserve="1000000000000",feeBps=30}={}){
- if(typeof scenarioId!=="string"||!scenarioId||!Number.isSafeInteger(seed)||!Number.isSafeInteger(steps)||steps<1||steps>10000||!Number.isSafeInteger(feeBps)||feeBps<0||feeBps>=10000)throw Error("INVALID_SIMULATION_CONFIG");
- const states=(agents??defaultAgents(scenarioId)).map(a=>({...a,quote:asBig(a.quote_balance_base_units,"agent quote"),token:asBig(a.token_balance_base_units,"agent token")}));
- if(!states.length||states.length>256||new Set(states.map(a=>a.agent_id)).size!==states.length||states.some(a=>!ROLES.has(a.role_class)||a.scenario_id!==scenarioId||typeof a.agent_id!=="string"||!a.agent_id.trim()||a.agent_id.length>128||!Number.isSafeInteger(a.execution_latency_ms??0)||(a.execution_latency_ms??0)<0||(a.execution_latency_ms??0)>=1000))throw Error("INVALID_SIMULATION_AGENT");
+ const config=validateSyntheticParticipantInputs({scenarioId,seed,steps,agents:agents??defaultAgents(scenarioId),initialQuoteReserve,initialTokenReserve,feeBps});
+ const states=config.agents.map(a=>({...a,quote:asBig(a.quote_balance_base_units),token:asBig(a.token_balance_base_units)}));
  let quote=asBig(initialQuoteReserve,"initial quote reserve"),token=asBig(initialTokenReserve,"initial token reserve");
  if(quote<=0n||token<=0n)throw Error("INVALID_SIMULATION_RESERVES");
  const openingAgentStates=states.map(a=>({agent_id:a.agent_id,quote_balance_base_units:a.quote.toString(),token_balance_base_units:a.token.toString()}));
@@ -33,12 +32,12 @@ export function runParticipantSimulation({scenarioId="offline-scenario",seed=42,
  const events=[],groundTruth=states.map(a=>({schema_version:"1.0.0",scenario_id:scenarioId,agent_id:a.agent_id,simulated_role:a.role_class,
   latent_controller_group:null,ground_truth_behavior_labels:[a.role_class==="arbitrage"?"legitimate_arbitrage":a.role_class==="early_holder"?"early_inventory_holder":a.role_class==="kol_broadcaster"?"organic_public_signal_response":"unknown"]}));
  const market={chain_id:"solana",network:"synthetic",token_mint:"synthetic-token-"+scenarioId,quote_mint:"synthetic-quote",curve_program_id:"synthetic-constant-product",market_phase:"bonding_curve"};
- let sentiment="neutral",seq=0,tradeCount=0;
+ let sentiment="neutral",seq=0,tradeCount=0,skippedDegenerateRecords=0;
  const push=(kind,time,payload)=>{
   events.push({schema_version:"1.0.0",event_id:scenarioId+":event:"+seq,provenance:"synthetic",event_kind:kind,market,event_time_ms:time,
-   ordering:{event_sequence:seq,ordering_confidence:"synthetic"},source:{source_type:"simulator",source_id:"participant-simulator.2"},payload,
+   ordering:{event_sequence:seq,ordering_confidence:"synthetic"},source:{source_type:"simulator",source_id:"participant-simulator.3"},payload,
    quality:{is_complete:true,validation_status:"valid",warnings:[]},
-   synthetic_metadata:{scenario_id:scenarioId,random_seed:seed,generator_version:"participant-simulator.2"}});
+   synthetic_metadata:{scenario_id:scenarioId,random_seed:seed,generator_version:"participant-simulator.3"}});
   seq++;
  };
  for(let step=0;step<steps;step++){
@@ -57,11 +56,14 @@ export function runParticipantSimulation({scenarioId="offline-scenario",seed=42,
   let tokenAmount=0n,quoteAmount=0n,fee=0n;
   if(side==="buy"){
    amount=amount>agent.quote?agent.quote:amount;const effective=amount*BigInt(10000-feeBps)/10000n,k=quote*token;
-   const nextToken=k/(quote+effective),out=token-nextToken;if(out<=0n)continue;
+   const nextToken=k/(quote+effective),out=token-nextToken;
+   // Do not emit invalid records or mutate balances for degenerate arithmetic.
+   if(effective<=0n||nextToken<=0n||out<=0n||decimalRatio(amount,out)==="0"){skippedDegenerateRecords++;continue;}
    tokenAmount=out;quoteAmount=amount;fee=amount-effective;quote+=amount;token-=out;agent.quote-=amount;agent.token+=out;
   }else{
    amount=amount>agent.token?agent.token:amount;const k=quote*token,nextQuote=k/(token+amount),gross=quote-nextQuote;
-   const net=gross*BigInt(10000-feeBps)/10000n;if(net<=0n)continue;
+   const net=gross*BigInt(10000-feeBps)/10000n;
+   if(net<=0n||quote-net<=0n||decimalRatio(net,amount)==="0"){skippedDegenerateRecords++;continue;}
    tokenAmount=amount;quoteAmount=net;fee=gross-net;token+=amount;quote-=net;agent.token-=amount;agent.quote+=net;
   }
   const executionPrice=decimalRatio(quoteAmount,tokenAmount);
@@ -76,7 +78,7 @@ export function runParticipantSimulation({scenarioId="offline-scenario",seed=42,
  const agentStates=states.map(a=>({agent_id:a.agent_id,role_class:a.role_class,quote_balance_base_units:a.quote.toString(),token_balance_base_units:a.token.toString()}));
  const conservation=auditSyntheticConservation({openingTotals,finalState:detectorInput.final_state,agentStates});
  return {schema_version:"cook-participant-simulation.1",status:"SYNTHETIC_ONLY",detector_input:detectorInput,ground_truth:groundTruth,
-  opening_agent_states:openingAgentStates,agent_states:agentStates,conservation_audit:conservation,model_contract:describeParticipantModel(),
+  opening_agent_states:openingAgentStates,agent_states:agentStates,conservation_audit:conservation,model_contract:describeParticipantModel(),fixture_diagnostics:{skipped_degenerate_records:skippedDegenerateRecords,validated_input_contract:true},
   summary:{steps,trade_count:tradeCount,event_count:events.length,agent_count:states.length,fee_bps:feeBps},
   execution_enabled:false,live_rpc_enabled:false,transaction_signing_enabled:false};
 }

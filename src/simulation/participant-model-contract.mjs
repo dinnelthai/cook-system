@@ -1,8 +1,8 @@
-/** Descriptive QA limitations of participant-simulator.2, not a behavior policy.
+/** Descriptive QA limitations of participant-simulator.3, not a behavior policy.
  * Keep model metadata outside detector inputs. */
 export function describeParticipantModel(){
  return {
-  generator_version:"participant-simulator.2",
+  generator_version:"participant-simulator.3",
   status:"UNCALIBRATED_SYNTHETIC_FIXTURE",
   scheduling:"SEEDED_SHUFFLED_ROUNDS",
   market_model:"SIMPLIFIED_CONSTANT_PRODUCT",
@@ -13,6 +13,8 @@ export function describeParticipantModel(){
    timestamp_only:["execution_latency_ms"],
    declared_but_unused:["risk_aversion","holding_horizon_ms","observation_latency_ms","observation_noise","public_information_sensitivity","transaction_cost_sensitivity","random_stream_id"]
   },
+  input_contract:"BOUNDED_SYNTHETIC_INPUTS",
+  degenerate_record_handling:"SKIP_WITHOUT_MUTATION",
   behavior_labels_are_synthetic_annotations:true,
   actual_arbitrage_verified:false,actual_mev_verified:false,
   domain_separated_random_streams:true,independent_random_streams_verified:false,
