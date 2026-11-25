@@ -560,12 +560,29 @@ export async function fetchPumpMintHistory({
       poolSignatureSet,
       PUMP_AMM_PROGRAM_ID,
     );
+    // Also retain pool-specific initialization evidence discovered via the
+    // curve scan, even if the pool's signature page is incomplete.
+    const initializationEvidence = parsedTransactions.flatMap(transaction =>
+      (transaction.parser_result?.unresolved_events ?? [])
+        .filter(item => item.status === "POOL_INITIALIZATION_PHASE_UNRECONCILED" && item.pool === pool.poolAddress)
+        .map(item => ({ signature: transaction.signature, ...item })));
+    for (const item of initializationEvidence) {
+      if (!poolUnresolved.some(existing => existing.signature === item.signature && existing.log_index === item.log_index)) {
+        poolUnresolved.push(item);
+      }
+    }
     let poolReplay = null;
     let poolSnapshotReconciliation = null;
     let poolStatus = "NO_POOL_CREATED_EVENT";
     let poolReplayComplete = false;
     const poolTimelineAudit = poolEvents.length ? auditObservedEventTimeline({ events: poolEvents }) : null;
-    if (poolCreatedEvent) {
+    if (initializationEvidence.length) {
+      poolStatus = "PARTIAL_POOL_HISTORY";
+      poolSnapshotReconciliation = {
+        status: "UNKNOWN",
+        reason: "pool_initialization_phase_unreconciled",
+      };
+    } else if (poolCreatedEvent) {
       const initialState = createInitialPumpSwapPoolState({ poolCreatedEvent, decodedPool: pool.snapshot.decoded_pool });
       poolReplay = replayPumpSwapPoolEvents(initialState, poolEvents);
       const poolTradeReconciliationComplete = poolEvents
@@ -602,6 +619,7 @@ export async function fetchPumpMintHistory({
       signature_coverage: poolSignatureCollections.find((item) => item.address === pool.poolAddress) ?? null,
       data_gaps: poolDataGaps,
       unresolved_events: poolUnresolved,
+      initialization_evidence: initializationEvidence,
       replay_status: poolStatus,
       event_timeline_audit: poolTimelineAudit,
       trade_balance_reconciliation_complete: poolEvents

@@ -47,3 +47,7 @@ The review dashboard renders the same backend risk alerts and check evidence as 
 ## F10 — second-round functional acceptance handoff
 
 See [Codex second-round functional acceptance](CODEX-FUNCTIONAL-ACCEPTANCE-R2.md). F01–F09 code changes are in master; baseline Node 22/24 CI has 390 tests passing each. F10 is an acceptance plan, not a completed Localnet/browser/financial acceptance. Production infrastructure remains deferred. State-changing functionality and execution are not part of this read-only acceptance pass.
+
+## R3 follow-up — historical initialization evidence (T01/T02/T05 partial)
+
+The operator's third-round database summary reports distinct CreatePoolEvent and InitBoostEvent stages in slot 177: creation quote amount 835053591, later recorded real quote reserve 662281004, difference 172772587. These are report-derived observations, not independently retained raw receipts available to this implementation. The parser no longer silently ignores InitBoostEvent. It retains the decoded event as an unresolved phase observation; the collector marks affected pool replay partial and withholds the unvalidated replay and final snapshot comparison. A synthetic encoded regression uses the reported initialization amounts but is not an actual chain receipt. No reserve reconstruction, fee attribution, pricing or execution model is added. The actual phase semantics, account creation/rent, independent fee attribution and full raw-receipt regressions remain open.

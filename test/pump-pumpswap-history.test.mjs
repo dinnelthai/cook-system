@@ -271,4 +271,21 @@ test("full mint collector follows migration into PumpSwap and reconciles post-gr
   assert.equal(result.raw_candles_status,"AVAILABLE");
   assert.equal(result.raw_candles_1m.length,2);
   }
+  // Encoded synthetic stage-event regression, not a retained RPC receipt.
+  // The earlier creation values must not silently become a final snapshot.
+  const init = Buffer.concat([
+    disc(snapshot.pump_amm.events,"InitBoostEvent"),i64(1_700_000_012),
+    pubkey(MINT),pubkey(curve),pubkey(POOL),i128(172772587),u64(662281004),
+  ]);
+  const logIndex=migration.meta.logMessages.findIndex(log=>log.startsWith("Program data: "+createPoolEvent().toString("base64")));
+  assert.ok(logIndex>=0);
+  migration.meta.logMessages.splice(logIndex+1,0,"Program data: "+init.toString("base64"));
+  const partial=await fetchPumpMintHistory({rpc,mint:MINT,network:"local_sim",maxSignatures:20});
+  const pool=partial.pool_replays[0];
+  assert.equal(pool.replay_status,"PARTIAL_POOL_HISTORY");
+  assert.equal(pool.replay,null);
+  assert.equal(pool.current_account_reconciliation.status,"UNKNOWN");
+  assert.equal(pool.initialization_evidence.length,1);
+  assert.equal(pool.initialization_evidence[0].status,"POOL_INITIALIZATION_PHASE_UNRECONCILED");
+  assert.notEqual(partial.status,"REPLAYED_FULL_HISTORY");
 });

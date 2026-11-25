@@ -405,3 +405,15 @@ test("transaction balance delta extraction aggregates token accounts by owner an
   assert.equal(deltas.lamports[0].delta_lamports, "-10");
   assert.equal(deltas.tokens[0].delta_base_units, "15");
 });
+
+test("decoded pool initialization is retained as an explicit historical evidence gap",()=>{
+ const signed128=Buffer.alloc(16);signed128.writeBigUInt64LE(172772587n,0);
+ const init=Buffer.concat([discriminator(snapshot.pump_amm.events,"InitBoostEvent"),i64(1700000000),pubkey(MINT),pubkey(CURVE),pubkey(POOL),signed128,u64(662281004)]);
+ const transaction=makeTransaction({logs:[`Program ${PUMP_AMM_PROGRAM_ID} invoke [1]`,`Program data: ${init.toString("base64")}`,`Program ${PUMP_AMM_PROGRAM_ID} success`]});
+ const result=decodePumpTransaction({transaction,transactionIndex:0,network:"local_sim"});
+ assert.equal(result.status,"PARTIAL");assert.equal(result.events.length,0);
+ const gap=result.unresolved_events.find(e=>e.event_name==="InitBoostEvent");
+ assert.equal(gap.status,"POOL_INITIALIZATION_PHASE_UNRECONCILED");assert.equal(gap.pool,POOL);
+ assert.equal(String(gap.decoded_event.data.real_quote_reserves_after),"662281004");
+ assert.equal(String(gap.decoded_event.data.virtual_quote_reserves),"172772587");
+});

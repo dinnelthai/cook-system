@@ -194,7 +194,6 @@ const NON_MARKET_PUMP_AMM_EVENTS = new Set([
   "CreateConfigEvent",
   "DisableEvent",
   "ExtendAccountEvent",
-  "InitBoostEvent",
   "InitUserVolumeAccumulatorEvent",
   "MigratePoolCoinCreatorEvent",
   "ReservedFeeRecipientsEvent",
@@ -401,6 +400,18 @@ export function decodePumpTransaction({
           events.push(normalizePumpSwapLiquidityEvent({ ...context, poolMetadata }));
           break;
         }
+        case "InitBoostEvent":
+          // The creation event and initialization event describe distinct
+          // intra-transaction stages. Keep the decoded historical evidence,
+          // but do not claim a reconciled opening state without phase validation.
+          unresolvedEvents.push({
+            event_name: decoded.event_name,
+            status: "POOL_INITIALIZATION_PHASE_UNRECONCILED",
+            pool: decoded.data.pool,
+            log_index: decoded.log_index,
+            decoded_event: decoded,
+          });
+          break;
         case "BoostBuyAndBurnEvent": {
           const poolAddress = decoded.data.pool;
           const poolMetadata = poolMetadataForEvent({
