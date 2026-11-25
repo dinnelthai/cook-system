@@ -18,23 +18,35 @@ export function auditHistoricalCostBasis({inventory,market}){
   return result("PARTIAL",["COST_BASIS_ADJUSTMENT_ORDER_UNAVAILABLE"],0);
  if(inventory.historyComplete!==true||market.historyComplete!==true)
   return result("PARTIAL",["COST_BASIS_HISTORY_INCOMPLETE"],0);
- const byId=new Map(market.trades.map(t=>[t.id,t]));
- const journal=ledger.position_journal;
+ const byId=new Map();
+ for(const t of market.trades){
+  if(typeof t.id!=="string"||!t.id.trim()||byId.has(t.id))return result("REVIEW_REQUIRED",["COST_BASIS_MARKET_EVENT_ID_INVALID_OR_DUPLICATE"],0);
+  byId.set(t.id,t);
+ }
+ const journal=ledger.position_journal,seen=new Set();
+ for(const j of journal){
+  if(typeof j.event_id!=="string"||!j.event_id.trim()||seen.has(j.event_id))return result("REVIEW_REQUIRED",["COST_BASIS_JOURNAL_EVENT_ID_INVALID_OR_DUPLICATE"],0);
+  if(!["BUY","SELL"].includes(j.side))return result("REVIEW_REQUIRED",["COST_BASIS_JOURNAL_SIDE_INVALID"],0);
+  seen.add(j.event_id);
+ }
  const linked=journal.map(j=>({j,t:byId.get(j.event_id)}));
- if(linked.some(({j,t})=>!t||t.side!==j.side||t.status!=="FINALIZED"||t.reconciliation!=="PASS"||!Number.isSafeInteger(t.sequence)))
+ if(linked.some(({j,t})=>!t||t.side!==j.side||t.status!=="FINALIZED"||t.reconciliation!=="PASS"||!Number.isSafeInteger(t.sequence)||t.sequence<0))
   return result("PARTIAL",["COST_BASIS_TRADE_ORDER_UNAVAILABLE"],0);
  if(journal.some(j=>j.side==="SELL"&&j.allocated_cost_basis_quote_base_units==null))
   return result("PARTIAL",["COST_BASIS_DISPOSAL_UNKNOWN"],0);
+ if(new Set(linked.map(({t})=>t.sequence)).size!==linked.length)return result("REVIEW_REQUIRED",["COST_BASIS_AMBIGUOUS_TRADE_ORDER"],0);
  linked.sort((a,b)=>a.t.sequence-b.t.sequence);
  let checked=0;
  for(const {j} of linked){
   const q=amount(j.token_amount_base_units,"journal quantity");
+  if(q===0n){issues.push("COST_BASIS_ZERO_TRADE_QUANTITY:"+j.event_id);break;}
   if(j.side==="BUY"){
    qty+=q;basis+=amount(j.cash_cost_quote_base_units,"journal acquisition cost");
   }else{
    qty-=q;basis-=amount(j.allocated_cost_basis_quote_base_units,"journal disposed basis");
   }
   checked++;
+  if(qty>U128_MAX||basis>U128_MAX)issues.push("COST_BASIS_INTERMEDIATE_RANGE_EXCEEDED:"+j.event_id);
   if(qty<0n)issues.push("COST_BASIS_NEGATIVE_INTERMEDIATE_INVENTORY:"+j.event_id);
   if(basis<0n)issues.push("COST_BASIS_NEGATIVE_INTERMEDIATE_BASIS:"+j.event_id);
   if(qty===0n&&basis!==0n)issues.push("COST_BASIS_RESIDUAL_WITHOUT_INVENTORY:"+j.event_id);

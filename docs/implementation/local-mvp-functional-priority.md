@@ -23,3 +23,7 @@ Historical curve replay preserves recorded post-state and separately reports `re
 ## F04 — historical PumpSwap snapshot and receipt consistency
 
 The replay checks conflicting repeated vault-delta annotations in one recorded transaction and reports FAIL rather than silently applying the first. Missing delta fields remain UNKNOWN. Current-account reconciliation detects incompatible reported slots across the Pool and both vaults; a mixed-slot snapshot is not comparable and has no combined effective reserve output. Missing quote amount or virtual reserve does not become zero. Older snapshots lacking context slots retain legacy value-comparison status but expose `snapshot_slot_status=UNKNOWN`; PASS does not certify atomic observation. This is retrospective evidence validation only, not new quote or trading logic. Actual fee attribution and independently captured local snapshots remain open.
+
+## F05 — historical inventory and cost journal
+
+The existing historical cost audit now diagnoses duplicate source/journal event IDs, ambiguous ordering, invalid side, zero-quantity trade rows and intermediate integer range violations even when supplied endpoints agree. Existing conservation checks remain. Six additional regressions cover these cases; independently retained cost records and ordered external adjustments remain required for actual Localnet accounting acceptance.

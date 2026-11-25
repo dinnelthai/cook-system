@@ -33,3 +33,31 @@ test("reported ending balance must match ordered ledger",()=>{
  const i=input([buy("a","10","20")],undefined,{tokens:"10",costBasis:"21"});
  assert.ok(auditHistoricalCostBasis(i).issues.includes("COST_BASIS_REPLAY_ENDPOINT_MISMATCH"));
 });
+
+test("duplicate market event identities cannot silently select the last record",()=>{
+ const i=input([buy("a","10","20")],undefined,{tokens:"10",costBasis:"20"});
+ i.market.trades.push({...i.market.trades[0]});
+ assert.deepEqual(auditHistoricalCostBasis(i).issues,["COST_BASIS_MARKET_EVENT_ID_INVALID_OR_DUPLICATE"]);
+});
+test("duplicate journal entries cannot inflate a matching historical endpoint",()=>{
+ const i=input([buy("a","10","20")],undefined,{tokens:"20",costBasis:"40"});
+ i.inventory.ledger.position_journal.push({...i.inventory.ledger.position_journal[0]});
+ assert.deepEqual(auditHistoricalCostBasis(i).issues,["COST_BASIS_JOURNAL_EVENT_ID_INVALID_OR_DUPLICATE"]);
+});
+test("same trade sequence cannot be resolved by arbitrary input order",()=>{
+ const i=input([buy("a","10","20"),sell("b","10","20")]);i.market.trades[1].sequence=0;
+ assert.deepEqual(auditHistoricalCostBasis(i).issues,["COST_BASIS_AMBIGUOUS_TRADE_ORDER"]);
+});
+test("unknown journal side is not treated as a disposal",()=>{
+ const i=input([{...sell("a","1","1"),side:"OTHER"}],{tokens:"1",costBasis:"1"});
+ assert.deepEqual(auditHistoricalCostBasis(i).issues,["COST_BASIS_JOURNAL_SIDE_INVALID"]);
+});
+test("zero token quantity cannot add cost to a historical position",()=>{
+ const i=input([buy("a","0","20")],{tokens:"10",costBasis:"10"},{tokens:"10",costBasis:"30"});
+ assert.deepEqual(auditHistoricalCostBasis(i).issues,["COST_BASIS_ZERO_TRADE_QUANTITY:a"]);
+});
+test("intermediate quantity and cost must remain inside supported integer range",()=>{
+ const max=((1n<<128n)-1n).toString();
+ const i=input([buy("a","1","1"),sell("b","1","1")],{tokens:max,costBasis:max},{tokens:max,costBasis:max});
+ assert.ok(auditHistoricalCostBasis(i).issues.includes("COST_BASIS_INTERMEDIATE_RANGE_EXCEEDED:a"));
+});
