@@ -79,7 +79,7 @@ function renderGlobalContext(){
  const label=document.createElement("span");
  label.textContent=id?"读取当前项目身份…":"独立工作区 · 未选项目";
  host.append(label);
- const button=document.createElement("button");button.type="button";button.textContent="项目操作台";
+ const button=document.createElement("button");button.type="button";button.textContent="我的 Meme";
  button.onclick=()=>{importTicket++;page="terminal";render();};host.append(button);
  if(!id)return;
  getProjectDirectory().then(({projects})=>{
@@ -123,7 +123,7 @@ function compareBars(items,unit){
 function splitView(left,right){return '<div class="terminal-grid"><div>'+left+'</div><div>'+right+'</div></div>'}
 function screenHeading(title,sub){return '<div class="terminal-heading"><div><p class="eyebrow">COOK / OPERATIONS</p><h2>'+esc(title)+'</h2><span class="muted">'+esc(sub)+'</span></div><span class="source-chip">'+(page==="wallet"?"SOL":activeProjectId?"项目证据复核":report.source_mode==="SYNTHETIC"?"未载入项目记录":"独立历史记录")+'</span></div>'}
 let terminalTab="inventory",reviewPaused=false,metadata=null,reviewStage="REVIEW",reviewInput=data,candleInterval=60000;
-let operatorMode="OPERATOR",candleWindow=80;
+const operatorMode="OPERATOR";let candleWindow=80;
 function candleChart(result){
  if(result.status!=="CONSISTENT")return emptyState(result.status==="EMPTY"?"区间内无成交":"暂无可验证 K 线",result.reason??"无成交事件");
  const points=result.candles.slice(-candleWindow),vals=points.flatMap(c=>[Number(c.low_price),Number(c.high_price)]);
@@ -144,19 +144,19 @@ function candleChart(result){
 }
 
 const issuedMemeStages=new Set(["LAUNCHED","BONDING_CURVE_ACTIVE","GRADUATION_PENDING","PUMPSWAP_ACTIVE","EXIT_IN_PROGRESS","SETTLEMENT_PENDING","CLOSED","ARCHIVED"]);
-let memeFilter="",memeMode="operations";
+let memeFilter="",memeMode="operations",memeChartMinimized=false;
 function mountMemeDesk(){
  const rail=document.createElement("section");rail.className="meme-rail";rail.setAttribute("aria-label","我的 Meme 项目");
- rail.innerHTML='<div class="meme-rail-head"><strong>我的 MEME</strong><button type="button" id="meme-new" aria-label="新建项目">＋</button></div><label for="meme-search">搜索项目</label><input id="meme-search" type="search" placeholder="名称 / Symbol / Mint"><div id="meme-list">读取项目目录…</div><button type="button" id="meme-independent">独立历史复盘</button>';
+ rail.innerHTML='<div class="meme-rail-head"><strong>我的 Meme</strong><button type="button" id="meme-new" aria-label="新建项目">＋</button></div><label for="meme-search">搜索项目</label><input id="meme-search" type="search" placeholder="名称 / Symbol / Mint"><div id="meme-list">读取项目目录…</div><button type="button" id="meme-independent">独立历史复盘</button>';
  nav.prepend(rail);
  const go=(target,id=activeProjectId)=>{importTicket++;selectProjectContext(id);page=target;render();};
- rail.querySelector("#meme-new").onclick=()=>go("create",null);
- rail.querySelector("#meme-independent").onclick=()=>go("terminal",null);
+ rail.querySelector("#meme-new").onclick=()=>{memeMode="launch";go("terminal",null);};
+ rail.querySelector("#meme-independent").onclick=()=>{memeMode="operations";go("terminal",null);};
  rail.querySelector("#meme-search").value=memeFilter;
  const shell=document.createElement("div");shell.className="meme-desk";
  const center=document.createElement("div");center.className="meme-center";
  const side=document.createElement("aside");side.className="meme-control";side.setAttribute("aria-label","项目运营与发行准备");
- side.innerHTML='<div class="meme-mode" role="group" aria-label="工作模式"><button data-desk-mode="operations">运营</button><button data-desk-mode="launch">发行准备</button></div><div id="meme-live-summary" aria-label="项目核算与风险"></div><div id="meme-control-body"></div>';
+ side.innerHTML='<div class="meme-mode" role="group" aria-label="工作模式"><button data-desk-mode="operations">运营</button><button data-desk-mode="launch">发行准备</button></div><div id="meme-live-summary" aria-label="项目核算与风险"></div><div id="meme-control-body"></div><div id="meme-launch-host" hidden></div>';
  shell.append(center,side);
  const reportArea=main.querySelector("#terminal-report-area"),placeholder=main.querySelector("#terminal-scoped-placeholder");
  const wallet=document.createElement("section");wallet.className="pro-pane meme-wallet";wallet.innerHTML='<h3>项目钱包 / Wallets</h3>'+emptyState("未选择项目","从左侧选择 Meme 查看登记钱包。");
@@ -167,10 +167,21 @@ function mountMemeDesk(){
  reportArea.append(extra);
  placeholder.classList.add("meme-chart-empty");
  if(!activeProjectId&&!offlineReview){reportArea.hidden=true;reportArea.inert=true;reportArea.style.display="none";placeholder.hidden=false;placeholder.innerHTML='<h3>市场行情 / Market</h3>'+emptyState("未选择 Meme","选择左侧项目以查看对应的历史行情与资产。");}
- center.append(main.querySelector("#terminal-project-context"),main.querySelector("#terminal-context-notice"),placeholder,reportArea,wallet,main.querySelector("#terminal-business-review"),main.querySelector("#terminal-project-details"));
+ const chartToolbar=document.createElement("div");chartToolbar.className="meme-chart-toolbar";chartToolbar.innerHTML='<strong>Market / K 线</strong><button type="button" id="meme-chart-toggle"></button>';
+ const toggleChart=()=>{center.classList.toggle("meme-chart-minimized",memeChartMinimized);const b=chartToolbar.querySelector("button");b.textContent=memeChartMinimized?"展开 K 线":"收起 K 线";b.setAttribute("aria-expanded",String(!memeChartMinimized));};
+ chartToolbar.querySelector("button").onclick=()=>{memeChartMinimized=!memeChartMinimized;toggleChart();};toggleChart();
+ center.append(main.querySelector("#terminal-project-context"),chartToolbar,placeholder,reportArea,wallet,main.querySelector("#terminal-context-notice"),main.querySelector("#terminal-business-review"),main.querySelector("#terminal-project-details"));
  main.insertBefore(shell,main.querySelector("#launch-dialog"));
  let selected=null,projects=[],loaded=false,failed=false;
- const controls=side.querySelector("#meme-control-body"),summary=side.querySelector("#meme-live-summary"),list=rail.querySelector("#meme-list");
+ const controls=side.querySelector("#meme-control-body"),summary=side.querySelector("#meme-live-summary"),list=rail.querySelector("#meme-list"),launchHost=side.querySelector("#meme-launch-host");
+ let launchMounted=false,launchProjectId=activeProjectId;
+ function mountLaunch(){
+  if(launchMounted)return;launchMounted=true;
+  mountProjectSetup(launchHost,{initialProjectId:launchProjectId,initialMessage:projectMessage,
+   onActiveProjectId:id=>{launchProjectId=id;},
+   isActive:()=>page==="terminal"&&memeMode==="launch"&&launchHost.isConnected,
+   screenHeading,panel,note,table,esc,download,projectRegistry,record,errorKind});
+ }
  const reviewBox=document.createElement("details");reviewBox.className="meme-report-extra meme-business-extra";reviewBox.hidden=!activeProjectId;reviewBox.innerHTML="<summary>项目生命周期与详细复核</summary>";
  const business=main.querySelector("#terminal-business-review");business.before(reviewBox);reviewBox.append(business);
  function summaryState(message){summary.textContent=message;}
@@ -180,17 +191,18 @@ function mountMemeDesk(){
   const q=memeFilter.trim().toLowerCase(),match=p=>[p.profile?.name,p.profile?.symbol,p.token?.mint].some(v=>String(v??"").toLowerCase().includes(q));
   const issued=p=>issuedMemeStages.has(p.lifecycle?.stage)&&Boolean(p.token?.mint);
   const row=p=>'<button type="button" class="meme-project '+(p.project_id===activeProjectId?"selected":"")+'" data-meme-project="'+esc(p.project_id)+'"'+(p.project_id===activeProjectId?' aria-current="true"':'')+'><span class="meme-avatar" aria-hidden="true">'+esc((p.profile.symbol||"?").slice(0,2))+'</span><span class="meme-project-label"><strong>'+esc(p.profile.symbol)+'</strong><small>'+esc(p.profile.name)+'</small><small>'+esc(lifecycleLabel(p.lifecycle.stage))+'</small></span></button>';
-  const group=(title,rows)=>'<div class="meme-list-title">'+title+' <span>'+rows.length+'</span></div>'+(rows.filter(match).map(row).join("")||'<p class="muted meme-list-empty">'+(q?"无匹配项目":"暂无记录")+'</p>');
-  list.innerHTML=group("已发行 Meme",projects.filter(issued))+group("准备 / 待核验",projects.filter(p=>!issued(p)));
-  list.querySelectorAll("[data-meme-project]").forEach(b=>b.onclick=()=>{record("project.context.selected",{project_id:b.dataset.memeProject});go("terminal",b.dataset.memeProject);});
+  const ordered=[...projects.filter(issued),...projects.filter(p=>!issued(p))];
+  list.innerHTML=ordered.filter(match).map(row).join("")||'<p class="muted meme-list-empty">'+(q?"无匹配项目":"暂无 Meme 项目")+'</p>';
+  list.querySelectorAll("[data-meme-project]").forEach(b=>b.onclick=()=>{record("project.context.selected",{project_id:b.dataset.memeProject});memeMode="operations";go("terminal",b.dataset.memeProject);});
  }
  rail.querySelector("#meme-search").oninput=e=>{memeFilter=e.target.value;drawList();};
  function drawControls(){
   summary.hidden=memeMode!=="operations";
+  controls.hidden=memeMode!=="operations";launchHost.hidden=memeMode!=="launch";
   side.querySelectorAll("[data-desk-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.deskMode===memeMode)));
   const button=(action,label,disabled=false)=>'<button type="button" data-desk-action="'+action+'"'+(disabled?" disabled":"")+'>'+label+'</button>';
   const missing=!selected;
-  controls.innerHTML=memeMode==="launch"?'<section class="meme-control-section"><h3>发行准备</h3><p class="muted">创建项目资料、登记钱包与发行证据。当前没有链上发行执行权限。</p>'+button("new","＋ 新建 Meme 项目")+button("setup","编辑当前项目",missing)+'</section>':'<section class="meme-control-section"><h3>当前项目</h3><strong class="meme-current">'+esc(selected?selected.profile.symbol:"未选择")+'</strong><p class="muted">'+esc(selected?lifecycleLabel(selected.lifecycle.stage):"选择左侧 Meme")+'</p><div class="meme-kv"><span>Mint</span><strong>'+esc(selected?.token?.mint||"—")+'</strong><span>实时资产</span><strong>未接入</strong><span>执行状态</span><strong>已禁用</strong></div></section><section class="meme-control-section"><h3>资金与风控</h3>'+button("assets","资产与钱包",missing)+button("risk","项目风险复核",missing)+button("market","市场证据",missing)+button("orders","历史订单复核",missing)+button("review","财务与项目复盘",missing)+'</section><section class="meme-control-section"><h3>数据与记录</h3>'+button("sample","载入离线样本",Boolean(activeProjectId))+button("data","载入历史记录",Boolean(activeProjectId))+button("refresh","刷新项目目录")+'</section>';
+  controls.innerHTML=memeMode==="launch"?'<section class="meme-control-section"><h3>发行准备</h3><p class="muted">创建项目资料、登记钱包与发行证据。当前没有链上发行执行权限。</p>'+button("new","＋ 新建 Meme 项目")+button("setup","编辑当前项目",missing)+'</section>':'<section class="meme-control-section"><h3>当前项目</h3><strong class="meme-current">'+esc(selected?selected.profile.symbol:"未选择")+'</strong><p class="muted">'+esc(selected?lifecycleLabel(selected.lifecycle.stage):"选择左侧 Meme")+'</p><div class="meme-kv"><span>Mint</span><strong>'+esc(selected?.token?.mint||"—")+'</strong><span>实时资产</span><strong>未接入</strong><span>执行状态</span><strong>已禁用</strong></div></section><section class="meme-control-section"><h3>项目管理</h3>'+button("assets","资产与钱包",missing)+button("risk","项目风险复核",missing)+button("market","市场证据",missing)+button("orders","历史订单复核",missing)+button("review","财务与项目复盘",missing)+'</section><section class="meme-control-section"><h3>数据与记录</h3>'+button("sample","载入离线样本",Boolean(activeProjectId))+button("data","载入历史记录",Boolean(activeProjectId))+button("refresh","刷新项目目录")+'</section>';
   controls.querySelectorAll("[data-desk-action]").forEach(b=>b.onclick=()=>{
    const x=b.dataset.deskAction;
    if(x==="new")return go("create",null);
@@ -204,8 +216,12 @@ function mountMemeDesk(){
    if(target&&!target.hidden){main.querySelector("#terminal-project-details").open=true;target.scrollIntoView({block:"start"});}
   });
  }
- side.querySelectorAll("[data-desk-mode]").forEach(b=>b.onclick=()=>{memeMode=b.dataset.deskMode;drawControls();});
- drawControls();
+ side.querySelectorAll("[data-desk-mode]").forEach(b=>b.onclick=()=>{
+  const next=b.dataset.deskMode;if(next===memeMode)return;
+  if(next==="operations"){memeMode=next;go("terminal",launchProjectId);return;}
+  memeMode=next;drawControls();mountLaunch();
+ });
+ drawControls();if(memeMode==="launch")mountLaunch();
  return {update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();
   if(current)wallet.innerHTML='<div class="meme-rail-head"><h3>项目钱包 / Wallets</h3><button id="meme-wallet-assets" type="button">资产详情</button></div><p class="muted">登记钱包 · 非实时余额 · 归属未独立核验</p>'+table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(current));
   else wallet.innerHTML='<h3>项目钱包 / Wallets</h3>'+emptyState("未选择项目","选择左侧 Meme 查看登记钱包。");
@@ -254,7 +270,7 @@ function renderTerminal(){
  const navContent=seriesChart(snapshots.map(x=>({label:x.sequence,value:x.nav_base_units})),"NAV");
  const participantRows=[["买入地址",isSample?"—":report.market_history.buy_address_count??"—"],["卖出地址",isSample?"—":report.market_history.sell_address_count??"—"],["实际 SOL 储备",money(m.verified_real_reserve_base_units)],["历史回撤",isSample||a.max_observed_drawdown_bps==null?"—":Number(a.max_observed_drawdown_bps)/100+"%"]];
  const actionForm='<form id="terminal-meta"><div class="field-pair"><label>名称<input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"></label><label>Symbol<input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"></label></div><div class="row"><button type="submit" class="primary">保存项目资料</button><button type="button" disabled>提交发行</button></div><p class="muted">仅保存当前会话资料，不代表已发行，不调用发行接口。</p></form>';
- main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>项目操作台</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
+ main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>Market</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
  '<div id="terminal-project-context" class="pro-statebar">正在读取 Project 数据…</div>'+
  '<div id="terminal-context-notice" role="status"></div>'+ 
  '<section id="terminal-business-review" class="pro-pane" hidden></section>'+
@@ -285,7 +301,7 @@ function renderTerminal(){
    const selected=projects.find(x=>x.project_id===activeProjectId)||null;
     memeDesk.update(projects,selected);
    const options='<option value="">选择 Project</option>'+(!selected&&activeProjectId?'<option value="'+esc(activeProjectId)+'" selected>此前项目不可用，请重新选择</option>':"")+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
-   projectContext.innerHTML='<div class="row"><label>当前 Project <select id="terminal-project-select">'+options+'</select></label>'+
+   projectContext.innerHTML='<div class="row"><details class="meme-context-select"><summary>切换项目</summary><label>项目 <select id="terminal-project-select">'+options+'</select></label></details>'+
     (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(lifecycleLabel(selected.lifecycle.stage))+'</span><span>运行登记：'+esc(operationalLabel(selected.lifecycle.operational_status))+'</span><span>Mint：'+esc(selected.token.mint||"未登记")+'</span><span>市场：'+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' 已核验</span>':'<span>尚未选择项目</span>')+
     '<span>Execution: DISABLED</span></div><details><summary>项目组合登记复核</summary>'+table(["项目","阶段","配置状态","登记重叠"],directory.projects.map(x=>[x.project_id,x.stage,x.configuration_status,x.registration_overlap_count]))+table(["登记异常","项目"],directory.findings.map(x=>[x.code,x.project_ids.join(", ")]))+note("登记重叠不等于共同控制，组合资金与 NAV 未核验")+'</details>';
    const notice=main.querySelector("#terminal-context-notice");
@@ -524,7 +540,7 @@ function renderTerminal(){
  main.querySelector("#workflow-graduation").onclick=()=>{importTicket++;page="projects";record("page.open",{page});render();};
  main.querySelector("#workflow-save").onclick=()=>{try{if(activeProjectId||isSample||workspaceBusy)return;catalogueSelection=projectCatalogue.add(data).key;workflowMessage="报告已加入会话档案；请到项目档案保存数据库版本。";render()}catch(e){workflowMessage="档案添加失败："+errorKind(e);render()}};
  main.querySelector("#workflow-export").onclick=()=>{if(!isSample)download("historical-report-input.json",JSON.stringify(data,null,2))};
- main.querySelector("#open-launch").onclick=()=>{page="create";record("page.open",{page});render()};
+ main.querySelector("#open-launch").onclick=()=>{memeMode="launch";render()};
  main.querySelector("#open-data").onclick=()=>main.querySelector("#data-dialog").showModal();
  main.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>main.querySelector("#"+b.dataset.close).close());
  main.querySelectorAll("[data-candle-interval]").forEach(b=>b.onclick=()=>{candleInterval=Number(b.dataset.candleInterval);render()});
@@ -544,9 +560,7 @@ function render(){
  main.dataset.page=page;
  if(pageChanged)window.scrollTo({top:0,left:0,behavior:"instant"});
  main.dataset.viewMode=operatorMode;
- const mode=document.querySelector("#operator-view-mode");
- mode.value=operatorMode;
- mode.onchange=()=>{operatorMode=mode.value==="AUDIT"?"AUDIT":"OPERATOR";main.dataset.viewMode=operatorMode;main.querySelectorAll("details.audit-detail").forEach(d=>{d.open=operatorMode==="AUDIT";});};
+ // Detailed audit sections remain individually expandable.
  renderGlobalContext();
  document.querySelector(".tag").textContent=activeProjectId?"PROJECT REVIEW":offlineReview?"OFFLINE REVIEW":"LOCALNET";
  nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+((page===id||id==="market"&&["lab","create"].includes(page))?"active":"")+'"'+(page===id?' aria-current="page"':'')+'><span class="nav-num" aria-hidden="true">'+label.slice(0,2)+'</span><span>'+esc(label.slice(3))+'</span></button>').join("");

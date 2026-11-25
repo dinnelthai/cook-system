@@ -142,7 +142,42 @@ nav #meme-independent{border:1px solid var(--line);margin-top:7px;font-size:11px
 .meme-business-extra[hidden]{display:none}.meme-business-extra>.pro-pane{margin:8px 0 0;padding:8px}.meme-business-extra .operator-workspace{display:block}
 @media(max-width:980px){.meme-control{max-height:none;overflow:visible}#meme-live-summary .meme-control-section{grid-template-columns:1fr}}
 
+
+/* Smithii-inspired Meme desk. Existing project and evidence APIs remain authoritative. */
+body:has(main[data-page=terminal]){--bg:#0b1113;--surface:#101719;--surface2:#0d1518;--line:#293c40;--cyan:#67b6b9}
+body:has(main[data-page=terminal]) header{height:48px;background:#0d1518}
+body:has(main[data-page=terminal]) #global-project-context{display:none}
+body:has(main[data-page=terminal]) nav{top:48px;height:calc(100vh - 48px)}
+main[data-page=terminal]>.pro-top{display:none}
+nav:has(.meme-rail){padding:12px 9px}
+nav .meme-rail-head strong{font-size:15px;letter-spacing:0}
+.meme-project-label{flex:1}
+.meme-rail #meme-list{max-height:55vh}
+nav button.meme-project{min-height:49px;border-bottom:1px solid var(--line);border-radius:4px}
+nav:has(.meme-rail)>button[data-page=terminal],nav:has(.meme-rail)>button[data-page=create]{display:none}
+.meme-desk{grid-template-columns:minmax(0,1fr) minmax(280px,360px)}
+.meme-chart-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0}
+.meme-chart-toolbar strong{font-size:14px}
+.meme-chart-minimized .pro-chart,.meme-chart-minimized .meme-chart-empty{display:none!important}
+.meme-context-select{flex:0 0 auto;margin:0!important}.meme-context-select summary{cursor:pointer;font-size:11px}
+.meme-control{top:58px;max-height:calc(100vh - 70px);padding:9px}
+.meme-mode{position:sticky;top:0;z-index:2}
+.meme-control [hidden]{display:none!important}
+#meme-launch-host{min-width:0}
+#meme-launch-host .setup-workspace,#meme-launch-host .setup-evidence-grid,#meme-launch-host .grid{grid-template-columns:minmax(0,1fr)}
+#meme-launch-host .setup-primary,#meme-launch-host .setup-secondary{gap:8px}
+#meme-launch-host .panel{padding:9px;margin-bottom:8px}
+#meme-launch-host .panel h3{margin-bottom:8px}
+#meme-launch-host .notice{font-size:11px;margin-bottom:8px}
+#meme-launch-host h2{font-size:17px}
+#meme-launch-host .form-section-title{margin:9px 0 6px}
+#meme-launch-host label{margin:5px 0 4px}
+#meme-launch-host input,#meme-launch-host select,#meme-launch-host textarea{padding:6px;font-size:12px}
+#meme-launch-host .setup-evidence{margin-top:8px}
+@media(max-width:1200px){.meme-desk{grid-template-columns:minmax(0,1fr) minmax(250px,300px)}}
+@media(max-width:980px){.meme-desk{grid-template-columns:1fr}.meme-control{max-height:none;overflow:visible}.meme-mode{position:static}}
+@media(max-width:700px){body:has(main[data-page=terminal]) nav{height:auto;max-height:44vh}.meme-rail #meme-list{max-height:22vh}body:has(main[data-page=terminal]) header{height:auto}}
 </style></head>
-<body><a class="skip-link" href="#main">跳转到主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div class="header-meta"><div id="global-project-context" role="status"></div><label class="view-mode-label">视图 <select id="operator-view-mode" aria-label="工作区展示模式"><option value="OPERATOR">操作员</option><option value="AUDIT">工程审计</option></select></label><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
+<body><a class="skip-link" href="#main">跳转到主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="页面导航" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
 <script type="module" src="/web/app.mjs"></script></body></html>
