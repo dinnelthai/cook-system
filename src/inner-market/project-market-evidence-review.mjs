@@ -27,6 +27,21 @@ export function reviewProjectMarketEvidence(projectInput,input){
    if(!bound.length)unknown.push("REGISTERED_MARKET_IDENTITY_UNAVAILABLE");
   }else unknown.push("CURVE_ACCOUNT_IDENTITY_UNAVAILABLE");
  }
+ // Coverage statistics are descriptive, not a participant attribution model.
+ const trades=input.market.trades;
+ const complete=trades.filter(t=>t.status==="FINALIZED"&&t.reconciliation==="PASS");
+ const attributed=complete.filter(t=>typeof t.actorAddress==="string"&&t.actorAddress.trim()===t.actorAddress&&t.actorAddress.length>0);
+ const participantCoverage={record_count:trades.length,reconciled_record_count:complete.length,declared_address_record_count:attributed.length,
+  missing_address_record_count:complete.length-attributed.length,
+  status:complete.length!==trades.length?"REVIEW_REQUIRED":attributed.length!==complete.length?"PARTIAL":"DECLARED_COMPLETE",
+  independent_participant_count:null,ownership_attestation:"UNKNOWN"};
+ if(participantCoverage.status==="REVIEW_REQUIRED")issues.push("UNRECONCILED_TRADE_RECORDS");
+ if(participantCoverage.status==="PARTIAL")unknown.push("TRADE_ADDRESS_LABEL_COVERAGE_INCOMPLETE");
+ const reserveKeys=["real_quote_reserves_base_units","virtual_quote_reserves_base_units","real_token_reserves_base_units","virtual_token_reserves_base_units"];
+ const missingFields=reserveKeys.filter(k=>m.snapshot[k]===null||m.snapshot[k]===undefined);
+ const reserveEvidence={status:m.snapshot.status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":missingFields.length?"PARTIAL":"DECLARED_FIELDS_PRESENT",
+  missing_fields:missingFields,declared_lifecycle:m.snapshot.lifecycle,independent_reserve_attestation:"UNKNOWN",current_executable_depth:null};
+ if(missingFields.length)unknown.push("HISTORICAL_RESERVE_FIELDS_UNAVAILABLE");
  const intervals=[60000,300000,900000,3600000].map(interval_ms=>{
   const r=buildTerminalCandles(input,interval_ms);
   return {interval_ms,status:r.status,reason:r.reason,candle_count:r.status==="CONSISTENT"||r.status==="EMPTY"?r.candles.length:null};
@@ -37,6 +52,7 @@ export function reviewProjectMarketEvidence(projectInput,input){
   status:issues.length?"REVIEW_REQUIRED":"PARTIAL",declared_history_complete:m.declared_history_complete,
   trade_evidence_status:trade?.status??"UNKNOWN",candle_evidence_status:state.candles.status,
   candle_intervals:intervals,market_snapshot_status:m.snapshot.status,
+  participant_coverage:participantCoverage,reserve_evidence:reserveEvidence,
   observed_trade_record_count:input.market.trades.length,issues:[...new Set(issues)],unknown:[...new Set(unknown)],
   source_attestation:"UNKNOWN",live_market_assessed:false,execution_enabled:false,settlement_allowed:false};
 }

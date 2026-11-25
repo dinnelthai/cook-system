@@ -236,6 +236,11 @@ test("market evidence review preserves missing candles as unknown and flags inco
  const v=reviewProjectMarketEvidence(p,i);
  assert.equal(v.status,"PARTIAL");assert.equal(v.candle_evidence_status,"UNAVAILABLE");
  assert.ok(v.candle_intervals.every(x=>x.candle_count===null));assert.equal(v.execution_enabled,false);
+ assert.equal(v.participant_coverage.status,"PARTIAL");
+ assert.equal(v.participant_coverage.missing_address_record_count,2);
+ assert.equal(v.participant_coverage.independent_participant_count,null);
+ assert.equal(v.reserve_evidence.status,"DECLARED_FIELDS_PRESENT");
+ assert.equal(v.reserve_evidence.current_executable_depth,null);
  i.market.historyComplete=false;assert.equal(reviewProjectMarketEvidence(p,i).status,"REVIEW_REQUIRED");
  assert.throws(()=>reviewProjectMarketEvidence({...p,project_id:"other"},i),/PROJECT_MARKET_REPORT_SCOPE_MISMATCH/);
 });

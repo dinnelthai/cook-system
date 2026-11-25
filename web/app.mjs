@@ -189,6 +189,8 @@ function renderTerminal(){
         mt.textContent=v.status+" · 已归档 · 来源未独立认证";
         mr.innerHTML=table(["指标","证据状态"],[["历史覆盖",String(v.declared_history_complete)],["成交证据",v.trade_evidence_status],["K线证据",v.candle_evidence_status],["市场快照",v.market_snapshot_status],["记录数",v.observed_trade_record_count]])+
         table(["周期（分钟）","状态","K线数量"],v.candle_intervals.map(x=>[x.interval_ms/60000,x.status,x.candle_count??"—"]))+
+        table(["参与记录证据","数量 / 状态"],[["已对账记录",v.participant_coverage?.reconciled_record_count??"—"],["有地址标签记录",v.participant_coverage?.declared_address_record_count??"—"],["缺失地址标签记录",v.participant_coverage?.missing_address_record_count??"—"],["标签覆盖",v.participant_coverage?.status??"UNKNOWN"],["独立参与者数量","未知"]])+
+        table(["储备证据","状态"],[["历史字段",v.reserve_evidence?.status??"UNKNOWN"],["缺失字段",(v.reserve_evidence?.missing_fields??[]).join("、")||"—"],["独立储备认证","未知"],["当前可用深度","未知"]])+
         table(["待复核 / 未知"],[...v.issues,...v.unknown].map(x=>[x]));
        }catch(e){if(marketCurrent())mt.textContent=errorKind(e);}
        finally{if(marketCurrent()){ms.disabled=false;mb.disabled=!ms.value;}}

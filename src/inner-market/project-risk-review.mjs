@@ -34,6 +34,14 @@ export function describeProjectRiskReview(projectInput,archives=[],orders=[]){
   if(v.budget_review?.status==="RECORDED_INTERVAL_INFLOW_EXCEEDS_CONFIGURED_BUDGET")add("BUDGET","RECORDED_INFLOW_ABOVE_CURRENT_BUDGET","WARNING",a.archive_id);
   for(const code of v.unknown??[])add("TREASURY",code,"UNKNOWN",a.archive_id);
  }
+ const marketReviews=scoped.filter(a=>a.kind==="MARKET_EVIDENCE_REVIEW");
+ if(!marketReviews.length)add("MARKET","MARKET_EVIDENCE_REVIEW_MISSING","UNKNOWN");
+ for(const a of marketReviews){
+  const v=a.payload;
+  if(v.status==="REVIEW_REQUIRED")add("MARKET","MARKET_EVIDENCE_CONFLICT","CRITICAL",a.archive_id);
+  for(const code of v.issues??[])add("MARKET",code,"CRITICAL",a.archive_id);
+  for(const code of v.unknown??[])add("MARKET",code,"UNKNOWN",a.archive_id);
+ }
  const allOrders=orders.filter(o=>o.project_id===p.project_id);
  for(const o of allOrders){
   if(!current(p,o)){add("ORDER","STALE_ORDER_REVISION","WARNING",o.order_id);continue;}
@@ -56,6 +64,6 @@ export function describeProjectRiskReview(projectInput,archives=[],orders=[]){
  for(const row of rows)counts[row.severity.toLowerCase()]++;
  return {schema_version:"cook-project-risk-review.1",project_id:p.project_id,project_revision:p.revision,
   status:counts.critical?"REVIEW_REQUIRED":counts.warning?"WARNING":"EVIDENCE_INCOMPLETE",counts,findings:rows,
-  coverage:{current_archive_count:scoped.length,stale_archive_count:stale.length,order_count:allOrders.length,treasury_review_count:treasury.length},
+  coverage:{current_archive_count:scoped.length,stale_archive_count:stale.length,order_count:allOrders.length,treasury_review_count:treasury.length,market_evidence_review_count:marketReviews.length},
   source_attestation:"UNKNOWN",live_risk_assessed:false,settlement_allowed:false,execution_enabled:false,lifecycle_mutated:false};
 }

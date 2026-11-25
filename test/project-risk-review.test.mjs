@@ -21,3 +21,15 @@ test("order receipt review cannot hide contradiction or reuse a mismatched order
  a.payload.order_head_hash="head";a.payload.rpc_observation.status="REVIEW_REQUIRED";
  assert.equal(describeProjectRiskReview(p,[a],[o]).status,"REVIEW_REQUIRED");
 });
+
+test("market evidence contradictions propagate to unified risk without trusting stale archives",()=>{
+ const a={...archive("REVIEW_REQUIRED"),kind:"MARKET_EVIDENCE_REVIEW",payload:{...archive("REVIEW_REQUIRED").payload,issues:["CANDLE_EVENT_CONTRADICTION"],unknown:["TRADE_ADDRESS_LABEL_COVERAGE_INCOMPLETE"]}};
+ const r=describeProjectRiskReview(p,[a]);
+ assert.equal(r.status,"REVIEW_REQUIRED");
+ assert.equal(r.coverage.market_evidence_review_count,1);
+ assert.ok(r.findings.some(f=>f.code==="CANDLE_EVENT_CONTRADICTION"&&f.severity==="CRITICAL"&&f.references.includes(a.archive_id)));
+ assert.ok(r.findings.some(f=>f.code==="TRADE_ADDRESS_LABEL_COVERAGE_INCOMPLETE"&&f.severity==="UNKNOWN"));
+ const stale=describeProjectRiskReview(p,[{...a,project_revision:0,stale:true}]);
+ assert.equal(stale.coverage.market_evidence_review_count,0);
+ assert.ok(!stale.findings.some(f=>f.code==="CANDLE_EVENT_CONTRADICTION"));
+});
