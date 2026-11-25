@@ -18,16 +18,14 @@ export function mountProjectAssets(host,{projectId,isActive,esc,table,note,openT
    const v=await getProjectBusinessReview(projectId,project.revision);
    if(!valid())return;
    const model=projectOverviewModel(v);
-   host.innerHTML=title+'<p>'+esc(project.profile.name+" / "+project.profile.symbol+" · v"+project.revision)+'</p>'+
+   host.innerHTML='<div class="review-section-head"><div>'+title+'<p class="muted">'+esc(project.profile.name+" / "+project.profile.symbol+" · v"+project.revision)+'</p></div><div class="row">'+back+'<button id="asset-refresh">刷新项目</button></div></div>'+
     note("仅展示当前 Project 已关联的历史区间；未独立认证。实时资产、可用资金、当前 NAV 和 LP 归属未知。禁止跨区间汇总。")+
-    '<div class="row">'+back+'<button id="asset-refresh">刷新项目</button></div>'+
-    '<h4>已登记钱包</h4>'+table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(project))+
-    '<h4>历史资产区间</h4><label>选择历史区间<select id="asset-interval"><option value="">请选择（不会自动选取）</option>'+model.intervals.map(i=>'<option value="'+esc(i.id)+'">'+esc(i.label)+'</option>').join("")+'</select></label>'+
-    '<div id="asset-interval-body" role="status">'+note("尚未选择区间，金额不显示。")+'</div>';
+    '<div class="secondary-workspace"><section class="workspace-content"><h4>历史资产区间</h4><label>选择历史区间<select id="asset-interval"><option value="">请选择（不会自动选取）</option>'+model.intervals.map(i=>'<option value="'+esc(i.id)+'">'+esc(i.label)+'</option>').join("")+'</select></label>'+
+    '<div id="asset-interval-body" class="workspace-empty" role="status">'+note("尚未选择区间，金额不显示。")+'</div></section><aside class="workspace-side"><h4>已登记钱包</h4><p class="muted">仅登记用途及额度；不代表实际余额或归属。</p>'+(project.wallet_groups.length?table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(project)):'<p class="workspace-empty">尚无登记钱包。</p>')+'</aside></div>';
    bindBack();host.querySelector("#asset-refresh").onclick=load;
    const select=host.querySelector("#asset-interval"),body=host.querySelector("#asset-interval-body");
    select.disabled=!v.runtime_context_id||!model.intervals.length;
-   if(select.disabled)body.textContent="暂无可选的历史区间。";
+   if(select.disabled)body.textContent="暂无可选历史区间；请先关联历史报告。";
    let intervalTicket=0;
    select.onchange=async()=>{
     const seq=++intervalTicket,archiveId=select.value;

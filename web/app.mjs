@@ -480,15 +480,17 @@ function render(){
  const catalogue=projectCatalogue.list(),projects=listHistoricalProjects(projectCatalogue);
  main.innerHTML=screenHeading("项目档案","项目实体 · 独立历史区间 · 工作区文件")+
  note("档案仅供历史审阅，不改变操作台、默认 Token 或钱包。最多 8 份；可显式保存至已启用的本地数据库，或导出工作区文件；未保存的修改在刷新后丢失。仅导入脱敏报告，不包含凭据或私钥。")+
- panel("项目工作区",table(["项目","Token","网络","身份","区间数","待复核"],projects.map(p=>[p.project_id,p.token_mint,p.network,p.identity_status,p.record_count,p.review_required_count]))+'<button id="workspace-export">保存工作区 JSON</button> <label for="workspace-import">合并工作区 JSON</label><input id="workspace-import" type="file" accept=".json"><p class="muted">只保存原始输入；恢复时重新审计。冲突则整批不变。</p>')+
- panel("本地数据库版本",note(workspaceMessage)+table(["当前已知版本","状态"],[[workspaceRevision??"未知",workspaceBusy?"请求中":"显式保存"]])+ '<button id="workspace-db-load">读取数据库工作区</button> <button id="workspace-db-save">保存当前工作区到数据库</button> <button id="workspace-db-versions">查看版本记录</button>'+table(["版本","字节","摘要"],workspaceVersions.map(v=>[v.revision,v.bytes,v.digest])))+
- panel("已保存项目复盘",'<div id="saved-project-review"></div>')+
- panel("毕业与 PumpSwap 历史审阅",'<div id="graduation-review"></div>')+
- panel("项目全生命周期复盘",'<div id="project-lifecycle-review"></div>')+
- panel("独立报告缓冲区（非当前 Project）",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status]])+'<button id="catalogue-add">将当前报告加入档案</button>')+
+ '<div class="archive-workspace"><div class="archive-primary">'+panel("项目工作区",table(["项目","Token","网络","身份","区间数","待复核"],projects.map(p=>[p.project_id,p.token_mint,p.network,p.identity_status,p.record_count,p.review_required_count]))+'<button id="workspace-export">保存工作区 JSON</button> <label for="workspace-import">合并工作区 JSON</label><input id="workspace-import" type="file" accept=".json"><p class="muted">只保存原始输入；恢复时重新审计。冲突则整批不变。</p>')+
  panel("历史档案",'<label for="catalogue-file">导入历史报告输入 JSON</label><input id="catalogue-file" type="file" accept=".json"><p id="catalogue-message" role="status"></p>'+
  table(["项目","Token","来源","起始","结束","审计"],catalogue.map(r=>[r.projectId,r.tokenMint,r.source_mode,r.openingCutoff,r.closingCutoff,r.audit_status]))+
- '<label for="catalogue-select">选择独立审阅记录</label><select id="catalogue-select"><option value="">请选择</option>'+catalogue.map((r,i)=>'<option value="'+i+'"'+(r.key===catalogueSelection?' selected':'')+'>'+esc(r.projectId+" · "+r.source_mode+" · "+r.openingCutoff+" → "+r.closingCutoff)+'</option>').join("")+'</select> <button id="catalogue-open" disabled>在操作台审阅</button> <button id="catalogue-export" disabled>导出原始记录</button> <button id="catalogue-remove" disabled>移出会话档案</button><div id="catalogue-detail"></div>');
+ '<label for="catalogue-select">选择独立审阅记录</label><select id="catalogue-select"><option value="">请选择</option>'+catalogue.map((r,i)=>'<option value="'+i+'"'+(r.key===catalogueSelection?' selected':'')+'>'+esc(r.projectId+" · "+r.source_mode+" · "+r.openingCutoff+" → "+r.closingCutoff)+'</option>').join("")+'</select> <button id="catalogue-open" disabled>在操作台审阅</button> <button id="catalogue-export" disabled>导出原始记录</button> <button id="catalogue-remove" disabled>移出会话档案</button><div id="catalogue-detail"></div>')+
+ '</div><aside class="archive-secondary">'+
+panel("本地数据库版本",note(workspaceMessage)+table(["当前已知版本","状态"],[[workspaceRevision??"未知",workspaceBusy?"请求中":"显式保存"]])+ '<button id="workspace-db-load">读取数据库工作区</button> <button id="workspace-db-save">保存当前工作区到数据库</button> <button id="workspace-db-versions">查看版本记录</button>'+table(["版本","字节","摘要"],workspaceVersions.map(v=>[v.revision,v.bytes,v.digest])))+
+panel("独立报告缓冲区（非当前 Project）",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status]])+'<button id="catalogue-add">将当前报告加入档案</button>')+
+ '</aside></div><details class="panel archive-evidence"><summary>高级历史证据复核</summary>'+
+panel("已保存项目复盘",'<div id="saved-project-review"></div>')+
+panel("毕业与 PumpSwap 历史审阅",'<div id="graduation-review"></div>')+
+panel("项目全生命周期复盘",'<div id="project-lifecycle-review"></div>')+'</details>';
  const msg=main.querySelector("#catalogue-message"),detail=main.querySelector("#catalogue-detail"),select=main.querySelector("#catalogue-select"),exportButton=main.querySelector("#catalogue-export"),removeButton=main.querySelector("#catalogue-remove");
  mountSavedProjectReview(main.querySelector("#saved-project-review"),{query:queryHistoricalWorkspace,revision:workspaceRevision});
  mountGraduationReview(main.querySelector("#graduation-review"),{download,initial:graduationReview,onReview:value=>{graduationReview=value;}});

@@ -91,3 +91,11 @@ test("operator workspace groups historical assets separately from evidence and t
  assert.match(app,/class="operator-workspace"/);assert.match(app,/class="operator-treasury"/);assert.match(app,/class="operator-sidebar"/);assert.match(app,/class="operator-risk-counts"/);
  assert.match(app,/projectIntervalMetrics\(row\)/);
 });
+
+test("secondary views preserve their task entry points in structured workspaces",async()=>{
+ const setup=await readFile(new URL("../web/project-setup-view.mjs",import.meta.url),"utf8");
+ assert.match(setup,/setup-workspace/);assert.match(setup,/project-draft-form/);assert.match(setup,/project-budget-form/);assert.match(setup,/issuance-evidence-form/);
+ const assets=await readFile(new URL("../web/project-assets-view.mjs",import.meta.url),"utf8");assert.match(assets,/secondary-workspace/);
+ const review=await readFile(new URL("../web/project-review-dashboard.mjs",import.meta.url),"utf8");assert.match(review,/review-kpis/);assert.match(review,/review-risk-summary/);
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");assert.match(app,/archive-workspace/);assert.match(app,/archive-evidence/);
+});

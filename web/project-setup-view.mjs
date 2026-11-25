@@ -93,37 +93,42 @@ export function mountProjectSetup(container, {
       x.token.issuance_status, x.token.verification_evidence_ref || "待链上核验"
     ]);
 
-    container.innerHTML = screenHeading("Project Setup / 项目准备", "项目主记录 · Localnet 身份 · 生命周期证据") +
-      note("Project 数据现已保存到本机 SQLite，不再写入浏览器 localStorage。此页面只管理项目配置和证据，不会创建 Token、签名或提交交易。执行权限固定关闭。") +
+    container.innerHTML = screenHeading("项目准备", "项目配置 · 风险声明 · 历史证据登记") +
+      note("本机项目台账 · 配置和证据登记 · 项目交易执行禁用。") +
       (recoveryId||recoveryError?panel("保存请求恢复",'<p id="project-recovery-status" role="status" class="muted">'+esc(recoveryError||"存在未确认的项目创建请求。仅查询已保存结果，不自动重发。")+'</p><button id="project-recovery-check"'+(recoveryError?" disabled":"")+'>查询此前保存结果</button>'):"")+
       (missingSelection?note("此前选择的项目不在当前数据库中。请选择已存在项目，或主动点击新建项目以退出此前上下文。"):"")+
-      panel("项目配置", '<form id="project-draft-form"><div class="grid">' +
+      '<div class="setup-workspace"><div class="setup-primary">'+
+      panel("项目配置", '<form id="project-draft-form"><h4 class="form-section-title">基本信息与供应量</h4><div class="grid form-section">' +
         '<div><label>项目名称</label><input name="name" required maxlength="32" value="' + esc(current?.profile.name ?? "") + '" placeholder="Project name"' + lock + '></div>' +
         '<div><label>Token Symbol</label><input name="symbol" required maxlength="10" pattern="[A-Za-z0-9]{1,10}" value="' + esc(current?.profile.symbol ?? "") + '" placeholder="TOKEN"' + lock + '></div>' +
         '<div><label>总供应量（Token）</label><input name="supply" inputmode="decimal" maxlength="30" value="' + esc(currentSupply) + '"' + lock + '></div>' +
         '<div><label>Decimals</label><input name="decimals" type="number" min="0" max="9" step="1" value="' + esc(current ? current.token.decimals??"" : 6) + '"' + lock + '></div>' +
+        '</div><h4 class="form-section-title">网络与登记钱包</h4><div class="grid form-section">'+
         '<div><label>报价资产</label><input value="SOL" disabled><input type="hidden" name="quote_asset" value="SOL"></div>' +
         '<div><label>网络</label><input value="Localnet（本地验证）" disabled><input type="hidden" name="network" value="localnet"></div>' +
         '<div><label>本地 Genesis Hash</label><input value="' + esc(current?.network.genesis_hash ?? config?.network?.genesis_hash ?? "未配置") + '" disabled></div>' +
         '<div><label>项目主钱包 / Dev Wallet</label><select name="creator_wallet" id="project-wallet"' + lock + '><option value="">读取受管钱包中…</option></select></div>' +
+        '</div><details class="profile-optional"><summary>公开资料与项目描述（选填）</summary><div class="grid form-section">'+
         '<div><label>Website</label><input name="website" type="url" value="' + esc(current?.profile.website ?? "") + '" placeholder="https://"' + lock + '></div>' +
         '<div><label>Telegram</label><input name="telegram" type="url" value="' + esc(current?.profile.telegram ?? "") + '" placeholder="https://"' + lock + '></div>' +
         '<div><label>Twitter / X</label><input name="twitter" type="url" value="' + esc(current?.profile.twitter ?? "") + '" placeholder="https://"' + lock + '></div>' +
         '<div style="grid-column:1/-1"><label>项目描述</label><textarea name="description" maxlength="1000"' + lock + '>' + esc(current?.profile.description ?? "") + '</textarea></div>' +
-        '</div><p class="muted">供应量按 Token 单位精确转换为 base units；供应量和 decimals 均为空时表示未配置，不进行取整。Dev Wallet 只保存公钥地址，不保存私钥。</p>' +
+        '</div></details><p class="muted">供应量按 Token 单位精确转换为 base units；供应量和 decimals 均为空时表示未配置，不进行取整。Dev Wallet 只保存公钥地址，不保存私钥。</p>' +
         '<div class="row"><button type="submit" class="primary"' + (editable ? "" : " disabled") + '>保存项目配置</button><button type="button" id="project-new">新建项目</button></div></form>' +
         '<p id="project-wallet-status" class="muted" role="status">钱包列表尚未读取</p><p id="project-status" role="status" class="muted">' + esc(message) + '</p>') +
-      panel("项目列表与状态", table(["项目", "Symbol", "供应量", "Dev Wallet", "生命周期 / 运行状态", "发行核验"], projectRows) +
+      '</div><aside class="setup-secondary">'+
+      panel("项目选择与状态", '<div class="setup-summary">'+esc(current?current.profile.name+" · "+current.profile.symbol+" · v"+current.revision:"未选择项目")+'</div>'+note(current?lifecycleLabel(current.lifecycle.stage)+" · "+operationalLabel(current.lifecycle.operational_status):"请选择已有项目或新建草稿。") +
         '<div class="row"><select id="project-open-select"><option value="">选择项目</option>' + options + '</select>' +
         '<button id="project-open" ' + (projects.length ? "" : "disabled") + '>打开项目</button>' +
         '<button id="project-export">导出服务器项目台账</button>' +
         '<button id="project-legacy-export" ' + (legacyCount ? "" : "disabled") + '>导出旧版浏览器台账 (' + legacyCount + ')</button></div>' +
         '<div class="row"><button id="project-mark-ready" ' + (readyAllowed ? "" : "disabled") + '>配置完成 → READY</button>' +
-        '<button id="project-launch-submitted" ' + (launchSubmitAllowed ? "" : "disabled") + '>登记为已提交发行</button></div>') +
+        '<button id="project-launch-submitted" ' + (launchSubmitAllowed ? "" : "disabled") + '>登记为已提交发行</button></div><details><summary>完整项目列表（'+projects.length+'）</summary>'+table(["项目", "Symbol", "供应量", "Dev Wallet", "生命周期 / 运行状态", "发行核验"], projectRows)+'</details>') +
       (current?panel("项目预算与风险声明",note("仅保存风险上限配置，不代表可用资金、交易许可或已通过风控。空白为未配置，0 为明确零额度。修改会产生项目新版本。")+
         '<form id="project-budget-form"><div class="grid">'+limitFields.map(([k,label])=>'<label>'+esc(label)+'<input name="'+k+'" inputmode="decimal" maxlength="30" value="'+esc(budgetInputValue(current.limits[k]))+'"></label>').join("")+
         '<label>最大回撤上限（bps，100 bps = 1%）<input name="max_drawdown_bps" inputmode="numeric" maxlength="5" value="'+esc(current.limits.max_drawdown_bps??"")+'"></label></div><button type="submit">保存风险上限声明</button><p id="project-budget-status" role="status"></p></form>')+
         panel("项目登记钱包",table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(current))+note("仅为项目登记，不等于链上余额、资产归属或资金占用。")):"")+
+      '</aside></div><details class="panel setup-evidence"><summary>发行、市场与报告证据登记</summary><div class="setup-evidence-grid">'+
       panel("发行证据登记", '<form id="issuance-evidence-form"><label>所属项目</label><select name="project_id" required><option value="">选择项目</option>' + issuanceOptions + '</select>' +
         '<label>Token Mint 地址</label><input name="mint" required maxlength="44" placeholder="已发行 Token 的 Mint 地址">' +
         '<label>交易签名</label><input name="signature" required minlength="64" maxlength="88" placeholder="链上交易 Signature">' +
@@ -133,7 +138,7 @@ export function mountProjectSetup(container, {
         '<div class="row"><button id="project-inspect-evidence"' + (current?.token.mint ? "" : " disabled") + '>只读核验当前项目发行证据</button></div><p id="project-evidence-result" role="status" class="muted">观察结果不自动推进生命周期。</p><div id="project-evidence-archive"></div>')+
       panel("市场账户身份观察",table(["Market ID","Venue","账户","登记状态"],(current?.markets??[]).map(m=>[m.market_id,m.venue,m.market_account,m.verification_status]))+
         '<select id="project-market-select">'+(current?.markets??[]).map(m=>'<option value="'+esc(m.market_id)+'">'+esc(m.market_id+" · "+m.venue)+'</option>').join("")+'</select><button id="project-market-inspect"'+(current?.markets?.length?"":" disabled")+'>只读核验并归档</button><p id="project-market-result" role="status" class="muted">仅检查已登记市场账户身份，不认证来源。</p>')+
-      panel("已保存历史报告关联",'<button id="project-report-candidates"'+(current?"":" disabled")+'>读取当前工作区匹配报告</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>关联所选报告</button><p id="project-report-result" role="status" class="muted">仅关联声明身份一致的已保存报告。</p>');
+      panel("已保存历史报告关联",'<button id="project-report-candidates"'+(current?"":" disabled")+'>读取当前工作区匹配报告</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>关联所选报告</button><p id="project-report-result" role="status" class="muted">仅关联声明身份一致的已保存报告。</p>')+'</div></details>';
     const recoveryButton=container.querySelector("#project-recovery-check");
     if(recoveryButton)recoveryButton.onclick=async()=>{
       if(!recoveryId||recoveryError)return;
