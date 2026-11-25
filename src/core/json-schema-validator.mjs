@@ -1,7 +1,7 @@
 import {readFile,readdir} from "node:fs/promises";
 import {join,basename} from "node:path";
 const META=new Set(["$schema","$id","title","description","default","examples","deprecated","readOnly","writeOnly"]);
-const SUPPORTED=new Set(["$ref","type","const","enum","required","properties","additionalProperties","items","pattern","minLength","minimum","maximum","allOf","if","then"]);
+const SUPPORTED=new Set(["$ref","type","const","enum","required","properties","additionalProperties","items","pattern","minLength","maxLength","minimum","maximum","allOf","if","then"]);
 const stable=value=>value===null||typeof value!=="object"?JSON.stringify(value):Array.isArray(value)?"["+value.map(stable).join(",")+"]":"{"+Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+stable(value[k])).join(",")+"}";
 const typeMatches=(value,type)=>(Array.isArray(type)?type:[type]).some(t=>t==="null"?value===null:t==="array"?Array.isArray(value):t==="object"?value!==null&&typeof value==="object"&&!Array.isArray(value):t==="integer"?typeof value==="number"&&Number.isInteger(value):t==="number"?typeof value==="number"&&Number.isFinite(value):t==="string"?typeof value==="string":t==="boolean"?typeof value==="boolean":false);
 export async function loadSchemaRegistry(directory){
@@ -38,6 +38,7 @@ export function inspectSchemaContract(schema,registry){
   if(Object.hasOwn(s,"enum")&&(!Array.isArray(s.enum)||!s.enum.length))add(path,"INVALID_SCHEMA_ENUM","nonempty enum required");
   if(Object.hasOwn(s,"required")&&(!Array.isArray(s.required)||s.required.some(k=>typeof k!=="string")||new Set(s.required).size!==s.required.length))add(path,"INVALID_SCHEMA_REQUIRED","unique strings required");
   if(Object.hasOwn(s,"minLength")&&(!Number.isSafeInteger(s.minLength)||s.minLength<0))add(path,"INVALID_SCHEMA_MIN_LENGTH","nonnegative integer required");
+  if(Object.hasOwn(s,"maxLength")&&(!Number.isSafeInteger(s.maxLength)||s.maxLength<0))add(path,"INVALID_SCHEMA_MAX_LENGTH","nonnegative integer required");
   for(const k of ["minimum","maximum"])if(Object.hasOwn(s,k)&&(typeof s[k]!=="number"||!Number.isFinite(s[k])))add(path,"INVALID_SCHEMA_BOUND",k);
   if(Object.hasOwn(s,"pattern")){try{if(typeof s.pattern!=="string")throw Error();new RegExp(s.pattern);}catch{add(path,"INVALID_PATTERN","invalid pattern");}}
   if(Object.hasOwn(s,"properties")){
@@ -72,6 +73,7 @@ export function validateJsonSchema(value,schema,registry,{maxErrors=100}={}){
   if(Array.isArray(s.enum)&&!s.enum.some(item=>stable(item)===stable(v)))add(path,"ENUM_MISMATCH","value is not in enum");
   if(typeof v==="string"){
    if(Number.isInteger(s.minLength)&&[...v].length<s.minLength)add(path,"MIN_LENGTH","minimum length "+s.minLength);
+   if(Number.isInteger(s.maxLength)&&[...v].length>s.maxLength)add(path,"MAX_LENGTH","maximum length "+s.maxLength);
    if(typeof s.pattern==="string"){let re;try{re=new RegExp(s.pattern);}catch{add(path,"INVALID_PATTERN",s.pattern);}if(re&&!re.test(v))add(path,"PATTERN_MISMATCH",s.pattern);}
   }
   if(typeof v==="number"){

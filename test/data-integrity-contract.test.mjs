@@ -100,7 +100,7 @@ test("archived cross-source receipts distinguish exact agreement, missing data a
 });
 
 test("schema contract rejects unsupported rules even in unvisited properties and conditionals",()=>{
- for(const s of [{type:"object",properties:{optional:{maxLength:1}}},{if:{const:"other"},then:{not:{const:"x"}}},{if:{unknownRule:true},then:{const:"x"}}]){
+ for(const s of [{type:"object",properties:{optional:{maxItems:1}}},{if:{const:"other"},then:{not:{const:"x"}}},{if:{unknownRule:true},then:{const:"x"}}]){
   const r=validateJsonSchema({},s,registry);assert.equal(r.valid,false);assert.ok(r.errors.some(e=>e.code==="UNSUPPORTED_SCHEMA_KEYWORD"));
  }
 });
@@ -115,4 +115,14 @@ test("schema contract rejects unresolved refs, cycles, unsupported ref siblings 
   assert.equal(inspectSchemaContract(s,registry).valid,false);
  }
  for(const [name,s] of registry)assert.equal(inspectSchemaContract(s,registry).valid,true,name);
+});
+
+test("schema length limits apply to Unicode code points and validate nested genesis identity",()=>{
+ const s=registry.get("market-identity.schema.json");
+ assert.equal(validateJsonSchema({...market,genesis_hash:"g".repeat(256)},s,registry).valid,true);
+ assert.equal(validateJsonSchema({...market,genesis_hash:"g".repeat(257)},s,registry).valid,false);
+ assert.equal(validateJsonSchema({...market,genesis_hash:null},s,registry).valid,true);
+ assert.equal(validateJsonSchema("😀",{type:"string",maxLength:1},registry).valid,true);
+ assert.equal(inspectSchemaContract({type:"string",maxLength:-1},registry).valid,false);
+ assert.equal(inspectSchemaContract({type:"string",maxLength:"2"},registry).valid,false);
 });
