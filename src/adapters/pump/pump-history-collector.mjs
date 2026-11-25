@@ -30,6 +30,7 @@ import { buildRawCandles } from "../../core/candle-builder.mjs";
 import { auditObservedEventTimeline } from "../../core/event-timeline-audit.mjs";
 import { auditCandleEvidence } from "../../core/candle-integrity-audit.mjs";
 import { assessSourceProvenance, observeHistoricalGenesis } from "../../core/source-provenance.mjs";
+import { collectHistoricalSignaturePages, summarizeHistoricalReadEvidence } from "../../core/historical-signature-pages.mjs";
 import { fetchPumpFeeConfigHistory } from "./pump-fee-history.mjs";
 
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -75,44 +76,9 @@ async function mapLimit(items, limit, mapper) {
   return output;
 }
 
-async function collectSignatures(rpc, address, {
-  maxSignatures = 10_000,
-  pageSize = 1000,
-  until = null,
-  commitment = "confirmed",
-} = {}) {
-  const signatures = [];
-  let before;
-  let reachedUntil = false;
-  let exhausted = false;
-  if (!Number.isSafeInteger(maxSignatures) || maxSignatures < 1) throw new RangeError("maxSignatures must be positive");
-  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) throw new RangeError("pageSize must be between 1 and 1000");
-  while (signatures.length < maxSignatures) {
-    const requested = Math.min(pageSize, maxSignatures - signatures.length);
-    const page = await rpc.getSignaturesForAddress(address, { commitment, limit: requested, before, until });
-    if (!Array.isArray(page) || page.length === 0) {
-      exhausted = true;
-      break;
-    }
-    signatures.push(...page);
-    if (until && page.some((item) => item.signature === until)) {
-      reachedUntil = true;
-      break;
-    }
-    before = page.at(-1).signature;
-    if (page.length < requested) {
-      exhausted = true;
-      break;
-    }
-    if (signatures.length >= maxSignatures) break;
-  }
-  return {
-    address,
-    signatures,
-    coverage_complete: exhausted || reachedUntil,
-    stopped_at_limit: signatures.length >= maxSignatures && !exhausted && !reachedUntil,
-    reached_until: reachedUntil,
-  };
+async function collectSignatures(rpc, address, {maxSignatures=10_000,pageSize=1000,until=null,commitment="confirmed"}={}) {
+ const result=await collectHistoricalSignaturePages({rpc,address,maxSignatures,pageSize,until,commitment});
+ return {...result,coverage_complete:result.exhausted||result.reached_until,stopped_at_limit:result.truncated_at_limit};
 }
 
 async function getTransactions(rpc, signatures, concurrency = 5) {
@@ -669,7 +635,8 @@ export async function fetchPumpMintHistory({
   const allPoolsComplete = hasMigration
     ? poolReplays.length > 0 && poolReplays.every((pool) => pool.replay_status === "REPLAYED_FULL_POOL_HISTORY")
     : poolReplays.length === 0 || poolReplays.every((pool) => pool.replay_status === "REPLAYED_FULL_POOL_HISTORY");
-  const overallStatus = curveReplayComplete && allPoolsComplete
+  const readEvidence = summarizeHistoricalReadEvidence({scans:signatureCollections,source:sourceProvenance,missingTransactionCount:allFetched.filter(item=>!item.transaction).length,candleAudit:candleIntegrityAudit});
+  const overallStatus = readEvidence.status === "REVIEW_REQUIRED" ? "HISTORICAL_EVIDENCE_REVIEW_REQUIRED" : curveReplayComplete && allPoolsComplete
     ? "REPLAYED_FULL_HISTORY"
     : curveReplayComplete && hasMigration && poolReplays.length === 0
       ? "MISSING_PUMPSWAP_POOL_DISCOVERY"
@@ -706,6 +673,7 @@ export async function fetchPumpMintHistory({
     event_timeline_audit: { curve: curveTimelineAudit, pools: poolReplays.map(item => ({ pool_address: item.pool_address, audit: item.event_timeline_audit })) },
     candle_integrity_audit: candleIntegrityAudit,
     source_provenance: sourceProvenance,
+    historical_read_evidence: readEvidence,
     fee_config_pda: PUMP_FEE_CONFIG_PDA,
     fee_config_history: feeConfigHistory,
     limitations: [

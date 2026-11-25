@@ -16,6 +16,7 @@ import { buildRawCandles } from "../../core/candle-builder.mjs";
 import { auditObservedEventTimeline } from "../../core/event-timeline-audit.mjs";
 import { auditCandleEvidence } from "../../core/candle-integrity-audit.mjs";
 import { assessSourceProvenance, observeHistoricalGenesis } from "../../core/source-provenance.mjs";
+import { collectHistoricalSignaturePages, summarizeHistoricalReadEvidence } from "../../core/historical-signature-pages.mjs";
 
 export const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -52,58 +53,8 @@ async function mapLimit(items, concurrency, mapper) {
   return output;
 }
 
-async function fetchAddressSignatures(rpc, address, {
-  maxSignatures = 50_000,
-  pageSize = 1000,
-  untilSignature = null,
-  commitment = "confirmed",
-} = {}) {
-  if (!Number.isSafeInteger(maxSignatures) || maxSignatures < 1) throw new RangeError("maxSignatures must be positive");
-  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) throw new RangeError("pageSize must be between 1 and 1000");
-  const signatures = [];
-  const seen = new Set();
-  let before;
-  let exhausted = false;
-  let reachedUntil = false;
-  while (signatures.length < maxSignatures) {
-    const requested = Math.min(pageSize, maxSignatures - signatures.length);
-    const page = await rpc.getSignaturesForAddress(address, {
-      commitment,
-      limit: requested,
-      before,
-      until: untilSignature ?? undefined,
-    });
-    if (!Array.isArray(page) || page.length === 0) {
-      exhausted = true;
-      break;
-    }
-    for (const item of page) {
-      if (item?.signature && !seen.has(item.signature)) {
-        signatures.push(item);
-        seen.add(item.signature);
-      }
-    }
-    if (untilSignature && page.some((item) => item.signature === untilSignature)) {
-      reachedUntil = true;
-      break;
-    }
-    before = page.at(-1)?.signature;
-    if (page.length < requested) {
-      exhausted = true;
-      break;
-    }
-    if (signatures.length >= maxSignatures) break;
-  }
-  return {
-    address,
-    signatures,
-    count: signatures.length,
-    exhausted,
-    reached_until: reachedUntil,
-    truncated_at_limit: !exhausted && !reachedUntil && signatures.length >= maxSignatures,
-    newest_slot: signatures[0]?.slot ?? null,
-    oldest_slot: signatures.at(-1)?.slot ?? null,
-  };
+async function fetchAddressSignatures(rpc,address,{maxSignatures=50_000,pageSize=1000,untilSignature=null,commitment="confirmed"}={}){
+ return collectHistoricalSignaturePages({rpc,address,maxSignatures,pageSize,until:untilSignature,commitment});
 }
 
 function transactionAccountKeys(transaction) {
@@ -737,10 +688,11 @@ export async function fetchRaydiumMintHistory({
     capture: { commitment: "confirmed", captured_at_ms: Date.now(), adapter_version: JSON.stringify(getRaydiumIdlMetadata()), query_fingerprint: queryFingerprint },
     rawPayload: parsedTransactions.map(item => ({ signature: item.signature, transaction: item.transaction }))
   });
-  const full = coverageComplete && eventOrderComplete && vaultReconciliationPass && candleIntegrityAudit.status === "CONSISTENT";
+  const readEvidence = summarizeHistoricalReadEvidence({scans:[launchCoverage,cpmmCoverage],source:sourceProvenance,missingTransactionCount:transactionGaps.length,candleAudit:candleIntegrityAudit});
+  const full = readEvidence.status !== "REVIEW_REQUIRED" && coverageComplete && eventOrderComplete && vaultReconciliationPass && candleIntegrityAudit.status === "CONSISTENT";
 
   return {
-    status: full ? "REPLAYED_FULL_LAUNCHLAB_TO_CPMM_HISTORY" : "PARTIAL_LAUNCHLAB_TO_CPMM_HISTORY",
+    status: readEvidence.status === "REVIEW_REQUIRED" ? "HISTORICAL_EVIDENCE_REVIEW_REQUIRED" : full ? "REPLAYED_FULL_LAUNCHLAB_TO_CPMM_HISTORY" : "PARTIAL_LAUNCHLAB_TO_CPMM_HISTORY",
     mint,
     quote_mint: quoteMint,
     decimals: { token: mintDecoded.decimals, quote: quoteDecoded.decimals },
@@ -802,6 +754,7 @@ export async function fetchRaydiumMintHistory({
     event_timeline_audits: timelineAudits,
     candle_integrity_audit: candleIntegrityAudit,
     source_provenance: sourceProvenance,
+    historical_read_evidence: readEvidence,
     raw_candles_1m: rawCandles1m,
     raw_candles_5m: rawCandles5m,
     normalized_events: normalizedEvents,

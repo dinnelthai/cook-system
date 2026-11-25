@@ -43,3 +43,7 @@ The index now uses an unambiguous serialized namespace tuple, sorts within each 
 ## Source identity follow-up
 
 An explicitly pinned genesis must match before collector account/history reads; an unpinned genesis observation cannot authenticate itself. Offline cross-source receipt comparison detects missing signatures and conflicting raw transaction JSON but cannot prove provider independence or chain finality. Pagination audit rejects cursor cycles and event-quality warnings. The cross-source comparison is not yet wired into the report UI, and collector-native pagination manifests still require provider-specific integration. Existing replay-complete statuses describe internal replay coverage, not authenticated chain completeness.
+
+## Collector pagination follow-up
+
+Pump and Raydium use a shared bounded signature paginator. Malformed, oversized, duplicated, cyclic, or slot-inconsistent pages are rejected instead of being treated as exhaustion. Actual page cursor/signature metadata is returned, with explicit termination declaration and no completeness attestation. Both collectors emit a shared historical_read_evidence object and downgrade the overall replay label on a detected contradiction. Missing identity or receipts remain partial. Existing legacy internal replay labels do not certify provider history. No live dual-RPC validation was performed; this evidence is collector JSON output, not yet a terminal UI integration.
