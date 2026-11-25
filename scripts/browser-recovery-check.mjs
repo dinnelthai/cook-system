@@ -13,7 +13,7 @@ async function eventually(fn,timeout=12000,stage="browser-start"){
  throw Error("BROWSER_INTERACTION_TIMEOUT:"+stage);
 }
 async function connect(url){
- const ws=new WebSocket(url),pending=new Map();
+ const ws=new WebSocket(url),pending=new Map(),listeners=new Map();
  let id=0;
  const fail=()=>{for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error("BROWSER_CONNECTION_CLOSED"));}pending.clear();};
  ws.addEventListener("close",fail);ws.addEventListener("error",fail);
@@ -24,6 +24,7 @@ async function connect(url){
  });
  ws.addEventListener("message",({data})=>{
   const m=JSON.parse(data),p=pending.get(m.id);
+  if(m.method)for(const fn of listeners.get(m.method)??[])fn(m.params??{});
   if(!p)return;pending.delete(m.id);clearTimeout(p.timer);
   if(m.error)p.reject(Error("BROWSER_COMMAND_FAILED:"+p.method));else p.resolve(m.result);
  });
@@ -33,7 +34,7 @@ async function connect(url){
     const n=++id,timer=setTimeout(()=>{pending.delete(n);reject(Error("BROWSER_COMMAND_TIMEOUT:"+method));},5000);
     pending.set(n,{resolve,reject,timer,method});ws.send(JSON.stringify({id:n,method,params}));
    });
-  },close(){ws.close();}
+  },on(method,fn){const rows=listeners.get(method)??[];rows.push(fn);listeners.set(method,rows);},close(){ws.close();}
  };
 }
 /** Disposable loopback browser QA; only metadata fixtures and read-only recovery. */
@@ -48,6 +49,10 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost","--remote-debugging-address=127.0.0.1",
   "--remote-debugging-port=0","--user-data-dir="+profile,"about:blank"],{env,stdio:"ignore"});
  let cdp,spawnError=null;child.on("error",e=>{spawnError=e;});
+ const observations=[],requests=new Map();
+ const add=(kind,detail)=>{if(observations.length<80)observations.push({kind,...detail});};
+ const pathOnly=value=>{try{const u=new URL(value);return u.origin===url?u.pathname:"OTHER_ORIGIN";}catch{return "UNKNOWN";}};
+ const brief=value=>String(value??"").replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,240);
  try{
   const port=await eventually(async()=>{
    if(spawnError||child.exitCode!==null)throw Error("BROWSER_START_FAILED");
@@ -72,6 +77,16 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
     throw error;
    }
   },12000,stage);
+  cdp.on("Runtime.exceptionThrown",({exceptionDetails:d})=>{
+   add("exception",{text:brief(d?.exception?.description??d?.text),path:pathOnly(d?.url),line:d?.lineNumber??null});
+  });
+  cdp.on("Log.entryAdded",({entry:e})=>{if(e?.level==="error")add("browser_error",{text:brief(e.text),path:pathOnly(e.url)});});
+  cdp.on("Network.requestWillBeSent",p=>{if(requests.size<256)requests.set(p.requestId,pathOnly(p.request?.url));});
+  cdp.on("Network.responseReceived",p=>{if(p.response?.status>=400)add("http_error",{path:pathOnly(p.response.url),status:p.response.status});});
+  cdp.on("Network.loadingFailed",p=>add("network_failure",{path:requests.get(p.requestId)??"UNKNOWN",reason:brief(p.errorText)}));
+  await cdp.call("Runtime.enable");
+  await cdp.call("Network.enable");
+  await cdp.call("Log.enable");
   await cdp.call("Page.enable");
   await cdp.call("Page.navigate",{url});
   await wait("initial-terminal",'location.origin==='+JSON.stringify(url)+' && document.querySelector("#terminal-project-select")');
@@ -94,6 +109,15 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
   assert.equal(directory.projects.length,1);
   assert.equal(directory.projects[0].execution_policy.enabled,false);
   return {status:"BROWSER_RECOVERY_PASS",scope:"DISPOSABLE_METADATA_RECOVERY",execution_enabled:false,full_browser_e2e_validated:false};
+ }catch(error){
+  let state=null;
+  if(cdp)try{
+   const r=await cdp.call("Runtime.evaluate",{expression:'({origin:location.origin,ready:document.readyState,page:document.querySelector("#main")?.dataset.page??null,main:document.querySelector("#main")?.innerText.slice(0,160)??null,context:document.querySelector("#terminal-project-context")?.innerText.slice(0,160)??null})',returnByValue:true});
+   state=r.result?.value??null;
+  }catch{}
+  // All browser data is from disposable QA fixtures, never a user's session.
+  console.error("BROWSER_QA_DIAGNOSTICS "+JSON.stringify({state,observations}));
+  throw error;
  }finally{
   cdp?.close();
   if(child.exitCode===null){const closed=once(child,"exit").catch(()=>{});child.kill();await Promise.race([closed,sleep(2000)]);if(child.exitCode===null)child.kill("SIGKILL");}

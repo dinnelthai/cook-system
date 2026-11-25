@@ -26,3 +26,12 @@ test("invalid or unavailable diagnostics storage does not crash logging",()=>{
  const log=createDiagnosticLog({storage});log.record("app.start");
  assert.equal(log.snapshot().persistence_status,"UNAVAILABLE");assert.equal(log.snapshot().entries.length,1);
 });
+
+test("project metadata diagnostics accept known event names but do not retain identifiers",()=>{
+ const log=createDiagnosticLog();
+ for(const name of ["project.context.selected","project.aggregate.saved","project.aggregate.opened","project.issuance_evidence.recorded"])
+  log.record(name,{project_id:"private-fixture-id",wallet:"private-wallet",revision:1,stage:"DRAFT"});
+ assert.equal(log.snapshot().entries.length,4);
+ assert.ok(log.snapshot().entries.every(row=>Object.keys(row.detail).length===0));
+ assert.ok(!JSON.stringify(log.snapshot()).includes("private-"));
+});
