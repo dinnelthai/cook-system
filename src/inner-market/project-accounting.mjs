@@ -28,7 +28,7 @@ export function reconcileProjectCash({
   if (typeof historyComplete !== "boolean") throw new TypeError("historyComplete must be boolean");
   const opening = amount(openingCashBaseUnits, "opening cash");
   const totals = Object.fromEntries([...CREDIT, ...DEBIT].map(k => [k, 0n]));
-  const seen = new Set();
+  const seen = new Set(), orderedPostings=[];
   let pending = 0;
   let invalid = 0;
   for (const e of entries) {
@@ -42,6 +42,7 @@ export function reconcileProjectCash({
     const n = amount(e.amountBaseUnits, "posting amount");
     if (n === 0n) throw new RangeError("posting amount must be positive");
     totals[e.kind] += n;
+    orderedPostings.push({id:e.id,sequence:e.cashSequence,delta:CREDIT.has(e.kind)?n:-n});
   }
   const capitalNet = totals.CAPITAL_IN - totals.CAPITAL_OUT;
   const expense = [...EXPENSE].reduce((s,k) => s + totals[k], 0n);
@@ -56,6 +57,25 @@ export function reconcileProjectCash({
   if (expected < 0n) flags.push("NEGATIVE_EXPECTED_CASH");
   if (observed === null) flags.push("CASH_SNAPSHOT_MISSING");
   else if (observed !== expected) flags.push("CASH_MISMATCH");
+  // Legacy records lack a declared total cash-posting order. Never infer
+  // historical order from input array position or unrelated trade sequences.
+  let intermediate_balance_audit={status:"ORDER_UNAVAILABLE",checked_posting_count:0,first_negative_posting_id:null};
+  if(orderedPostings.some(p=>p.sequence!==undefined)){
+    const valid=orderedPostings.every(p=>Number.isSafeInteger(p.sequence)&&p.sequence>=0);
+    const unique=new Set(orderedPostings.map(p=>p.sequence)).size===orderedPostings.length;
+    if(orderedPostings.some(p=>p.sequence!==undefined&&(!Number.isSafeInteger(p.sequence)||p.sequence<0))||
+       new Set(orderedPostings.filter(p=>p.sequence!==undefined).map(p=>p.sequence)).size!==orderedPostings.filter(p=>p.sequence!==undefined).length){
+      flags.push("CASH_POSTING_ORDER_INVALID");intermediate_balance_audit.status="REVIEW_REQUIRED";
+    }else if(valid&&unique&&historyComplete&&!pending&&!invalid){
+      let running=opening,checked=0,firstNegative=null;
+      for(const p of [...orderedPostings].sort((a,b)=>a.sequence-b.sequence)){
+        running+=p.delta;checked++;
+        if(running<0n&&firstNegative===null)firstNegative=p.id;
+      }
+      if(firstNegative!==null)flags.push("NEGATIVE_INTERMEDIATE_CASH");
+      intermediate_balance_audit={status:firstNegative===null?"DECLARED_ORDER_REPLAY_MATCH":"REVIEW_REQUIRED",checked_posting_count:checked,first_negative_posting_id:firstNegative};
+    }
+  }
   const complete = flags.length === 0;
   return {
     project_id: projectId, quote_asset: quoteAsset,
@@ -69,7 +89,7 @@ export function reconcileProjectCash({
     confirmed_postings_by_kind: Object.fromEntries(Object.entries(totals).map(([k,v])=>[k,v.toString()])),
     confirmed_expenses_base_units: expense.toString(),
     confirmed_nontrade_income_base_units: otherIncome.toString(),
-    pending_count: pending, unverified_count: invalid,
+    pending_count: pending, unverified_count: invalid, intermediate_balance_audit,
   };
 }
 

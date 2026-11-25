@@ -44,7 +44,7 @@ export function reconcileCreatorReceivables({
     if(e.kind==="CREATOR_WRITEOFF") writtenOff+=v;
     if(e.kind==="CREATOR_RECEIPT") {received+=v; receipts.set(e.id,{amount:v,matched:false,event:e});}
   }
-  const cashIds=new Set(),identityResults=[];
+  const cashIds=new Set(),identityResults=[],receiptSignatures=new Map();
   for(const p of cashEntries) {
     if(p.kind!=="CREATOR_FEE_RECEIVED") continue;
     if(typeof p.id!=="string"||!p.id.trim()||cashIds.has(p.id)) throw new Error("missing or duplicate cash receipt id");
@@ -58,6 +58,15 @@ export function reconcileCreatorReceivables({
     if(r.amount!==amount(p.amountBaseUnits,"receipt amount")) issues.push({code:"RECEIPT_AMOUNT_MISMATCH",id:p.id});
     const identity=compareCreatorReceiptIdentity(r.event,p);
     identityResults.push(identity);
+    // Signature alone identifies a transaction, not an individual posting.
+    // Until a canonical instruction-level identity is available, repeated
+    // transaction labels are ambiguous and cannot certify cash income.
+    const signature=r.event.signature??p.signature;
+    if(typeof signature==="string"&&signature.trim()){
+      const prior=receiptSignatures.get(signature);
+      if(prior!==undefined)issues.push({code:"AMBIGUOUS_CREATOR_RECEIPT_TRANSACTION",id:p.id,prior_id:prior});
+      else receiptSignatures.set(signature,p.id);
+    }
     for(const code of identity.issues)issues.push({code,id:p.id});
   }
   for(const [id,r] of receipts) if(!r.matched) issues.push({code:"MISSING_CASH_RECEIPT",id});

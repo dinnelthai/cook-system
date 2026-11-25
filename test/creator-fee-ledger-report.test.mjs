@@ -53,3 +53,14 @@ test("legacy missing receipt identity is incomplete rather than independently ve
  p.slot=-1;
  assert.equal(buildCreatorFeeLedgerReport({scope:i.scope,creator:i.creator,cash:i.cash}).status,"REVIEW_REQUIRED");
 });
+
+test("distinct business IDs cannot certify repeated transaction identity as two creator receipts",()=>{
+ const i=fixture(),e=i.creator.entries.find(x=>x.kind==="CREATOR_RECEIPT"),p=i.cash.entries.find(x=>x.kind==="CREATOR_FEE_RECEIVED");
+ e.signature=p.signature="same-transaction";e.slot=p.slot=10;
+ i.creator.entries[0].amountBaseUnits="17";
+ i.creator.entries.push({...e,id:"second-receipt"});
+ i.cash.entries.push({...p,id:"second-posting",feeEventId:"second-receipt"});
+ const r=buildCreatorFeeLedgerReport({scope:i.scope,creator:i.creator,cash:i.cash});
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.equal(r.summary.verified_cash_income_base_units,null);
+ assert.ok(r.issues.some(x=>x.code==="AMBIGUOUS_CREATOR_RECEIPT_TRANSACTION"));
+});

@@ -13,3 +13,11 @@ test("local only, pin genesis, no retries",async()=>{
  for(const change of [{enabled:false},{endpoint:"https://api.mainnet-beta.solana.com"},{expectedGenesis:key},{expectedGenesis:"EtWTRABZaYq6iMfeYKouRu166VU2xqa1"}])await assert.rejects(()=>createLocalFaucet({...opts,...change}).airdrop(key,"1"));
  assert.equal(calls.filter(x=>x==="requestAirdrop").length,1);
 });
+
+test("disabled faucet still permits pinned local read-only balance checks",async()=>{
+ const calls=[],fetchImpl=async(url,init)=>{const b=JSON.parse(init.body);calls.push(b.method);return {ok:true,json:async()=>({id:b.id,result:b.method==="getGenesisHash"?genesis:{value:100}})}};
+ const f=createLocalFaucet({enabled:false,endpoint:"http://127.0.0.1:8899",expectedGenesis:genesis,fetchImpl});
+ assert.equal((await f.balance(key)).balance_lamports,"100");
+ await assert.rejects(()=>f.airdrop(key,"1"),/FAUCET_DISABLED/);
+ assert.deepEqual(calls,["getGenesisHash","getBalance"]);
+});

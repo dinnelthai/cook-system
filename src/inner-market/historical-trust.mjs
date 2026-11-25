@@ -8,7 +8,7 @@ export function describeHistoricalTrust({sourceMode,ready,checks,navEndpoints,tr
  // Coverage refers only to supplied evidence checks; no independent authentication.
  const evidenceChecks=checks.filter(c=>!["accounting","source_attestation","wallet_attribution","live_execution"].includes(c.id));
  const evidenceStatus=evidenceChecks.some(c=>c.status==="REVIEW")?"REVIEW_REQUIRED":evidenceChecks.length===0||evidenceChecks.some(c=>c.status!=="PASS")?"INCOMPLETE":"SUPPLIED_CHECKS_PASS";
- const dimensions={structure:"ACCEPTED_INPUT",internal_consistency:ready?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",evidence_completeness:evidenceStatus,independent_coverage:"UNKNOWN",source_verification:"UNKNOWN",wallet_attribution:"UNKNOWN",settlement_eligibility:sample&&ready?"SYNTHETIC_TEST_ONLY":"BLOCKED",live_execution:"UNAVAILABLE"};
+ const dimensions={structure:"ACCEPTED_INPUT",internal_consistency:ready?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",evidence_completeness:evidenceStatus,independent_coverage:"UNKNOWN",source_verification:"UNKNOWN",wallet_attribution:"UNKNOWN",settlement_eligibility:sample&&ready&&evidenceStatus!=="REVIEW_REQUIRED"?"SYNTHETIC_TEST_ONLY":"BLOCKED",live_execution:"UNAVAILABLE"};
  const group=(available,reasons)=>entry(!ready?"REVIEW_REQUIRED":!available?"UNAVAILABLE":sample?"SYNTHETIC_ONLY":"PROVISIONAL",reasons);
  return {schema_version:"cook-historical-trust.1",grade:ready?"D3":"D2",
   status:ready?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",

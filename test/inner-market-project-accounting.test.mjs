@@ -66,3 +66,13 @@ test("signed historical profit parsing preserves exact bounds and rejects oversi
  for(const v of [(max+1n).toString(),(-max-1n).toString(),"-"+"9".repeat(100000)])assert.throws(()=>summarizeProjectRealizedPnl({cashReport,tradeRealizedPnlBaseUnits:v,tradeHistoryComplete:true}),RangeError);
  for(const v of ["-0","-01","1e3"])assert.throws(()=>summarizeProjectRealizedPnl({cashReport,tradeRealizedPnlBaseUnits:v,tradeHistoryComplete:true}),TypeError);
 });
+
+test("declared ordered cash replay detects impossible intermediate negative balances despite matched endpoints",()=>{
+ const x=[posting("spend","OPERATING_EXPENSE","10",{cashSequence:1}),posting("fund","CAPITAL_IN","10",{cashSequence:2})];
+ const r=report({entries:x,observedClosingCashBaseUnits:"0"});
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.flags.includes("NEGATIVE_INTERMEDIATE_CASH"));
+ assert.equal(r.intermediate_balance_audit.first_negative_posting_id,"spend");
+ const y=x.map((p,i)=>({...p,cashSequence:2-i}));
+ assert.equal(report({entries:y,observedClosingCashBaseUnits:"0"}).intermediate_balance_audit.status,"DECLARED_ORDER_REPLAY_MATCH");
+ assert.equal(report().intermediate_balance_audit.status,"ORDER_UNAVAILABLE");
+});
