@@ -48,7 +48,7 @@ export async function auditLocalReadAcceptance({endpoint,expectedGenesisHash,ran
   if(tx?.slot!==sample.slot||tx?.transaction?.signatures?.[0]!==sample.signature||!tx.meta||typeof tx.meta!=="object"||!Object.hasOwn(tx.meta,"err")||!slot(tx.meta.fee)){receiptSummary.contradicted++;continue;}
   receiptSummary.matched++;
   const audit=auditReceiptObservation(tx,sample.expected);
-  financialSamples.push({sample_index:receiptSamples.indexOf(sample),...audit});
+  financialSamples.push({sample_index:receiptSamples.indexOf(sample),token_expectations_declared:sample.expected?.token_accounts?.length??0,...audit});
  }
  if(receiptSummary.contradicted)add("receipts","REVIEW_REQUIRED","RECEIPT_SAMPLE_CONTRADICTION");
  else if(!receiptSamples.length||receiptSummary.unavailable)add("receipts","PARTIAL","RECEIPT_SAMPLES_UNAVAILABLE_OR_MISSING");
@@ -56,6 +56,11 @@ export async function auditLocalReadAcceptance({endpoint,expectedGenesisHash,ran
  if(financialSamples.some(x=>x.status==="REVIEW_REQUIRED"))add("receipt_financial","REVIEW_REQUIRED","SAMPLED_FINANCIAL_CONTRADICTION");
  else if(!receiptSamples.length||financialSamples.length!==receiptSamples.length||financialSamples.some(x=>x.status!=="DECLARED_SAMPLE_MATCH"))add("receipt_financial","PARTIAL","SAMPLED_FINANCIAL_EVIDENCE_INCOMPLETE");
  else add("receipt_financial","PASS","DECLARED_SAMPLE_AMOUNTS_MATCH_NOT_INDEPENDENTLY_ATTESTED");
+ const tokenSamples=financialSamples.filter(x=>x.token_expectations_declared>0);
+ const tokenRequested=receiptSamples.filter(x=>x.expected?.token_accounts?.length>0).length;
+ if(tokenSamples.some(x=>x.checks.some(c=>c.id.startsWith("token_")&&c.status==="MISMATCH")))add("receipt_tokens","REVIEW_REQUIRED","SAMPLED_TOKEN_CONTRADICTION");
+ else if(!tokenRequested||tokenSamples.length!==tokenRequested||tokenSamples.some(x=>!x.checks.some(c=>c.id.startsWith("token_"))||x.checks.some(c=>c.id.startsWith("token_")&&c.status!=="MATCH")))add("receipt_tokens","PARTIAL","TOKEN_EVIDENCE_MISSING_OR_INCOMPLETE");
+ else add("receipt_tokens","PASS","DECLARED_TOKEN_SAMPLE_MATCH_NOT_INDEPENDENTLY_ATTESTED");
  if(reportInput===null)add("report","UNKNOWN","HISTORICAL_REPORT_UNAVAILABLE");
  else {
   try{

@@ -79,3 +79,58 @@ test("read-only acceptance rejects mismatched JSON-RPC response IDs",async()=>{
  }});
  assert.equal(r.status,"PARTIAL");assert.equal(r.checks[0].code,"GENESIS_UNAVAILABLE");assert.deepEqual(calls,["getGenesisHash"]);
 });
+
+const tokenAccount="11111111111111111111111111111112",mint="So11111111111111111111111111111111111111112";
+const tokenExpected={address:tokenAccount,mint,owner:acct,decimals:6,pre_amount:"18446744073709551615",post_amount:"0"};
+const tokenRow=(amount,extra={})=>({accountIndex:1,mint,owner:acct,uiTokenAmount:{amount,decimals:6},...extra});
+function tokenTx(){
+ const t=tx();t.version=0;t.transaction.message.addressTableLookups=[{}];t.meta.loadedAddresses={writable:[tokenAccount],readonly:[]};
+ t.meta.preBalances.push(200);t.meta.postBalances.push(200);
+ t.meta.preTokenBalances=[tokenRow(tokenExpected.pre_amount)];t.meta.postTokenBalances=[tokenRow("0")];return t;
+}
+const tokenInput=(row=tokenExpected)=>({...input(),receiptSamples:[{signature:sig,slot:110,expected:{...expected,token_accounts:[row]}}]});
+test("token receipts match exact u64 strings on loaded account indices",async()=>{
+ const r=await auditLocalReadAcceptance({...tokenInput(),fetchImpl:mock({getTransaction:tokenTx()})});
+ assert.equal(r.status,"PARTIAL");assert.ok(r.checks.some(c=>c.id==="receipt_tokens"&&c.status==="PASS"));
+ assert.equal(r.receipt_financial_observations[0].status,"DECLARED_SAMPLE_MATCH");
+ assert.equal(r.financial_parity_attested,false);assert.ok(!JSON.stringify(r).includes(tokenAccount));
+});
+test("token amount mint decimals and owner contradictions require review",async()=>{
+ for(const patch of [{uiTokenAmount:{amount:"1",decimals:6}},{mint:acct},{uiTokenAmount:{amount:"0",decimals:9}},{owner:tokenAccount}]){
+  const t=tokenTx();Object.assign(t.meta.postTokenBalances[0],patch);
+  const r=await auditLocalReadAcceptance({...tokenInput(),fetchImpl:mock({getTransaction:t})});
+  assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.checks.some(c=>c.id==="receipt_tokens"&&c.status==="REVIEW_REQUIRED"));
+ }
+});
+test("absent token metadata and missing owner remain unknown rather than zero",async()=>{
+ for(const change of [t=>delete t.meta.postTokenBalances,t=>t.meta.postTokenBalances=[],t=>delete t.meta.postTokenBalances[0].owner]){
+  const t=tokenTx();change(t);
+  const r=await auditLocalReadAcceptance({...tokenInput(),fetchImpl:mock({getTransaction:t})});
+  assert.equal(r.receipt_financial_observations[0].status,"PARTIAL");assert.ok(r.checks.some(c=>c.id==="receipt_tokens"&&c.status==="PARTIAL"));
+ }
+});
+test("explicitly absent token record is not equivalent to an observed zero",async()=>{
+ const t=tokenTx(),wanted={...tokenExpected,post_amount:null};t.meta.postTokenBalances=[];
+ const r=await auditLocalReadAcceptance({...tokenInput(wanted),fetchImpl:mock({getTransaction:t})});
+ assert.equal(r.receipt_financial_observations[0].status,"DECLARED_SAMPLE_MATCH");
+ t.meta.postTokenBalances=[tokenRow("0")];
+ const r2=await auditLocalReadAcceptance({...tokenInput(wanted),fetchImpl:mock({getTransaction:t})});
+ assert.equal(r2.status,"REVIEW_REQUIRED");
+});
+test("duplicate indices and malformed token receipt amounts require review",async()=>{
+ for(const change of [t=>t.meta.postTokenBalances.push(tokenRow("0")),t=>t.meta.postTokenBalances[0].accountIndex=256,t=>t.meta.postTokenBalances[0].uiTokenAmount.amount="18446744073709551616"]){
+  const t=tokenTx();change(t);const r=await auditLocalReadAcceptance({...tokenInput(),fetchImpl:mock({getTransaction:t})});
+  assert.equal(r.status,"REVIEW_REQUIRED");
+ }
+});
+test("token expectation rejects duplicate accounts and unsafe amounts before RPC",async()=>{
+ const calls=[],i=tokenInput();i.receiptSamples[0].expected.token_accounts.push({...tokenExpected});
+ await assert.rejects(()=>auditLocalReadAcceptance({...i,fetchImpl:mock({},calls)}),/DUPLICATE_TOKEN_EXPECTATION_ACCOUNT/);
+ await assert.rejects(()=>auditLocalReadAcceptance({...tokenInput({...tokenExpected,pre_amount:"18446744073709551616"}),fetchImpl:mock({},calls)}),/INVALID_RECEIPT_EXPECTATION_AMOUNT/);
+ assert.deepEqual(calls,[]);
+});
+test("token contradiction is not masked by missing native balance evidence",async()=>{
+ const t=tokenTx();delete t.meta.preBalances;t.meta.postTokenBalances[0].uiTokenAmount.amount="1";
+ const r=await auditLocalReadAcceptance({...tokenInput(),fetchImpl:mock({getTransaction:t})});
+ assert.equal(r.status,"REVIEW_REQUIRED");
+});
