@@ -14,6 +14,7 @@ const GROUP_PURPOSES = new Set(["DEV", "TREASURY", "OPERATIONS", "MARKET_OPERATI
 const MEMBER_ROLES = new Set(["DEV", "TREASURY", "OPERATOR", "EXECUTOR", "OBSERVER"]);
 const STAGES = new Set(PROJECT_STAGES);
 const BASE_UNITS = /^(0|[1-9][0-9]*)$/;
+const U64_MAX = 18446744073709551615n;
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 function fail(code) { throw Error(code); }
@@ -98,7 +99,7 @@ function normalizeToken(input, { persisted = false } = {}) {
   const mint = input.mint ?? null;
   if (mint !== null) publicKey(mint, "INVALID_TOKEN_MINT");
   const supply = input.supply_base_units ?? null;
-  if (supply !== null) baseUnits(supply, "INVALID_TOKEN_SUPPLY");
+  if (supply !== null && BigInt(baseUnits(supply, "INVALID_TOKEN_SUPPLY")) > U64_MAX) fail("TOKEN_SUPPLY_EXCEEDS_U64");
   const decimals = input.decimals ?? null;
   if (decimals !== null && (!Number.isInteger(decimals) || decimals < 0 || decimals > 9)) fail("INVALID_TOKEN_DECIMALS");
   if ((supply === null) !== (decimals === null)) fail("INCOMPLETE_TOKEN_SUPPLY");
@@ -397,6 +398,7 @@ export function applyProjectCommand(current, command, { now = () => Date.now() }
     }
     case "RECORD_ISSUANCE_EVIDENCE": {
       exactKeys(payload, ["mint", "signature"], "INVALID_PROJECT_COMMAND_PAYLOAD");
+      if (!["READY", "LAUNCH_SUBMITTED"].includes(project.lifecycle.stage)) fail("ISSUANCE_EVIDENCE_STAGE_INVALID");
       const mint = publicKey(payload.mint, "INVALID_TOKEN_MINT");
       const txSignature = signature(payload.signature);
       if (project.token.mint && (project.token.mint !== mint || project.token.issuance_signature !== txSignature)) fail("ISSUANCE_EVIDENCE_CONFLICT");
@@ -409,6 +411,7 @@ export function applyProjectCommand(current, command, { now = () => Date.now() }
     }
     case "VERIFY_ISSUANCE": {
       exactKeys(payload, ["evidence"], "INVALID_PROJECT_COMMAND_PAYLOAD");
+      if (project.lifecycle.stage !== "LAUNCH_SUBMITTED") fail("ISSUANCE_VERIFICATION_STAGE_INVALID");
       const evidence = requireEvidence(payload.evidence, {
         kind: "TOKEN_MINT", source: "observed_chain", verification: "VERIFIED", reference: project.token.mint
       });
@@ -425,6 +428,8 @@ export function applyProjectCommand(current, command, { now = () => Date.now() }
       exactKeys(payload, ["market"], "INVALID_PROJECT_COMMAND_PAYLOAD");
       if (!project.token.mint) fail("PROJECT_TOKEN_MINT_REQUIRED");
       const market = normalizeMarketBinding(payload.market, project);
+      if (market.venue === "PUMP_BONDING_CURVE" && !["LAUNCHED", "BONDING_CURVE_ACTIVE"].includes(project.lifecycle.stage)) fail("BONDING_CURVE_BINDING_STAGE_INVALID");
+      if (market.venue !== "PUMP_BONDING_CURVE" && !["GRADUATION_PENDING", "PUMPSWAP_ACTIVE"].includes(project.lifecycle.stage)) fail("POST_GRADUATION_BINDING_STAGE_INVALID");
       if (project.markets.some(m => m.market_id === market.market_id)) fail("DUPLICATE_MARKET_ID");
       if (project.markets.length >= 20) fail("PROJECT_MARKET_LIMIT");
       project.markets.push(market);
