@@ -148,3 +148,19 @@ test("unsupported execution enabling and non-SOL quote assets are rejected", () 
   assert.throws(() => applyProjectCommand(p, { type: "SET_EXECUTION_POLICY", payload: { enabled: true } }), /UNSUPPORTED_PROJECT_COMMAND/);
   assert.throws(() => createProjectAggregate({ ...base, network: { cluster: "localnet", genesis_hash: wallet, quote_mint: mint } }), /UNSUPPORTED_QUOTE_ASSET/);
 });
+
+test("issued projects can record early exit without claiming graduation or settlement", () => {
+  let p = launchedProject();
+  const approval = { kind: "EXIT_APPROVAL", source: "operator", verification: "OPERATOR_CONFIRMED", reference: "stop-operations" };
+  p = run(p, "TRANSITION_LIFECYCLE", { to: "EXIT_IN_PROGRESS", evidence: approval }, 1010);
+  assert.equal(p.lifecycle.stage, "EXIT_IN_PROGRESS");
+  assert.equal(p.lifecycle.operational_status, "HALTED");
+  assert.equal(p.execution_policy.enabled, false);
+  assert.throws(() => run(p, "TRANSITION_LIFECYCLE", { to: "CLOSED" }, 1011), /INVALID_LIFECYCLE_TRANSITION/);
+  assert.throws(() => run(p, "TRANSITION_LIFECYCLE", { to: "SETTLEMENT_PENDING", evidence: approval }, 1011), /LIFECYCLE_EVIDENCE_KIND_MISMATCH/);
+  assert.throws(() => run(readyProject(), "TRANSITION_LIFECYCLE", { to: "EXIT_IN_PROGRESS", evidence: approval }, 1011), /INVALID_LIFECYCLE_TRANSITION/);
+});
+test("review-required state cannot be cleared through the HALTED status", () => {
+  const p = run(readyProject(), "SET_OPERATIONAL_STATUS", { status: "REVIEW_REQUIRED" });
+  assert.throws(() => run(p, "SET_OPERATIONAL_STATUS", { status: "HALTED" }), /PROJECT_REVIEW_CLEARANCE_REQUIRED/);
+});

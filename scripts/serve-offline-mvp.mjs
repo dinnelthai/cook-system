@@ -61,7 +61,7 @@ const server=createServer(async(req,res)=>{
     if(req.url.endsWith("/portfolio")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>k!=="limit"))throw Error("INVALID_BODY");send(200,await walletPortfolio.snapshot(data));return;}
     if(req.url.endsWith("/market-data")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>k!=="interval"))throw Error("INVALID_BODY");send(200,await trading.snapshot(data.interval));return;}
     if(req.url.endsWith("/market")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length)throw Error("INVALID_BODY");send(200,await trading.market());return;}
-    if(req.url.endsWith("/trade")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>!["side","amount","addresses","mint","pool"].includes(k)))throw Error("INVALID_BODY");send(200,{results:await trading.batch(data)});return;}
+    if(req.url.endsWith("/trade")){send(403,{code:"PROJECT_EXECUTION_DISABLED"});return;}
     if(req.url.endsWith("/transfer")){
      if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>!["from","to","amount"].includes(k)))throw Error("INVALID_BODY");
      const owned=await wallets.list();if(!owned.some(w=>w.address===data.to))throw Error("WALLET_NOT_FOUND");

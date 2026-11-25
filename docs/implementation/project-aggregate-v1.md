@@ -113,3 +113,11 @@ Command requests include command_id, type, payload and expected_revision. The HT
 - production signing or mainnet execution.
 
 All project execution remains disabled.
+
+## M10-A — business isolation hardening
+
+- Operator HTTP is allowlisted. Chain verification, trusted audit clearance and evidence-gated transitions cannot be asserted through the public command API. READY, unverified LAUNCH_SUBMITTED and operator-approved EXIT_IN_PROGRESS remain available subject to domain validation.
+- An issued project may enter EXIT_IN_PROGRESS before graduation. This is an intent record, not an executed sale, transfer, or completed settlement. REVIEW_REQUIRED cannot be cleared via a status change to HALTED.
+- The terminal separates selected canonical Project context from independent historical reports. Selecting a Project hides and makes the report area inert; report loading is disabled until the selection is cleared. No report is silently treated as a current project balance. Verified report binding and migration of historical data are still pending.
+- The legacy unbound Localnet trade HTTP route returns PROJECT_EXECUTION_DISABLED even if its environment flag is set. No new trading execution path is introduced.
+- Remaining: trusted read-only verifier, data provenance migration, complete exception lifecycle (including failed or abandoned unissued launch), end-to-end browser and Localnet verification. Existing project records created before the boundary change require independent review before being treated as trusted.

@@ -24,3 +24,11 @@ test('Project Setup writes through the canonical Project API, not the legacy bro
   assert.match(view, /appendProjectCommand/);
   assert.doesNotMatch(view, /projectRegistry\.saveDraft/);
 });
+
+test('selected Project keeps unrelated report hidden and inert', async () => {
+  const app = await readFile(new URL('../web/app.mjs', import.meta.url), 'utf8');
+  assert.match(app, /terminal-report-area/);
+  assert.match(app, /hidden inert style="display:none"/);
+  assert.match(app, /open-data"\)\.disabled=Boolean\(activeProjectId\)/);
+  assert.match(app, /独立离线报告/);
+});

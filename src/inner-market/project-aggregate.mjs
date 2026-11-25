@@ -305,7 +305,10 @@ const NEXT_STAGE = Object.freeze({
 });
 function transitionLifecycle(project, payload, now) {
   exactKeys(payload, ["to", "evidence", "settlement"], "INVALID_LIFECYCLE_TRANSITION");
-  const expected = NEXT_STAGE[project.lifecycle.stage];
+  // An already issued project may stop operations without reaching graduation.
+  // This only records operator intent; reconciliation still requires trusted evidence.
+  const earlyExit = payload.to === "EXIT_IN_PROGRESS" && ["LAUNCHED", "BONDING_CURVE_ACTIVE", "GRADUATION_PENDING"].includes(project.lifecycle.stage);
+  const expected = earlyExit ? "EXIT_IN_PROGRESS" : NEXT_STAGE[project.lifecycle.stage];
   if (!expected || payload.to !== expected) fail("INVALID_LIFECYCLE_TRANSITION");
   let evidence = null;
   const verified = (kind, reference) => requireEvidence(payload.evidence, { kind, source: "observed_chain", verification: "VERIFIED", reference });
@@ -353,6 +356,9 @@ function transitionLifecycle(project, payload, now) {
   }
   project.lifecycle = {
     ...project.lifecycle, stage: expected, stage_changed_at_ms: now,
+    operational_status: ["EXIT_IN_PROGRESS", "SETTLEMENT_PENDING", "CLOSED", "ARCHIVED"].includes(expected)
+      ? (project.lifecycle.operational_status === "REVIEW_REQUIRED" ? "REVIEW_REQUIRED" : "HALTED")
+      : project.lifecycle.operational_status,
     evidence_ref: evidence?.reference ?? project.lifecycle.evidence_ref
   };
   return { to: expected, evidence, settlement: payload.settlement ?? null };
@@ -495,6 +501,7 @@ export function applyProjectCommand(current, command, { now = () => Date.now() }
         ["DRAFT", "CLOSED", "ARCHIVED"].includes(project.lifecycle.stage) ||
         project.lifecycle.operational_status === "REVIEW_REQUIRED"
       )) fail("PROJECT_CANNOT_ACTIVATE");
+      if (project.lifecycle.operational_status === "REVIEW_REQUIRED" && payload.status !== "REVIEW_REQUIRED") fail("PROJECT_REVIEW_CLEARANCE_REQUIRED");
       project.lifecycle.operational_status = payload.status;
       eventPayload = { status: payload.status, execution_enabled: false };
       break;

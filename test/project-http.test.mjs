@@ -118,3 +118,31 @@ test("Project HTTP API rejects malformed, oversized and unsupported requests", a
   assert.equal(missing.status, 404);
   assert.equal((await missing.json()).code, "PROJECT_NOT_FOUND");
 });
+
+test("operator HTTP cannot manufacture verified evidence or bypass internal lifecycle gates", async t => {
+  const base = await setup(t);
+  const root = base + "/api/projects";
+  const created = await json(root, "POST", { project_id: "trust-test", profile: { name: "Trust", symbol: "TRUST" } });
+  assert.equal(created.status, 201);
+  const route = root + "/trust-test/commands";
+  const evidence = { kind: "TOKEN_MINT", source: "observed_chain", verification: "VERIFIED", reference: wallet };
+  const attempts = [
+    ["VERIFY_ISSUANCE", { evidence }],
+    ["VERIFY_MARKET", { market_id: "fake", evidence }],
+    ["CLEAR_REVIEW", { evidence }],
+    ["TRANSITION_LIFECYCLE", { to: "LAUNCHED", evidence }],
+    ["TRANSITION_LIFECYCLE", { to: "GRADUATION_PENDING", evidence }],
+    ["TRANSITION_LIFECYCLE", { to: "CLOSED", evidence }],
+    ["TRANSITION_LIFECYCLE", { to: "READY", evidence }]
+  ];
+  for (const [i, [type, payload]] of attempts.entries()) {
+    const res = await json(route, "POST", { command_id: "forged-" + i, type, payload, expected_revision: 1 });
+    assert.equal(res.status, 403);
+    assert.equal((await res.json()).code, "TRUSTED_VERIFIER_REQUIRED");
+  }
+  const project = (await (await fetch(root + "/trust-test")).json()).project;
+  assert.equal(project.revision, 1);
+  assert.equal(project.lifecycle.stage, "DRAFT");
+  assert.equal(project.token.issuance_status, "DRAFT");
+  assert.equal((await (await fetch(root + "/trust-test/events")).json()).events.length, 1);
+});

@@ -1,4 +1,20 @@
 const ROOT = "/api/projects";
+// This public operator boundary is not a chain verifier or an internal auditor.
+const OPERATOR_COMMANDS = new Set([
+  "UPDATE_PROFILE", "UPDATE_DRAFT_CONFIGURATION", "SET_NETWORK_IDENTITY",
+  "SET_TOKEN_CONFIGURATION", "UPSERT_WALLET_GROUP", "RECORD_ISSUANCE_EVIDENCE",
+  "BIND_MARKET", "SET_BUDGET_LIMITS", "SET_OPERATIONAL_STATUS"
+]);
+const OPERATOR_TRANSITIONS = new Set(["READY", "LAUNCH_SUBMITTED", "EXIT_IN_PROGRESS"]);
+function assertOperatorCommand(type, payload) {
+  if (type === "TRANSITION_LIFECYCLE") {
+    if (!OPERATOR_TRANSITIONS.has(payload.to)) throw Error("TRUSTED_VERIFIER_REQUIRED");
+    if (payload.settlement != null || payload.evidence?.verification === "VERIFIED") throw Error("TRUSTED_VERIFIER_REQUIRED");
+    if (payload.to === "READY" && payload.evidence != null) throw Error("TRUSTED_VERIFIER_REQUIRED");
+    return;
+  }
+  if (!OPERATOR_COMMANDS.has(type)) throw Error("TRUSTED_VERIFIER_REQUIRED");
+}
 const CONFLICTS = new Set([
   "PROJECT_ALREADY_EXISTS", "PROJECT_REVISION_CONFLICT", "PROJECT_IDEMPOTENCY_KEY_CONFLICT",
   "PROJECT_NETWORK_LOCKED", "PROJECT_TOKEN_CONFIGURATION_LOCKED", "PROJECT_SYMBOL_LOCKED",
@@ -36,6 +52,7 @@ function errorResponse(error) {
       code === "INVALID_REQUEST_BODY" || code === "JSON_CONTENT_TYPE_REQUIRED") {
     return { status: code === "JSON_CONTENT_TYPE_REQUIRED" ? 415 : 400, code };
   }
+  if (code === "TRUSTED_VERIFIER_REQUIRED") return { status: 403, code };
   if (CONFLICTS.has(code)) return { status: 409, code };
   if (NOT_FOUND.has(code)) return { status: 404, code };
   if (/^[A-Z][A-Z0-9_]{2,100}$/.test(code)) return { status: 400, code };
@@ -100,6 +117,7 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
             !Number.isSafeInteger(input.expected_revision) || input.expected_revision < 1) {
           throw Error("INVALID_PROJECT_COMMAND");
         }
+        assertOperatorCommand(input.type, input.payload);
         const result = store.append(projectId, {
           command_id: input.command_id, type: input.type, payload: input.payload
         }, { expected_revision: input.expected_revision, actor_id: "operator" });

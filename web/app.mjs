@@ -133,8 +133,11 @@ function renderTerminal(){
  const navContent=seriesChart(snapshots.map(x=>({label:x.sequence,value:x.nav_base_units})),"NAV");
  const participantRows=[["买入地址",isSample?"—":report.market_history.buy_address_count??"—"],["卖出地址",isSample?"—":report.market_history.sell_address_count??"—"],["实际 SOL 储备",money(m.verified_real_reserve_base_units)],["历史回撤",isSample||a.max_observed_drawdown_bps==null?"—":Number(a.max_observed_drawdown_bps)/100+"%"]];
  const actionForm='<form id="terminal-meta"><div class="field-pair"><label>名称<input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"></label><label>Symbol<input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"></label></div><div class="row"><button type="submit" class="primary">保存项目资料</button><button type="button" disabled>提交发行</button></div><p class="muted">仅保存当前会话资料，不代表已发行，不调用发行接口。</p></form>';
- main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>'+esc(metadata?.symbol||(!isSample?scope.projectId:"未选择 Token"))+' <span class="pair-unit">/ SOL</span></h2><small>'+esc(metadata?.name||(!isSample?scope.tokenMint:"新建项目或载入记录"))+'</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
+ main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>项目操作台</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
  '<div id="terminal-project-context" class="pro-statebar">正在读取 Project 数据…</div>'+
+ '<div id="terminal-context-notice" role="status"></div>'+
+ '<div id="terminal-report-area"'+(activeProjectId?' hidden inert style="display:none"':'')+'>'+
+ '<section class="pro-pane"><h3>独立离线报告</h3><p class="muted">报告项目：'+esc(scope.projectId)+' · Mint：'+esc(scope.tokenMint)+' · '+esc(sourceLabel)+'</p></section>'+
   '<div class="pro-statebar"><span><i class="status-dot"></i> '+(isSample?"SYNTHETIC SAMPLE":"OFFLINE REVIEW")+'</span><span>'+esc(sourceLabel)+'</span><span>'+(isSample?"仅展示合成样本 · 执行禁用":"离线审阅 · 禁止交易")+'</span><span>阶段：'+esc(workflow.review_status)+'</span></div>'+
  '<section class="pro-pane" style="margin-bottom:12px"><h3>项目业务流程 · '+esc(workflow.review_status)+'</h3>'+table(["业务阶段","状态","说明"],workflow.steps.map(x=>[x.label,x.status,x.note]))+'<div class="row"><button id="workflow-sample">载入离线验收样本</button><button id="workflow-cash" '+(isSample?"disabled":"")+'>资金流水</button><button id="workflow-finance" '+(isSample?"disabled":"")+'>财务结算复核</button><button id="workflow-risk" '+(isSample?"disabled":"")+'>风险复核</button><button id="workflow-graduation">毕业与外盘审阅</button><button id="workflow-save" '+(isSample||workspaceBusy?"disabled":"")+'>加入项目档案</button><button id="workflow-export" '+(isSample?"disabled":"")+'>导出原始报告</button></div><p role="status" class="muted">'+esc(workflowMessage)+'</p></section>'+
  '<div class="pro-metrics">'+[["历史期末净值",money(d.performance.closing_nav_base_units)],["历史期末现金",money(a.closing_cash_base_units)],["已实现收益",money(a.realized_project_pnl_base_units)],["库存成本",money(a.remaining_cost_basis_base_units)],["创作者费",money(a.creator_cash_income_base_units)],["最大回撤",isSample||a.max_observed_drawdown_bps==null?"—":Number(a.max_observed_drawdown_bps)/100+"%"]].map(([k,v])=>'<div class="pro-metric"><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div>'+
@@ -143,9 +146,11 @@ function renderTerminal(){
  '<aside class="pro-actions"><section class="pro-pane"><h3>执行状态</h3><div class="notice">交易执行已关闭。当前尚未完成 Project Market 身份绑定、Venue Adapter、订单账本和交易前 Risk Gate；不会调用 Pump Lab 默认 Mint。</div></section><section class="pro-pane"><h3>资产核算</h3><div class="key-values"><div><span>库存成本</span><strong>'+esc(money(a.remaining_cost_basis_base_units))+'</strong></div><div><span>已实现收益</span><strong>'+esc(money(a.realized_project_pnl_base_units))+'</strong></div><div><span>可兑现估值</span><strong>— SOL</strong></div></div></section></aside></div>'+
  '<section class="pro-pane pro-blotter"><div class="pro-blotter-head"><div class="terminal-tabs" role="group" aria-label="操作台明细">'+[["inventory","钱包库存"],...tabs.filter(t=>t[0]!=="inventory"),["nav","资产曲线"]].map(([id,label])=>'<button data-tab="'+id+'" aria-pressed="'+(terminalTab===id)+'">'+label+'</button>').join("")+'</div><button id="terminal-pause">'+(reviewPaused?"恢复浏览":"暂停浏览")+'</button></div><div class="tab-content">'+(reviewPaused?emptyState("浏览已暂停","恢复浏览后查看当前报告明细"):terminalTab==="nav"?navContent:isSample&&terminalTab!=="logs"?emptyState("暂无记录","载入项目数据后显示明细"):rows[terminalTab]())+'</div></section>'+
  '<div class="pro-bottom"><span>数据来源：'+esc(sourceLabel)+(!isSample&&!d.settlement_allowed?" · 未通过独立认证，禁止结算":"")+'</span><div class="row"><button id="terminal-export" '+(isSample?"disabled":"")+'>导出报告</button><button id="terminal-settle" '+(!isSample&&workflow.test_settlement_allowed?"":"disabled")+'>合成报告测试结算</button><button id="terminal-archive" '+(workflow.test_archive_allowed?"":"disabled")+'>导出测试归档</button></div></div>'+
+ '</div>'+
  '<dialog id="launch-dialog" class="pro-dialog"><div class="pro-dialog-head"><h3>发行配置</h3><button data-close="launch-dialog" aria-label="关闭">×</button></div>'+actionForm+'</dialog>'+
  '<dialog id="data-dialog" class="pro-dialog"><div class="pro-dialog-head"><h3>项目数据</h3><button data-close="data-dialog" aria-label="关闭">×</button></div><label for="terminal-import">导入区间报告</label><input type="file" id="terminal-import" accept=".json"><div class="row"><button id="terminal-local-load" class="primary">读取本地记录</button></div><p id="terminal-error" class="negative" role="status"></p></dialog>';
  const projectContext=main.querySelector("#terminal-project-context");
+  main.querySelector("#open-data").disabled=Boolean(activeProjectId);
   const contextVersion=++terminalContextVersion;
   listProjects().then(projects=>{
    if(page!=="terminal"||contextVersion!==terminalContextVersion)return;
@@ -154,9 +159,22 @@ function renderTerminal(){
    projectContext.innerHTML='<div class="row"><label>当前 Project <select id="terminal-project-select">'+options+'</select></label>'+
     (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(selected.lifecycle.stage)+'</span><span>Mint：'+esc(selected.token.mint||"未登记")+'</span><span>市场：'+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' 已核验</span>':'<span>尚未选择项目</span>')+
     '<span>Execution: DISABLED</span></div>';
-   main.querySelector("#terminal-project-select").onchange=e=>{activeProjectId=e.target.value||null;record("project.context.selected",{project_id:activeProjectId});render()};
+   const notice=main.querySelector("#terminal-context-notice");
+   if(activeProjectId){
+    notice.innerHTML=note(selected?"当前 Project 尚未接入独立核验的市场及财务数据。为防止跨项目误用，历史报告已隔离；清除项目选择后可继续独立复盘。":"当前 Project 不存在或不可读取。历史报告保持隔离。");
+    main.querySelector("#open-data").disabled=true;
+   }else{
+    notice.innerHTML=note("当前为独立历史复盘模式，不代表任何 Project 的实时资产或市场状态。");
+   }
+   main.querySelector("#terminal-project-select").onchange=e=>{importTicket++;activeProjectId=e.target.value||null;record("project.context.selected",{project_id:activeProjectId});render()};
   }).catch(()=>{
-   if(page==="terminal"&&contextVersion===terminalContextVersion)projectContext.textContent="Project 数据库不可用；交易执行保持关闭。";
+   if(page==="terminal"&&contextVersion===terminalContextVersion){
+    projectContext.textContent="Project 数据库不可用；交易执行保持关闭。";
+    if(activeProjectId){
+     const clear=document.createElement("button");clear.textContent="返回独立复盘";
+     clear.onclick=()=>{importTicket++;activeProjectId=null;render()};projectContext.append(clear);
+    }
+   }
   });
   main.querySelector("#workflow-sample").onclick=async()=>{if(!isSample&&!window.confirm("切换到离线样本？请先导出当前报告。"))return;const ticket=++importTicket;try{const response=await fetch("../fixtures/synthetic/terminal-candle-report.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("SAMPLE_UNAVAILABLE");const next=await response.json(),nextReport=auditedReport(next);if(!importCurrent(ticket,"terminal"))return;offlineReview=true;data=next;report=nextReport;render()}catch(e){if(importCurrent(ticket,"terminal")){workflowMessage="离线样本载入失败："+errorKind(e);render()}}};
  main.querySelector("#workflow-cash").onclick=()=>{terminalTab="cash";reviewPaused=false;render()};
