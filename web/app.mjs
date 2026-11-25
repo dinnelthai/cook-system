@@ -219,7 +219,7 @@ function renderTerminal(){
            const ctx=await selectProjectRuntimeInterval(selected.project_id,selected.revision,v.runtime_context_id,archiveId);
            if(!businessCurrent()||ticket!==businessTicket||seq!==intervalTicket||!detail.isConnected)return;
            const row=ctx.selected_interval;
-           detail.innerHTML=note(row.status+" · "+row.opening_cutoff+" → "+row.closing_cutoff+(row.evidence_conflict_codes?.length?" · "+row.evidence_conflict_codes.join(" / "):""))+assetCards(row)+'<details><summary>全部资产字段</summary>'+table(["区间资产项","基础单位"],Object.entries(row.assets).map(([key,value])=>[key,value??"—"]))+"</details>"+(row.account_coverage?note("钱包标签覆盖："+row.account_coverage.registered_label_coverage+" · 归属未独立验证")+table(["项目 / 账户合计核对","状态"],row.account_coverage.checks.map(c=>[c.field,c.status])):"");
+           detail.innerHTML=note(row.status+" · "+row.opening_cutoff+" → "+row.closing_cutoff+(row.evidence_conflict_codes?.length?" · "+row.evidence_conflict_codes.join(" / "):""))+assetCards(row)+'<details><summary>全部资产字段</summary>'+table(["区间资产项","基础单位"],Object.entries(row.assets).map(([key,value])=>[key,value??"—"]))+"</details>"+(row.lp_evidence?note("LP 头寸证据："+row.lp_evidence.status+" · 归属、估值及 NAV 是否已包含均未验证；不额外计入资产或费用。"):"")+(row.account_coverage?note("钱包标签覆盖："+row.account_coverage.registered_label_coverage+" · 归属未独立验证")+table(["项目 / 账户合计核对","状态"],row.account_coverage.checks.map(c=>[c.field,c.status])):"");
           }catch(err){if(businessCurrent()&&ticket===businessTicket&&seq===intervalTicket&&detail.isConnected)detail.textContent="区间不可用，请刷新运行概览："+errorKind(err);}
          };
         }

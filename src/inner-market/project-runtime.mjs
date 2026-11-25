@@ -42,8 +42,14 @@ export function buildProjectRuntime(project,{archives,intervals,lifecycle,config
   if(conflict){for(const c of account_coverage.checks){c.project_value=null;c.account_total=null;}for(const k of Object.keys(assets))assets[k]=null;issues.push({code:"RUNTIME_INTERVAL_CONFLICT",reference:i.archive_id});}
   const status=conflict?"REVIEW_REQUIRED":Object.values(assets).every(x=>x!==null)?"DECLARED_ENDPOINT_PRESENT":"INCOMPLETE";
   if(status==="INCOMPLETE")unknown.push({code:"RUNTIME_ASSET_COVERAGE_INCOMPLETE",reference:i.archive_id});
+  unknown.push({code:"HISTORICAL_LP_POSITION_COVERAGE_UNATTESTED",reference:i.archive_id});
   return {report_link_archive_id:i.archive_id,report_digest:i.report_digest,opening_cutoff:i.opening_cutoff,closing_cutoff:i.closing_cutoff,
-   status,assets,account_coverage,evidence_conflict_codes:evidenceConflicts,lp_assets:null,asset_unit_contract:"TOKEN_BASE_UNITS_FOR_TOKEN_QUANTITY; SOL_LAMPORTS_FOR_OTHER_FIELDS",archive_ids:linked.map(a=>a.archive_id)};
+   status,assets,account_coverage,evidence_conflict_codes:evidenceConflicts,lp_assets:null,
+   lp_evidence:{status:conflict?"REVIEW_REQUIRED":"UNAVAILABLE",position_count:null,position_value_base_units:null,
+    fee_cash_base_units:null,fee_receivable_base_units:null,ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",
+    project_nav_inclusion:"NOT_ESTABLISHED",synthetic_statement_model_only:true,
+    reason:conflict?"INTERVAL_EVIDENCE_CONFLICT":"HISTORICAL_POSITION_STATEMENT_NOT_AVAILABLE"},
+   asset_unit_contract:"TOKEN_BASE_UNITS_FOR_TOKEN_QUANTITY; SOL_LAMPORTS_FOR_OTHER_FIELDS",archive_ids:linked.map(a=>a.archive_id)};
  });
  const market=describeRuntimeMarkets(project,{archives,intervals,lifecycle,operational});
  issues.push(...market.issues);unknown.push(...market.unknown);
@@ -54,6 +60,7 @@ export function buildProjectRuntime(project,{archives,intervals,lifecycle,config
   {id:"historical_market",status:lifecycle.markets.some(m=>m.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":!lifecycle.markets.length?"MISSING":lifecycle.markets.every(m=>m.status==="OBSERVED_NOT_ATTESTED")?"OBSERVED_NOT_ATTESTED":"REGISTRATION_OR_EVIDENCE_INCOMPLETE"},
   {id:"financial_interval",status:rows.length?rows.some(r=>r.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":rows.every(r=>r.status==="DECLARED_ENDPOINT_PRESENT")?"DECLARED_ENDPOINTS_PRESENT":"INCOMPLETE":"MISSING"},
   {id:"order_exceptions",status:receipts.some(r=>r.status!=="DECLARED_SAMPLE_MATCH")?"REVIEW_REQUIRED":receipts.length?"DECLARED_MATCH":"UNKNOWN"},
+  {id:"historical_lp_evidence",status:"UNKNOWN"},
   {id:"independent_source",status:"NOT_RUN"}
  ];
  return {schema_version:"cook-project-runtime.1",project_id:project.project_id,project_revision:project.revision,
