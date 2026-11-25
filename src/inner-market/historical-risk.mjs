@@ -6,6 +6,8 @@ const checks=[
  ["market_coverage","MARKET_HISTORY","市场历史覆盖","CRITICAL"],
  ["economic_classification","ECONOMIC_CLASSIFICATION","经济分类认证","CRITICAL"],
  ["cost_basis","COST_BASIS","库存成本认证","CRITICAL"],
+ ["closing_account_set","ACCOUNT_SET_RECONCILIATION","期末账户集合对账","CRITICAL"],
+ ["trade_evidence","TRADE_EVIDENCE","成交证据对账","CRITICAL"],
  ["valuation","VALUATION","资产估值","WARNING"],
  ["candle_evidence","CANDLE_EVIDENCE","K 线证据","WARNING"],
  ["source_attestation","SOURCE_ATTESTATION","来源认证","CRITICAL"],
@@ -47,7 +49,15 @@ export function assessHistoricalRisk({reportChecks,sourceMode,accountAudit=null,
   }
  }
  if(cashAudit===null)alerts.push(alert("CASH_POSTINGS","UNKNOWN","现金分录交叉审计","EVIDENCE_UNAVAILABLE"));
- else if(cashAudit.schema_version!=="cook-archived-cash-crosscheck.1"||cashAudit.status!=="AMOUNTS_INTERNALLY_CONSISTENT")alerts.push(alert("CASH_POSTINGS","CRITICAL","现金分录交叉审计","AUDIT_REVIEW_REQUIRED"));
+ else{
+  if(cashAudit.schema_version!=="cook-archived-cash-crosscheck.1"||cashAudit.status!=="AMOUNTS_INTERNALLY_CONSISTENT")alerts.push(alert("CASH_POSTINGS","CRITICAL","现金分录交叉审计","AUDIT_REVIEW_REQUIRED"));
+  const value=cashAudit.cash_audit?.cash_difference_base_units;
+  if(!signed(value))alerts.push(alert("CASH_LEDGER_DIFF","UNKNOWN","现金账簿差额","EVIDENCE_UNAVAILABLE"));
+  else if(value!=="0")alerts.push(alert("CASH_LEDGER_DIFF","CRITICAL","现金账簿差额","NONZERO_DIFFERENCE"));
+  const expected=cashAudit.cash_audit?.expected_closing_cash_base_units,observed=cashAudit.cash_audit?.observed_closing_cash_base_units;
+  if(signed(expected)&&signed(observed)&&signed(value)&&BigInt(observed)-BigInt(expected)!==BigInt(value))
+   alerts.push(alert("CASH_LEDGER_IDENTITY","CRITICAL","现金差额计算","ARITHMETIC_CONTRADICTION"));
+ }
  alerts.push(alert("CURRENT_MARKET","UNKNOWN","当前市场状态","HISTORICAL_SCOPE_ONLY"));
  alerts.push(alert("INVENTORY_CONCENTRATION","UNKNOWN","持仓集中度","NO_VERIFIED_OWNERSHIP"));
  alerts.push(alert("LIQUIDITY_RISK","UNKNOWN","实时流动性","NO_CURRENT_EVIDENCE"));

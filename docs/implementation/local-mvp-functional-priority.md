@@ -35,3 +35,7 @@ Compare available endpoint balance-sheet components independently. Missing or ma
 ## F07 — synthetic regression evidence
 
 The existing offline participant simulator now emits an aggregate opening/closing asset conservation audit. The audit checks exact integer differences and rejects duplicate agent identities or malformed balances; it neither changes participant behavior nor generates trades. The different-seed regression compares event content rather than seed metadata. The defensive regression explicitly distinguishes its four fixed templates from repeated seed-labelled cases; repetitions do not represent independent market paths. Calibration against real markets is not claimed.
+
+## F08 — historical risk reporting consistency
+
+Historical risk summaries now include independent closing-account-set and trade-evidence review findings. The cash crosscheck's nested ledger difference and arithmetic identity are checked with exact integers even when the top-level summary claims consistency. Missing differences remain unknown. Four regressions cover these cases. Current liquidity, independent ownership, asset valuation and live risk are not inferred from closed-interval accounting. No order sizing, execution policy or forward liquidity model is changed.

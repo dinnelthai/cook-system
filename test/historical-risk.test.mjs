@@ -30,3 +30,21 @@ test("freshness uses explicit observation time and rejects future or invalid tim
  assert.equal(f(null).status,"UNKNOWN");assert.equal(f(901).status,"FRESH");assert.equal(f(899).status,"STALE");assert.equal(f(1001).status,"REVIEW");
  assert.equal(f(900).age_ms,100);assert.throws(()=>assessObservationFreshness({nowMs:1000,maxAgeMs:0}));
 });
+
+test("historical risk includes independent closing account and trade evidence findings",()=>{
+ const i=input();i.reportChecks.push({id:"closing_account_set",status:"REVIEW"},{id:"trade_evidence",status:"REVIEW"});
+ const r=assessHistoricalRisk(i);
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.alerts.some(a=>a.code==="ACCOUNT_SET_RECONCILIATION"&&a.severity==="CRITICAL"));assert.ok(r.alerts.some(a=>a.code==="TRADE_EVIDENCE"&&a.severity==="CRITICAL"));
+});
+test("a contradictory cash ledger amount remains critical despite a claimed consistent summary",()=>{
+ const r=assessHistoricalRisk({...input(),cashAudit:{schema_version:"cook-archived-cash-crosscheck.1",status:"AMOUNTS_INTERNALLY_CONSISTENT",cash_audit:{expected_closing_cash_base_units:"9007199254740993",observed_closing_cash_base_units:"9007199254740994",cash_difference_base_units:"1"}}});
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.alerts.some(a=>a.code==="CASH_LEDGER_DIFF"&&a.severity==="CRITICAL"));
+});
+test("a declared zero cash difference cannot mask arithmetic contradiction",()=>{
+ const r=assessHistoricalRisk({...input(),cashAudit:{schema_version:"cook-archived-cash-crosscheck.1",status:"AMOUNTS_INTERNALLY_CONSISTENT",cash_audit:{expected_closing_cash_base_units:"9007199254740993",observed_closing_cash_base_units:"9007199254740994",cash_difference_base_units:"0"}}});
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.alerts.some(a=>a.code==="CASH_LEDGER_IDENTITY"));
+});
+test("missing cash difference remains unknown and does not imply a balanced ledger",()=>{
+ const r=assessHistoricalRisk({...input(),cashAudit:{schema_version:"cook-archived-cash-crosscheck.1",status:"AMOUNTS_INTERNALLY_CONSISTENT"}});
+ assert.ok(r.alerts.some(a=>a.code==="CASH_LEDGER_DIFF"&&a.severity==="UNKNOWN"));assert.equal(r.live_risk_assessed,false);
+});
