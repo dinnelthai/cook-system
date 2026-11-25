@@ -165,3 +165,5 @@ Do not claim production readiness. Return the report and JSON artifact to the pr
 Additional browser check: change the active-wallet selector in the top header and the wallet-management page independently. Each selector must update the stored active address without throwing a browser-console error or mutating another form's destination field.
 
 CI also runs the unified code acceptance matrix on Node.js 22 and 24. Workflow actions are pinned to immutable commit SHAs; checkout credentials are not persisted and setup-node's automatic package-manager cache is disabled.
+
+The npm lockfile has been normalized with npm 11 so clean installs work with both Node 22/npm 10 and Node 24/npm 11. The CI matrix now installs the committed lockfile directly on both Node versions; it does not rewrite or push repository files during a test run.
