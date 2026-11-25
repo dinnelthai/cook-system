@@ -8,7 +8,7 @@ test("header wallet selector changes active wallet without depending on wallet-m
  globalThis.Option=class{constructor(label,value){this.label=label;this.value=value}};
  globalThis.fetch=async()=>({ok:true,json:async()=>({wallets:[{address:"11111111111111111111111111111111"},{address:"11111111111111111111111111111112"}]})});
  t.after(()=>{globalThis.fetch=previousFetch;if(previousOption===undefined)delete globalThis.Option;else globalThis.Option=previousOption;if(previousStorage===undefined)delete globalThis.localStorage;else globalThis.localStorage=previousStorage;});
- const select={disabled:false,value:"",options:[],add(option){this.options.push(option);added.push(option)}};
+ const select={disabled:false,value:"",options:[],replaceChildren(){this.options=[]},add(option){this.options.push(option);added.push(option)}};
  const state={textContent:""},button={};
  const host={innerHTML:"",querySelector(selector){return selector==="select"?select:selector==="[data-state]"?state:button}};
  await mountWalletSelector(host,()=>{});
