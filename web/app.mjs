@@ -156,7 +156,7 @@ function mountMemeDesk(){
  const shell=document.createElement("div");shell.className="meme-desk";
  const center=document.createElement("div");center.className="meme-center";
  const side=document.createElement("aside");side.className="meme-control";side.setAttribute("aria-label","项目运营与发行准备");
- side.innerHTML='<div class="meme-mode" role="group" aria-label="工作模式"><button data-desk-mode="operations">运营</button><button data-desk-mode="launch">发行准备</button></div><div id="meme-control-body"></div>';
+ side.innerHTML='<div class="meme-mode" role="group" aria-label="工作模式"><button data-desk-mode="operations">运营</button><button data-desk-mode="launch">发行准备</button></div><div id="meme-live-summary" aria-label="项目核算与风险"></div><div id="meme-control-body"></div>';
  shell.append(center,side);
  const reportArea=main.querySelector("#terminal-report-area"),placeholder=main.querySelector("#terminal-scoped-placeholder");
  const wallet=document.createElement("section");wallet.className="pro-pane meme-wallet";wallet.innerHTML='<h3>项目钱包 / Wallets</h3>'+emptyState("未选择项目","从左侧选择 Meme 查看登记钱包。");
@@ -170,7 +170,11 @@ function mountMemeDesk(){
  center.append(main.querySelector("#terminal-project-context"),main.querySelector("#terminal-context-notice"),placeholder,reportArea,wallet,main.querySelector("#terminal-business-review"),main.querySelector("#terminal-project-details"));
  main.insertBefore(shell,main.querySelector("#launch-dialog"));
  let selected=null,projects=[],loaded=false,failed=false;
- const controls=side.querySelector("#meme-control-body"),list=rail.querySelector("#meme-list");
+ const controls=side.querySelector("#meme-control-body"),summary=side.querySelector("#meme-live-summary"),list=rail.querySelector("#meme-list");
+ const reviewBox=document.createElement("details");reviewBox.className="meme-report-extra meme-business-extra";reviewBox.hidden=!activeProjectId;reviewBox.innerHTML="<summary>项目生命周期与详细复核</summary>";
+ const business=main.querySelector("#terminal-business-review");business.before(reviewBox);reviewBox.append(business);
+ function summaryState(message){summary.textContent=message;}
+ summaryState(activeProjectId?"读取项目核算与风险…":"选择 Meme 后查看项目核算与风险。");
  function drawList(){
   if(!loaded){list.textContent=failed?"目录不可用，请重试。":"读取项目目录…";return;}
   const q=memeFilter.trim().toLowerCase(),match=p=>[p.profile?.name,p.profile?.symbol,p.token?.mint].some(v=>String(v??"").toLowerCase().includes(q));
@@ -182,6 +186,7 @@ function mountMemeDesk(){
  }
  rail.querySelector("#meme-search").oninput=e=>{memeFilter=e.target.value;drawList();};
  function drawControls(){
+  summary.hidden=memeMode!=="operations";
   side.querySelectorAll("[data-desk-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.deskMode===memeMode)));
   const button=(action,label,disabled=false)=>'<button type="button" data-desk-action="'+action+'"'+(disabled?" disabled":"")+'>'+label+'</button>';
   const missing=!selected;
@@ -205,7 +210,19 @@ function mountMemeDesk(){
   if(current)wallet.innerHTML='<div class="meme-rail-head"><h3>项目钱包 / Wallets</h3><button id="meme-wallet-assets" type="button">资产详情</button></div><p class="muted">登记钱包 · 非实时余额 · 归属未独立核验</p>'+table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(current));
   else wallet.innerHTML='<h3>项目钱包 / Wallets</h3>'+emptyState("未选择项目","选择左侧 Meme 查看登记钱包。");
   const b=wallet.querySelector("#meme-wallet-assets");if(b)b.onclick=()=>go("wallet");
- },error(){failed=true;drawList();}};
+ },error(){failed=true;drawList();summaryState("项目目录不可用，未显示资产与风险。");},
+  pending(){summaryState("读取项目核算与风险…");},
+  unavailable(){summaryState("项目复核不可用，请刷新。");},
+  showReview(v,model,treasury){
+   if(!selected||v.project_id!==selected.project_id||v.project_revision!==selected.revision)return;
+   const kv=rows=>'<div class="meme-kv">'+rows.map(([label,value])=>"<span>"+esc(label)+"</span><strong>"+esc(value??"未知")+"</strong>").join("")+"</div>";
+   const section=(heading,body)=>'<section class="meme-control-section"><h3>'+heading+"</h3>"+body+"</section>";
+   summary.innerHTML=section("项目核算 · 历史区间",'<p class="muted">声明值，未独立认证；非当前余额。</p><div id="meme-treasury-host"></div>')+
+    section("风险与订单",'<div class="meme-risk-grid">'+[["严重",model.counts.critical,"risk-critical"],["警告",model.counts.warning,"risk-warning"],["未知",model.counts.unknown,"risk-unknown"]].map(([label,count,cls])=>'<div><span>'+label+'</span><strong class="'+(count?cls:"")+'">'+esc(count)+"</strong></div>").join("")+ "</div>"+kv([["待复核订单",v.orders.unresolved_count],["实时风险","未核验"]]))+
+    section("市场质量与模型",kv([["历史市场证据",model.market.status],["内盘区间",model.market.interval_count],["外盘快照",model.market.pool_count],["参与者模型",v.model_evidence?.participant_model?.status],["当前市场质量","未核验"]]))+
+    section("生命周期",'<div class="meme-stage-list">'+projectStageStrip(model.stage).map(s=>'<div class="'+s.state.toLowerCase()+'"><i aria-hidden="true"></i>'+esc(s.label)+(s.state==="CURRENT"?" · 当前":"")+"</div>").join("")+"</div>");
+   if(treasury)summary.querySelector("#meme-treasury-host").append(treasury);
+  }};
 }
 
 function renderTerminal(){
@@ -285,7 +302,7 @@ function renderTerminal(){
       const businessCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&businessArea.isConnected;
       let businessTicket=0;
       async function refreshBusiness(){
-       const ticket=++businessTicket;businessArea.textContent="读取统一项目复核…";riskArea.textContent="读取同一项目快照…";
+       const ticket=++businessTicket;memeDesk.pending();businessArea.textContent="读取统一项目复核…";riskArea.textContent="读取同一项目快照…";
        const area=main.querySelector("#terminal-report-area");area.hidden=true;area.inert=true;area.style.display="none";
        main.querySelector("#terminal-scoped-placeholder").hidden=false;
        try{
@@ -348,11 +365,11 @@ function renderTerminal(){
         businessArea.querySelector("#project-show-setup").onclick=()=>{importTicket++;page="create";render();};
         businessArea.querySelector("#project-show-risk").onclick=()=>{main.querySelector("#terminal-project-details").open=true;riskArea.scrollIntoView({block:"start"});};
         riskArea.querySelector("#project-risk-export").onclick=()=>download("project-risk-review.json",JSON.stringify(gr,null,2));
-        const intervalSelect=businessArea.querySelector("#runtime-interval");
+        const intervalSelect=businessArea.querySelector("#runtime-interval"),intervalDetail=businessArea.querySelector("#runtime-interval-detail");
         if(intervalSelect){
          let intervalTicket=0;
          intervalSelect.onchange=async()=>{
-          const seq=++intervalTicket,archiveId=intervalSelect.value,detail=businessArea.querySelector("#runtime-interval-detail");
+          const seq=++intervalTicket,archiveId=intervalSelect.value,detail=intervalDetail;
           if(!archiveId){detail.innerHTML=assetCards(null)+note("请选择一个历史区间。");return;}
           detail.textContent="读取区间资产…";
           try{
@@ -365,7 +382,8 @@ function renderTerminal(){
         }
         businessArea.querySelector("#business-refresh").onclick=()=>{importTicket++;render();};
         businessArea.querySelector("#business-export").onclick=()=>download("project-business-review.json",JSON.stringify(v,null,2));
-       }catch(err){if(businessCurrent()&&ticket===businessTicket){businessArea.textContent="统一复核不可用："+errorKind(err);riskArea.textContent="风险证据不可用，请刷新项目";const retry=document.createElement("button");retry.textContent="重新读取项目与最新版本";retry.onclick=()=>{importTicket++;render();};businessArea.append(retry);}}
+         memeDesk.showReview(v,model,businessArea.querySelector(".operator-treasury"));
+       }catch(err){if(businessCurrent()&&ticket===businessTicket){memeDesk.unavailable();businessArea.textContent="统一复核不可用："+errorKind(err);riskArea.textContent="风险证据不可用，请刷新项目";const retry=document.createElement("button");retry.textContent="重新读取项目与最新版本";retry.onclick=()=>{importTicket++;render();};businessArea.append(retry);}}
       }
       void refreshBusiness();
       const marketArea=main.querySelector("#terminal-market-evidence");marketArea.hidden=false;
