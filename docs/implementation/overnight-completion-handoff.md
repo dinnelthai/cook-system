@@ -39,3 +39,7 @@ Review branch: codex/overnight-market-quality-completion
 ## Index hardening follow-up
 
 The index now uses an unambiguous serialized namespace tuple, sorts within each namespace by the full chain ordering coordinates (synthetic records use event time and sequence), requires the archive manifest and checks bounded reads, and rejects unsupported filters. Query responses disclose truncation. Existing index snapshots lacking the full ordering fields must be rebuilt; immutable batch files are unchanged. Checksums remain consistency checks, not independent source authentication or a transactional snapshot under concurrent writes.
+
+## Source identity follow-up
+
+An explicitly pinned genesis must match before collector account/history reads; an unpinned genesis observation cannot authenticate itself. Offline cross-source receipt comparison detects missing signatures and conflicting raw transaction JSON but cannot prove provider independence or chain finality. Pagination audit rejects cursor cycles and event-quality warnings. The cross-source comparison is not yet wired into the report UI, and collector-native pagination manifests still require provider-specific integration. Existing replay-complete statuses describe internal replay coverage, not authenticated chain completeness.

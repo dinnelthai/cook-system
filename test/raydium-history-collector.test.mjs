@@ -326,5 +326,7 @@ test("collector follows a LaunchLab pool through CPMM migration, swaps, and vaul
   assert.equal(result.launchlab.vault_delta_replay.status,"PASS");
   assert.equal(result.cpmm.vault_delta_replay.status,"PASS");
   assert.equal(result.coverage_complete,true);
+  assert.equal(result.source_provenance.status,"UNVERIFIED");
+  await assert.rejects(()=>fetchRaydiumMintHistory({rpc:{...rpc,getGenesisHash:async()=>"wrong"},mint:MINT,quoteMint:WSOL,expectedGenesisHash:"expected"}),/PINNED_GENESIS_MISMATCH/);
   assert.equal(result.vault_reconciliation_pass,true);
 });

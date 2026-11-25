@@ -29,7 +29,7 @@ import {
 import { buildRawCandles } from "../../core/candle-builder.mjs";
 import { auditObservedEventTimeline } from "../../core/event-timeline-audit.mjs";
 import { auditCandleEvidence } from "../../core/candle-integrity-audit.mjs";
-import { assessSourceProvenance } from "../../core/source-provenance.mjs";
+import { assessSourceProvenance, observeHistoricalGenesis } from "../../core/source-provenance.mjs";
 import { fetchPumpFeeConfigHistory } from "./pump-fee-history.mjs";
 
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -364,10 +364,7 @@ export async function fetchPumpMintHistory({
   }
   if (typeof mint !== "string" || mint.length === 0) throw new TypeError("mint is required");
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("concurrency must be positive");
-  let observedGenesisHash = null;
-  if (typeof rpc.getGenesisHash === "function") {
-    try { observedGenesisHash = await rpc.getGenesisHash(); } catch { observedGenesisHash = null; }
-  }
+  const observedGenesisHash = await observeHistoricalGenesis(rpc, expectedGenesisHash);
   const curveAddress = derivePumpBondingCurveAddress(mint);
 
   const [mintInfo, curveInfo, curveSignatureCollection, feeConfigHistory] = await Promise.all([
@@ -662,7 +659,7 @@ export async function fetchPumpMintHistory({
   const adapterVersion = getPumpIdlSnapshotMetadata().pump_idl_blob_sha ?? getPumpIdlSnapshotMetadata().pump_amm_idl_blob_sha ?? "unknown";
   const queryFingerprint = createHash("sha256").update(JSON.stringify({ mint, network, maxSignatures, pageSize, until, commitment })).digest("hex");
   const sourceProvenance = assessSourceProvenance({
-    scope: { network, genesis_hash: expectedGenesisHash ?? observedGenesisHash ?? null, provenance: "observed_chain" },
+    scope: { network, genesis_hash: expectedGenesisHash ?? null, provenance: "observed_chain" },
     source: { source_type: "rpc", source_id: "solana-rpc:" + endpointId, endpoint_id: endpointId, observed_genesis_hash: observedGenesisHash },
     capture: { commitment, captured_at_ms: Date.now(), adapter_version: String(adapterVersion), query_fingerprint: queryFingerprint },
     rawPayload: allFetched.map(item => ({ signature: item.signature, transaction: item.transaction }))

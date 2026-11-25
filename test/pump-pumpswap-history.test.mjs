@@ -253,6 +253,8 @@ test("full mint collector follows migration into PumpSwap and reconciles post-gr
   assert.notEqual(result.event_timeline_audit.curve.status,"REVIEW_REQUIRED");
   assert.equal(result.candle_integrity_audit.status,"CONSISTENT");
   assert.equal(result.source_provenance.source_attestation,"UNKNOWN");
+  assert.equal(result.source_provenance.status,"UNVERIFIED");
+  await assert.rejects(()=>fetchPumpMintHistory({rpc:{...rpc,getGenesisHash:async()=>"wrong"},mint:MINT,network,expectedGenesisHash:"expected"}),/PINNED_GENESIS_MISMATCH/);
   assert.equal(result.pool_replays.length,1);
   assert.equal(result.pool_replays[0].replay_status,"REPLAYED_FULL_POOL_HISTORY");
   assert.equal(result.status,"REPLAYED_FULL_HISTORY");

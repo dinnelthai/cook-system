@@ -21,7 +21,8 @@ export function auditHistoricalCoverage({scope,scan,events}){
  const byId=new Map(batch.events.map(e=>[e.event_id,e]));
  const ordered=batch.events;
  const rank=new Map(ordered.map((e,i)=>[e.event_id,i]));
- const issues=[],seen=new Set();
+ const issues=[],seen=new Set(),seenCursors=new Set();
+ if(batch.issues.includes("EVENT_QUALITY_REVIEW"))issue(issues,"COVERAGE_EVENT_QUALITY_REVIEW");
  let occurrences=0,previousRank=null,previousCursor=null,previousHasMore=true;
  const pages=scan.pages;
  for(let i=0;i<pages.length;i++){
@@ -33,10 +34,11 @@ export function auditHistoricalCoverage({scope,scan,events}){
   if(i===0&&p.cursor_in!==null)issue(issues,"COVERAGE_INITIAL_CURSOR_MISMATCH");
   if(i>0&&(!previousHasMore||p.cursor_in!==previousCursor))issue(issues,"COVERAGE_CURSOR_CHAIN_MISMATCH");
   if(p.has_more&&(!p.cursor_out||p.cursor_out===p.cursor_in))issue(issues,"COVERAGE_CURSOR_DID_NOT_ADVANCE");
+  if(p.cursor_out!==null){if(seenCursors.has(p.cursor_out))issue(issues,"COVERAGE_CURSOR_CYCLE");seenCursors.add(p.cursor_out);}
   if(!p.has_more&&p.cursor_out!==null)issue(issues,"COVERAGE_TERMINAL_CURSOR_NOT_NULL");
   if(p.has_more&&p.event_ids.length===0)issue(issues,"COVERAGE_EMPTY_NONTERMINAL_PAGE");
   for(const id of p.event_ids){
-   occurrences++;
+   if(++occurrences>100000)throw Error("COVERAGE_OCCURRENCE_LIMIT");
    if(!nonempty(id))throw Error("INVALID_COVERAGE_EVENT_ID");
    const e=byId.get(id);
    if(!e){issue(issues,"COVERAGE_UNKNOWN_EVENT_ID");continue;}

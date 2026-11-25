@@ -12,7 +12,9 @@ export function assessSourceProvenance({scope,source,capture,rawPayload}={}){
   source:{source_type:source.source_type??"simulator",source_id:source.source_id??null},
   capture:{captured_at_ms:capture.captured_at_ms??null,adapter_version:capture.adapter_version??null,raw_payload_sha256:rawHash},
   issues:["SYNTHETIC_DATA_NOT_CHAIN_EVIDENCE"],source_attestation:"NOT_APPLICABLE",signature_verified:false};
- if(scope.provenance!=="observed_chain")issues.push("PROVENANCE_SCOPE_MISMATCH");
+ if(scope.provenance!=="observed_chain"||!["mainnet","devnet","local_sim"].includes(scope.network))issues.push("PROVENANCE_SCOPE_MISMATCH");
+ if(!nonempty(scope.genesis_hash))issues.push("EXPECTED_GENESIS_UNPINNED");
+ if(rawPayload==null)issues.push("RAW_EVIDENCE_UNAVAILABLE");
  if(!["rpc","indexer"].includes(source.source_type))issues.push("SOURCE_TYPE_NOT_INDEPENDENTLY_CHECKABLE");
  if(!nonempty(source.source_id)||!nonempty(source.endpoint_id))issues.push("SOURCE_IDENTITY_MISSING");
  if(!nonempty(source.observed_genesis_hash))issues.push("GENESIS_IDENTITY_UNAVAILABLE");
@@ -26,4 +28,52 @@ export function assessSourceProvenance({scope,source,capture,rawPayload}={}){
   capture:{commitment:capture.commitment??null,captured_at_ms:capture.captured_at_ms??null,adapter_version:capture.adapter_version??null,query_fingerprint:capture.query_fingerprint??null,raw_payload_sha256:rawHash},
   issues,source_attestation:"UNKNOWN",signature_verified:false,
   note:"Genesis and capture metadata are caller-supplied observations. Hashing detects later byte changes but does not authenticate the source or prove completeness."};
+}
+
+/** Reject a contradictory explicitly pinned identity before a historical read.
+ * Unpinned readers remain compatible, but their identity stays unverified. */
+export async function observeHistoricalGenesis(rpc,expectedGenesisHash=null){
+ if(expectedGenesisHash!==null&&!nonempty(expectedGenesisHash))throw Error("INVALID_EXPECTED_GENESIS");
+ let observed=null;
+ if(typeof rpc?.getGenesisHash==="function"){
+  try{const value=await rpc.getGenesisHash();if(nonempty(value))observed=value;}catch{}
+ }
+ if(expectedGenesisHash!==null){
+  if(observed===null)throw Error("PINNED_GENESIS_UNAVAILABLE");
+  if(observed!==expectedGenesisHash)throw Error("PINNED_GENESIS_MISMATCH");
+ }
+ return observed;
+}
+
+/** Compare already captured receipt sets for the same declared closed scope.
+ * Different labels do not prove that the underlying providers are independent.
+ * Strict JSON equivalence is conservative: encoding differences need review. */
+export function compareArchivedSourceReceipts({scope,left,right}={}){
+ if(!plain(scope)||scope.provenance!=="observed_chain"||!nonempty(scope.genesis_hash)||
+    !["mainnet","devnet","local_sim"].includes(scope.network)||!nonempty(scope.interval_id)||
+    !nonempty(scope.token_mint)||!nonempty(scope.quote_mint))throw Error("INVALID_COMPARISON_SCOPE");
+ const issues=[],maps=[];
+ for(const capture of [left,right]){
+  if(!plain(capture)||!plain(capture.scope)||!nonempty(capture.source_id)||!nonempty(capture.endpoint_id)||
+     !Array.isArray(capture.receipts)||capture.receipts.length>10000)throw Error("INVALID_RECEIPT_CAPTURE");
+  if(stable(capture.scope)!==stable(scope))issues.push("RECEIPT_SCOPE_MISMATCH");
+  if(capture.observed_genesis_hash!==scope.genesis_hash)issues.push("RECEIPT_GENESIS_MISMATCH");
+  const map=new Map();
+  for(const row of capture.receipts){
+   if(!plain(row)||!nonempty(row.signature)||!plain(row.transaction)||!Number.isSafeInteger(row.transaction.slot)||row.transaction.slot<0||
+      row.transaction.transaction?.signatures?.[0]!==row.signature||!plain(row.transaction.meta))throw Error("INVALID_ARCHIVED_RECEIPT");
+   if(map.has(row.signature))issues.push("DUPLICATE_RECEIPT");
+   map.set(row.signature,hash(row.transaction));
+  }
+  maps.push(map);
+ }
+ const [a,b]=maps,missingLeft=[],missingRight=[],conflicts=[];
+ for(const [id,h] of a){if(!b.has(id))missingRight.push(id);else if(b.get(id)!==h)conflicts.push(id);}
+ for(const id of b.keys())if(!a.has(id))missingLeft.push(id);
+ if(conflicts.length)issues.push("RECEIPT_CONTENT_CONFLICT");
+ const distinct=left.source_id!==right.source_id&&left.endpoint_id!==right.endpoint_id;
+ const status=issues.length?"REVIEW_REQUIRED":!distinct||!a.size||missingLeft.length||missingRight.length?"PARTIAL":"MATCHED_NOT_AUTHENTICATED";
+ return {schema_version:"cook-source-receipt-comparison.1",status,issues:[...new Set(issues)],
+  left_count:a.size,right_count:b.size,missing_left:missingLeft.sort(),missing_right:missingRight.sort(),conflicting_signatures:conflicts.sort(),
+  distinct_declared_sources:distinct,source_attestation:"UNKNOWN",history_complete_attested:false};
 }

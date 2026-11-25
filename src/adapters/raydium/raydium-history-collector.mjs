@@ -15,7 +15,7 @@ import {
 import { buildRawCandles } from "../../core/candle-builder.mjs";
 import { auditObservedEventTimeline } from "../../core/event-timeline-audit.mjs";
 import { auditCandleEvidence } from "../../core/candle-integrity-audit.mjs";
-import { assessSourceProvenance } from "../../core/source-provenance.mjs";
+import { assessSourceProvenance, observeHistoricalGenesis } from "../../core/source-provenance.mjs";
 
 export const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -479,10 +479,7 @@ export async function fetchRaydiumMintHistory({
   expectedGenesisHash = null,
 } = {}) {
   if (!rpc) throw new TypeError("rpc client is required");
-  let observedGenesisHash = null;
-  if (typeof rpc.getGenesisHash === "function") {
-    try { observedGenesisHash = await rpc.getGenesisHash(); } catch { observedGenesisHash = null; }
-  }
+  const observedGenesisHash = await observeHistoricalGenesis(rpc, expectedGenesisHash);
   const mintInfo = await rpc.getAccountInfo(mint);
   const quoteInfo = await rpc.getAccountInfo(quoteMint);
   const mintDecoded = decodeMintAccount(mintInfo);
@@ -735,7 +732,7 @@ export async function fetchRaydiumMintHistory({
   const endpointId = (() => { try { return new URL(rpc.endpoint).hostname; } catch { return "injected-rpc-client"; } })();
   const queryFingerprint = createHash("sha256").update(JSON.stringify({ mint, quoteMint, maxSignatures, pageSize, untilSignature })).digest("hex");
   const sourceProvenance = assessSourceProvenance({
-    scope: { network: "mainnet", genesis_hash: expectedGenesisHash ?? observedGenesisHash ?? null, provenance: "observed_chain" },
+    scope: { network: "mainnet", genesis_hash: expectedGenesisHash ?? null, provenance: "observed_chain" },
     source: { source_type: "rpc", source_id: "solana-rpc:" + endpointId, endpoint_id: endpointId, observed_genesis_hash: observedGenesisHash },
     capture: { commitment: "confirmed", captured_at_ms: Date.now(), adapter_version: JSON.stringify(getRaydiumIdlMetadata()), query_fingerprint: queryFingerprint },
     rawPayload: parsedTransactions.map(item => ({ signature: item.signature, transaction: item.transaction }))

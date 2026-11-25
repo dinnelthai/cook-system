@@ -5,7 +5,7 @@ import {dirname,join} from "node:path";
 import {loadSchemaRegistry,validateJsonSchema} from "../src/core/json-schema-validator.mjs";
 import {auditObservedEventTimeline} from "../src/core/event-timeline-audit.mjs";
 import {auditCandleEvidence} from "../src/core/candle-integrity-audit.mjs";
-import {assessSourceProvenance} from "../src/core/source-provenance.mjs";
+import {assessSourceProvenance,observeHistoricalGenesis,compareArchivedSourceReceipts} from "../src/core/source-provenance.mjs";
 const root=join(dirname(fileURLToPath(import.meta.url)),"..","schemas"),registry=await loadSchemaRegistry(root);
 const market={chain_id:"solana",network:"synthetic",token_mint:"token",quote_mint:"SOL",curve_program_id:"synthetic-curve",market_phase:"bonding_curve"};
 const event=(i,extra={})=>({schema_version:"1.0.0",event_id:"e"+i,provenance:"observed_chain",event_kind:"CURVE_BUY_EXECUTED",
@@ -75,4 +75,26 @@ test("timeline treats bonding-curve and post-graduation phases as one token life
  b.market={...b.market,market_phase:"post_graduation"};
  const r=auditObservedEventTimeline({events:[a,b]});
  assert.notEqual(r.status,"REVIEW_REQUIRED");assert.deepEqual(r.ordered_event_ids,["e1","e2"]);
+});
+
+test("observed genesis cannot serve as its own expected identity",()=>{
+ const r=assessSourceProvenance({scope:{network:"local_sim",genesis_hash:null,provenance:"observed_chain"},source:{source_type:"rpc",source_id:"a",endpoint_id:"a",observed_genesis_hash:"g"},capture:{commitment:"confirmed",captured_at_ms:1,adapter_version:"1",query_fingerprint:"q"},rawPayload:[]});
+ assert.equal(r.status,"UNVERIFIED");assert.ok(r.issues.includes("EXPECTED_GENESIS_UNPINNED"));
+});
+test("pinned genesis must be present and match before reading history",async()=>{
+ assert.equal(await observeHistoricalGenesis({getGenesisHash:async()=>"g"},"g"),"g");
+ await assert.rejects(()=>observeHistoricalGenesis({getGenesisHash:async()=>"x"},"g"),/PINNED_GENESIS_MISMATCH/);
+ await assert.rejects(()=>observeHistoricalGenesis({},"g"),/PINNED_GENESIS_UNAVAILABLE/);
+ assert.equal(await observeHistoricalGenesis({}),null);
+});
+test("archived cross-source receipts distinguish exact agreement, missing data and contradiction",()=>{
+ const scope={network:"local_sim",provenance:"observed_chain",genesis_hash:"g",token_mint:"t",quote_mint:"q",interval_id:"closed"};
+ const receipt={signature:"s",transaction:{slot:1,transaction:{signatures:["s"]},meta:{err:null,fee:5}}};
+ const left={scope,source_id:"a",endpoint_id:"a",observed_genesis_hash:"g",receipts:[receipt]};
+ const right={...left,source_id:"b",endpoint_id:"b",receipts:[structuredClone(receipt)]};
+ const ok=compareArchivedSourceReceipts({scope,left,right});assert.equal(ok.status,"MATCHED_NOT_AUTHENTICATED");assert.equal(ok.source_attestation,"UNKNOWN");
+ assert.equal(compareArchivedSourceReceipts({scope,left,right:{...right,receipts:[]}}).status,"PARTIAL");
+ right.receipts[0].transaction.meta.fee=6;
+ assert.equal(compareArchivedSourceReceipts({scope,left,right}).status,"REVIEW_REQUIRED");
+ assert.equal(compareArchivedSourceReceipts({scope,left,right:left}).status,"PARTIAL");
 });

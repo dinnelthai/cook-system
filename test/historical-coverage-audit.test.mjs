@@ -48,3 +48,16 @@ test("out-of-order pages and malformed cursor advancement are rejected",()=>{
  ])});
  assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.issues.includes("COVERAGE_EVENT_ORDER_MISMATCH"));
 });
+
+test("a cyclic cursor chain is rejected even when pages contain distinct records",()=>{
+ const r=auditHistoricalCoverage({scope,events:[event(1),event(2),event(3)],scan:scan([
+ {page_index:0,cursor_in:null,cursor_out:"a",has_more:true,event_ids:["event-1"]},
+ {page_index:1,cursor_in:"a",cursor_out:"b",has_more:true,event_ids:["event-2"]},
+ {page_index:2,cursor_in:"b",cursor_out:"a",has_more:true,event_ids:["event-3"]}
+ ])});assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.issues.includes("COVERAGE_CURSOR_CYCLE"));
+});
+test("terminal pagination cannot clear event quality warnings",()=>{
+ const e=event(1);e.quality.validation_status="warning";
+ const r=auditHistoricalCoverage({scope,events:[e],scan:scan([{page_index:0,cursor_in:null,cursor_out:null,has_more:false,event_ids:["event-1"]}])});
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.issues.includes("COVERAGE_EVENT_QUALITY_REVIEW"));
+});
