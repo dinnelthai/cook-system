@@ -113,7 +113,7 @@ The first core slice currently includes:
 
 ## Next implementation steps
 
-- [ ] Add automated JSON Schema validation and contract tests.
+- [x] Add automated JSON Schema registry validation and contract tests (repository-supported keyword subset).
 - [x] Add the initial IDL-driven Pump Legacy / V2 / V3 decoder and account / event decoders.
 - [x] Add the initial FeeConfig tier resolver and stale-history guard.
 - [x] Add deterministic event ordering, curve-state replay, and snapshot reconciliation for normalized inputs.
@@ -134,5 +134,12 @@ The first core slice currently includes:
 - [x] Reconcile LaunchLab / CPMM raw vault balances from transaction token-account deltas.
 - [ ] Run the MCAT LaunchLab → CPMM replay against an archive-capable mainnet RPC and inspect the resulting artifact.
 - [ ] Add Meteora DLMM / DAMM history adapters for cross-DEX token-wide volume.
-- [ ] Add heterogeneous organic agents and public-information response.
-- [ ] Add isolated defensive scenarios and held-out evaluation.
+- [x] Add deterministic heterogeneous offline agents and public-information response; keep ground truth separate from detector input.
+- [x] Add isolated defensive regression scenarios and held-out seed evaluation (synthetic regression only; not real-market accuracy).
+
+
+## Overnight implementation status (review branch)
+
+The review branch adds DATA-04 chain-coordinate timeline auditing, DATA-05 candle recomputation, DATA-06 a rebuildable file-backed event index, DATA-07 source/genesis/capture provenance metadata, and DATA-08 regression/chaos coverage. Collector outputs now include per-market event-timeline checks, candle integrity reports, and source provenance observations. It also adds descriptive market-quality analytics, an offline heterogeneous participant simulator, synthetic held-out defensive regression, portfolio-risk evaluation, a hash-chained alert journal, and a paper-only quote-risk planner.
+
+These additions do not complete real-chain acceptance. Mainnet archive-RPC fixtures for Pump/PumpSwap and the MCAT LaunchLab→CPMM replay remain pending; Meteora DLMM/DAMM IDL-driven history adapters remain pending. Independent source authentication, full historical coverage attestation, transactional multi-writer storage, notifications, live wallet signing/submission, and production operational acceptance are not implemented. See docs/implementation/overnight-completion-handoff.md before treating any result as production-ready.

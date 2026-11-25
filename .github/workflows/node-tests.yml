@@ -23,3 +23,7 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Run tests
         run: npm test
+      - name: Validate JSON Schema registry
+        run: npm run validate:schemas
+      - name: Run held-out defensive regression cases
+        run: node scripts/run-heldout-defensive-evaluation.mjs /tmp/cook-heldout-defensive-evaluation.json 901,902,903

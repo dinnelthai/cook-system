@@ -12,3 +12,17 @@ test("diagnostics export only known fields and strips raw issue identifiers",()=
  const s=log.snapshot();assert.deepEqual(s.entries[0].detail,{source_mode:"SYNTHETIC",issues:["UNVERIFIED_MARKET_TRADE","OTHER_ISSUE","MISSING_CURVE_FIELD"]});assert.ok(!JSON.stringify(s).includes("secret"));assert.equal(errorKind(new TypeError("secret")),"TypeError");
  assert.throws(()=>log.record("secret"),TypeError);
 });
+
+test("diagnostics persist across reload and re-sanitize imported storage",()=>{
+ const data=new Map(),storage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)};
+ const first=createDiagnosticLog({storage});first.record("app.start");first.record("page.open",{page:"dashboard"});
+ const saved=JSON.parse(data.get("cook-diagnostics.v1"));saved.entries[0].detail={message:"secret",issues:["MISSING_CURVE_FIELD:secret"]};data.set("cook-diagnostics.v1",JSON.stringify(saved));
+ const second=createDiagnosticLog({storage});second.record("report.built");
+ assert.deepEqual(second.snapshot().entries.map(x=>x.seq),[1,2,3]);assert.ok(!JSON.stringify(second.snapshot()).includes("secret"));
+ second.clear();assert.equal(createDiagnosticLog({storage}).snapshot().entries[0].event,"log.cleared");
+});
+test("invalid or unavailable diagnostics storage does not crash logging",()=>{
+ const storage={getItem:()=>"{broken",setItem:()=>{throw Error("quota");}};
+ const log=createDiagnosticLog({storage});log.record("app.start");
+ assert.equal(log.snapshot().persistence_status,"UNAVAILABLE");assert.equal(log.snapshot().entries.length,1);
+});

@@ -1,0 +1,9 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/dinnelthai/cook-system/blob/main/schemas/paper-quote-plan.schema.json",
+ "title":"PaperQuotePlan","type":"object","additionalProperties":false,
+ "required":["schema_version","status","quote","reasons","paper_only","execution_enabled","transaction_signing_enabled","transaction_submission_enabled"],
+ "properties":{"schema_version":{"const":"cook-paper-quote-plan.1"},"status":{"type":"string","enum":["BLOCKED","PAPER_PLAN_READY","NO_QUOTE_CAPACITY"]},
+ "market_id":{"type":["string","null"]},"observed_at_ms":{"type":["integer","null"],"minimum":0},"age_ms":{"type":["integer","null"],"minimum":0},
+ "quote":{"type":"object"},"reasons":{"type":"array","items":{"type":"string"}},"limits":{"type":"object"},
+ "paper_only":{"const":true},"execution_enabled":{"const":false},"transaction_signing_enabled":{"const":false},"transaction_submission_enabled":{"const":false}}
+}

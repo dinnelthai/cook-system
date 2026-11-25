@@ -135,5 +135,7 @@ export function createHistoricalEventStore(directory){
   if(canonical(names)!==canonical(after))throw Error("ARCHIVE_CHANGED_DURING_SCAN");
   return auditHistoricalEventBatches(batches);
  }
- return {get,put,audit};
+ async function rebuildIndex(){const {rebuildHistoricalEventIndex}=await import("./historical-event-index.mjs");return rebuildHistoricalEventIndex(directory);}
+ async function query(filter={},limit=1000){const {queryHistoricalEventIndex}=await import("./historical-event-index.mjs");return queryHistoricalEventIndex({directory,filter,limit});}
+ return {get,put,audit,rebuildIndex,query};
 }

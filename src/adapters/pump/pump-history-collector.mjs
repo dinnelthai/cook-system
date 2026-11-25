@@ -1,4 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
+import { createHash } from "node:crypto";
 import {
   PUMP_PROGRAM_ID,
   PUMP_AMM_PROGRAM_ID,
@@ -26,6 +27,10 @@ import {
   reconcilePumpSwapPoolSnapshot,
 } from "../../core/pool-state.mjs";
 import { buildRawCandles } from "../../core/candle-builder.mjs";
+import { auditObservedEventTimeline } from "../../core/event-timeline-audit.mjs";
+import { auditCandleEvidence } from "../../core/candle-integrity-audit.mjs";
+import { assessSourceProvenance, observeHistoricalGenesis } from "../../core/source-provenance.mjs";
+import { collectHistoricalSignaturePages, summarizeHistoricalReadEvidence } from "../../core/historical-signature-pages.mjs";
 import { fetchPumpFeeConfigHistory } from "./pump-fee-history.mjs";
 
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -71,44 +76,9 @@ async function mapLimit(items, limit, mapper) {
   return output;
 }
 
-async function collectSignatures(rpc, address, {
-  maxSignatures = 10_000,
-  pageSize = 1000,
-  until = null,
-  commitment = "confirmed",
-} = {}) {
-  const signatures = [];
-  let before;
-  let reachedUntil = false;
-  let exhausted = false;
-  if (!Number.isSafeInteger(maxSignatures) || maxSignatures < 1) throw new RangeError("maxSignatures must be positive");
-  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) throw new RangeError("pageSize must be between 1 and 1000");
-  while (signatures.length < maxSignatures) {
-    const requested = Math.min(pageSize, maxSignatures - signatures.length);
-    const page = await rpc.getSignaturesForAddress(address, { commitment, limit: requested, before, until });
-    if (!Array.isArray(page) || page.length === 0) {
-      exhausted = true;
-      break;
-    }
-    signatures.push(...page);
-    if (until && page.some((item) => item.signature === until)) {
-      reachedUntil = true;
-      break;
-    }
-    before = page.at(-1).signature;
-    if (page.length < requested) {
-      exhausted = true;
-      break;
-    }
-    if (signatures.length >= maxSignatures) break;
-  }
-  return {
-    address,
-    signatures,
-    coverage_complete: exhausted || reachedUntil,
-    stopped_at_limit: signatures.length >= maxSignatures && !exhausted && !reachedUntil,
-    reached_until: reachedUntil,
-  };
+async function collectSignatures(rpc, address, {maxSignatures=10_000,pageSize=1000,until=null,commitment="confirmed"}={}) {
+ const result=await collectHistoricalSignaturePages({rpc,address,maxSignatures,pageSize,until,commitment});
+ return {...result,coverage_complete:result.exhausted||result.reached_until,stopped_at_limit:result.truncated_at_limit};
 }
 
 async function getTransactions(rpc, signatures, concurrency = 5) {
@@ -352,6 +322,7 @@ export async function fetchPumpMintHistory({
   includeRawTransactions = false,
   includeFeeConfigHistory = false,
   feeConfigBaselineSnapshotRecord = null,
+  expectedGenesisHash = null,
 } = {}) {
   if (!rpc || typeof rpc.getTransaction !== "function" || typeof rpc.getAccountInfo !== "function" ||
       typeof rpc.getSignaturesForAddress !== "function" || typeof rpc.getBlock !== "function") {
@@ -359,6 +330,7 @@ export async function fetchPumpMintHistory({
   }
   if (typeof mint !== "string" || mint.length === 0) throw new TypeError("mint is required");
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("concurrency must be positive");
+  const observedGenesisHash = await observeHistoricalGenesis(rpc, expectedGenesisHash);
   const curveAddress = derivePumpBondingCurveAddress(mint);
 
   const [mintInfo, curveInfo, curveSignatureCollection, feeConfigHistory] = await Promise.all([
@@ -535,6 +507,8 @@ export async function fetchPumpMintHistory({
     idlRevision: getPumpIdlSnapshotMetadata().pump_idl_blob_sha,
   });
   const creationEvent = allEvents.find((event) => event.event_kind === "MARKET_CREATED" && event.market.token_mint === mint);
+  const curveTimelineEvents = allEvents.filter((event) => event.market.token_mint === mint && CURVE_EVENT_KINDS.has(event.event_kind));
+  const curveTimelineAudit = curveTimelineEvents.length ? auditObservedEventTimeline({ events: curveTimelineEvents }) : null;
   let replay = null;
   let snapshotReconciliation = null;
   let replayStatus = "NO_CREATION_EVENT";
@@ -549,7 +523,7 @@ export async function fetchPumpMintHistory({
     curveReplayComplete = curveSignatureCollection.coverage_complete &&
       curveDataGaps.length === 0 &&
       curveUnresolved.length === 0 &&
-      !hasPartialOrder;
+      !hasPartialOrder && curveTimelineAudit?.status !== "REVIEW_REQUIRED";
     if (curveReplayComplete) {
       replay = replayCurveEvents(initialState, curveEvents);
       replayStatus = "REPLAYED_FULL_CURVE_HISTORY";
@@ -590,6 +564,7 @@ export async function fetchPumpMintHistory({
     let poolSnapshotReconciliation = null;
     let poolStatus = "NO_POOL_CREATED_EVENT";
     let poolReplayComplete = false;
+    const poolTimelineAudit = poolEvents.length ? auditObservedEventTimeline({ events: poolEvents }) : null;
     if (poolCreatedEvent) {
       const initialState = createInitialPumpSwapPoolState({ poolCreatedEvent, decodedPool: pool.snapshot.decoded_pool });
       poolReplay = replayPumpSwapPoolEvents(initialState, poolEvents);
@@ -602,7 +577,8 @@ export async function fetchPumpMintHistory({
         poolReplay.status === "PASS" &&
         pool.snapshot.errors.length === 0 &&
         poolTradeReconciliationComplete &&
-        poolEvents.every((event) => event.ordering.ordering_confidence === "complete");
+        poolEvents.every((event) => event.ordering.ordering_confidence === "complete") &&
+        poolTimelineAudit?.status !== "REVIEW_REQUIRED";
       if (pool.snapshot.decoded_pool && pool.snapshot.base_vault && pool.snapshot.quote_vault) {
         poolSnapshotReconciliation = reconcilePumpSwapPoolSnapshot({
           replayedState: poolReplay.state,
@@ -627,6 +603,7 @@ export async function fetchPumpMintHistory({
       data_gaps: poolDataGaps,
       unresolved_events: poolUnresolved,
       replay_status: poolStatus,
+      event_timeline_audit: poolTimelineAudit,
       trade_balance_reconciliation_complete: poolEvents
         .filter((event) => event.event_kind === "POOL_BUY_EXECUTED" || event.event_kind === "POOL_SELL_EXECUTED")
         .every((event) => event.quality.transaction_balance_reconciliation?.status === "PASS"),
@@ -642,12 +619,24 @@ export async function fetchPumpMintHistory({
   const candleOrderComplete = candleEvents.every((event) => event.ordering.ordering_confidence === "complete");
   const candles = candleOrderComplete ? buildRawCandles(candleEvents, 60_000) : [];
   const candleStatus = !candleOrderComplete ? "INCOMPLETE_CHAIN_ORDER" : candles.length ? "AVAILABLE" : "NO_TRADE_EVENTS";
+  const allPaginationDeclaredComplete = curveSignatureCollection.coverage_complete && poolSignatureCollections.every(item => item.coverage_complete);
+  const candleIntegrityAudit = auditCandleEvidence({ events: candleEvents, candles, intervalMs: 60_000, coverageStatus: allPaginationDeclaredComplete ? "PAGINATION_COMPLETE_DECLARED" : "PARTIAL" });
+  const endpointId = (() => { try { return new URL(rpc.endpoint).hostname; } catch { return "injected-rpc-client"; } })();
+  const adapterVersion = getPumpIdlSnapshotMetadata().pump_idl_blob_sha ?? getPumpIdlSnapshotMetadata().pump_amm_idl_blob_sha ?? "unknown";
+  const queryFingerprint = createHash("sha256").update(JSON.stringify({ mint, network, maxSignatures, pageSize, until, commitment })).digest("hex");
+  const sourceProvenance = assessSourceProvenance({
+    scope: { network, genesis_hash: expectedGenesisHash ?? null, provenance: "observed_chain" },
+    source: { source_type: "rpc", source_id: "solana-rpc:" + endpointId, endpoint_id: endpointId, observed_genesis_hash: observedGenesisHash },
+    capture: { commitment, captured_at_ms: Date.now(), adapter_version: String(adapterVersion), query_fingerprint: queryFingerprint },
+    rawPayload: allFetched.map(item => ({ signature: item.signature, transaction: item.transaction }))
+  });
 
   const hasMigration = allEvents.some((event) => event.event_kind === "CURVE_MIGRATED");
   const allPoolsComplete = hasMigration
     ? poolReplays.length > 0 && poolReplays.every((pool) => pool.replay_status === "REPLAYED_FULL_POOL_HISTORY")
     : poolReplays.length === 0 || poolReplays.every((pool) => pool.replay_status === "REPLAYED_FULL_POOL_HISTORY");
-  const overallStatus = curveReplayComplete && allPoolsComplete
+  const readEvidence = summarizeHistoricalReadEvidence({scans:signatureCollections,source:sourceProvenance,missingTransactionCount:allFetched.filter(item=>!item.transaction).length,candleAudit:candleIntegrityAudit});
+  const overallStatus = readEvidence.status === "REVIEW_REQUIRED" ? "HISTORICAL_EVIDENCE_REVIEW_REQUIRED" : curveReplayComplete && allPoolsComplete
     ? "REPLAYED_FULL_HISTORY"
     : curveReplayComplete && hasMigration && poolReplays.length === 0
       ? "MISSING_PUMPSWAP_POOL_DISCOVERY"
@@ -681,6 +670,10 @@ export async function fetchPumpMintHistory({
     pool_replays: poolReplays,
     raw_candles_1m: candles,
     raw_candles_status: candleStatus,
+    event_timeline_audit: { curve: curveTimelineAudit, pools: poolReplays.map(item => ({ pool_address: item.pool_address, audit: item.event_timeline_audit })) },
+    candle_integrity_audit: candleIntegrityAudit,
+    source_provenance: sourceProvenance,
+    historical_read_evidence: readEvidence,
     fee_config_pda: PUMP_FEE_CONFIG_PDA,
     fee_config_history: feeConfigHistory,
     limitations: [

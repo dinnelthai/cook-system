@@ -1,6 +1,6 @@
 // Presentation metadata for offline reports. Never an authorization decision.
 const entry=(status,reasons=[])=>({status,reasons,independent_attestation:"UNKNOWN"});
-export function describeHistoricalTrust({sourceMode,ready,checks,navEndpoints,tradeEvidence,costBasisEvidence,archivedEvidence}){
+export function describeHistoricalTrust({sourceMode,ready,checks,navEndpoints,tradeEvidence,costBasisEvidence,archivedEvidence,accountSet=null}){
  if(!["SYNTHETIC","ARCHIVED_HISTORICAL"].includes(sourceMode)||typeof ready!=="boolean")throw Error("INVALID_TRUST_CONTEXT");
  const review=checks.filter(x=>x.status==="REVIEW").map(x=>x.id);
  const unknown=checks.filter(x=>x.status==="UNKNOWN"||x.status==="UNAVAILABLE").map(x=>x.id);
@@ -13,6 +13,7 @@ export function describeHistoricalTrust({sourceMode,ready,checks,navEndpoints,tr
   metrics:{
    cash_balance:group(true,archivedEvidence.status==="INTERNALLY_CONSISTENT"?[]:["RECEIPT_EVIDENCE_INCOMPLETE"]),
    inventory_quantity:group(true,["OWNERSHIP_UNATTESTED"]),
+   closing_account_set:group(accountSet?.status==="INTERNALLY_CONSISTENT",["ACCOUNT_SET_COMPLETENESS_UNATTESTED","OWNERSHIP_UNATTESTED"]),
    cost_basis:group(true,[costBasisEvidence.status,"ALLOCATION_UNATTESTED"]),
    realized_pnl:group(true,[tradeEvidence.status,"ECONOMIC_CLASSIFICATION_UNATTESTED","ALLOCATION_UNATTESTED"]),
    nav_endpoints:group(sample||navEndpoints.status==="INTERNALLY_CONSISTENT",["VALUATION_UNATTESTED"]),
