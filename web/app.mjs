@@ -22,7 +22,7 @@ import {mountProjectLifecycleReview} from "./project-lifecycle-review-view.mjs";
 import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-workflow.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
-import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory} from "./project-client.mjs";
+import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence} from "./project-client.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
@@ -175,7 +175,28 @@ function renderTerminal(){
         table(["业务阶段","登记状态","证据状态"],v.steps.map(s=>[s.stage,s.recorded,s.evidence_status]))+
         table(["历史里程碑","证据状态"],(v.historical_milestones??[]).map(s=>[s.stage,s.status]))+
         table(["待复核事项"],v.blockers.map(s=>[s]))+note("旧版本档案 "+v.stale_archive_count+" · 当前关联报告 "+v.report_link_count+" · 当前订单记录 "+v.order_review_count)+
-        '<label>历史 Pump 回放 JSON（最大 900 KiB）<input id="project-graduation-file" type="file" accept=".json"></label><button id="project-graduation-review">复核并归档历史里程碑</button><p id="project-graduation-status" role="status"></p>';
+        '<label>历史 Pump 回放 JSON（最大 900 KiB）<input id="project-graduation-file" type="file" accept=".json"></label><button id="project-graduation-review">复核并归档历史里程碑</button><p id="project-graduation-status" role="status"></p>'+
+        '<h3>退出与财务证据复核</h3>'+note("当前归档复核状态："+(v.close_evidence?.status??"MISSING"))+
+        table(["未解决事项"],[...(v.close_evidence?.blockers??[]),...(v.close_evidence?.unknown??[])].map(x=>[x]))+
+        '<label>关联历史报告<select id="project-close-report"><option value="">读取报告中…</option></select></label><button id="project-close-review" disabled>生成财务复核并归档</button><p id="project-close-status" role="status"></p><pre id="project-close-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+       const closeSelect=lifecycleArea.querySelector("#project-close-report"),closeButton=lifecycleArea.querySelector("#project-close-review"),closeStatus=lifecycleArea.querySelector("#project-close-status");
+       listProjectArchive(selected.project_id).then(rows=>{
+        if(!stillCurrent())return;
+        if(rows.some(a=>a.project_id!==selected.project_id||a.current_revision!==selected.revision))throw Error("PROJECT_ARCHIVE_SCOPE_MISMATCH");
+        closeSelect.replaceChildren(new Option("选择当前版本报告",""));
+        for(const a of rows.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&!a.stale))closeSelect.add(new Option("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff,a.archive_id));
+       }).catch(e=>{if(stillCurrent())closeStatus.textContent=errorKind(e);});
+       closeSelect.onchange=()=>{closeButton.disabled=!closeSelect.value;lifecycleArea.querySelector("#project-close-result").textContent="";closeStatus.textContent="";};
+       closeButton.onclick=async()=>{
+        const archiveId=closeSelect.value;if(!archiveId)return;
+        closeButton.disabled=true;closeSelect.disabled=true;closeStatus.textContent="复核中…";
+        try{const result=await reviewProjectCloseEvidence(selected.project_id,selected.revision,archiveId);
+         if(!stillCurrent())return;
+         closeStatus.textContent=result.review.status+" · 已归档 · 不代表结算完成";
+         lifecycleArea.querySelector("#project-close-result").textContent=JSON.stringify(result.review,null,2);
+        }catch(e){if(stillCurrent())closeStatus.textContent=errorKind(e);}
+        finally{if(stillCurrent()){closeSelect.disabled=false;closeButton.disabled=!closeSelect.value;}}
+       };
        const button=lifecycleArea.querySelector("#project-graduation-review");
        button.onclick=async()=>{
         button.disabled=true;const output=lifecycleArea.querySelector("#project-graduation-status");

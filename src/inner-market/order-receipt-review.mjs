@@ -50,7 +50,7 @@ function expectedFromArchive(raw,scope){
   ...(r.tokens.length?{token_accounts:r.tokens.map(t=>({address:t.address,mint:t.mint,owner:t.owner,decimals:t.decimals,
    pre_amount:presence(m.preTokenBalances,t.address)?t.before.toString():null,post_amount:presence(m.postTokenBalances,t.address)?t.after.toString():null}))}:{})};
 }
-function loadLinkedReport(project,link,path){
+export function loadLinkedReport(project,link,path){
  if(link.kind!=="HISTORICAL_REPORT_LINK"||link.stale||link.project_id!==project.project_id||link.project_revision!==project.revision)throw Error("ORDER_REPORT_LINK_SCOPE_MISMATCH");
  const p=link.payload,store=openHistoricalWorkspaceStore(path);
  try{

@@ -96,3 +96,9 @@ export async function reviewProjectGraduationHistory(projectId,revision,history)
  if(r.review?.project_id!==projectId||r.review.project_revision!==revision||r.review.execution_enabled!==false||r.review.lifecycle_mutated!==false||r.review.settlement_allowed!==false)throw Error("PROJECT_GRADUATION_SCOPE_MISMATCH");
  return r;
 }
+
+export async function reviewProjectCloseEvidence(projectId,revision,archiveId){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/close-evidence-review",{method:"POST",body:{expected_revision:revision,archive_id:archiveId}});
+ if(r.review?.project_id!==projectId||r.review.project_revision!==revision||r.review.execution_enabled!==false||r.review.settlement_allowed!==false||r.review.lifecycle_mutated!==false)throw Error("PROJECT_CLOSE_SCOPE_MISMATCH");
+ return r;
+}

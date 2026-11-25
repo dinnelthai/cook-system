@@ -25,18 +25,22 @@ export function describeProjectLifecycleEvidence(projectInput,archive,orders=[])
   const status=rows.some(m=>m.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":rows.some(m=>m.status==="REPLAY_MATCH_NOT_ATTESTED")?"REPLAY_MATCH_NOT_ATTESTED":rows.some(m=>m.status==="RECORDED_NOT_ATTESTED")?"RECORDED_NOT_ATTESTED":rows.some(m=>m.status==="MIGRATION_LINK_ONLY")?"MIGRATION_LINK_ONLY":rows.length?"UNKNOWN":"MISSING";
   return {stage,status,archive_ids:rows.map(m=>m.archive_id)};
  });
+ const closeReviews=scoped.filter(a=>a.kind==="PROJECT_CLOSE_REVIEW");
+ const closeEvidence={status:closeReviews.some(a=>a.payload.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":closeReviews.length?"PARTIAL":"MISSING",
+  archive_ids:closeReviews.map(a=>a.archive_id),blockers:[...new Set(closeReviews.flatMap(a=>a.payload.blockers??[]))],unknown:[...new Set(closeReviews.flatMap(a=>a.payload.unknown??[]))]};
  const currentOrders=orders.filter(o=>o.project_id===p.project_id&&o.project_revision===p.revision&&o.stale===false);
  const blockers=[];
  if(issuance.status!=="OBSERVED_NOT_ATTESTED")blockers.push("ISSUANCE_EVIDENCE_"+issuance.status);
  if(venueStatus("PUMP_BONDING_CURVE")!=="OBSERVED_NOT_ATTESTED")blockers.push("CURVE_IDENTITY_"+venueStatus("PUMP_BONDING_CURVE"));
  if(currentOrders.some(o=>["REVIEW_REQUIRED","OUTCOME_UNKNOWN","RECORDED"].includes(o.status)))blockers.push("ORDER_EVIDENCE_UNRESOLVED");
  if(p.lifecycle.operational_status==="REVIEW_REQUIRED")blockers.push("PROJECT_REVIEW_REQUIRED");
+ if(closeEvidence.status==="REVIEW_REQUIRED")blockers.push("PROJECT_CLOSE_REVIEW_REQUIRED");
  if(historicalMilestones.some(m=>m.status==="REVIEW_REQUIRED"))blockers.push("GRADUATION_HISTORY_CONFLICT");
  blockers.push("INDEPENDENT_ATTESTATION_UNAVAILABLE");
  const steps=PROJECT_STAGES.map(stage=>({stage,recorded:stage===p.lifecycle.stage?"CURRENT":"NOT_CURRENT",evidence_status:
   stage==="LAUNCHED"?issuance.status:stage==="BONDING_CURVE_ACTIVE"?venueStatus("PUMP_BONDING_CURVE"):
   stage==="PUMPSWAP_ACTIVE"?venueStatus("PUMP_SWAP"):"NOT_ASSESSED"}));
- return {schema_version:"cook-project-lifecycle-evidence.1",project_id:p.project_id,project_revision:p.revision,recorded_stage:p.lifecycle.stage,operational_status:p.lifecycle.operational_status,issuance,markets,steps,historical_milestones:historicalMilestones,stale_archive_count:stale,
+ return {schema_version:"cook-project-lifecycle-evidence.1",project_id:p.project_id,project_revision:p.revision,recorded_stage:p.lifecycle.stage,operational_status:p.lifecycle.operational_status,issuance,markets,steps,historical_milestones:historicalMilestones,close_evidence:closeEvidence,stale_archive_count:stale,
   report_link_count:scoped.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&a.payload.status==="DECLARED_MATCH").length,
   order_review_count:currentOrders.length,blockers,source_attestation:"UNKNOWN",lifecycle_mutated:false,settlement_allowed:false,execution_enabled:false};
 }

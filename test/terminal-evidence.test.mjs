@@ -132,3 +132,15 @@ test("historical import derives only explicitly linked trade receipts",async()=>
  i.archivedEvidence.accountInterval.closing.tokenAmount="49";
  assert.throws(()=>deriveArchivedTradeReceiptSamples(p,i),/ORDER_IMPORT_REPORT_REVIEW_REQUIRED/);
 });
+
+test("close evidence discloses residual assets and never authorizes settlement",async()=>{
+ const {reviewProjectCloseEvidence}=await import("../src/inner-market/project-close-evidence.mjs");
+ const {createProjectAggregate}=await import("../src/inner-market/project-aggregate.mjs");
+ const i=fixture(),pin="11111111111111111111111111111111",mint="11111111111111111111111111111112";
+ // Relabel every exact scope/receipt identity consistently for a valid aggregate.
+ function relabel(x){if(Array.isArray(x)){x.forEach(relabel);return;}if(!x||typeof x!=="object")return;for(const k of Object.keys(x)){if(x[k]==="local-fixture")x[k]=pin;else if(x[k]==="synthetic-mint")x[k]=mint;else relabel(x[k]);}}
+ relabel(i);
+ const p=createProjectAggregate({project_id:i.scope.projectId,profile:{name:"Close",symbol:"CLOSE"},network:{cluster:"localnet",genesis_hash:pin},token:{mint,issuance_signature:"1".repeat(64)}});
+ const r=reviewProjectCloseEvidence(p,i);
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.blockers.includes("TOKEN_INVENTORY_OUTSTANDING"));assert.ok(r.unknown.includes("PROJECT_WIDE_ACCOUNT_COVERAGE_UNATTESTED"));assert.equal(r.settlement_allowed,false);assert.equal(r.lifecycle_mutated,false);
+});
