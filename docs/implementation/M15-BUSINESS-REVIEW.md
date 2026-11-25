@@ -57,3 +57,7 @@ CI: [45580257777](https://github.com/dinnelthai/cook-system/actions/runs/4558025
 ## M16 第二批修复
 
 Project current、list、归档查询及订单日志只读查询统一使用 SQLite 同步 savepoint 读取范围；兼容外部已有事务，不在 await 间持有事务。新增内部 inspectIntegrity 诊断，对各项目单独记录快照/事件语义核验结果，正常 list/get 仍拒绝损坏状态，不自动修改数据库。测试覆盖两连接交替读写、失败读取后释放事务、损坏项目隔离和草稿配置事件逐版本重放。巡检仅验证 Project 快照与事件，不等同 SQLite 文件完整性检查、归档/订单全库巡检或数据库备份恢复。真实并发争用、规模性能和备份恢复待测，数据接入仍延后。
+
+## M16 第三批修复
+
+新增全库 SQLite quick_check / foreign_key_check 与逐项目快照、事件、归档、订单日志复核。createVerifiedBackup 使用 VACUUM INTO 创建独立一致副本，限制私有目录且独占新文件路径，再打开副本进行核验；不提供自动覆盖源库的恢复操作。失败保留新副本待人工诊断。测试覆盖副本重开、独立版本变化、拒绝覆盖、损坏归档及损坏副本拒绝。新增纯元数据事件重放基准（npm run benchmark:project-replay -- 1000 3），仅度量内存语义重放，不代表 SQLite I/O 或生产吞吐。实际全生命周期外部证据验证、实际恢复演练和负载压力测试仍未完成；统一数据接入仍延后。

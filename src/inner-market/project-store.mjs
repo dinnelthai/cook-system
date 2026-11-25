@@ -315,7 +315,47 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         db.exec("COMMIT");return result;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
-    return { create, append, get, list, events, verify, inspectIntegrity, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, close: () => db.close() };
+    function inspectDatabaseIntegrity() {
+      return readSnapshot(()=>{
+        const physical=db.prepare("PRAGMA quick_check").all();
+        const foreign=db.prepare("PRAGMA foreign_key_check").all();
+        const physicalPass=physical.length===1&&Object.values(physical[0])[0]==="ok";
+        const health=inspectIntegrity();
+        const projects=health.projects.map(row=>{
+          if(row.status!=="INTERNALLY_CONSISTENT")return row;
+          try{
+            const archives=listArchive(row.project_id),orders=orderReview.list(row.project_id);
+            for(const order of orders)orderReview.events(row.project_id,order.order_id);
+            return {...row,archive_count:archives.length,order_count:orders.length};
+          }catch(error){
+            return {...row,status:"REVIEW_REQUIRED",reason:typeof error?.message==="string"&&/^[A-Z][A-Z0-9_]{2,100}$/.test(error.message)?error.message:"PROJECT_JOURNAL_READ_FAILED"};
+          }
+        });
+        return {status:physicalPass&&foreign.length===0&&projects.every(x=>x.status==="INTERNALLY_CONSISTENT")?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",
+          sqlite_quick_check:physicalPass?"PASS":"REVIEW_REQUIRED",foreign_key_violation_count:foreign.length,projects,source_attestation:"UNKNOWN",execution_enabled:false};
+      });
+    }
+    // SQLite creates a consistent independent copy; never overwrite an existing
+    // destination or restore automatically. Parent directory must be private.
+    function createVerifiedBackup(destination) {
+      if(typeof destination!=="string"||!destination)throw Error("INVALID_PROJECT_BACKUP_PATH");
+      const target=resolve(destination),parent=dirname(target);
+      const dir=lstatSync(parent);
+      if(!dir.isDirectory()||dir.isSymbolicLink()||realpathSync(parent)!==parent||
+         (process.platform!=="win32"&&(dir.mode&0o077)!==0))throw Error("UNSAFE_PROJECT_BACKUP_DIRECTORY");
+      try{closeSync(openSync(target,"wx",0o600));}catch(error){if(error.code==="EEXIST")throw Error("PROJECT_BACKUP_DESTINATION_EXISTS");throw error;}
+      // Failure leaves the reserved destination for diagnosis, never silently
+      // removes or replaces any file. Use a fresh path for another attempt.
+      db.prepare("VACUUM INTO ?").run(target);
+      const copy=openProjectStore(target);
+      try{
+        const integrity=copy.inspectDatabaseIntegrity();
+        if(integrity.status!=="INTERNALLY_CONSISTENT")throw Error("PROJECT_BACKUP_REVIEW_REQUIRED");
+        return {status:"VERIFIED_INDEPENDENT_COPY",project_count:integrity.projects.length,integrity,
+          original_database_replaced:false,source_attestation:"UNKNOWN",execution_enabled:false};
+      }finally{copy.close();}
+    }
+    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

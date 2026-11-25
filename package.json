@@ -27,6 +27,7 @@
     "evaluate:defensive": "node scripts/run-heldout-defensive-evaluation.mjs",
     "accept:local-read": "node scripts/accept-local-read.mjs",
     "audit:repo": "node scripts/audit-repository-hygiene.mjs",
+    "benchmark:project-replay": "node scripts/benchmark-project-replay.mjs",
     "accept:all": "node scripts/run-unified-acceptance.mjs"
   },
   "devDependencies": {

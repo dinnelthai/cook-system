@@ -176,3 +176,40 @@ test("composite reads and rejected reads release their transaction boundaries",t
   assert.equal(b.get(p.project_id).revision,2);
  }finally{b.close();a.close();}
 });
+
+test("verified SQLite backup is independently readable and never replaces the source",t=>{
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000}),destination=join(path,"..","backup.sqlite");
+ try{
+  const p=s.create(base);
+  s.append(p.project_id,{command_id:"backup-profile",type:"UPDATE_PROFILE",payload:{profile:{name:"Backup revision"}}},{expected_revision:1});
+  s.recordArchive(p.project_id,"ISSUANCE_OBSERVATION",{project_id:p.project_id,project_revision:2,status:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false},2);
+  const v=s.createVerifiedBackup(destination);
+  assert.equal(v.status,"VERIFIED_INDEPENDENT_COPY");assert.equal(v.integrity.sqlite_quick_check,"PASS");
+  assert.equal(v.integrity.projects[0].archive_count,1);assert.equal(v.original_database_replaced,false);
+  assert.throws(()=>s.createVerifiedBackup(destination),/PROJECT_BACKUP_DESTINATION_EXISTS/);
+  assert.throws(()=>s.createVerifiedBackup(path),/PROJECT_BACKUP_DESTINATION_EXISTS/);
+  const copy=openProjectStore(destination);
+  try{
+   assert.deepEqual(copy.get(p.project_id),s.get(p.project_id));
+   assert.deepEqual(copy.events(p.project_id),s.events(p.project_id));
+   assert.deepEqual(copy.listArchive(p.project_id),s.listArchive(p.project_id));
+   s.append(p.project_id,{command_id:"source-only",type:"UPDATE_PROFILE",payload:{profile:{name:"Source changed"}}},{expected_revision:2});
+   assert.equal(copy.get(p.project_id).revision,2);assert.equal(s.get(p.project_id).revision,3);
+  }finally{copy.close();}
+ }finally{s.close();}
+});
+test("database inspection does not treat corrupt archive as a healthy project",t=>{
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000});
+ try{
+  const p=s.create(base);s.recordArchive(p.project_id,"ISSUANCE_OBSERVATION",{project_id:p.project_id,project_revision:1,status:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false},1);
+ }finally{s.close();}
+ const raw=new DatabaseSync(path);
+ try{raw.exec("DROP TRIGGER project_archive_no_update; UPDATE project_archive SET record_hash='invalid'");}finally{raw.close();}
+ const r=openProjectStore(path);
+ try{
+  assert.equal(r.inspectIntegrity().status,"INTERNALLY_CONSISTENT");
+  const v=r.inspectDatabaseIntegrity();assert.equal(v.status,"REVIEW_REQUIRED");
+  assert.equal(v.projects[0].reason,"PROJECT_ARCHIVE_INTEGRITY_FAILURE");
+  assert.throws(()=>r.createVerifiedBackup(join(path,"..","bad-copy.sqlite")),/PROJECT_BACKUP_REVIEW_REQUIRED/);
+ }finally{r.close();}
+});
