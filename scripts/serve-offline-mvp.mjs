@@ -5,7 +5,8 @@ import {createLocalTransfer} from "../src/inner-market/local-transfer.mjs";
 import {createLocalFaucet} from "../src/inner-market/local-faucet.mjs";
 import { checkLocalRpcHealth } from "../src/inner-market/local-rpc-health.mjs";
 import { buildTerminalState } from "../src/inner-market/terminal-state.mjs";
-import { readFile, stat, realpath } from "node:fs/promises";
+import { realpath } from "node:fs/promises";
+import {readBoundedRegularFile} from "../src/core/bounded-private-file.mjs";
 import { fileURLToPath } from "node:url";
 import { resolve,extname,sep,relative as relativePath,isAbsolute } from "node:path";
 const root=await realpath(fileURLToPath(new URL("../",import.meta.url)));
@@ -53,10 +54,7 @@ createServer(async(req,res)=>{
    if(url.pathname==="/api/terminal/health"){json(200,{report_bridge:reportPath?"CONFIGURED":"NOT_CONFIGURED",rpc:await checkLocalRpcHealth(process.env.COOK_LOCAL_RPC_URL),execution_enabled:false});return}
    if(!reportPath){json(503,{code:"REPORT_BRIDGE_NOT_CONFIGURED"});return}
    try{
-    const info=await stat(reportPath);
-    if(!info.isFile()||info.size>maxReportBytes){json(422,{code:"REPORT_FILE_INVALID"});return}
-    const bytes=await readFile(reportPath);
-    if(bytes.length>maxReportBytes){json(422,{code:"REPORT_FILE_TOO_LARGE"});return}
+    const bytes=await readBoundedRegularFile(reportPath,maxReportBytes);
     const input=JSON.parse(bytes.toString("utf8"));buildTerminalState(input);
     json(200,input);
    }catch{json(422,{code:"REPORT_VALIDATION_FAILED"});}
@@ -68,10 +66,7 @@ createServer(async(req,res)=>{
   if(isAbsolute(relative)||relative===".."||relative.startsWith("../")||!allowed.some(prefix=>relative.startsWith(prefix))||!types[extname(target)]){res.writeHead(404);res.end("Not found");return}
   const resolved=await realpath(target);
   if(resolved!==target){res.writeHead(404);res.end("Not found");return}
-  const info=await stat(resolved);
-  if(!info.isFile()||info.size>maxReportBytes){res.writeHead(404);res.end("Not found");return}
-  const bytes=await readFile(resolved);
-  if(bytes.length>maxReportBytes){res.writeHead(404);res.end("Not found");return}
+  const bytes=await readBoundedRegularFile(resolved,maxReportBytes);
   res.writeHead(200,{"Content-Type":types[extname(target)],"Cache-Control":"no-store","X-Content-Type-Options":"nosniff","Content-Security-Policy":"default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});
   res.end(bytes);
  }catch{res.writeHead(404);res.end("Not found")}

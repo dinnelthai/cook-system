@@ -21,3 +21,7 @@ Do not commit private fixtures, keyfiles, secrets, endpoints containing credenti
 Review the PR diff, run browser checks on the offline terminal with execution controls disabled, verify contradictory financial reports hide derived totals, verify all evidence limitations, and test archive recovery and performance in the operator environment. Do not reset a validator for acceptance. No claim of actual localnet parity, production readiness, independent source attestation or complete historical coverage is made.
 
 Merge gate: latest CI green, operator review completed, outstanding limitations explicitly accepted for the offline research scope. Production deployment is out of scope.
+
+## Post-merge follow-up
+
+Master merge e0031bb passed 314/314 tests and both auxiliary CI steps in run 45528929553. The report bridge, CLI validator and local read preflight now share a bounded regular-file reader; it rejects leaf symlinks and non-regular files and caps actual bytes read, including when files grow during reading. Static serving retains its existing path checks. The configured report must be an actual private regular file; a symlink is no longer accepted. Trusted parent directories and operator-controlled file permissions are still required; this is not a complete filesystem sandbox. The bridge still serves raw report inputs to the local terminal, so operators must not place secrets or unrelated sensitive fields in them. Actual local Validator and browser acceptance remain pending.

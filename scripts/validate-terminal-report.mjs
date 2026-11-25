@@ -1,10 +1,9 @@
-import {readFile,stat} from "node:fs/promises";
+import {readBoundedRegularFile} from "../src/core/bounded-private-file.mjs";
 import {buildTerminalState} from "../src/inner-market/terminal-state.mjs";
 const [path,...extra]=process.argv.slice(2),limit=16*1024*1024;
 if(!path||extra.length){console.error("Usage: node scripts/validate-terminal-report.mjs <normalized-report.json>");process.exitCode=1;}
 else try{
- const info=await stat(path);if(!info.isFile()||info.size>limit)throw Error("REPORT_SIZE_INVALID");
- const bytes=await readFile(path);if(bytes.length>limit)throw Error("REPORT_SIZE_INVALID");
+ const bytes=await readBoundedRegularFile(path,limit);
  const state=buildTerminalState(JSON.parse(bytes.toString("utf8")));
  console.log(JSON.stringify(state,null,2));
  // 0: synthetic review only; 2: internally ready but no settlement;

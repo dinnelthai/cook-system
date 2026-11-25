@@ -4,14 +4,16 @@ import {spawn} from "node:child_process";
 import {createServer} from "node:net";
 import {once} from "node:events";
 import {fileURLToPath} from "node:url";
-import {mkdtemp,writeFile,symlink,rm} from "node:fs/promises";
+import {mkdtemp,writeFile,symlink,rm,copyFile} from "node:fs/promises";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
 
 test("localhost server serves terminal shell, modules and explicit report bridge",{timeout:15000},async t=>{
  const probe=createServer();probe.listen(0,"127.0.0.1");await once(probe,"listening");
  const port=probe.address().port;probe.close();await once(probe,"close");
- const report=fileURLToPath(new URL("../fixtures/synthetic/inner-market-mvp.json",import.meta.url));
+ const fixture=fileURLToPath(new URL("../fixtures/synthetic/inner-market-mvp.json",import.meta.url));
+ const reportDir=await mkdtemp(join(tmpdir(),"cook-bridge-")),report=join(reportDir,"report.json");
+ t.after(()=>rm(reportDir,{recursive:true,force:true}));await copyFile(fixture,report);
  const script=fileURLToPath(new URL("../scripts/serve-offline-mvp.mjs",import.meta.url));
  const child=spawn(process.execPath,[script],{env:{...process.env,PORT:String(port),COOK_TERMINAL_REPORT:report,COOK_LOCAL_RPC_URL:"",COOK_LOCAL_FAUCET:"0",COOK_PUMP_LAB_URL:""},stdio:["ignore","pipe","pipe"]});
  t.after(()=>{if(child.exitCode===null)child.kill();});
@@ -45,4 +47,8 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  const cross=await fetch(base+"/api/local-wallet/trade",{method:"POST",headers:{"content-type":"application/json","sec-fetch-site":"cross-site"},body:"{}"});assert.equal(cross.status,403);
  assert.equal((await fetch(base+"/api/terminal/report",{method:"POST"})).status,405);
  assert.equal((await fetch(base+"/api/terminal/report",{headers:{"sec-fetch-site":"cross-site"}})).status,403);
+ if(process.platform!=="win32"){
+  await rm(report);await symlink(fixture,report);
+  assert.equal((await fetch(base+"/api/terminal/report")).status,422);
+ }
 });
