@@ -63,12 +63,21 @@ export function buildProjectFinancialCloseReview(input){
   capital_adjusted_nav_change_base_units:endpoints?nav.capital_adjusted_nav_change_base_units:null
  };
  const residual=assets.capital_adjusted_nav_change_base_units==null||realized.project_cash_basis_realized_pnl_base_units==null||assets.interval_inventory_unrealized_change_base_units==null?null:(BigInt(assets.capital_adjusted_nav_change_base_units)-BigInt(realized.project_cash_basis_realized_pnl_base_units)-BigInt(assets.interval_inventory_unrealized_change_base_units)).toString();
+ // Explain the historical NAV residual without assuming it is profit or zero.
+ const components={receivable_change_base_units:diff(receivables.closing_receivable_base_units,receivables.opening_receivable_base_units),
+  other_asset_change_base_units:endpoints?diff(closing.otherAssetsBaseUnits,opening.otherAssetsBaseUnits):null,
+  liability_change_base_units:endpoints?diff(closing.liabilitiesBaseUnits,opening.liabilitiesBaseUnits):null};
+ const remaining=residual===null||Object.values(components).some(v=>v===null)?null:
+  (BigInt(residual)-BigInt(components.receivable_change_base_units)-BigInt(components.other_asset_change_base_units)+BigInt(components.liability_change_base_units)).toString();
  const report={schema_version:"cook-project-financial-close-review.1",scope:structuredClone(state.scope),source_mode:state.source_mode,status:!ready?"REVIEW_REQUIRED":!endpoints?"ACCOUNTING_CONSISTENT_VALUATION_UNAVAILABLE":"SUPPLIED_ACCOUNTING_AND_ENDPOINTS_CONSISTENT",
   cash_flow:cashFlow,realized_pnl:realized,creator_receivables:receivables,assets,valuation_status:valuationStatus,
-  nav_bridge:{unexplained_by_cash_basis_pnl_and_inventory_unrealized_change_base_units:residual,interpretation:"RESIDUAL_NOT_PROFIT_OR_RECONCILIATION_PROOF; MAY_INCLUDE_RECEIVABLES_OTHER_ASSETS_LIABILITIES_AND_COST_BASIS_ADJUSTMENTS"},
+  nav_bridge:{unexplained_by_cash_basis_pnl_and_inventory_unrealized_change_base_units:residual,
+   ...components,remaining_unexplained_base_units:remaining,interpretation:"RESIDUAL_NOT_PROFIT_OR_RECONCILIATION_PROOF; MAY_INCLUDE_RECEIVABLES_OTHER_ASSETS_LIABILITIES_AND_COST_BASIS_ADJUSTMENTS"},
   review_checks:state.checks.map(({id,status,evidence})=>({id,status,evidence})),issues:state.issues,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",
   lifetime_funding_base_units:null,liquidation_value_base_units:null,actual_settlement_allowed:false,synthetic_test_settlement_allowed:sample&&state.settlement_allowed===true,execution_enabled:false,
   notes:["Opening cash is not lifetime funding. External capital is not profit.","Net trade receipts are not realized PnL; trade fees are already included in trade cash amounts.","Creator accruals and receivables are not cash receipts.","Inventory value is a supplied historical endpoint, not a realizable sale value. No independent valuation or source verification."]};
- return {...report,mathematical_audit:auditFinancialIdentities(report)};
+ const mathematical_audit=auditFinancialIdentities(report);
+ if(mathematical_audit.status==="REVIEW_REQUIRED")return {...report,status:"REVIEW_REQUIRED",issues:[...report.issues,"FINANCIAL_IDENTITY_MISMATCH"],synthetic_test_settlement_allowed:false,mathematical_audit};
+ return {...report,mathematical_audit};
 }

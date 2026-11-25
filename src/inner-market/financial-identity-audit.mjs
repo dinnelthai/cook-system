@@ -6,7 +6,8 @@ export function auditFinancialIdentities(report){
  const c=report.cash_flow??{},p=report.realized_pnl??{},r=report.creator_receivables??{},a=report.assets??{};
  const rows=[];
  function identity(id,left,terms){
-  const values=[int(left),...terms.map(([v])=>int(v))];
+  const raw=[left,...terms.map(([v])=>v)],values=raw.map(int);
+  if(raw.some((x,i)=>x!=null&&values[i]===null)){rows.push({id,status:"REVIEW_REQUIRED",difference_base_units:null,reason:"MALFORMED_AMOUNT"});return;}
   if(values.some(x=>x===null)){rows.push({id,status:"UNKNOWN",difference_base_units:null});return;}
   const residual=values[0]-terms.reduce((s,term,i)=>s+values[i+1]*BigInt(term[1]),0n);
   rows.push({id,status:residual===0n?"PASS":"REVIEW_REQUIRED",difference_base_units:residual.toString()});
@@ -22,6 +23,12 @@ export function auditFinancialIdentities(report){
  identity("closing_inventory_mark_minus_cost",a.closing_inventory_unrealized_value_minus_cost_base_units,[[a.closing_inventory_supplied_value_base_units,1],[a.remaining_inventory_cost_base_units,-1]]);
  identity("closing_nav",a.closing_nav_base_units,[[a.closing_cash_base_units,1],[a.closing_inventory_supplied_value_base_units,1],[a.closing_creator_receivable_base_units,1],[a.closing_other_assets_base_units,1],[a.closing_liabilities_base_units,-1]]);
  identity("capital_adjusted_nav",a.capital_adjusted_nav_change_base_units,[[a.closing_nav_base_units,1],[a.opening_nav_base_units,-1],[c.net_external_capital_base_units,-1]]);
+ identity("separate_expense_total",c.total_separate_expenses_base_units,[[c.issuance_expenses_base_units,1],[c.operating_expenses_base_units,1],[c.failed_tx_expenses_base_units,1],[c.other_expenses_base_units,1]]);
+ identity("realized_creator_cash_crosscheck",p.creator_cash_income_base_units,[[c.creator_fee_cash_receipts_base_units,1]]);
+ identity("realized_other_income_crosscheck",p.other_cash_income_base_units,[[c.other_income_base_units,1]]);
+ identity("realized_expense_crosscheck",p.separate_expenses_base_units,[[c.total_separate_expenses_base_units,1]]);
+ identity("balance_sheet_cash_crosscheck",a.closing_cash_base_units,[[c.observed_closing_cash_base_units,1]]);
+ identity("balance_sheet_receivable_crosscheck",a.closing_creator_receivable_base_units,[[r.closing_receivable_base_units,1]]);
  const counts={pass:rows.filter(x=>x.status==="PASS").length,review_required:rows.filter(x=>x.status==="REVIEW_REQUIRED").length,unknown:rows.filter(x=>x.status==="UNKNOWN").length};
  return {schema_version:"cook-financial-identity-audit.1",status:counts.review_required?"REVIEW_REQUIRED":counts.unknown?"PARTIAL":"ARITHMETIC_MATCH",counts,checks:rows,source_attestation:"UNKNOWN",execution_enabled:false};
 }

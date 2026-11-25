@@ -1,6 +1,7 @@
 import {createHash} from "node:crypto";
 import {canonicalJson} from "../core/canonical-json.mjs";
 import {buildTerminalState} from "../inner-market/terminal-state.mjs";
+import {auditCalibrationIntervals} from "./calibration-interval-audit.mjs";
 /** Readiness of supplied closed-interval historical evidence for future
  * descriptive calibration. No behavior fitting, policy tuning or predictions. */
 export function assessHistoricalCalibrationReadiness(reports=[]){
@@ -20,5 +21,6 @@ export function assessHistoricalCalibrationReadiness(reports=[]){
  }
  return {schema_version:"cook-calibration-readiness.1",status:rows.length?"HISTORICAL_INPUT_REVIEWED_NOT_CALIBRATED":"NOT_RUN_NO_HISTORICAL_DATA",
   report_count:rows.length,internally_complete_count:rows.filter(r=>r.internal_coverage_complete).length,rows,
+  interval_audit:auditCalibrationIntervals(reports.map(r=>r.scope)),
   independent_source_attestation:"UNKNOWN",nonoverlapping_intervals_verified:false,empirical_calibration_performed:false,real_market_validated:false,execution_enabled:false};
 }

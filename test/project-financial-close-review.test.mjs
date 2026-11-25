@@ -50,7 +50,7 @@ test("independent financial identities distinguish incomplete valuations from di
  const {auditFinancialIdentities}=await import("../src/inner-market/financial-identity-audit.mjs");
  const r=buildProjectFinancialCloseReview(endpoints(fixture()));
  assert.equal(r.mathematical_audit.status,"ARITHMETIC_MATCH");
- assert.equal(r.mathematical_audit.checks.length,11);
+ assert.equal(r.mathematical_audit.checks.length,17);
  const incomplete=buildProjectFinancialCloseReview(fixture());
  assert.equal(incomplete.mathematical_audit.status,"PARTIAL");
  assert.equal(incomplete.mathematical_audit.checks.find(c=>c.id==="closing_nav").status,"UNKNOWN");
@@ -60,4 +60,21 @@ test("independent financial identities distinguish incomplete valuations from di
  assert.equal(audit.checks.find(c=>c.id==="creator_receivable").difference_base_units,"1");
  assert.equal(audit.checks.find(c=>c.id==="creator_cash_crosscheck").difference_base_units,"1");
  assert.equal(audit.execution_enabled,false);
+});
+
+test("NAV residual decomposition preserves unknown values and is not an income forecast",()=>{
+ const r=buildProjectFinancialCloseReview(endpoints(fixture()));
+ assert.equal(r.nav_bridge.receivable_change_base_units,"3");
+ assert.equal(r.nav_bridge.other_asset_change_base_units,"0");
+ assert.equal(r.nav_bridge.liability_change_base_units,"0");
+ assert.equal(r.nav_bridge.remaining_unexplained_base_units,"0");
+ const partial=buildProjectFinancialCloseReview(fixture());
+ assert.equal(partial.nav_bridge.remaining_unexplained_base_units,null);
+});
+test("financial audit rejects malformed amounts rather than silently classifying them as missing",async()=>{
+ const {auditFinancialIdentities}=await import("../src/inner-market/financial-identity-audit.mjs");
+ const r=buildProjectFinancialCloseReview(endpoints(fixture()));r.cash_flow.other_income_base_units="NaN";
+ const a=auditFinancialIdentities(r);
+ assert.equal(a.status,"REVIEW_REQUIRED");
+ assert.equal(a.checks.find(c=>c.id==="operating_cash").reason,"MALFORMED_AMOUNT");
 });

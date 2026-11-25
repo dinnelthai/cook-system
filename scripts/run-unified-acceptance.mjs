@@ -55,7 +55,9 @@ async function main(){
  add("business_regression_count",businessRegression.ok&&businessCounts.tests!==null&&businessCounts.tests===businessCounts.passed&&businessCounts.failed===0&&businessCounts.skipped===0?"PASS":"FAIL","Project storage, evidence, API and synthetic numerical diagnostic regression; not external acceptance",businessCounts);
  const temp=await mkdtemp(join(tmpdir(),"cook-unified-acceptance-"));
  try{
-  command("participant_validation_suite",["scripts/run-participant-validation-suite.mjs",join(temp,"participant-validation.json")]);
+  const participant=command("participant_validation_suite",["scripts/run-participant-validation-suite.mjs",join(temp,"participant-validation.json")]);
+  if(participant.ok)command("math_model_review",["scripts/review-math-models.mjs",join(temp,"participant-validation.json"),join(temp,"math-model-review.json")]);
+  else add("math_model_review","FAIL","Participant artifact unavailable");
   const evalPath=join(temp,"heldout.json");
   const heldout=command("heldout_synthetic_regression",["scripts/run-heldout-defensive-evaluation.mjs",evalPath,"901,902,903"]);
   if(heldout.ok){
