@@ -1,7 +1,7 @@
 import {createHash} from "node:crypto";
 import {canonicalJson} from "../core/canonical-json.mjs";
 import {buildTerminalState} from "../inner-market/terminal-state.mjs";
-import {auditCalibrationIntervals} from "./calibration-interval-audit.mjs";
+import {auditCalibrationIntervals,calibrationNetworkKey} from "./calibration-interval-audit.mjs";
 /** Readiness of supplied closed-interval historical evidence for future
  * descriptive calibration. No behavior fitting, policy tuning or predictions. */
 export function assessHistoricalCalibrationReadiness(reports=[]){
@@ -11,7 +11,7 @@ export function assessHistoricalCalibrationReadiness(reports=[]){
   if(input?.sourceMode!=="ARCHIVED_HISTORICAL")throw Error("ARCHIVED_CALIBRATION_REPORT_REQUIRED");
   const s=input.scope;
   if(!s||typeof s.network!=="string"||typeof s.genesisHash!=="string"||!s.network||!s.genesisHash)throw Error("CALIBRATION_SCOPE_INCOMPLETE");
-  const key=canonicalJson([s.network,s.genesisHash,s.tokenMint,s.quoteAsset,s.openingCutoff,s.closingCutoff]);
+  const key=canonicalJson([calibrationNetworkKey(s.network),s.genesisHash,s.tokenMint,s.quoteAsset,s.openingCutoff,s.closingCutoff]);
   if(seen.has(key))throw Error("DUPLICATE_CALIBRATION_INTERVAL");seen.add(key);
   const r=buildTerminalState(input);
   const checks=["trade_evidence","market_coverage","candle_evidence","archived_evidence"].map(id=>({id,status:r.checks.find(c=>c.id===id)?.status??"UNKNOWN"}));

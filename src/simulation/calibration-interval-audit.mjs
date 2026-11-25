@@ -1,7 +1,10 @@
 import {canonicalJson} from "../core/canonical-json.mjs";
+import {isLocalHistoricalNetwork} from "../core/historical-network-label.mjs";
 /** Check declared historical interval coverage only. Never fit participant
  * behavior or infer completeness from non-overlapping samples. */
-const slot=v=>typeof v==="string"&&/^slot:(0|[1-9][0-9]{0,19})$/.test(v)?BigInt(v.slice(5)):null;
+const slot=v=>typeof v==="string"&&/^slot:(0|[1-9][0-9]{0,19})$/.test(v)&&BigInt(v.slice(5))<=18446744073709551615n?BigInt(v.slice(5)):null;
+// Only an explicit read-only comparison key. Persisted source labels stay intact.
+export const calibrationNetworkKey=network=>isLocalHistoricalNetwork(network)?"localnet":network;
 export function auditCalibrationIntervals(scopes){
  if(!Array.isArray(scopes)||scopes.length>50)throw Error("INVALID_CALIBRATION_INTERVALS");
  const groups=new Map(),unknown=[],issues=[],pairs=[];
@@ -11,7 +14,7 @@ export function auditCalibrationIntervals(scopes){
   const a=slot(s.openingCutoff),b=slot(s.closingCutoff);
   if(a===null||b===null){unknown.push(i);continue;}
   if(a>=b){issues.push({code:"INVALID_INTERVAL_ORDER",index:i});continue;}
-  const key=canonicalJson([s.network,s.genesisHash,s.tokenMint,s.quoteAsset]);
+  const key=canonicalJson([calibrationNetworkKey(s.network),s.genesisHash,s.tokenMint,s.quoteAsset]);
   if(!groups.has(key))groups.set(key,[]);
   groups.get(key).push({i,a,b});
  }
