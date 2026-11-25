@@ -13,6 +13,7 @@ This is the first P0 implementation slice. It does not yet migrate the browser l
 ProjectAggregate 1.0.0 contains:
 
 - stable project_id and optimistic revision;
+- atomic draft configuration commands for profile, network, token parameters and the Dev wallet group;
 - profile: name, symbol, description and public URLs;
 - network: Solana cluster, genesis hash and SOL quote mint;
 - token: mint, supply in base units, decimals, Dev Wallet and issuance verification state;
@@ -89,7 +90,7 @@ The caller must supply an absolute database path. The snippet is illustrative; d
 
 ## 7. Loopback HTTP API
 
-The local server exposes the same Project store through loopback-only endpoints. The parent server enforces localhost Host and same-origin checks; responses are no-store JSON.
+The Project Setup page now reads and writes the canonical API; draft profile, network, token and Dev wallet group are saved in one atomic command. The local server exposes the same Project store through loopback-only endpoints. The parent server enforces localhost Host and same-origin checks; responses are no-store JSON.
 
 - GET /api/projects — list Project aggregates.
 - POST /api/projects — create a Project draft.
@@ -106,6 +107,7 @@ Command requests include command_id, type, payload and expected_revision. The HT
 - migration from web/project-registry.mjs localStorage;
 - migration of historical workspace records into Project;
 - Project-aware wallet store and trade adapters;
+- Project-bound market subscription and transaction execution;
 - order, execution, inventory and Treasury ledgers;
 - live RPC verification;
 - production signing or mainnet execution.
