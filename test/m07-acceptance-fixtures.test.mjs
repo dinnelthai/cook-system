@@ -28,3 +28,13 @@ test("fixed project fixtures cover separate and conflicting catalogue records",(
  assert.throws(()=>c.add(read("m07/catalogue-conflict.json")),/CONFLICTING_CLOSED_INTERVAL/);
  assert.equal(c.list().length,2);
 });
+
+test("legacy fixed accounting fixtures retain accounting review without claiming generator validation",()=>{
+ const r=auditRecordedSyntheticBatch(read("m07/report-array-pass.json"));
+ for(const result of r.results){
+  assert.equal(result.status,"INTERNALLY_CONSISTENT");
+  assert.equal(result.checks.find(c=>c.id==="generator_identity").status,"UNKNOWN");
+  assert.equal(result.checks.find(c=>c.id==="record_numeric_consistency").status,"UNKNOWN");
+ }
+ assert.equal(r.execution_enabled,false);
+});

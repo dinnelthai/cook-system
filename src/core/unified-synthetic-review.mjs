@@ -20,7 +20,9 @@ export function buildUnifiedSyntheticReview(report){
  const declaredVersion=[...versionSet][0];
  const knownVersion=["participant-simulator.1","participant-simulator.2","participant-simulator.3"].includes(declaredVersion);
  // A generator label alone cannot establish the validity of its numeric model.
- if(events.length&&!versionIssues.length&&!knownVersion)versionIssues.push("UNSUPPORTED_GENERATOR_VERSION");
+ // Fixed accounting QA fixtures carry no simulator behavior claim.
+ const accountingOnlyVersion=declaredVersion==="fixed-accounting-qa.1";
+ if(events.length&&!versionIssues.length&&!knownVersion&&!accountingOnlyVersion)versionIssues.push("UNSUPPORTED_GENERATOR_VERSION");
  if(report.model_contract!=null){
   const model=report.model_contract;
   if(events.length&&model.generator_version!==declaredVersion)versionIssues.push("GENERATOR_CONTRACT_VERSION_MISMATCH");
