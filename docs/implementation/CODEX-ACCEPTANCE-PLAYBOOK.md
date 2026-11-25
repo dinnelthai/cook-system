@@ -163,3 +163,5 @@ End with one of:
 Do not claim production readiness. Return the report and JSON artifact to the project owner. Wait for the owner to pass findings back for implementation; this baseline pass is review-only.
 
 Additional browser check: change the active-wallet selector in the top header and the wallet-management page independently. Each selector must update the stored active address without throwing a browser-console error or mutating another form's destination field.
+
+CI also runs the unified code acceptance matrix on Node.js 22 and 24. Workflow actions are pinned to immutable commit SHAs; checkout credentials are not persisted and setup-node's automatic package-manager cache is disabled.
