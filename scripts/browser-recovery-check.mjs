@@ -120,6 +120,12 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
    await wait("navigation-"+id,'document.querySelector("#main").dataset.page==='+JSON.stringify(id)+'&&'+condition);
   }
   assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
+  await evaluate('document.querySelector("#project-show-risk").click()');
+  await wait("risk-filter",'document.querySelector("#risk-severity")&&document.querySelector("#terminal-project-details").open');
+  await evaluate('(()=>{const s=document.querySelector("#risk-severity");s.value="UNKNOWN";s.dispatchEvent(new Event("change"));})()');
+  assert.equal(await evaluate('document.querySelector("#risk-evidence-rows").textContent.includes("UNKNOWN")'),true);
+  assert.equal(await evaluate('document.querySelector("#open-data").disabled'),true);
+  assert.equal(observations.filter(x=>x.kind==="exception").length,0);
   const events=await (await fetch(url+"/api/projects/"+encodeURIComponent(project.project_id)+"/events",{signal:AbortSignal.timeout(3000)})).json();
   assert.equal(events.events.length,1);
   const directory=await (await fetch(url+"/api/projects",{signal:AbortSignal.timeout(3000)})).json();

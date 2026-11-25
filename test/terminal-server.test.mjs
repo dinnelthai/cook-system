@@ -58,6 +58,8 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  assert.ok(visited.has(base+"/src/core/participant-model-contract.mjs"));
  assert.ok(visited.has(base+"/src/core/historical-network-label.mjs"));
  assert.ok(!visited.has(base+"/src/core/source-provenance.mjs"));
+ assert.ok(!visited.has(base+"/src/core/market-quality-engine.mjs"),"server-only quality engine must not enter the browser graph");
+ assert.ok(!visited.has(base+"/src/inner-market/closed-market-quality.mjs"),"quality review is scoped through the server API");
  assert.ok(visited.has(base+"/web/project-request-recovery.mjs"));
  assert.equal((await fetch(base+"/src/simulation/participant-model-contract.mjs")).status,404);
  assert.equal((await fetch(base+"/web/project-client.mjs")).status,200);

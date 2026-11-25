@@ -64,7 +64,8 @@ export function mountProjectSetup(container, {
     if (loading) { renderLoading(); return; }
     const version = ++viewVersion;
     const current = activeProjectId ? projects.find(x => x.project_id === activeProjectId) : null;
-    const editable = !current || current.lifecycle.stage === "DRAFT";
+    const missingSelection=Boolean(activeProjectId&&!current);
+    const editable = !missingSelection && (!current || current.lifecycle.stage === "DRAFT");
     const lock = editable ? "" : " disabled";
     const projectRows = projects.map(x => [
       x.profile.name, x.profile.symbol,
@@ -96,6 +97,7 @@ export function mountProjectSetup(container, {
     container.innerHTML = screenHeading("Project Setup / 项目准备", "项目主记录 · Localnet 身份 · 生命周期证据") +
       note("Project 数据现已保存到本机 SQLite，不再写入浏览器 localStorage。此页面只管理项目配置和证据，不会创建 Token、签名或提交交易。执行权限固定关闭。") +
       (recoveryId||recoveryError?panel("保存请求恢复",'<p id="project-recovery-status" role="status" class="muted">'+esc(recoveryError||"存在未确认的项目创建请求。仅查询已保存结果，不自动重发。")+'</p><button id="project-recovery-check"'+(recoveryError?" disabled":"")+'>查询此前保存结果</button>'):"")+
+      (missingSelection?note("此前选择的项目不在当前数据库中。请选择已存在项目，或主动点击新建项目以退出此前上下文。"):"")+
       panel("项目配置", '<form id="project-draft-form"><div class="grid">' +
         '<div><label>项目名称</label><input name="name" required maxlength="32" value="' + esc(current?.profile.name ?? "") + '" placeholder="Project name"' + lock + '></div>' +
         '<div><label>Token Symbol</label><input name="symbol" required maxlength="10" pattern="[A-Za-z0-9]{1,10}" value="' + esc(current?.profile.symbol ?? "") + '" placeholder="TOKEN"' + lock + '></div>' +
@@ -239,6 +241,7 @@ export function mountProjectSetup(container, {
 
     container.querySelector("#project-draft-form").onsubmit = async event => {
       event.preventDefault();
+      if(!editable)return;
       const button = event.currentTarget.querySelector('button[type="submit"]');
       button.disabled = true;
       try {

@@ -26,7 +26,7 @@ export function candleTimeLayout(points,intervalMs,left=48,right=548){
 export function candleEvidenceRows(points){
  return points.map(c=>[new Date(c.interval_start_ms).toISOString(),c.open_price,c.high_price,c.low_price,c.close_price,c.quote_volume_base_units]);
 }
-// The server/browser shared closed-market audit is authoritative, not the chart.
+// Only display the existing server's scoped closed-market audit; never import Node-only analysis into the browser.
 export function marketQualityRows(q){
  const safe=q?.source_attestation==="UNKNOWN"&&q.live_state===false&&q.execution_enabled===false?q:null;
  const descriptive=safe?.status==="DESCRIPTIVE_ONLY"||safe?.status==="NO_EXECUTIONS";
