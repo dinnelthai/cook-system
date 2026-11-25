@@ -89,7 +89,8 @@ test("symbol cannot be changed after launch", () => {
   assert.equal(p.token.mint, mint);
 });
 test("initial Dev wallet group can be created with the Project aggregate", () => {
-  const project = createProjectAggregate({ ...base, wallet_group: group }, { now: () => 1000 });
+  const project = createProjectAggregate({ ...base, wallet_group: group }, { now: () => 1000   assert.throws(() => createProjectAggregate({ ...base, wallet_group: { ...group, members: [{ ...group.members[0], wallet_address: mint }] } }, { now: () => 1000 }), /PROJECT_DEV_WALLET_GROUP_MISMATCH/);
+});
   assert.equal(project.wallet_groups.length, 1);
   assert.equal(project.wallet_groups[0].members[0].wallet_address, wallet);
 });
@@ -117,7 +118,7 @@ test("draft configuration updates profile, network, token and Dev wallet atomica
       token: { supply_base_units: "1000000000", decimals: 6, creator_wallet_address: wallet },
       wallet_group: { ...group, members: [{ ...group.members[0], wallet_address: mint }] }
     }
-  }, { now: () => 1002 }), /PROJECT_DRAFT_CONFIGURATION_LOCKED/);
+  }, { now: () => 1002 }), /PROJECT_DEV_WALLET_GROUP_MISMATCH/);
 });
 test("network and token configuration can be set only before launch", () => {
   let p = createProjectAggregate({ project_id: "draft-config", profile: base.profile }, { now: () => 1000 });
