@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {runParticipantSimulation} from "../src/simulation/participant-simulator.mjs";
 import {analyzeMarketQuality} from "../src/core/market-quality-engine.mjs";
+import {reviewRecordedSyntheticSimulation} from "../src/simulation/synthetic-report-ledger.mjs";
 test("participant simulation is deterministic and keeps role labels outside detector input",()=>{
  const a=runParticipantSimulation({scenarioId:"test-run",seed:7,steps:120}),b=runParticipantSimulation({scenarioId:"test-run",seed:7,steps:120});
  assert.deepEqual(a.detector_input.events,b.detector_input.events);assert.equal(a.status,"SYNTHETIC_ONLY");assert.ok(a.summary.trade_count>0);
@@ -33,5 +34,24 @@ test("synthetic conservation report matches aggregate opening and closing balanc
   assert.equal(r.conservation_audit.quote_difference_base_units,"0");
   assert.equal(r.conservation_audit.token_difference_base_units,"0");
   assert.equal(r.conservation_audit.real_market_validated,false);
+ }
+});
+
+test("recorded offline simulation can be reconciled per account from opening records and events",()=>{
+ for(const seed of [7,8,701]){
+  const r=runParticipantSimulation({scenarioId:"ledger-review",seed,steps:240}),v=reviewRecordedSyntheticSimulation(r);
+  assert.equal(v.audit.status,"INTERNALLY_CONSISTENT");assert.equal(v.audit.account_count,r.agent_states.length+1);
+  assert.equal(v.ledger_input.entries.length,r.summary.trade_count*2);
+  assert.ok(v.audit.accounts.every(a=>a.quote_difference_base_units==="0"&&a.token_difference_base_units==="0"));
+ }
+});
+test("offsetting synthetic closing balance changes are detected by the recorded ledger review",()=>{
+ const r=runParticipantSimulation({scenarioId:"ledger-review",seed:7,steps:240});
+ const a=r.agent_states[0],b=r.agent_states[1];a.quote_balance_base_units=(BigInt(a.quote_balance_base_units)+1n).toString();b.quote_balance_base_units=(BigInt(b.quote_balance_base_units)-1n).toString();
+ const v=reviewRecordedSyntheticSimulation(r);assert.equal(v.audit.status,"REVIEW_REQUIRED");assert.equal(v.audit.issues.length,2);
+});
+test("legacy missing openings and duplicated or cross-scenario recorded events are rejected",()=>{
+ for(const mutate of [r=>delete r.opening_agent_states,r=>r.detector_input.events.push(r.detector_input.events[0]),r=>r.detector_input.events[0].synthetic_metadata.scenario_id="other"]){
+  const r=runParticipantSimulation({scenarioId:"ledger-review",seed:7,steps:120});mutate(r);assert.throws(()=>reviewRecordedSyntheticSimulation(r));
  }
 });

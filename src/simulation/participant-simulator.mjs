@@ -23,6 +23,7 @@ export function runParticipantSimulation({scenarioId="offline-scenario",seed=42,
  if(!states.length||new Set(states.map(a=>a.agent_id)).size!==states.length||states.some(a=>!ROLES.has(a.role_class)||a.scenario_id!==scenarioId))throw Error("INVALID_SIMULATION_AGENT");
  let quote=asBig(initialQuoteReserve,"initial quote reserve"),token=asBig(initialTokenReserve,"initial token reserve");
  if(quote<=0n||token<=0n)throw Error("INVALID_SIMULATION_RESERVES");
+ const openingAgentStates=states.map(a=>({agent_id:a.agent_id,quote_balance_base_units:a.quote.toString(),token_balance_base_units:a.token.toString()}));
  const openingTotals={quote:(quote+states.reduce((sum,a)=>sum+a.quote,0n)).toString(),token:(token+states.reduce((sum,a)=>sum+a.token,0n)).toString()};
  const random=rng(seed),events=[],groundTruth=states.map(a=>({schema_version:"1.0.0",scenario_id:scenarioId,agent_id:a.agent_id,simulated_role:a.role_class,
   latent_controller_group:null,ground_truth_behavior_labels:[a.role_class==="arbitrage"?"legitimate_arbitrage":a.role_class==="early_holder"?"early_inventory_holder":a.role_class==="kol_broadcaster"?"organic_public_signal_response":"unknown"]}));
@@ -69,7 +70,7 @@ export function runParticipantSimulation({scenarioId="offline-scenario",seed=42,
  const agentStates=states.map(a=>({agent_id:a.agent_id,role_class:a.role_class,quote_balance_base_units:a.quote.toString(),token_balance_base_units:a.token.toString()}));
  const conservation=auditSyntheticConservation({openingTotals,finalState:detectorInput.final_state,agentStates});
  return {schema_version:"cook-participant-simulation.1",status:"SYNTHETIC_ONLY",detector_input:detectorInput,ground_truth:groundTruth,
-  agent_states:agentStates,conservation_audit:conservation,
+  opening_agent_states:openingAgentStates,agent_states:agentStates,conservation_audit:conservation,
   summary:{steps,trade_count:tradeCount,event_count:events.length,agent_count:states.length,fee_bps:feeBps},
   execution_enabled:false,live_rpc_enabled:false,transaction_signing_enabled:false};
 }
