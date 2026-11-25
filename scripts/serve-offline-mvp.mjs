@@ -35,7 +35,7 @@ const server=createServer(async(req,res)=>{
  try{
   const requestHost=req.headers.host,requestOrigin=req.headers.origin;
   if(!["127.0.0.1:"+port,"localhost:"+port].includes(requestHost)||req.headers["sec-fetch-site"]==="cross-site"||(requestOrigin&&requestOrigin!=="http://"+requestHost)){res.writeHead(403,{"Cache-Control":"no-store","Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"FORBIDDEN"}));return;}
-  if(["/api/historical-workspace","/api/historical-workspace/revisions"].includes(req.url)){
+  if(["/api/historical-workspace","/api/historical-workspace/revisions","/api/historical-workspace/query"].includes(req.url)){
    if(!workspaceHandler){res.writeHead(503,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"WORKSPACE_DISABLED"}));return;}
    await workspaceHandler(req,res);return;
   }

@@ -6,7 +6,7 @@ import {mkdtempSync,realpathSync,rmSync,readFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {createHistoricalWorkspaceHandler} from "../src/inner-market/historical-workspace-http.mjs";
-import {requestHistoricalWorkspace} from "../web/historical-workspace-client.mjs";
+import {requestHistoricalWorkspace,queryHistoricalWorkspace} from "../web/historical-workspace-client.mjs";
 import {createHistoricalProjectCatalogue} from "../src/inner-market/historical-project-catalogue.mjs";
 import {exportHistoricalWorkspace} from "../src/inner-market/historical-project-workspace.mjs";
 test("HTTP workspace round trip, conflict and revision listing preserve original data",async t=>{
@@ -23,6 +23,12 @@ test("HTTP workspace round trip, conflict and revision listing preserve original
  assert.deepEqual((await requestHistoricalWorkspace({fetcher})).workspace,workspace);
  assert.equal((await requestHistoricalWorkspace({fetcher,revisions:true})).revisions.length,1);
  const bad=await fetcher("/api/historical-workspace",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});assert.equal(bad.status,400);
+ assert.equal((await requestHistoricalWorkspace({fetcher})).revision,1);
+ const list=await queryHistoricalWorkspace({kind:"projects",revision:1},{fetcher});assert.equal(list.projects.length,1);
+ const projectKey=list.projects[0].key,recordKey=list.projects[0].record_keys[0];
+ const detail=await queryHistoricalWorkspace({kind:"record",revision:1,projectKey,recordKey},{fetcher});assert.equal(detail.accounting.closing_cash_base_units,"887");assert.equal(detail.settlement_allowed,false);
+ await assert.rejects(queryHistoricalWorkspace({kind:"projects",revision:2},{fetcher}),/WORKSPACE_REVISION_NOT_FOUND/);
+ await assert.rejects(queryHistoricalWorkspace({kind:"projects",revision:1,unknown:true},{fetcher}),/INVALID_WORKSPACE_QUERY/);
  assert.equal((await requestHistoricalWorkspace({fetcher})).revision,1);
 });
 test("workspace client makes only one request on ambiguous failure",async()=>{
