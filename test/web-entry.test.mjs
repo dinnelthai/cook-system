@@ -99,3 +99,9 @@ test("secondary views preserve their task entry points in structured workspaces"
  const review=await readFile(new URL("../web/project-review-dashboard.mjs",import.meta.url),"utf8");assert.match(review,/review-kpis/);assert.match(review,/review-risk-summary/);
  const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");assert.match(app,/archive-workspace/);assert.match(app,/archive-evidence/);
 });
+
+test("experiment and diagnostics pages expose primary tasks and accessible empty tables",async()=>{
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");
+ assert.match(app,/lab-workspace/);assert.match(app,/settings-workspace/);assert.match(app,/table-empty/);assert.match(app,/scope="col"/);
+ assert.match(app,/seedInput\.checkValidity\(\)/);assert.match(app,/runsInput\.checkValidity\(\)/);
+});

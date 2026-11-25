@@ -97,7 +97,7 @@ const esc=s=>String(s??"—").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">"
 const solAmount=x=>{if(x==null)return "—";const n=BigInt(x),v=n<0n?-n:n;return (n<0n?"-":"")+(v/1000000000n)+"."+String(v%1000000000n).padStart(9,"0").replace(/0+$/,"").padEnd(2,"0")+" SOL"};
 const quoteAmount=(x,asset)=>x==null?"—":asset==="SOL_LAMPORTS"?solAmount(x):x+" base units";
 const stat=(name,value)=>'<div class="stat"><small>'+esc(name)+'</small><strong>'+esc(value)+'</strong></div>';
-const table=(headers,rows)=>'<div class="scroll"><table><thead><tr>'+headers.map(x=>'<th>'+esc(x)+'</th>').join("")+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>';
+const table=(headers,rows)=>'<div class="scroll" tabindex="0" role="region" aria-label="表格：'+esc(headers.join(" / "))+'"><table><thead><tr>'+headers.map(x=>'<th scope="col">'+esc(x)+'</th>').join("")+'</tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join("")+'</tr>').join(""):'<tr><td class="table-empty" colspan="'+Math.max(1,headers.length)+'">暂无记录</td></tr>')+'</tbody></table></div>';
 const note=s=>'<div class="notice">'+esc(s)+'</div>';
 const panel=(title,body)=>'<section class="panel"><h3>'+esc(title)+'</h3>'+body+'</section>';
 function download(name,text){record("file.export");const a=document.createElement("a");const url=URL.createObjectURL(new Blob([text],{type:"application/json"}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
@@ -616,13 +616,17 @@ panel("项目全生命周期复盘",'<div id="project-lifecycle-review"></div>')
  const results=evaluateParticipantStressCases({base:original,reportBuilder:buildHistoricalMvpReport});
  main.innerHTML=screenHeading("市场风险实验","合成风险场景 · 独立于真实历史数据")+note("固定合成压力场景：验证风险提示和数据核算，不模拟攻击执行、不预测真实钱包行为。角色标签只属于实验。")+
  '<div class="stats">'+stat("角色类别",roles.length)+stat("合成场景",results.length)+stat("预期结果匹配",results.filter(r=>r.passed).length+" / "+results.length)+'</div>'+
- panel("角色与风险特征",table(["角色","特征","观测关注","局限"],roles.map(r=>[r.role,r.traits.join(" / "),r.observable,r.limitation])))+
+ '<div class="lab-workspace"><div class="lab-primary">'+
+ panel("随机压力实验",'<div class="grid"><div><label for="experiment-seed">随机种子</label><input id="experiment-seed" type="number" min="0" max="4294967295" step="1" required value="42"></div><div><label for="experiment-runs">每类实验次数</label><input id="experiment-runs" type="number" min="1" max="1000" step="1" required value="100"></div></div><p class="muted">仅随机抽取预置风险场景，不生成交易；采样权重并非真实行为概率。</p><button id="run-experiment" class="primary">运行随机实验</button> <button id="export-experiment" disabled>导出实验</button><div id="experiment-result" role="status" aria-live="polite" class="lab-result"><p class="workspace-empty">尚未运行随机实验。请设置种子及实验次数。</p></div>')+
+ '</div><aside class="lab-secondary">'+
  panel("固定场景验收",table(["场景","风险","预期","实际","结果"],results.map(r=>[r.title,r.risk_category,r.expected_status,r.actual_status,r.passed?"PASS":"FAIL"])))+
- panel("随机压力实验",'<div class="grid"><div><label for="experiment-seed">随机种子</label><input id="experiment-seed" type="number" min="0" max="4294967295" value="42"></div><div><label for="experiment-runs">每类实验次数</label><input id="experiment-runs" type="number" min="1" max="1000" value="100"></div></div><p class="muted">仅随机抽取预置风险场景，不生成交易；采样权重并非真实行为概率。</p><button id="run-experiment" class="primary">运行随机实验</button> <button id="export-experiment" disabled>导出实验</button><div id="experiment-result"></div>')+
  panel("场景报告",'<button id="export-participants">导出实验结果 JSON</button>'+details("实验原始数据",results))+
+ '</aside></div><details class="panel lab-evidence"><summary>角色目录与模型局限</summary>'+
+panel("角色与风险特征",table(["角色","特征","观测关注","局限"],roles.map(r=>[r.role,r.traits.join(" / "),r.observable,r.limitation])))+'</details>'+
+ '<details class="panel lab-evidence"><summary>离线账簿与版本对照复核</summary><div class="lab-evidence-grid">'+
  panel("离线账簿复核",'<p class="muted">仅导入已记录的合成账簿；不生成交易，不认证市场行为。</p><label for="synthetic-ledger-file">账簿输入 JSON</label><input type="file" id="synthetic-ledger-file" accept=".json"><button id="synthetic-ledger-sample">载入固定测试样本</button> <button id="synthetic-ledger-export" disabled>导出核验结果</button><div id="synthetic-ledger-result" role="status"></div>')+
  panel("统一仿真实验验收",'<p class="muted">使用 npm run simulate:validate 生成离线报告；导入仅复核报告计数，不独立验证运行结果。</p><label for="participant-validation-file">基线报告</label><input id="participant-validation-file" type="file" accept=".json"><div id="participant-validation-result" role="status"></div><label for="participant-validation-candidate">候选版本报告</label><input id="participant-validation-candidate" type="file" accept=".json"><div id="participant-validation-comparison" role="status"></div>')+
- panel("多实验报告复盘",'<p class="muted">导入已完成的离线合成报告数组，重新核验账簿和记录；不导入派生审计结论，不评估真实市场行为。</p><label for="batch-review-file">原始实验报告数组 JSON（最多 100 份 / 4 MiB）</label><input id="batch-review-file" type="file" accept=".json"><button id="batch-review-export" disabled>导出批量核验报告</button><div id="batch-review-result" role="status"></div>');
+ panel("多实验报告复盘",'<p class="muted">导入已完成的离线合成报告数组，重新核验账簿和记录；不导入派生审计结论，不评估真实市场行为。</p><label for="batch-review-file">原始实验报告数组 JSON（最多 100 份 / 4 MiB）</label><input id="batch-review-file" type="file" accept=".json"><button id="batch-review-export" disabled>导出批量核验报告</button><div id="batch-review-result" role="status"></div>')+ '</div></details>';
  const validationResult=main.querySelector("#participant-validation-result"),validationComparison=main.querySelector("#participant-validation-comparison"),validationCandidate=main.querySelector("#participant-validation-candidate");
  let validationTicket=0,comparisonTicket=0,validationBase=null;validationCandidate.disabled=true;
  main.querySelector("#participant-validation-file").onchange=async e=>{
@@ -645,7 +649,9 @@ panel("项目全生命周期复盘",'<div id="project-lifecycle-review"></div>')
  document.querySelector("#run-experiment").onclick=()=>{
   const el=document.querySelector("#experiment-result"),exportButton=document.querySelector("#export-experiment");
   try{
-   const seed=Number(document.querySelector("#experiment-seed").value),runs=Number(document.querySelector("#experiment-runs").value),start=performance.now();
+   const seedInput=document.querySelector("#experiment-seed"),runsInput=document.querySelector("#experiment-runs");
+   if(!seedInput.value||!runsInput.value||!seedInput.checkValidity()||!runsInput.checkValidity())throw Error("请输入范围内的整数种子和实验次数。");
+   const seed=Number(seedInput.value),runs=Number(runsInput.value),start=performance.now();
    record("experiment.started",{seed,runs});
    experiment=runParticipantExperiment({base:original,seed,runs});
    record("experiment.completed",{trial_count:experiment.total_trials,match_count:experiment.total_matches,duration_ms:Math.round(performance.now()-start)});
@@ -700,19 +706,21 @@ panel("项目全生命周期复盘",'<div id="project-lifecycle-review"></div>')
  batchExport.onclick=()=>{if(batchAudit)download("synthetic-batch-audit.json",JSON.stringify(batchAudit,null,2))};
  }else if(page==="logs"){
  const logs=diagnostics.snapshot();
- main.innerHTML=screenHeading("系统设置","连接状态 · 诊断事件 · 数据导入")+panel("服务状态",table(["服务","状态"],[["浏览器应用","已初始化"],["报告引擎",report.status],["Localnet RPC","待检查"],["交易执行","项目交易接口已禁用"]])+'<div class="row"><button id="rpc-health">检查本地连接</button></div><div id="rpc-health-result" role="status"></div>')+note("仅保存当前页面会话的最近 1000 条结构化诊断事件，同一标签页刷新时保留（浏览器存储不可用时除外）。不会记录原始输入、钱包地址、私钥、RPC URL 或原始错误信息。")+
- '<div class="stats">'+stat("日志条数",logs.entries.length)+stat("警告",logs.entries.filter(x=>x.level==="WARN").length)+stat("错误",logs.entries.filter(x=>x.level==="ERROR").length)+stat("已滚动丢弃",logs.dropped_count)+'</div>'+
+ main.innerHTML=screenHeading("系统设置","连接状态 · 诊断日志")+ '<div class="settings-workspace"><aside class="settings-side">'+panel("服务状态",table(["服务","状态"],[["浏览器应用","已初始化"],["独立报告引擎",report.status],["Localnet RPC","待检查"],["交易执行","项目交易接口已禁用"]])+'<div class="row"><button id="rpc-health">检查本地连接</button></div><div id="rpc-health-result" role="status"></div>')+note("仅保存当前页面会话的最近 1000 条结构化诊断事件，同一标签页刷新时保留（浏览器存储不可用时除外）。不会记录原始输入、钱包地址、私钥、RPC URL 或原始错误信息。")+
+ '</aside><section class="settings-content"><h3>会话诊断日志</h3><div class="stats">'+stat("日志条数",logs.entries.length)+stat("警告",logs.entries.filter(x=>x.level==="WARN").length)+stat("错误",logs.entries.filter(x=>x.level==="ERROR").length)+stat("已滚动丢弃",logs.dropped_count)+'</div>'+
  panel("日志工具",'<div class="row"><button id="log-download" class="primary">导出诊断日志 JSON</button><button id="log-refresh">刷新</button><button id="log-clear">清空日志</button></div>')+
- panel("最近事件",table(["时间 (UTC)","级别","事件","详情"],logs.entries.slice().reverse().map(x=>[x.time,x.level,x.event,JSON.stringify(x.detail)])));
- document.querySelector("#rpc-health").onclick=async()=>{const output=document.querySelector("#rpc-health-result");output.textContent="检查中…";try{const response=await fetch("/api/terminal/health",{cache:"no-store"});if(!response.ok)throw Error("health endpoint unavailable");const result=await response.json();output.innerHTML=table(["检查","状态"],[["报告桥",result.report_bridge],["RPC",result.rpc?.status],["最终确认 slot",result.rpc?.slot],["版本",result.rpc?.version],["Genesis hash",result.rpc?.genesis_hash],["网络身份","待独立核验"]]);}catch{output.textContent="本地检查接口不可用";}};
+ panel("最近事件",table(["时间 (UTC)","级别","事件","详情"],logs.entries.slice().reverse().map(x=>[x.time,x.level,x.event,JSON.stringify(x.detail)])))+'</section></div>';
+ document.querySelector("#rpc-health").onclick=async()=>{const output=document.querySelector("#rpc-health-result"),button=document.querySelector("#rpc-health");button.disabled=true;output.textContent="检查中…";try{const response=await fetch("/api/terminal/health",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("health endpoint unavailable");const result=await response.json();if(!output.isConnected)return;output.innerHTML=table(["检查","状态"],[["报告桥",result.report_bridge],["RPC",result.rpc?.status],["最终确认 slot",result.rpc?.slot],["版本",result.rpc?.version],["Genesis hash",result.rpc?.genesis_hash],["网络身份","待独立核验"]]);}catch{if(output.isConnected)output.textContent="本地检查接口不可用，请重试。";}finally{if(button.isConnected)button.disabled=false;}};
  document.querySelector("#log-download").onclick=async()=>{await exportDiagnostics();render()};
  document.querySelector("#log-refresh").onclick=()=>render();
  document.querySelector("#log-clear").onclick=()=>{if(window.confirm("清空当前会话诊断日志？")){diagnostics.clear();render()}};
  }else{
  main.innerHTML=screenHeading("Risk Center / 风险中心","已观测风险与数据质量 · 非交易信号")+panel("风险检查矩阵",table(["类别","状态"],[["财务对账",report.status],["可信等级",report.trust.grade+" / "+report.trust.status],["库存核算",report.trust.metrics.cost_basis.status],["历史回撤",a.max_observed_drawdown_bps==null?"未知":Number(a.max_observed_drawdown_bps)/100+"%"],["实时流动性","未知"],["市场行为风险","未验证"]]))+note("仅核算已发生的历史事件；未通过统一审计时，财务输出为未知。")+'<div class="stats">'+stat("已实现项目盈亏（lamports）",a.realized_project_pnl_base_units)+stat("已到账手续费（lamports）",a.creator_cash_income_base_units)+stat("历史观测回撤（bps）",a.max_observed_drawdown_bps)+stat("审计状态",report.status)+'</div>'+panel("异常清单",report.issues.length?table(["异常"],report.issues.map(x=>[x])):"<p class='positive'>输入样本通过当前审计规则。</p>")+details("详细审计",report.audits)+"<p class='muted'>合成样本通过不等于本地链数据已验证，也不意味着收益可实现。</p>";
  }
- main.insertAdjacentHTML("beforeend",'<div class="row"><button id="quick-log-export">导出诊断日志</button></div>');
- document.querySelector("#quick-log-export").onclick=exportDiagnostics;
+ if(page!=="logs"){
+  main.insertAdjacentHTML("beforeend",'<div class="row"><button id="quick-log-export">导出诊断日志</button></div>');
+  document.querySelector("#quick-log-export").onclick=exportDiagnostics;
+ }
  const extras=page==="market"?[["lab","历史回放 / 导入"],["create","发行资料"]]:page==="lab"?[["market","返回市场中心"]]:["create","logs"].includes(page)?[["terminal","返回操作台"]]:[];
  if(extras.length){main.insertAdjacentHTML("afterbegin",links(extras));main.querySelectorAll("[data-subpage]").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.subpage;record("page.open",{page});render()});}
  main.insertAdjacentHTML("beforeend",'<p class="foot">Cook System · 项目历史证据复核 · 项目交易执行禁用</p>');

@@ -139,8 +139,16 @@ export async function checkBrowserRecovery({browser,dir,env,url,previewDir=null}
    for(const [id,condition] of pageChecks){
     await evaluate('document.querySelector('+JSON.stringify('[data-page="'+id+'"]')+').click()');
     await wait("navigation-"+viewport+"-"+id,'document.querySelector("#main").dataset.page==='+JSON.stringify(id)+'&&'+condition);
-    const marker=({create:".setup-workspace",wallet:".secondary-workspace",dashboard:".review-kpis",projects:".archive-workspace"})[id];
+    const marker=({create:".setup-workspace",wallet:".secondary-workspace",dashboard:".review-kpis",projects:".archive-workspace",participants:".lab-workspace",logs:".settings-workspace"})[id];
     if(marker)assert.equal(await evaluate('Boolean(document.querySelector('+JSON.stringify(marker)+'))'),true);
+    if(id==="participants"){
+     assert.equal(await evaluate('document.querySelector(".lab-primary #run-experiment")!==null&&document.querySelector("#export-experiment").disabled'),true);
+     await evaluate('document.querySelector("#experiment-runs").value="";document.querySelector("#run-experiment").click()');
+     assert.equal(await evaluate('document.querySelector("#experiment-result").textContent.includes("请输入")&&document.querySelector("#export-experiment").disabled'),true);
+     await evaluate('document.querySelector("#experiment-runs").value="2";document.querySelector("#run-experiment").click()');
+     assert.equal(await evaluate('!document.querySelector("#export-experiment").disabled&&document.querySelector(".qa-bars")!==null'),true);
+    }
+    if(id==="logs")assert.equal(await evaluate('document.querySelector("#log-download")!==null&&!document.querySelector("#quick-log-export")'),true);
     await capturePreview(id,viewport);
    }
   }
