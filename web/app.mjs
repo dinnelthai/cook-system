@@ -183,6 +183,7 @@ function renderTerminal(){
          table(["模块","状态","记录数"],[["资金与库存",v.treasury.status,v.treasury.review_count],["市场证据",v.market.status,v.market.review_count],["财务关闭",v.close.status,v.close.review_count],["订单复核","未充分复核 "+v.orders.unresolved_count,v.orders.record_count]])+
          table(["区间开始","区间结束","关联复核数"],v.intervals.map(x=>[x.opening_cutoff,x.closing_cutoff,x.reviews.length]))+
          table(["证据冲突","引用"],v.findings.map(x=>[x.code,x.reference??"—"]))+
+         table(["证据未知","引用"],(v.unknown??[]).map(x=>[x.code,x.reference??"—"]))+
          table(["接入验收条件","状态"],v.data_integration.gates.map(g=>[g.id,g.status]))+
          '<button id="business-refresh">刷新统一复核</button><button id="business-export">导出复核 JSON</button>';
         businessArea.querySelector("#business-refresh").onclick=refreshBusiness;
@@ -199,7 +200,7 @@ function renderTerminal(){
        if(!marketCurrent())return;
        if(rows.some(a=>a.project_id!==selected.project_id||a.current_revision!==selected.revision))throw Error("PROJECT_ARCHIVE_SCOPE_MISMATCH");
        ms.replaceChildren(new Option("选择当前版本报告",""));
-       for(const a of rows.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&!a.stale))ms.add(new Option("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff,a.archive_id));
+       for(const a of rows.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&(!a.stale||a.evidence_applicability==="PROFILE_ONLY_COMPATIBLE")))ms.add(new Option("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff,a.archive_id));
       }).catch(e=>{if(marketCurrent())mt.textContent=errorKind(e);});
       const me=marketArea.querySelector("#market-evidence-export");
       let lastMarketReview=null;
@@ -272,7 +273,7 @@ function renderTerminal(){
         if(!stillCurrent())return;
         if(rows.some(a=>a.project_id!==selected.project_id||a.current_revision!==selected.revision))throw Error("PROJECT_ARCHIVE_SCOPE_MISMATCH");
         closeSelect.replaceChildren(new Option("选择当前版本报告",""));
-        for(const a of rows.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&!a.stale))closeSelect.add(new Option("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff,a.archive_id));
+        for(const a of rows.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&(!a.stale||a.evidence_applicability==="PROFILE_ONLY_COMPATIBLE")))closeSelect.add(new Option("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff,a.archive_id));
        }).catch(e=>{if(stillCurrent())closeStatus.textContent=errorKind(e);});
        const treasuryButton=lifecycleArea.querySelector("#project-treasury-review");
        treasuryButton.onclick=async()=>{

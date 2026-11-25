@@ -1,11 +1,12 @@
 import {assertProjectAggregate,PROJECT_STAGES} from "./project-aggregate.mjs";
+import {evidenceApplicable,archiveApplicable} from "./project-evidence-scope.mjs";
 /** Retrospective evidence coverage, never an executable lifecycle transition.
  * Archived observations are declarations from a configured source, not independent verification. */
 export function describeProjectLifecycleEvidence(projectInput,archive,orders=[]){
  const p=assertProjectAggregate(projectInput);
- const scoped=archive.filter(a=>a.project_id===p.project_id&&a.project_revision===p.revision&&a.stale===false&&a.payload?.project_id===p.project_id&&a.payload?.project_revision===p.revision&&a.payload.source_attestation==="UNKNOWN"&&a.payload.execution_enabled===false);
- const stale=archive.filter(a=>a.project_id===p.project_id&&a.project_revision!==p.revision).length;
- const scopeConflicts=archive.filter(a=>a.project_id===p.project_id&&a.project_revision===p.revision&&!scoped.includes(a));
+ const scoped=archive.filter(a=>archiveApplicable(p,a));
+ const stale=archive.filter(a=>a.project_id===p.project_id&&!evidenceApplicable(p,a)).length;
+ const scopeConflicts=archive.filter(a=>evidenceApplicable(p,a)&&!scoped.includes(a));
  const issuanceIdentity=v=>Boolean(p.token.mint&&p.token.issuance_signature)&&v.mint===p.token.mint&&v.signature===p.token.issuance_signature;
  const marketIdentity=(v,m)=>v.market_id===m.market_id&&v.market_account===m.market_account&&v.identity_digest===m.identity_digest&&v.venue===m.venue;
  const identityConflicts=scoped.filter(a=>a.kind==="ISSUANCE_OBSERVATION"?!issuanceIdentity(a.payload):
@@ -37,11 +38,12 @@ export function describeProjectLifecycleEvidence(projectInput,archive,orders=[])
   const status=rows.some(m=>m.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":rows.some(m=>m.status==="REPLAY_MATCH_NOT_ATTESTED")?"REPLAY_MATCH_NOT_ATTESTED":rows.some(m=>m.status==="RECORDED_NOT_ATTESTED")?"RECORDED_NOT_ATTESTED":rows.some(m=>m.status==="MIGRATION_LINK_ONLY")?"MIGRATION_LINK_ONLY":rows.length?"UNKNOWN":"MISSING";
   return {stage,status,archive_ids:rows.map(m=>m.archive_id)};
  });
- const closeReviews=scoped.filter(a=>a.kind==="PROJECT_CLOSE_REVIEW");
+ const allCloseReviews=scoped.filter(a=>a.kind==="PROJECT_CLOSE_REVIEW");
+ const closeReviews=allCloseReviews.filter(a=>!["STALE","UNKNOWN_LEGACY"].includes(a.evidence_snapshot_status));
  const closeEvidence={status:closeReviews.some(a=>a.payload.status==="REVIEW_REQUIRED"||(Array.isArray(a.payload.blockers)&&a.payload.blockers.length>0))?"REVIEW_REQUIRED":closeReviews.length?"PARTIAL":"MISSING",
   archive_ids:closeReviews.map(a=>a.archive_id),blockers:[...new Set(closeReviews.flatMap(a=>a.payload.blockers??[]))],unknown:[...new Set(closeReviews.flatMap(a=>a.payload.unknown??[]))]};
  const allOrders=orders.filter(o=>o.project_id===p.project_id);
- const currentOrders=allOrders.filter(o=>o.project_revision===p.revision&&o.stale===false);
+ const currentOrders=allOrders.filter(o=>evidenceApplicable(p,o));
  const staleOrders=allOrders.filter(o=>!currentOrders.includes(o));
  const unresolvedOrders=allOrders.filter(o=>!["REPORTED_SUCCESS","REPORTED_FAILURE"].includes(o.status));
  const blockers=[...new Set(evidence_conflicts.map(x=>x.code))];
@@ -54,6 +56,7 @@ export function describeProjectLifecycleEvidence(projectInput,archive,orders=[])
  else if(p.lifecycle.stage==="PUMPSWAP_ACTIVE"&&swapStatus!=="OBSERVED_NOT_ATTESTED")blockers.push("PUMPSWAP_IDENTITY_"+swapStatus);
  if(p.lifecycle.operational_status==="REVIEW_REQUIRED")blockers.push("PROJECT_REVIEW_REQUIRED");
  if(closeEvidence.status==="REVIEW_REQUIRED")blockers.push("PROJECT_CLOSE_REVIEW_REQUIRED");
+ if(allCloseReviews.length!==closeReviews.length)blockers.push("CLOSE_EVIDENCE_SNAPSHOT_OUTDATED_OR_UNKNOWN");
  if(historicalMilestones.some(m=>m.status==="REVIEW_REQUIRED"))blockers.push("GRADUATION_HISTORY_CONFLICT");
  blockers.push("INDEPENDENT_ATTESTATION_UNAVAILABLE");
  const steps=PROJECT_STAGES.map(stage=>({stage,recorded:stage===p.lifecycle.stage?"CURRENT":"NOT_CURRENT",evidence_status:

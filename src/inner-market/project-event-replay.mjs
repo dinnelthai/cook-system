@@ -31,7 +31,7 @@ function commandFromEvent(event){
  * The caller must independently check hashes and store isolation. */
 export function replayProjectEvents(events){
  if(!Array.isArray(events)||!events.length)throw Error("PROJECT_EVENT_REPLAY_EMPTY");
- const first=events[0];let project;
+ const first=events[0];let project,metadataCompatibleSince=1;
  try{
   const original=assertProjectAggregate(first.payload.aggregate);
   if(first.event_type!=="PROJECT_CREATED"||first.revision!==1||original.revision!==1||first.project_id!==original.project_id||
@@ -48,8 +48,9 @@ export function replayProjectEvents(events){
       !Number.isSafeInteger(event.occurred_at_ms)||event.occurred_at_ms<project.updated_at_ms)throw Error("INVALID_EVENT_SCOPE");
    const applied=applyProjectCommand(project,{type:event.event_type,payload:commandFromEvent(event)},{now:()=>event.occurred_at_ms});
    if(applied.event_type!==event.event_type||applied.aggregate.revision!==event.revision||!equal(applied.payload,event.payload))throw Error("EVENT_PAYLOAD_MISMATCH");
+   if(event.event_type!=="UPDATE_PROFILE"||applied.aggregate.profile.symbol!==project.profile.symbol)metadataCompatibleSince=event.revision;
    project=applied.aggregate;
   }catch{throw Error("PROJECT_EVENT_REPLAY_TRANSITION_INVALID");}
  }
- return {aggregate:project,event_count:events.length,semantic_replay:"MATCHABLE",original_request_attestation:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false};
+ return {aggregate:project,event_count:events.length,metadata_compatible_since_revision:metadataCompatibleSince,semantic_replay:"MATCHABLE",original_request_attestation:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false};
 }

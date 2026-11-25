@@ -8,6 +8,7 @@ import { describeProjectRiskReview } from "./project-risk-review.mjs";
 import { buildProjectAuditBundle } from "./project-audit-bundle.mjs";
 import { createProjectAggregate, applyProjectCommand, assertProjectAggregate } from "./project-aggregate.mjs";
 import { replayProjectEvents } from "./project-event-replay.mjs";
+import { evidenceApplicability } from "./project-evidence-scope.mjs";
 import { describeProjectLifecycleEvidence } from "./project-lifecycle-evidence.mjs";
 import { buildProjectBusinessReview } from "./project-business-review.mjs";
 import { describeRecordedProjectTimeline, describeLifecycleExceptions } from "./project-lifecycle-timeline.mjs";
@@ -146,7 +147,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       const chain = verifyRows(projectId, aggregate);
       const replay = replayProjectEvents(chain.events);
       if (canonicalJson(replay.aggregate) !== canonicalJson(aggregate)) throw Error("PROJECT_SNAPSHOT_REPLAY_MISMATCH");
-      return { aggregate, events: chain.events, head_hash: chain.head_hash, aggregate_hash: snapshot.aggregate_hash };
+      return { aggregate, events: chain.events, head_hash: chain.head_hash, aggregate_hash: snapshot.aggregate_hash, metadata_compatible_since_revision:replay.metadata_compatible_since_revision };
     }
     function makeEvent({ eventId, projectId, revision, type, payload, actorId, at, previousHash, requestDigest }) {
       const event = {
@@ -263,21 +264,43 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       return {archive_id:row.archive_id,project_id:row.project_id,project_revision:row.project_revision,
         project_head_hash:row.project_head_hash,kind:row.kind,recorded_at_ms:row.recorded_at_ms,record_hash:row.record_hash,
         payload:JSON.parse(row.content),current_revision:latest.aggregate.revision,stale:row.project_revision!==latest.aggregate.revision,
+        evidence_applicability:evidenceApplicability(latest,row.project_revision,row.kind),
         source_attestation:"UNKNOWN",execution_enabled:false};
     }
-    function recordArchive(projectId, kind, payload, expectedRevision) {
+    function evidenceSnapshotInTransaction(projectId,latest){
+      const archives=archiveRows.all(projectId).map(row=>decodeArchive(row,latest));
+      const orders=rawOrderReview.list(projectId);
+      const orderHeads=orders.map(o=>[o.order_id,o.revision,o.head_hash]).sort((a,b)=>a[0].localeCompare(b[0],"en"));
+      const snapshotDigest=predicate=>hash(canonicalJson({project_head_hash:latest.head_hash,
+        archive_hashes:archives.filter(predicate).map(a=>a.record_hash).sort(),orders:orderHeads}));
+      const digest=snapshotDigest(a=>a.kind!=="PROJECT_CLOSE_REVIEW");
+      const receiptDigest=snapshotDigest(a=>a.kind==="HISTORICAL_REPORT_LINK");
+      return {project:latest.aggregate,archives:archives.map(a=>a.kind==="PROJECT_CLOSE_REVIEW"?{...a,
+        evidence_snapshot_status:!a.payload.evidence_snapshot_digest?"UNKNOWN_LEGACY":a.payload.evidence_snapshot_digest===digest?"MATCHED":"STALE"}:a),orders,evidence_snapshot_digest:digest,receipt_snapshot_digest:receiptDigest};
+    }
+    function getEvidenceSnapshot(projectId){
+      return readSnapshot(()=>evidenceSnapshotInTransaction(projectId,current(projectId)));
+    }
+    function recordArchive(projectId, kind, payload, expectedRevision, expectedEvidenceDigest=null) {
       if (!["ISSUANCE_OBSERVATION","MARKET_OBSERVATION","HISTORICAL_REPORT_LINK","ORDER_RECEIPT_REVIEW","GRADUATION_HISTORY_REVIEW","PROJECT_CLOSE_REVIEW","TREASURY_REVIEW","MARKET_EVIDENCE_REVIEW"].includes(kind) ||
           !payload || payload.project_id!==projectId || payload.project_revision!==expectedRevision ||
           payload.source_attestation!=="UNKNOWN" || payload.execution_enabled!==false) throw Error("INVALID_PROJECT_ARCHIVE");
+      const guarded=["PROJECT_CLOSE_REVIEW","ORDER_RECEIPT_REVIEW"].includes(kind);
+      if(guarded&&(!/^[a-f0-9]{64}$/.test(expectedEvidenceDigest??"")||payload.evidence_snapshot_digest!==expectedEvidenceDigest))throw Error("PROJECT_EVIDENCE_SNAPSHOT_REQUIRED");
       const content=canonicalJson(payload);
       if (Buffer.byteLength(content)>64*1024) throw Error("PROJECT_ARCHIVE_SIZE_LIMIT");
       db.exec("BEGIN IMMEDIATE");
       try {
         const latest=current(projectId);
         if(latest.aggregate.revision!==expectedRevision) throw Error("PROJECT_REVISION_CONFLICT");
+        if(guarded){
+          const snapshot=evidenceSnapshotInTransaction(projectId,latest);
+          const actual=kind==="ORDER_RECEIPT_REVIEW"?snapshot.receipt_snapshot_digest:snapshot.evidence_snapshot_digest;
+          if(actual!==expectedEvidenceDigest)throw Error("PROJECT_EVIDENCE_SNAPSHOT_CONFLICT");
+        }
         const archive_id=hash(canonicalJson({project_id:projectId,revision:expectedRevision,kind,content}));
         const prior=archiveById.get(archive_id);
-        if(prior){const result=decodeArchive(prior,latest);db.exec("COMMIT");return result;}
+        if(prior){const result=decodeArchive(prior,latest);db.exec("COMMIT");return kind==="PROJECT_CLOSE_REVIEW"?{...result,evidence_snapshot_status:"MATCHED"}:result;}
         if(archiveCount.get(projectId).count>=256)throw Error("PROJECT_ARCHIVE_CAPACITY");
         const at=now();
         if(!Number.isSafeInteger(at)||at<latest.aggregate.updated_at_ms)throw Error("INVALID_PROJECT_STORE_CLOCK");
@@ -285,14 +308,11 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         const record_hash=hash(canonicalJson(archiveCore(row)));
         archiveInsert.run(archive_id,projectId,expectedRevision,latest.head_hash,kind,content,at,record_hash);
         const result=decodeArchive({...row,record_hash},latest);
-        db.exec("COMMIT");return result;
+        db.exec("COMMIT");return kind==="PROJECT_CLOSE_REVIEW"?{...result,evidence_snapshot_status:"MATCHED"}:result;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
     function listArchive(projectId){
-      return readSnapshot(()=>{
-        const latest=current(projectId);
-        return archiveRows.all(projectId).map(row=>decodeArchive(row,latest));
-      });
+      return getEvidenceSnapshot(projectId).archives;
     }
     const rawOrderReview=createOrderReviewJournal(db,{current,now});
     const orderReview={...rawOrderReview,
@@ -370,7 +390,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
           original_database_replaced:false,source_attestation:"UNKNOWN",execution_enabled:false};
       }finally{copy.close();}
     }
-    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, getBusinessReview, close: () => db.close() };
+    return { create, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, getBusinessReview, getEvidenceSnapshot, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

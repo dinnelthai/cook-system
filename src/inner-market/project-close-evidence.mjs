@@ -1,5 +1,6 @@
 import {assertProjectAggregate} from "./project-aggregate.mjs";
 import {matchProjectReport} from "./project-report-identity.mjs";
+import {evidenceApplicable,archiveApplicable} from "./project-evidence-scope.mjs";
 import {buildProjectFinancialCloseReview} from "./project-financial-close-review.mjs";
 import {loadLinkedReport} from "./order-receipt-review.mjs";
 import {createHash} from "node:crypto";
@@ -13,16 +14,16 @@ export function reviewProjectCloseEvidence(projectInput,input,orders=[],archives
  const f=buildProjectFinancialCloseReview(input);
  const blockers=[],unknown=[];
  const all=orders.filter(o=>o.project_id===p.project_id);
- const unresolved=all.filter(o=>o.stale||!["REPORTED_SUCCESS","REPORTED_FAILURE"].includes(o.status));
+ const unresolved=all.filter(o=>!evidenceApplicable(p,o)||!["REPORTED_SUCCESS","REPORTED_FAILURE"].includes(o.status));
  if(unresolved.length)blockers.push("ORDER_RECORDS_UNRESOLVED");
  const matching=all.filter(o=>!unresolved.includes(o));
- const reviewArchives=archives.filter(a=>a.kind==="ORDER_RECEIPT_REVIEW"&&a.project_id===p.project_id&&a.project_revision===p.revision&&a.stale===false&&a.payload?.project_id===p.project_id&&a.payload?.project_revision===p.revision&&a.payload?.source_attestation==="UNKNOWN"&&a.payload.execution_enabled===false);
+ const reviewArchives=archives.filter(a=>a.kind==="ORDER_RECEIPT_REVIEW"&&archiveApplicable(p,a));
  const receiptConflicts=[];
  const unmatched=matching.filter(o=>{
   const rows=reviewArchives.filter(a=>a.payload.order_id===o.order_id&&a.payload.order_revision===o.revision&&a.payload.order_head_hash===o.head_hash&&a.payload.signature===o.signature);
   const conflict=rows.some(a=>a.payload.status==="REVIEW_REQUIRED"||a.payload.rpc_observation?.status==="REVIEW_REQUIRED");
   if(conflict)receiptConflicts.push(o.order_id);
-  return !rows.some(a=>a.payload.status==="INTERNAL_MATCH"&&a.payload.rpc_observation?.status==="DECLARED_SAMPLE_MATCH")||conflict;
+  return !rows.some(a=>a.payload.status==="INTERNAL_MATCH"&&a.payload.report_digest===sha(input)&&a.payload.rpc_observation?.status==="DECLARED_SAMPLE_MATCH")||conflict;
  });
  if(unmatched.length)unknown.push("ORDER_RECEIPT_REVIEW_INCOMPLETE");
  if(receiptConflicts.length)blockers.push("ORDER_RECEIPT_REVIEW_CONFLICT");

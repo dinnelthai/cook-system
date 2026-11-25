@@ -1,6 +1,7 @@
 import {createHash} from "node:crypto";
 import {canonicalJson} from "../core/canonical-json.mjs";
 import {applyOrderReviewEvent} from "./order-review-model.mjs";
+import {evidenceApplicability} from "./project-evidence-scope.mjs";
 const hash=x=>createHash("sha256").update(canonicalJson(x),"utf8").digest("hex");
 const id=x=>typeof x==="string"&&x.length>0&&x.length<=128&&x.trim()===x;
 const core=r=>({event_id:r.event_id,project_id:r.project_id,order_id:r.order_id,revision:r.revision,event_json:r.event_json,recorded_at_ms:r.recorded_at_ms,previous_hash:r.previous_hash,request_hash:r.request_hash});
@@ -60,7 +61,7 @@ export function createOrderReviewJournal(db,{current,now}){
  }
  function list(projectId){
   const p=current(projectId);
-  return [...replay(projectId,p).values()].map(x=>({...x.state,stale:x.state.project_revision!==p.aggregate.revision,head_hash:x.head_hash}));
+  return [...replay(projectId,p).values()].map(x=>({...x.state,stale:x.state.project_revision!==p.aggregate.revision,current_revision:p.aggregate.revision,evidence_applicability:evidenceApplicability(p,x.state.project_revision),head_hash:x.head_hash}));
  }
  function events(projectId,orderId){
   const p=current(projectId),record=replay(projectId,p).get(orderId);
@@ -92,7 +93,7 @@ export function createOrderReviewJournal(db,{current,now}){
    for(const sample of samples){
     const old=existing.get(sample.signature);
     if(old){
-     if(old.state.project_revision!==expectedRevision||old.state.reported_slot!==sample.slot||old.state.reported_outcome!==sample.outcome||old.state.status==="REVIEW_REQUIRED")throw Error("ORDER_IMPORT_EXISTING_CONFLICT");
+     if(evidenceApplicability(project,old.state.project_revision)==="STALE"||old.state.reported_slot!==sample.slot||old.state.reported_outcome!==sample.outcome||old.state.status==="REVIEW_REQUIRED")throw Error("ORDER_IMPORT_EXISTING_CONFLICT");
      already_present++;continue;
     }
     const orderId="receipt-"+hash({projectId,signature:sample.signature});

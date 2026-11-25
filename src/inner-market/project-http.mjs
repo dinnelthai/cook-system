@@ -18,7 +18,7 @@ function assertOperatorCommand(type, payload) {
   if (!OPERATOR_COMMANDS.has(type)) throw Error("TRUSTED_VERIFIER_REQUIRED");
 }
 const CONFLICTS = new Set([
-  "PROJECT_ALREADY_EXISTS", "PROJECT_REVISION_CONFLICT", "PROJECT_IDEMPOTENCY_KEY_CONFLICT",
+  "PROJECT_ALREADY_EXISTS", "PROJECT_REVISION_CONFLICT", "PROJECT_EVIDENCE_SNAPSHOT_CONFLICT", "PROJECT_IDEMPOTENCY_KEY_CONFLICT",
   "PROJECT_NETWORK_LOCKED", "PROJECT_TOKEN_CONFIGURATION_LOCKED", "PROJECT_SYMBOL_LOCKED",
   "MARKET_ALREADY_VERIFIED", "ISSUANCE_ALREADY_VERIFIED"
 ]);
@@ -187,12 +187,12 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(typeof reviewProjectClose!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         const input=await bodyJson(req,readRequestJson,maxBodyBytes);
         if(Object.keys(input).some(k=>!["archive_id","expected_revision"].includes(k))||typeof input.archive_id!=="string"||!Number.isSafeInteger(input.expected_revision))throw Error("INVALID_CLOSE_REVIEW_REQUEST");
-        const project=store.get(projectId);
+        const snapshot=store.getEvidenceSnapshot(projectId),{project,archives,orders,evidence_snapshot_digest}=snapshot;
         if(project.revision!==input.expected_revision)throw Error("PROJECT_REVISION_CONFLICT");
-        const archives=store.listArchive(projectId),link=archives.find(a=>a.archive_id===input.archive_id);
+        const link=archives.find(a=>a.archive_id===input.archive_id);
         if(!link)throw Error("PROJECT_ARCHIVE_NOT_FOUND");
-        const review=reviewProjectClose(project,link,store.orderReview.list(projectId),archives);
-        const archive=store.recordArchive(projectId,"PROJECT_CLOSE_REVIEW",review,project.revision);
+        const review={...reviewProjectClose(project,link,orders,archives),evidence_snapshot_digest};
+        const archive=store.recordArchive(projectId,"PROJECT_CLOSE_REVIEW",review,project.revision,evidence_snapshot_digest);
         send(res,200,{review,archive});return true;
       }
       if(action==="graduation-history-review"){
@@ -228,16 +228,14 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         const input=await bodyJson(req,readRequestJson,maxBodyBytes);
         if(Object.keys(input).some(k=>!["order_id","archive_id","expected_revision","expected_order_revision"].includes(k))||
            typeof input.order_id!=="string"||typeof input.archive_id!=="string"||!Number.isSafeInteger(input.expected_revision)||!Number.isSafeInteger(input.expected_order_revision))throw Error("INVALID_ORDER_RECEIPT_REQUEST");
-        const project=store.get(projectId);
-        const order=store.orderReview.list(projectId).find(o=>o.order_id===input.order_id);
+        const snapshot=store.getEvidenceSnapshot(projectId),{project,archives,orders,receipt_snapshot_digest:evidence_snapshot_digest}=snapshot;
+        const order=orders.find(o=>o.order_id===input.order_id);
         if(!order)throw Error("ORDER_NOT_FOUND");
         if(project.revision!==input.expected_revision||order.revision!==input.expected_order_revision)throw Error("PROJECT_REVISION_CONFLICT");
-        const link=store.listArchive(projectId).find(a=>a.archive_id===input.archive_id);
+        const link=archives.find(a=>a.archive_id===input.archive_id);
         if(!link)throw Error("PROJECT_ARCHIVE_NOT_FOUND");
-        const review=await reviewOrderReceipt(project,order,link);
-        const latest=store.orderReview.list(projectId).find(o=>o.order_id===input.order_id);
-        if(store.get(projectId).revision!==project.revision||latest?.revision!==order.revision)throw Error("PROJECT_REVISION_CONFLICT");
-        const record=store.recordArchive(projectId,"ORDER_RECEIPT_REVIEW",{...review,order_head_hash:order.head_hash},project.revision);
+        const review={...await reviewOrderReceipt(project,order,link),evidence_snapshot_digest};
+        const record=store.recordArchive(projectId,"ORDER_RECEIPT_REVIEW",{...review,order_head_hash:order.head_hash},project.revision,evidence_snapshot_digest);
         send(res,200,{review,review_archive_id:record.archive_id});return true;
       }
       if(action==="order-review"){

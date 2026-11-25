@@ -31,3 +31,23 @@ test("stale conflicting orders still surface and foreign records cannot contribu
  assert.equal(v.status,"REVIEW_REQUIRED");assert.equal(v.orders.record_count,1);
  assert.equal(v.orders.records[0].status,"REVIEW_REQUIRED");assert.ok(v.risk.critical>0);
 });
+
+test("legacy missing receipt digest is unknown, not a fabricated link conflict",()=>{
+ const a=archive("receipt","ORDER_RECEIPT_REVIEW",{archive_id:"link",status:"UNKNOWN"});
+ const v=buildProjectBusinessReview(p,[link(),a]);
+ assert.equal(v.status,"EVIDENCE_INCOMPLETE");
+ assert.ok(v.unknown.some(x=>x.code==="LEGACY_RECEIPT_REPORT_DIGEST_UNAVAILABLE"));
+ assert.ok(!v.findings.some(x=>x.code==="REVIEW_REPORT_LINK_CONFLICT"));
+ a.payload.report_digest="b".repeat(64);
+ const bad=buildProjectBusinessReview(p,[link(),a]);assert.equal(bad.risk.status,"REVIEW_REQUIRED");
+});
+
+test("receipt review preserves report digest on incomplete evidence",async()=>{
+ const {reviewOrderReceipt}=await import("../src/inner-market/order-receipt-review.mjs");
+ const {createHash}=await import("node:crypto");
+ const {canonicalJson}=await import("../src/core/canonical-json.mjs");
+ const input={sourceMode:"SYNTHETIC"},o={project_id:p.project_id,project_revision:p.revision,stale:false,order_id:"receipt",revision:1,signature:"1".repeat(64),source_mode:"SYNTHETIC"};
+ const result=reviewOrderReceipt(p,o,input);
+ assert.equal(result.status,"REVIEW_REQUIRED");
+ assert.equal(result.report_digest,createHash("sha256").update(canonicalJson(input),"utf8").digest("hex"));
+});

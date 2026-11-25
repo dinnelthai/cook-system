@@ -3,6 +3,7 @@ import {canonicalJson} from "../core/canonical-json.mjs";
 import {normalizeArchivedReceipt} from "./archived-account-audit.mjs";
 import {buildUnifiedHistoricalReport} from "./unified-historical-report.mjs";
 import {matchProjectReport} from "./project-report-identity.mjs";
+import {evidenceApplicable,archiveApplicable} from "./project-evidence-scope.mjs";
 import {openHistoricalWorkspaceStore} from "./historical-workspace-store.mjs";
 import {restoreHistoricalWorkspace} from "./historical-project-workspace.mjs";
 import {SolanaRpcClient} from "../adapters/pump/solana-rpc.mjs";
@@ -18,8 +19,9 @@ function endpointUrl(endpoint){
 export function reviewOrderReceipt(project,order,input){
  const base={schema_version:"cook-order-receipt-review.1",project_id:project.project_id,project_revision:project.revision,order_id:order.order_id,order_revision:order.revision,signature:order.signature,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",settlement_allowed:false,execution_enabled:false};
- const finish=(status,reason,extra={})=>({...base,status,reason,...extra});
- if(order.project_id!==project.project_id||order.project_revision!==project.revision||order.stale===true)return finish("REVIEW_REQUIRED","ORDER_PROJECT_REVISION_MISMATCH");
+ const reportDigest=sha(input);
+ const finish=(status,reason,extra={})=>({...base,status,reason,report_digest:reportDigest,...extra});
+ if(!evidenceApplicable(project,{...order,stale:order.stale??false}))return finish("REVIEW_REQUIRED","ORDER_PROJECT_REVISION_MISMATCH");
  if(order.source_mode!=="ARCHIVED_HISTORICAL"||matchProjectReport(project,input).status!=="DECLARED_MATCH")return finish("REVIEW_REQUIRED","REPORT_SCOPE_MISMATCH");
  if(order.status==="REVIEW_REQUIRED")return finish("REVIEW_REQUIRED","ORDER_REVIEW_REQUIRED");
  let report;try{report=buildUnifiedHistoricalReport(input);}catch{return finish("REVIEW_REQUIRED","REPORT_VALIDATION_FAILED");}
@@ -51,13 +53,14 @@ function expectedFromArchive(raw,scope){
    pre_amount:presence(m.preTokenBalances,t.address)?t.before.toString():null,post_amount:presence(m.postTokenBalances,t.address)?t.after.toString():null}))}:{})};
 }
 export function loadLinkedReport(project,link,path){
- if(link.kind!=="HISTORICAL_REPORT_LINK"||link.stale||link.project_id!==project.project_id||link.project_revision!==project.revision)throw Error("ORDER_REPORT_LINK_SCOPE_MISMATCH");
+ if(link.kind!=="HISTORICAL_REPORT_LINK"||!archiveApplicable(project,link))throw Error("ORDER_REPORT_LINK_SCOPE_MISMATCH");
  const p=link.payload,store=openHistoricalWorkspaceStore(path);
  try{
   const snapshot=store.load(p.workspace_revision);
   if(snapshot.digest!==p.workspace_digest)throw Error("ORDER_REPORT_DIGEST_MISMATCH");
   const input=restoreHistoricalWorkspace(snapshot.workspace).get(p.record_key).input;
   if(sha(input)!==p.report_digest)throw Error("ORDER_REPORT_DIGEST_MISMATCH");
+  if(matchProjectReport(project,input).status!=="DECLARED_MATCH")throw Error("ORDER_REPORT_LINK_SCOPE_MISMATCH");
   return input;
  }finally{store.close();}
 }

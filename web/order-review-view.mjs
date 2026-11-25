@@ -45,7 +45,7 @@ export function mountOrderReview(container,{project,isActive,esc,table,note,down
    }catch(error){if(current()&&own===ticket)status.textContent="导入失败："+error.message;}
    finally{if(current()&&own===ticket)buttons();}
   };
-  function buttons(){importButton.disabled=!linkSelect.value;eventsButton.disabled=!selected;receiptButton.disabled=!selected||selected.stale||selected.source_mode!=="ARCHIVED_HISTORICAL"||!linkSelect.value;}
+  function buttons(){importButton.disabled=!linkSelect.value;eventsButton.disabled=!selected;receiptButton.disabled=!selected||(selected.stale&&selected.evidence_applicability!=="PROFILE_ONLY_COMPATIBLE")||selected.source_mode!=="ARCHIVED_HISTORICAL"||!linkSelect.value;}
   select.onchange=()=>{reset();selected=shown.find(o=>o.order_id===select.value)??null;buttons();};
   linkSelect.onchange=()=>{reset();buttons();};
   container.querySelector("#order-filter").onchange=x=>{ticket++;filter=x.target.value;selected=null;detail=null;render();};
@@ -75,7 +75,7 @@ export function mountOrderReview(container,{project,isActive,esc,table,note,down
    const [next,archive]=await Promise.all([listProjectOrders(project.project_id,project.revision),listProjectArchive(project.project_id)]);
    if(!current()||own!==ticket)return;
    if(archive.some(a=>a.project_id!==project.project_id||a.current_revision!==project.revision))throw Error("PROJECT_ARCHIVE_SCOPE_MISMATCH");
-   orders=next;links=archive.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&!a.stale&&a.project_revision===project.revision);loaded=true;render();
+   orders=next;links=archive.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&(!a.stale||a.evidence_applicability==="PROFILE_ONLY_COMPATIBLE")&&a.current_revision===project.revision);loaded=true;render();
   }catch(error){if(current()&&own===ticket)status.textContent="台账不可用："+error.message;}
  }
  render();load();

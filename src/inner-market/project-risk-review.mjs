@@ -1,7 +1,9 @@
 import {assertProjectAggregate} from "./project-aggregate.mjs";
 import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs";
 const rank={CRITICAL:0,WARNING:1,UNKNOWN:2};
-const current=(p,r)=>r.project_id===p.project_id&&r.project_revision===p.revision&&r.stale===false;
+import {evidenceApplicable,archiveApplicable} from "./project-evidence-scope.mjs";
+import {indexProjectEvidence} from "./project-evidence-index.mjs";
+const current=evidenceApplicable;
 const knownOutcome=new Set(["REPORTED_SUCCESS","REPORTED_FAILURE"]);
 /** Retrospective risk and evidence review. Does not calculate live exposure,
  * issue a trading permission, or mutate any project or order. */
@@ -21,8 +23,11 @@ export function describeProjectRiskReview(projectInput,archives=[],orders=[]){
   add("LIFECYCLE",code,severity);
  }
  if(p.lifecycle.operational_status==="HALTED")add("LIFECYCLE","PROJECT_RECORDED_HALTED","WARNING");
- const scoped=archives.filter(a=>current(p,a)&&a.payload?.project_id===p.project_id&&a.payload?.project_revision===p.revision&&a.payload.source_attestation==="UNKNOWN"&&a.payload.execution_enabled===false);
- const stale=archives.filter(a=>a.project_id===p.project_id&&a.project_revision!==p.revision);
+ const scoped=archives.filter(a=>archiveApplicable(p,a));
+ const index=indexProjectEvidence(p,archives,orders);
+ for(const f of index.findings)add("CROSS_MODULE",f.code,"CRITICAL",f.reference);
+ for(const f of index.unknown)add("CROSS_MODULE",f.code,"UNKNOWN",f.reference);
+ const stale=archives.filter(a=>a.project_id===p.project_id&&!evidenceApplicable(p,a));
  if(stale.length)add("EVIDENCE","STALE_ARCHIVES_EXIST","WARNING");
  const treasury=scoped.filter(a=>a.kind==="TREASURY_REVIEW");
  if(!treasury.length)add("TREASURY","TREASURY_REVIEW_MISSING","UNKNOWN");
@@ -55,10 +60,10 @@ export function describeProjectRiskReview(projectInput,archives=[],orders=[]){
   else if(o.status==="REPORTED_FAILURE")add("ORDER","REPORTED_TRANSACTION_FAILURE","WARNING",o.order_id);
   const matches=scoped.filter(a=>a.kind==="ORDER_RECEIPT_REVIEW"&&a.payload.order_id===o.order_id&&a.payload.order_revision===o.revision&&a.payload.order_head_hash===o.head_hash&&a.payload.signature===o.signature);
   if(matches.some(a=>a.payload.status==="REVIEW_REQUIRED"||a.payload.rpc_observation?.status==="REVIEW_REQUIRED"))add("ORDER","RECEIPT_EVIDENCE_CONFLICT","CRITICAL",o.order_id);
-  else if(!matches.some(a=>a.payload.status==="INTERNAL_MATCH"&&a.payload.rpc_observation?.status==="DECLARED_SAMPLE_MATCH"))add("ORDER","RECEIPT_EVIDENCE_INCOMPLETE","UNKNOWN",o.order_id);
+  else if(index.receipts.find(r=>r.order_id===o.order_id)?.status!=="DECLARED_SAMPLE_MATCH")add("ORDER","RECEIPT_EVIDENCE_INCOMPLETE","UNKNOWN",o.order_id);
  }
  if(!allOrders.length)add("ORDER","ORDER_COVERAGE_UNATTESTED","UNKNOWN");
- for(const a of scoped.filter(a=>a.kind==="PROJECT_CLOSE_REVIEW")){
+ for(const a of scoped.filter(a=>a.kind==="PROJECT_CLOSE_REVIEW"&&!["STALE","UNKNOWN_LEGACY"].includes(a.evidence_snapshot_status))){
   if(a.payload.status==="REVIEW_REQUIRED")add("CLOSE","CLOSE_REVIEW_REQUIRED","CRITICAL",a.archive_id);
   for(const code of a.payload.blockers??[])add("CLOSE",code,"WARNING",a.archive_id);
   for(const code of a.payload.unknown??[])add("CLOSE",code,"UNKNOWN",a.archive_id);

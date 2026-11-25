@@ -230,3 +230,50 @@ test("lifecycle, risk and audit export use one recorded project revision",t=>{
   assert.equal(b.settlement_allowed,false);assert.equal(s.get(p.project_id).revision,4);
  }finally{s.close();}
 });
+
+test("metadata-only edits preserve historical applicability without rewriting original revision",t=>{
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000});
+ try{
+  const p=s.create(base),id=p.project_id;
+  const a=s.recordArchive(id,"ISSUANCE_OBSERVATION",{project_id:id,project_revision:1,status:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false},1);
+  s.append(id,{command_id:"profile-only",type:"UPDATE_PROFILE",payload:{profile:{description:"new metadata"}}},{expected_revision:1});
+  const row=s.listArchive(id)[0];
+  assert.equal(row.evidence_applicability,"PROFILE_ONLY_COMPATIBLE");assert.equal(row.project_revision,1);assert.equal(row.record_hash,a.record_hash);
+  s.append(id,{command_id:"wallet-changed",type:"UPSERT_WALLET_GROUP",payload:{group:group()}},{expected_revision:2});
+  assert.equal(s.listArchive(id)[0].evidence_applicability,"STALE");
+ }finally{s.close();}
+});
+test("evidence snapshot guard rejects same-revision changes and marks previous close review stale",t=>{
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000});
+ try{
+  const id=s.create(base).project_id;
+  const snap=s.getEvidenceSnapshot(id),payload={project_id:id,project_revision:1,status:"PARTIAL",source_attestation:"UNKNOWN",execution_enabled:false,evidence_snapshot_digest:snap.evidence_snapshot_digest};
+  assert.throws(()=>s.recordArchive(id,"PROJECT_CLOSE_REVIEW",payload,1),/PROJECT_EVIDENCE_SNAPSHOT_REQUIRED/);
+  s.recordArchive(id,"PROJECT_CLOSE_REVIEW",payload,1,snap.evidence_snapshot_digest);
+  assert.equal(s.listArchive(id)[0].evidence_snapshot_status,"MATCHED");
+  s.recordArchive(id,"ISSUANCE_OBSERVATION",{project_id:id,project_revision:1,status:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false},1);
+  assert.throws(()=>s.recordArchive(id,"PROJECT_CLOSE_REVIEW",payload,1,snap.evidence_snapshot_digest),/PROJECT_EVIDENCE_SNAPSHOT_CONFLICT/);
+  assert.equal(s.listArchive(id).find(a=>a.kind==="PROJECT_CLOSE_REVIEW").evidence_snapshot_status,"STALE");
+ }finally{s.close();}
+});
+
+test("order head changes from a separate connection invalidate captured evidence guards",t=>{
+ const path=setup(t),a=openProjectStore(path,{now:()=>1000}),b=openProjectStore(path,{now:()=>1000});
+ try{
+  const id=a.create(base).project_id;
+  const snap=a.getEvidenceSnapshot(id);
+  b.orderReview.append(id,"o",{event_id:"reg-guard",expected_revision:0,expected_project_revision:1,type:"REGISTER_OBSERVATION",payload:{source_mode:"SYNTHETIC",signature:"1".repeat(64)}});
+  assert.equal(a.get(id).revision,1);
+  for(const [kind,d] of [["PROJECT_CLOSE_REVIEW",snap.evidence_snapshot_digest],["ORDER_RECEIPT_REVIEW",snap.receipt_snapshot_digest]]){
+   const payload={project_id:id,project_revision:1,status:"PARTIAL",source_attestation:"UNKNOWN",execution_enabled:false,evidence_snapshot_digest:d};
+   assert.throws(()=>a.recordArchive(id,kind,payload,1,d),/PROJECT_EVIDENCE_SNAPSHOT_CONFLICT/);
+  }
+  assert.equal(a.listArchive(id).length,0);
+  const current=a.getEvidenceSnapshot(id),d=current.receipt_snapshot_digest;
+  const payload={project_id:id,project_revision:1,status:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false,evidence_snapshot_digest:d};
+  const record=a.recordArchive(id,"ORDER_RECEIPT_REVIEW",payload,1,d);
+  assert.equal(a.getEvidenceSnapshot(id).receipt_snapshot_digest,d);
+  assert.equal(a.recordArchive(id,"ORDER_RECEIPT_REVIEW",payload,1,d).archive_id,record.archive_id);
+  assert.notEqual(a.getEvidenceSnapshot(id).evidence_snapshot_digest,current.evidence_snapshot_digest);
+ }finally{b.close();a.close();}
+});
