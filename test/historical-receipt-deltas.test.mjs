@@ -50,3 +50,18 @@ test("R3 reported network fee amounts match synthetic native balance pairs indep
   assert.equal(extractTransactionBalanceDeltas(t).native_fee_audit.residual_lamports,"0");
  }
 });
+
+test("one-sided token records are not proof of account creation, closure or rent",()=>{
+ for(const side of ["preTokenBalances","postTokenBalances"]){
+  const t=fixture();t.meta[side]=[];
+  const r=extractTransactionBalanceDeltas(t).token_accounts[0];
+  assert.equal(r.pre_record_present,side!=="preTokenBalances");
+  assert.equal(r.post_record_present,side!=="postTokenBalances");
+  assert.equal(r.delta_basis,"ABSENT_ROW_PROVISIONAL_ZERO");
+  assert.equal(r.account_lifecycle_attestation,"UNKNOWN");assert.equal(r.rent_attribution,"UNKNOWN");
+ }
+});
+test("two recorded token balances remain distinguishable from one-sided metadata",()=>{
+ const r=extractTransactionBalanceDeltas(fixture()).token_accounts[0];
+ assert.equal(r.pre_record_present,true);assert.equal(r.post_record_present,true);assert.equal(r.delta_basis,"TWO_RECORDED_BALANCES");
+});

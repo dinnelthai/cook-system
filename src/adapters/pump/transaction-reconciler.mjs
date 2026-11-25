@@ -78,7 +78,10 @@ export function extractTransactionBalanceDeltas(transaction) {
    const a=before?.amount??0n,z=after?.amount??0n;
    // A missing row in an available array is a recorded absence, not proof of account creation/closure.
    tokenAccounts.push({address,mint:row.mint,owner:before&&after?(before.owner===after.owner?before.owner:null):row.owner,
-    pre_amount_base_units:a.toString(),post_amount_base_units:z.toString(),delta_base_units:(z-a).toString(),decimals:row.decimals});
+    pre_amount_base_units:a.toString(),post_amount_base_units:z.toString(),delta_base_units:(z-a).toString(),decimals:row.decimals,
+    pre_record_present:!!before,post_record_present:!!after,
+    delta_basis:before&&after?"TWO_RECORDED_BALANCES":"ABSENT_ROW_PROVISIONAL_ZERO",
+    account_lifecycle_attestation:"UNKNOWN",rent_attribution:"UNKNOWN"});
    addOwner(before,"pre");addOwner(after,"post");
   }
   if(ownerIncomplete)issues.push("TOKEN_OWNER_AGGREGATION_INCOMPLETE");
