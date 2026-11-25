@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
 import { createProjectAggregate, applyProjectCommand, validateProjectAggregate, WRAPPED_SOL_MINT } from "../src/inner-market/project-aggregate.mjs";
 import { loadSchemaRegistry, validateJsonSchema } from "../src/core/json-schema-validator.mjs";
 
@@ -43,7 +44,7 @@ test("new Project aggregate is canonical, scoped to SOL and execution-disabled",
 });
 test("Project Aggregate validates against the registered JSON Schema", async () => {
   const project = createProjectAggregate(base, { now: () => 1000 });
-  const registry = await loadSchemaRegistry(new URL("../schemas/", import.meta.url));
+  const registry = await loadSchemaRegistry(fileURLToPath(new URL("../schemas/", import.meta.url)));
   const result = validateJsonSchema(project, registry.get("project-aggregate.schema.json"), registry);
   assert.deepEqual(result, { valid: true, errors: [] });
 });
