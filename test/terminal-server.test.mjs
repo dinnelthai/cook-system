@@ -38,6 +38,8 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  }
  const html=await fetch(base);assert.equal(html.status,200);assert.match(await html.text(),/src="\/web\/app\.mjs"/);
  assert.equal((await fetch(base+"/web/app.mjs")).status,200);
+ assert.equal((await fetch(base+"/web/project-client.mjs")).status,200);
+ assert.equal((await fetch(base+"/web/project-setup-view.mjs")).status,200);
  assert.equal((await fetch(base+"/src/inner-market/terminal-state.mjs")).status,200);
  assert.equal((await fetch(base+"/src/inner-market/terminal-candles.mjs")).status,200);
  assert.equal((await fetch(base+"/src/inner-market/historical-risk.mjs")).status,200);
