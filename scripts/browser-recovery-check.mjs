@@ -149,10 +149,18 @@ export async function checkBrowserRecovery({browser,dir,env,url,previewDir=null}
      assert.equal(await evaluate('!document.querySelector("#export-experiment").disabled&&document.querySelector(".qa-bars")!==null'),true);
     }
     if(id==="logs")assert.equal(await evaluate('document.querySelector("#log-download")!==null&&!document.querySelector("#quick-log-export")'),true);
+    if(id==="create"){
+     assert.equal(await evaluate('document.querySelector("label[for=draft-name]").control===document.querySelector("#draft-name")'),true);
+     assert.equal(await evaluate('(()=>{const field=document.querySelector("#draft-website");const section=field.closest("details");section.open=false;field.value="invalid-url";field.checkValidity();const opened=section.open;field.value="";section.open=false;return opened;})()'),true);
+    }
     await capturePreview(id,viewport);
    }
   }
   await navigatePrimaryPages("desktop");
+  await evaluate('(()=>{const b=document.querySelector(\'[data-page="wallet"]\');b.focus();b.click();})()');
+  await wait("navigation-keyboard-focus",'document.activeElement?.dataset.page==="wallet"&&document.querySelector("#asset-interval")');
+  await evaluate('document.querySelector(\'[data-page="terminal"]\').click()');
+  await wait("navigation-keyboard-return",'document.querySelector(".operator-task-grid")');
   assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
   await evaluate('document.querySelector("#project-show-risk").click()');
   await wait("risk-filter",'document.querySelector("#risk-severity")&&document.querySelector("#terminal-project-details").open');

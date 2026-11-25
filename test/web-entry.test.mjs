@@ -105,3 +105,13 @@ test("experiment and diagnostics pages expose primary tasks and accessible empty
  assert.match(app,/lab-workspace/);assert.match(app,/settings-workspace/);assert.match(app,/table-empty/);assert.match(app,/scope="col"/);
  assert.match(app,/seedInput\.checkValidity\(\)/);assert.match(app,/runsInput\.checkValidity\(\)/);
 });
+
+test("keyboard navigation and optional field validation retain usable focus targets",async()=>{
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");
+ const html=await readFile(new URL("../web/index.html",import.meta.url),"utf8");
+ const setup=await readFile(new URL("../web/project-setup-view.mjs",import.meta.url),"utf8");
+ assert.match(app,/current\?\.focus\(\{preventScroll:true\}\)/);
+ assert.match(html,/class="skip-link" href="#main"/);
+ assert.match(setup,/label for="draft-name"/);
+ assert.match(setup,/addEventListener\("invalid"/);
+});

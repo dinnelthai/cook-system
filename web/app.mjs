@@ -461,7 +461,7 @@ function render(){
  renderGlobalContext();
  document.querySelector(".tag").textContent=activeProjectId?"PROJECT REVIEW":offlineReview?"OFFLINE REVIEW":"LOCALNET";
  nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+((page===id||id==="market"&&["lab","create"].includes(page))?"active":"")+'"'+(page===id?' aria-current="page"':'')+'><span class="nav-num" aria-hidden="true">'+label.slice(0,2)+'</span><span>'+esc(label.slice(3))+'</span></button>').join("");
- nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.page;record("page.open",{page});render();if(innerWidth<=700) b.isConnected||nav.querySelector('[aria-current="page"]')?.scrollIntoView({block:"nearest",inline:"nearest"});});
+ nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{const keyboardFocus=document.activeElement===b;importTicket++;page=b.dataset.page;record("page.open",{page});render();const current=nav.querySelector('[aria-current="page"]');if(keyboardFocus)current?.focus({preventScroll:true});if(innerWidth<=700&&current){const n=nav.getBoundingClientRect(),c=current.getBoundingClientRect();if(c.left<n.left)nav.scrollLeft+=c.left-n.left;else if(c.right>n.right)nav.scrollLeft+=c.right-n.right;}});
  const a=report.accounting,m=report.market_history;
  const links=(items)=>'<div class="row subnav">'+items.map(([id,label])=>'<button data-subpage="'+id+'">'+esc(label)+'</button>').join("")+'</div>';
  const context=()=>note("数据来源："+report.source_mode+" · 离线区间报告；Localnet 实时接口尚未接入。未知值不作估算。");

@@ -99,20 +99,20 @@ export function mountProjectSetup(container, {
       (missingSelection?note("此前选择的项目不在当前数据库中。请选择已存在项目，或主动点击新建项目以退出此前上下文。"):"")+
       '<div class="setup-workspace"><div class="setup-primary">'+
       panel("项目配置", '<form id="project-draft-form"><h4 class="form-section-title">基本信息与供应量</h4><div class="grid form-section">' +
-        '<div><label>项目名称</label><input name="name" required maxlength="32" value="' + esc(current?.profile.name ?? "") + '" placeholder="Project name"' + lock + '></div>' +
-        '<div><label>Token Symbol</label><input name="symbol" required maxlength="10" pattern="[A-Za-z0-9]{1,10}" value="' + esc(current?.profile.symbol ?? "") + '" placeholder="TOKEN"' + lock + '></div>' +
-        '<div><label>总供应量（Token）</label><input name="supply" inputmode="decimal" maxlength="30" value="' + esc(currentSupply) + '"' + lock + '></div>' +
-        '<div><label>Decimals</label><input name="decimals" type="number" min="0" max="9" step="1" value="' + esc(current ? current.token.decimals??"" : 6) + '"' + lock + '></div>' +
+        '<div><label for="draft-name">项目名称</label><input id="draft-name" name="name" required maxlength="32" value="' + esc(current?.profile.name ?? "") + '" placeholder="Project name"' + lock + '></div>' +
+        '<div><label for="draft-symbol">Token Symbol</label><input id="draft-symbol" name="symbol" required maxlength="10" pattern="[A-Za-z0-9]{1,10}" value="' + esc(current?.profile.symbol ?? "") + '" placeholder="TOKEN"' + lock + '></div>' +
+        '<div><label for="draft-supply">总供应量（Token）</label><input id="draft-supply" name="supply" inputmode="decimal" maxlength="30" value="' + esc(currentSupply) + '"' + lock + '></div>' +
+        '<div><label for="draft-decimals">Decimals</label><input id="draft-decimals" name="decimals" type="number" min="0" max="9" step="1" value="' + esc(current ? current.token.decimals??"" : 6) + '"' + lock + '></div>' +
         '</div><h4 class="form-section-title">网络与登记钱包</h4><div class="grid form-section">'+
-        '<div><label>报价资产</label><input value="SOL" disabled><input type="hidden" name="quote_asset" value="SOL"></div>' +
-        '<div><label>网络</label><input value="Localnet（本地验证）" disabled><input type="hidden" name="network" value="localnet"></div>' +
-        '<div><label>本地 Genesis Hash</label><input value="' + esc(current?.network.genesis_hash ?? config?.network?.genesis_hash ?? "未配置") + '" disabled></div>' +
-        '<div><label>项目主钱包 / Dev Wallet</label><select name="creator_wallet" id="project-wallet"' + lock + '><option value="">读取受管钱包中…</option></select></div>' +
+        '<div><label for="draft-quote">报价资产</label><input id="draft-quote" value="SOL" disabled><input type="hidden" name="quote_asset" value="SOL"></div>' +
+        '<div><label for="draft-network">网络</label><input id="draft-network" value="Localnet（本地验证）" disabled><input type="hidden" name="network" value="localnet"></div>' +
+        '<div><label for="draft-genesis">本地 Genesis Hash</label><input id="draft-genesis" value="' + esc(current?.network.genesis_hash ?? config?.network?.genesis_hash ?? "未配置") + '" disabled></div>' +
+        '<div><label for="project-wallet">项目主钱包 / Dev Wallet</label><select name="creator_wallet" id="project-wallet"' + lock + '><option value="">读取受管钱包中…</option></select></div>' +
         '</div><details class="profile-optional"><summary>公开资料与项目描述（选填）</summary><div class="grid form-section">'+
-        '<div><label>Website</label><input name="website" type="url" value="' + esc(current?.profile.website ?? "") + '" placeholder="https://"' + lock + '></div>' +
-        '<div><label>Telegram</label><input name="telegram" type="url" value="' + esc(current?.profile.telegram ?? "") + '" placeholder="https://"' + lock + '></div>' +
-        '<div><label>Twitter / X</label><input name="twitter" type="url" value="' + esc(current?.profile.twitter ?? "") + '" placeholder="https://"' + lock + '></div>' +
-        '<div style="grid-column:1/-1"><label>项目描述</label><textarea name="description" maxlength="1000"' + lock + '>' + esc(current?.profile.description ?? "") + '</textarea></div>' +
+        '<div><label for="draft-website">Website</label><input id="draft-website" name="website" type="url" value="' + esc(current?.profile.website ?? "") + '" placeholder="https://"' + lock + '></div>' +
+        '<div><label for="draft-telegram">Telegram</label><input id="draft-telegram" name="telegram" type="url" value="' + esc(current?.profile.telegram ?? "") + '" placeholder="https://"' + lock + '></div>' +
+        '<div><label for="draft-twitter">Twitter / X</label><input id="draft-twitter" name="twitter" type="url" value="' + esc(current?.profile.twitter ?? "") + '" placeholder="https://"' + lock + '></div>' +
+        '<div style="grid-column:1/-1"><label for="draft-description">项目描述</label><textarea id="draft-description" name="description" maxlength="1000"' + lock + '>' + esc(current?.profile.description ?? "") + '</textarea></div>' +
         '</div></details><p class="muted">供应量按 Token 单位精确转换为 base units；供应量和 decimals 均为空时表示未配置，不进行取整。Dev Wallet 只保存公钥地址，不保存私钥。</p>' +
         '<div class="row"><button type="submit" class="primary"' + (editable ? "" : " disabled") + '>保存项目配置</button><button type="button" id="project-new">新建项目</button></div></form>' +
         '<p id="project-wallet-status" class="muted" role="status">钱包列表尚未读取</p><p id="project-status" role="status" class="muted">' + esc(message) + '</p>') +
@@ -129,9 +129,9 @@ export function mountProjectSetup(container, {
         '<label>最大回撤上限（bps，100 bps = 1%）<input name="max_drawdown_bps" inputmode="numeric" maxlength="5" value="'+esc(current.limits.max_drawdown_bps??"")+'"></label></div><button type="submit">保存风险上限声明</button><p id="project-budget-status" role="status"></p></form>')+
         panel("项目登记钱包",table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(current))+note("仅为项目登记，不等于链上余额、资产归属或资金占用。")):"")+
       '</aside></div><details class="panel setup-evidence"><summary>发行、市场与报告证据登记</summary><div class="setup-evidence-grid">'+
-      panel("发行证据登记", '<form id="issuance-evidence-form"><label>所属项目</label><select name="project_id" required><option value="">选择项目</option>' + issuanceOptions + '</select>' +
-        '<label>Token Mint 地址</label><input name="mint" required maxlength="44" placeholder="已发行 Token 的 Mint 地址">' +
-        '<label>交易签名</label><input name="signature" required minlength="64" maxlength="88" placeholder="链上交易 Signature">' +
+      panel("发行证据登记", '<form id="issuance-evidence-form"><label for="issuance-project">所属项目</label><select id="issuance-project" name="project_id" required><option value="">选择项目</option>' + issuanceOptions + '</select>' +
+        '<label for="issuance-mint">Token Mint 地址</label><input id="issuance-mint" name="mint" required maxlength="44" placeholder="已发行 Token 的 Mint 地址">' +
+        '<label for="issuance-signature">交易签名</label><input id="issuance-signature" name="signature" required minlength="64" maxlength="88" placeholder="链上交易 Signature">' +
         '<div class="row"><button type="submit" ' + (projects.length ? "" : "disabled") + '>登记发行证据（UNVERIFIED）</button></div></form>' +
         '<p class="muted">手工登记只产生待核验记录。只有受信任的链上读取器完成核验，才能推进到 LAUNCHED。</p>') +
       panel("发行证据记录", table(["项目", "Mint", "交易签名", "状态", "核验证据"], issuanceRows) +
@@ -139,6 +139,11 @@ export function mountProjectSetup(container, {
       panel("市场账户身份观察",table(["Market ID","Venue","账户","登记状态"],(current?.markets??[]).map(m=>[m.market_id,m.venue,m.market_account,m.verification_status]))+
         '<select id="project-market-select">'+(current?.markets??[]).map(m=>'<option value="'+esc(m.market_id)+'">'+esc(m.market_id+" · "+m.venue)+'</option>').join("")+'</select><button id="project-market-inspect"'+(current?.markets?.length?"":" disabled")+'>只读核验并归档</button><p id="project-market-result" role="status" class="muted">仅检查已登记市场账户身份，不认证来源。</p>')+
       panel("已保存历史报告关联",'<button id="project-report-candidates"'+(current?"":" disabled")+'>读取当前工作区匹配报告</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>关联所选报告</button><p id="project-report-result" role="status" class="muted">仅关联声明身份一致的已保存报告。</p>')+'</div></details>';
+    // Native validation must reveal a collapsed optional field before trying to focus it.
+    container.querySelector("#project-draft-form").addEventListener("invalid",event=>{
+      const section=event.target.closest("details");
+      if(section&&!section.open)section.open=true;
+    },true);
     const recoveryButton=container.querySelector("#project-recovery-check");
     if(recoveryButton)recoveryButton.onclick=async()=>{
       if(!recoveryId||recoveryError)return;

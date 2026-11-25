@@ -3,6 +3,7 @@ import {projectOverviewModel,projectIntervalMetrics} from "./project-overview-vi
 import {formatHistoricalSol} from "./terminal-display.mjs";
 import {lifecycleLabel,operationalLabel} from "./project-operator-view.mjs";
 
+const reviewStatusLabel=value=>({MISSING:"缺少证据",UNKNOWN:"未知",INCOMPLETE:"证据不完整",REVIEW_REQUIRED:"待复核",PASS:"内部检查通过",DECLARED_ENDPOINT_PRESENT:"声明期末数据齐备",DECLARED_MATCH:"声明一致",NOT_RUN:"未验收",BLOCKED:"阻断"})[value]??value;
 const fields=[["trade_realized_pnl_base_units","交易已实现损益"],["creator_cash_income_base_units","Creator 到账收入"],["other_cash_income_base_units","其他现金收入"],["separate_expenses_base_units","独立费用"],["project_cash_basis_realized_pnl_base_units","项目现金口径已实现损益"]];
 export function operatingComponentRows(review,interval){
  if(!interval||interval.status==="REVIEW_REQUIRED")return [];
@@ -24,7 +25,7 @@ export function mountScopedProjectReview(host,{projectId,isActive,esc,table,note
    const m=projectOverviewModel(v);
    host.innerHTML='<div class="review-section-head"><div><h3>'+esc(project.profile.name+" · v"+project.revision)+'</h3><p class="muted">项目历史复盘</p></div><div class="row"><button id="scoped-review-refresh">刷新复盘</button><button id="scoped-review-export">导出项目复盘证据</button></div></div>'+
     note(lifecycleLabel(project.lifecycle.stage)+" · "+operationalLabel(project.lifecycle.operational_status)+" · 历史证据未独立认证")+
-    '<div class="review-kpis">'+[["财务复核",v.treasury.status],["市场证据",v.market.status],["结算复核",v.close.status],["订单待复核",v.orders.unresolved_count]].map(([label,value])=>'<div class="project-stat"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join("")+'</div>'+
+    '<div class="review-kpis">'+[["财务复核",v.treasury.status],["市场证据",v.market.status],["结算复核",v.close.status],["订单待复核",v.orders.unresolved_count]].map(([label,value])=>'<div class="project-stat"><span>'+esc(label)+'</span><strong>'+esc(reviewStatusLabel(value))+'</strong></div>').join("")+'</div>'+
     '<div class="secondary-workspace"><section class="workspace-content">'+
     '<h4>历史区间复盘</h4><label>选择区间<select id="scoped-review-interval"><option value="">请选择历史区间</option>'+m.intervals.map(i=>'<option value="'+esc(i.id)+'">'+esc(i.label)+'</option>').join("")+'</select></label><div id="scoped-review-body" class="workspace-empty" role="status">尚未选择区间，金额未知。</div></section><aside class="workspace-side">'+
     '<h4>风险与证据</h4><div class="review-risk-summary">'+["critical","warning","unknown"].map((k,i)=>'<div><span>'+["严重","警告","未知"][i]+'</span><strong class="risk-'+k+'">'+esc(v.global_risk.counts[k])+'</strong></div>').join("")+'</div><details open><summary>完整风险清单</summary>'+table(["级别","类别","原因"],v.global_risk.findings.map(r=>[r.severity,r.category,r.code]))+'</details>'+
