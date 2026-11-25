@@ -23,6 +23,7 @@ import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
 import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury} from "./project-client.mjs";
+import {treasuryReviewSections} from "./treasury-review-view.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
@@ -178,7 +179,7 @@ function renderTerminal(){
         '<label>历史 Pump 回放 JSON（最大 900 KiB）<input id="project-graduation-file" type="file" accept=".json"></label><button id="project-graduation-review">复核并归档历史里程碑</button><p id="project-graduation-status" role="status"></p>'+
         '<h3>退出与财务证据复核</h3>'+note("当前归档复核状态："+(v.close_evidence?.status??"MISSING"))+
         table(["未解决事项"],[...(v.close_evidence?.blockers??[]),...(v.close_evidence?.unknown??[])].map(x=>[x]))+
-        '<label>关联历史报告<select id="project-close-report"><option value="">读取报告中…</option></select></label><button id="project-close-review" disabled>生成财务复核并归档</button><button id="project-treasury-review" disabled>查看历史资金与库存审计</button><p id="project-close-status" role="status"></p><pre id="project-close-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>'+
+        '<label>关联历史报告<select id="project-close-report"><option value="">读取报告中…</option></select></label><button id="project-close-review" disabled>生成财务复核并归档</button><button id="project-treasury-review" disabled>查看历史资金与库存审计</button><p id="project-close-status" role="status"></p><div id="project-treasury-sections"></div><pre id="project-close-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>'+
         '<h3>项目审计归档</h3>'+note("包含项目台账、订单事件、证据档案与异常清单。原始历史报告文件需另行保留。导出不改变生命周期。")+
         '<button id="project-audit-export">导出当前项目审计归档 JSON</button><p id="project-audit-status" role="status"></p>';
        const auditButton=lifecycleArea.querySelector("#project-audit-export");
@@ -203,19 +204,20 @@ function renderTerminal(){
        const treasuryButton=lifecycleArea.querySelector("#project-treasury-review");
        treasuryButton.onclick=async()=>{
         const archiveId=closeSelect.value;if(!archiveId)return;
-        treasuryButton.disabled=true;closeButton.disabled=true;closeSelect.disabled=true;closeStatus.textContent="核对历史资金与库存…";
+        treasuryButton.disabled=true;closeButton.disabled=true;closeSelect.disabled=true;closeStatus.textContent="核对历史资金与库存…";lifecycleArea.querySelector("#project-treasury-sections").replaceChildren();lifecycleArea.querySelector("#project-close-result").textContent="";
         try{
          const result=await reviewProjectTreasury(selected.project_id,selected.revision,archiveId);
          if(!stillCurrent())return;
          const v=result.review;closeStatus.textContent=v.status+" · 单一历史区间 · 非实时资产";
+         lifecycleArea.querySelector("#project-treasury-sections").innerHTML=treasuryReviewSections(v).map(s=>"<h4>"+esc(s.heading)+"</h4>"+table(["指标","历史记录"],s.rows)).join("")+table(["待复核 / 未知"],[...v.issues,...v.unknown].map(x=>[x]));
          lifecycleArea.querySelector("#project-close-result").textContent=JSON.stringify(v,null,2);
         }catch(e){if(stillCurrent())closeStatus.textContent=errorKind(e);}
         finally{if(stillCurrent()){closeSelect.disabled=false;treasuryButton.disabled=!closeSelect.value;closeButton.disabled=!closeSelect.value;}}
        };
-       closeSelect.onchange=()=>{treasuryButton.disabled=!closeSelect.value;closeButton.disabled=!closeSelect.value;lifecycleArea.querySelector("#project-close-result").textContent="";closeStatus.textContent="";};
+       closeSelect.onchange=()=>{lifecycleArea.querySelector("#project-treasury-sections").replaceChildren();treasuryButton.disabled=!closeSelect.value;closeButton.disabled=!closeSelect.value;lifecycleArea.querySelector("#project-close-result").textContent="";closeStatus.textContent="";};
        closeButton.onclick=async()=>{
         const archiveId=closeSelect.value;if(!archiveId)return;
-        closeButton.disabled=true;treasuryButton.disabled=true;closeSelect.disabled=true;closeStatus.textContent="复核中…";
+        closeButton.disabled=true;treasuryButton.disabled=true;closeSelect.disabled=true;closeStatus.textContent="复核中…";lifecycleArea.querySelector("#project-treasury-sections").replaceChildren();lifecycleArea.querySelector("#project-close-result").textContent="";
         try{const result=await reviewProjectCloseEvidence(selected.project_id,selected.revision,archiveId);
          if(!stillCurrent())return;
          closeStatus.textContent=result.review.status+" · 已归档 · 不代表结算完成";

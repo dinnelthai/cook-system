@@ -155,6 +155,13 @@ test("Project treasury retains one interval, suppresses contradictory values and
  const r=buildProjectTreasuryReview(p,i);
  assert.equal(r.status,"PARTIAL");assert.equal(r.cash_flow.observed_closing_cash_base_units,"887");assert.equal(r.inventory.closing_quantity_base_units,"50");
  assert.equal(r.project_wide_total,null);assert.equal(r.live_balance,null);assert.equal(r.available_to_trade,null);assert.equal(r.execution_enabled,false);
+ assert.equal(r.creator_fee_audit.summary.verified_cash_income_base_units,"7");
+ assert.equal(r.creator_fee_audit.pool_fee_bucket_cash_equivalence,"NOT_ESTABLISHED");
+ assert.equal(r.historical_valuation.closing_nav_base_units,null);
+ assert.equal(r.budget_review.status,"NOT_CONFIGURED");
+ const configured={...p,limits:{...p.limits,max_project_budget_base_units:"1"}};
+ const budget=buildProjectTreasuryReview(configured,i).budget_review;
+ assert.equal(budget.remaining_budget_base_units,null);assert.equal(budget.current_exposure_base_units,null);
  i.archivedEvidence.accountInterval.closing.tokenAmount="49";
  const bad=buildProjectTreasuryReview(p,i);assert.equal(bad.status,"REVIEW_REQUIRED");assert.equal(bad.inventory,null);assert.equal(bad.cash_flow,null);
 });

@@ -3,6 +3,7 @@ import {canonicalJson} from "../core/canonical-json.mjs";
 import {assertProjectAggregate} from "./project-aggregate.mjs";
 import {matchProjectReport} from "./project-report-identity.mjs";
 import {buildProjectFinancialCloseReview} from "./project-financial-close-review.mjs";
+import {buildCreatorFeeLedgerReport} from "./creator-fee-ledger-report.mjs";
 import {auditReportClosingAccounts} from "./historical-account-set-audit.mjs";
 import {loadLinkedReport} from "./order-receipt-review.mjs";
 const SOL="So11111111111111111111111111111111111111112";
@@ -13,6 +14,7 @@ export function buildProjectTreasuryReview(projectInput,input){
  const p=assertProjectAggregate(projectInput);
  if(p.network.quote_mint!==SOL||matchProjectReport(p,input).status!=="DECLARED_MATCH")throw Error("PROJECT_TREASURY_SCOPE_MISMATCH");
  const f=buildProjectFinancialCloseReview(input),a=auditReportClosingAccounts(input);
+ const creator=buildCreatorFeeLedgerReport({scope:input.scope,creator:input.creator,cash:input.cash});
  const registered=[...new Set(p.wallet_groups.flatMap(g=>g.members.map(m=>m.wallet_address)))].sort();
  const accountEvidence=input.closingAccountEvidence;
  const declared=Array.isArray(accountEvidence?.expectedAccounts)?accountEvidence.expectedAccounts:[];
@@ -26,7 +28,18 @@ export function buildProjectTreasuryReview(projectInput,input){
  if(coverage.status!=="DECLARED_LABELS_MATCH")unknown.push("REGISTERED_ACCOUNT_LABEL_COVERAGE_INCOMPLETE");
  if(f.review_checks.find(x=>x.id==="archived_evidence")?.status!=="PASS")unknown.push("ARCHIVED_RECEIPT_EVIDENCE_INCOMPLETE");
  if(f.valuation_status!=="SUPPLIED_ENDPOINT_ARITHMETIC_CONSISTENT")unknown.push("HISTORICAL_VALUATION_UNAVAILABLE");
- const blocked=f.status==="REVIEW_REQUIRED"||a.status==="REVIEW_REQUIRED";
+ const blocked=f.status==="REVIEW_REQUIRED"||a.status==="REVIEW_REQUIRED"||creator.status==="REVIEW_REQUIRED";
+ // Budget is a project configuration, not a lifetime cash-flow or current exposure measure.
+ // A closed interval can identify recorded gross capital inflow above the configured
+ // budget but cannot prove available budget or total historical funding.
+ const budget=p.limits.max_project_budget_base_units;
+ const inflow=blocked?null:f.cash_flow.external_capital_in_base_units;
+ const budgetCheck={configured_budget_base_units:budget,recorded_interval_capital_in_base_units:inflow,
+  status:budget===null?"NOT_CONFIGURED":inflow===null?"UNKNOWN":BigInt(inflow)>BigInt(budget)?"RECORDED_INTERVAL_INFLOW_EXCEEDS_CONFIGURED_BUDGET":"INTERVAL_COMPARISON_ONLY",
+  remaining_budget_base_units:null,lifetime_funding_base_units:null,current_exposure_base_units:null,
+  policy_effective_during_interval:"UNKNOWN",source_attestation:"UNKNOWN"};
+ if(budgetCheck.status==="RECORDED_INTERVAL_INFLOW_EXCEEDS_CONFIGURED_BUDGET")issues.push("REVIEW_RECORDED_CAPITAL_INFLOW_AGAINST_CURRENT_BUDGET");
+ unknown.push("LIFETIME_FUNDING_AND_POLICY_EFFECTIVE_PERIOD_UNATTESTED");
  const show=x=>blocked?null:x;
  return {schema_version:"cook-project-treasury-review.1",project_id:p.project_id,project_revision:p.revision,
   scope:f.scope,report_digest:sha(input),status:blocked?"REVIEW_REQUIRED":"PARTIAL",
@@ -35,6 +48,14 @@ export function buildProjectTreasuryReview(projectInput,input){
     remaining_cost_base_units:f.assets.remaining_inventory_cost_base_units,
     supplied_historical_value_base_units:f.assets.closing_inventory_supplied_value_base_units}),
   realized_pnl:show(f.realized_pnl),creator_receivables:show(f.creator_receivables),
+  historical_valuation:show({status:f.valuation_status,closing_nav_base_units:f.assets.closing_nav_base_units,
+    capital_adjusted_nav_change_base_units:f.assets.capital_adjusted_nav_change_base_units,
+    closing_inventory_value_minus_cost_base_units:f.assets.closing_inventory_unrealized_value_minus_cost_base_units,
+    interval_inventory_unrealized_change_base_units:f.assets.interval_inventory_unrealized_change_base_units,
+    nav_bridge_residual_base_units:f.nav_bridge.unexplained_by_cash_basis_pnl_and_inventory_unrealized_change_base_units,
+    interpretation:"SUPPLIED_HISTORICAL_ENDPOINTS_ONLY_NOT_REALIZABLE_VALUE"}),
+  creator_fee_audit:{status:creator.status,summary:show(creator.summary),pool_fee_bucket_cash_equivalence:"NOT_ESTABLISHED",
+    source_attestation:"UNKNOWN",wallet_attribution:"UNKNOWN"},budget_review:budgetCheck,
   account_set:{status:a.status,totals:show(a.totals),expected_account_count:a.expected_account_count??null,observed_account_count:a.observed_account_count??null,coverage},
   issues:[...new Set(issues)],unknown:[...new Set(unknown)],project_wide_total:null,live_balance:null,available_to_trade:null,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",settlement_allowed:false,execution_enabled:false};
