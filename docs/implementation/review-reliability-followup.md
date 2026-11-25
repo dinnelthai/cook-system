@@ -20,3 +20,7 @@ The SQLite mode creates and removes its own private temporary metadata fixture. 
 ## Alert journal benchmark
 
 `node scripts/benchmark-alert-store.mjs 100` measures synthetic open, acknowledge and resolve writes and a fresh-store full replay. Uses an isolated temporary journal, not operator records. The benchmark does not claim long-duration soak or production throughput.
+
+## Concurrent metadata writers
+
+`node --test test/project-store-contention.test.mjs` races two independent worker-thread SQLite connections against the same expected revision in a private fixture. Exactly one must commit; the other must report a revision conflict. The resulting database is fully audited. This is a concurrent-connection regression test, not a multi-process load or latency benchmark.
