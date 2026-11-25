@@ -209,7 +209,7 @@ function normalizeEvidence(input) {
 }
 function normalizeLifecycle(input) {
   exactKeys(input, ["stage", "operational_status", "stage_changed_at_ms", "evidence_ref"], "INVALID_PROJECT_LIFECYCLE");
-  if (!STAGES.has(input.stage) || !["HALTED", "REVIEW_REQUIRED"].includes(input.operational_status)) fail("INVALID_PROJECT_LIFECYCLE");
+  if (!STAGES.has(input.stage) || !["HALTED", "ACTIVE", "REVIEW_REQUIRED"].includes(input.operational_status)) fail("INVALID_PROJECT_LIFECYCLE");
   return {
     stage: input.stage, operational_status: input.operational_status,
     stage_changed_at_ms: timestamp(input.stage_changed_at_ms),
@@ -369,6 +369,20 @@ export function applyProjectCommand(current, command, { now = () => Date.now() }
       eventPayload = { profile: nextProfile };
       break;
     }
+    case "SET_NETWORK_IDENTITY": {
+      exactKeys(payload, ["network"], "INVALID_PROJECT_COMMAND_PAYLOAD");
+      if (project.lifecycle.stage !== "DRAFT") fail("PROJECT_NETWORK_LOCKED");
+      project.network = normalizeNetwork(payload.network);
+      eventPayload = { network: project.network };
+      break;
+    }
+    case "SET_TOKEN_CONFIGURATION": {
+      exactKeys(payload, ["supply_base_units", "decimals", "creator_wallet_address"], "INVALID_PROJECT_COMMAND_PAYLOAD");
+      if (project.lifecycle.stage !== "DRAFT" || project.token.mint !== null) fail("PROJECT_TOKEN_CONFIGURATION_LOCKED");
+      project.token = normalizeToken({ ...project.token, ...payload }, { persisted: true });
+      eventPayload = { token: project.token };
+      break;
+    }
     case "UPSERT_WALLET_GROUP": {
       exactKeys(payload, ["group"], "INVALID_PROJECT_COMMAND_PAYLOAD");
       const group = normalizeWalletGroup(payload.group);
@@ -439,9 +453,23 @@ export function applyProjectCommand(current, command, { now = () => Date.now() }
     }
     case "SET_OPERATIONAL_STATUS": {
       exactKeys(payload, ["status"], "INVALID_PROJECT_COMMAND_PAYLOAD");
-      if (!["HALTED", "REVIEW_REQUIRED"].includes(payload.status)) fail("INVALID_OPERATIONAL_STATUS");
+      if (!["HALTED", "ACTIVE", "REVIEW_REQUIRED"].includes(payload.status)) fail("INVALID_OPERATIONAL_STATUS");
+      if (payload.status === "ACTIVE" && (
+        ["DRAFT", "CLOSED", "ARCHIVED"].includes(project.lifecycle.stage) ||
+        project.lifecycle.operational_status === "REVIEW_REQUIRED"
+      )) fail("PROJECT_CANNOT_ACTIVATE");
       project.lifecycle.operational_status = payload.status;
-      eventPayload = { status: payload.status };
+      eventPayload = { status: payload.status, execution_enabled: false };
+      break;
+    }
+    case "CLEAR_REVIEW": {
+      exactKeys(payload, ["evidence"], "INVALID_PROJECT_COMMAND_PAYLOAD");
+      if (project.lifecycle.operational_status !== "REVIEW_REQUIRED") fail("PROJECT_REVIEW_NOT_ACTIVE");
+      const evidence = requireEvidence(payload.evidence, {
+        kind: "FINAL_RECONCILIATION", source: "internal_audit", verification: "VERIFIED"
+      });
+      project.lifecycle.operational_status = "HALTED";
+      eventPayload = { evidence, status: "HALTED" };
       break;
     }
     case "TRANSITION_LIFECYCLE":
