@@ -23,6 +23,7 @@ import {mountGraduationReview} from "./graduation-review-view.mjs";
 import {mountProjectLifecycleReview} from "./project-lifecycle-review-view.mjs";
 import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-workflow.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
+import {mountProjectSetup} from "./project-setup-view.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 // Session storage retains diagnostics across refreshes in the same tab, without cross-tab writers.
 const diagnostics=createDiagnosticLog({storage:(()=>{try{return window.sessionStorage;}catch{return null;}})()});
@@ -275,26 +276,15 @@ function render(){
  document.querySelector("#dashboard-export-input").onclick=()=>download("historical-report-input.json",JSON.stringify(data,null,2));
  document.querySelector("#dashboard-import").onchange=async e=>{const ticket=++importTicket,startPage=page;try{const file=e.target.files[0];if(!file)return;if(file.size>16*1024*1024)throw Error("报告文件超过 16 MiB");record("report.import.started",{page,file_bytes:file.size});const next=JSON.parse(await file.text());const nextReport=auditedReport(next);if(!importCurrent(ticket,startPage))return;offlineReview=true;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#dashboard-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
  }else if(page==="create"){
- let drafts;try{drafts=projectRegistry.list()}catch(e){drafts=[];projectMessage="项目本地存储不可用："+errorKind(e)}
- const current=activeProjectId?drafts.find(x=>x.id===activeProjectId):null;
- const projectRows=drafts.map(x=>[x.name,x.symbol,x.supply+" / "+x.decimals+" decimals",x.creator_wallet||"未分配钱包",x.status,x.issuance_records.length]);
- const options=drafts.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===activeProjectId?" selected":"")+'>'+esc(x.name+" · "+x.symbol+" · "+x.status)+'</option>').join("");
- main.innerHTML=screenHeading("Project Setup / 项目准备","项目资料 · Localnet 配置 · 发行证据台账")+
- note("本页管理项目配置与发行证据，不会创建 Token、签名或提交交易。发行签名仅记录为待核验；未通过链上核验不会显示为已发行。")+
- panel("项目准备",'<form id="project-draft-form"><div class="grid"><div><label>项目名称</label><input name="name" required maxlength="32" value="'+esc(current?.name??"")+'" placeholder="Project name"></div><div><label>Token Symbol</label><input name="symbol" required maxlength="10" pattern="[A-Za-z0-9]{1,10}" value="'+esc(current?.symbol??"")+'" placeholder="TOKEN"></div><div><label>总供应量（整币）</label><input name="supply" required inputmode="numeric" pattern="[0-9]{1,20}" value="'+esc(current?.supply??"1000000000")+'"></div><div><label>Decimals</label><input name="decimals" type="number" min="0" max="9" step="1" required value="'+esc(current?.decimals??6)+'"></div><div><label>报价资产</label><input value="SOL" disabled><input type="hidden" name="quote_asset" value="SOL"></div><div><label>网络</label><input value="Localnet（本地验证）" disabled><input type="hidden" name="network" value="LOCALNET"></div><div><label>项目主钱包 / Dev Wallet</label><select name="creator_wallet" id="project-wallet"><option value="">读取受管钱包中…</option></select></div><div><label>Website</label><input name="website" type="url" value="'+esc(current?.website??"")+'" placeholder="https://"></div><div><label>Telegram</label><input name="telegram" type="url" value="'+esc(current?.telegram??"")+'" placeholder="https://"></div><div><label>Twitter / X</label><input name="twitter" type="url" value="'+esc(current?.twitter??"")+'" placeholder="https://"></div><div style="grid-column:1/-1"><label>项目描述</label><textarea name="description" maxlength="1000">'+esc(current?.description??"")+'</textarea></div></div><p class="muted">供应量按整币填写，系统检查 decimals 后的原始数量是否超过 u64。主钱包只能从本地受管钱包选择；不在页面展示私钥。</p><div class="row"><button type="submit" class="primary">保存项目配置</button><button type="button" id="project-new">新建项目</button></div></form><p id="project-wallet-status" class="muted" role="status">钱包列表尚未读取</p><p id="project-status" role="status" class="muted">'+esc(projectMessage)+'</p>')+
- panel("项目草稿与发行状态",table(["项目","Symbol","供应量","主钱包","状态","发行证据数"],projectRows)+'<div class="row"><select id="project-open-select"><option value="">选择项目</option>'+options+'</select><button id="project-open" '+(drafts.length?"":"disabled")+'>编辑项目</button><button id="project-export">导出项目台账</button></div>')+
- panel("发行证据登记",'<form id="issuance-evidence-form"><label>所属项目</label><select name="project_id" required><option value="">选择项目</option>'+options+'</select><label>Token Mint 地址</label><input name="mint" required maxlength="44" placeholder="已发行 Token 的 Mint 地址"><label>交易签名</label><input name="signature" required minlength="64" maxlength="88" placeholder="链上交易 Signature"><div class="row"><button type="submit" '+(drafts.length?"":"disabled")+'>登记发行证据</button></div></form><p class="muted">登记后状态固定为 UNVERIFIED。当前不提供链上发行交易核验，因此不能将手工录入视为已发行。</p>')+
- panel("发行证据记录",table(["项目","Mint","交易签名","状态","登记时间"],drafts.flatMap(x=>x.issuance_records.map(e=>[x.name,e.mint,e.signature,e.status,e.recorded_at]))));
- const walletSelect=main.querySelector("#project-wallet"),walletStatus=main.querySelector("#project-wallet-status");
- const walletTicket=++importTicket,startPage=page;
- fetch("/api/local-wallet/list",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}",cache:"no-store"}).then(async response=>{const body=await response.json();if(!response.ok)throw Error(body.code||"WALLET_UNAVAILABLE");if(!importCurrent(walletTicket,startPage))return;walletSelect.replaceChildren(new Option("不指定钱包",""));for(const w of body.wallets)walletSelect.add(new Option(w.address,w.address));if(current?.creator_wallet)walletSelect.value=current.creator_wallet;walletStatus.textContent=body.wallets.length?"已读取 "+body.wallets.length+" 个本地受管钱包":"暂无受管钱包，请先到钱包管理创建";}).catch(()=>{if(importCurrent(walletTicket,startPage))walletStatus.textContent="钱包列表不可用；仍可保存未分配钱包的草稿";});
- main.querySelector("#project-draft-form").onsubmit=e=>{e.preventDefault();try{const input=Object.fromEntries(new FormData(e.currentTarget));if(activeProjectId)input.id=activeProjectId;const saved=projectRegistry.saveDraft(input);activeProjectId=saved.id;projectMessage=saved.status==="CONFIGURED_NOT_ISSUED"?"项目配置已保存；尚未发行。":"项目草稿已保存；请补充主钱包配置。";record("project.draft.saved",{project_id:saved.id,status:saved.status});render()}catch(err){projectMessage="项目未保存："+errorKind(err);const status=main.querySelector("#project-status");if(status)status.textContent=projectMessage}};
- main.querySelector("#project-new").onclick=()=>{activeProjectId=null;projectMessage="新建项目草稿";render()};
- main.querySelector("#project-open").onclick=()=>{const id=main.querySelector("#project-open-select").value;if(!id)return;const row=projectRegistry.get(id);activeProjectId=id;projectMessage="正在编辑 "+row.name+"；发行状态仍为 "+row.status+"。";record("project.edit.opened",{project_id:id});render()};
- main.querySelector("#project-export").onclick=()=>download("cook-project-registry.json",JSON.stringify(projectRegistry.exportBundle(),null,2));
- main.querySelector("#issuance-evidence-form").onsubmit=e=>{e.preventDefault();try{const form=Object.fromEntries(new FormData(e.currentTarget));const result=projectRegistry.recordIssuanceEvidence(form.project_id,{mint:form.mint.trim(),signature:form.signature.trim()});projectMessage=result.status==="ALREADY_PRESENT"?"该签名已登记。":"发行证据已登记，状态为 UNVERIFIED；尚未完成链上核验。";record("project.issuance_evidence.recorded",{project_id:form.project_id,status:"UNVERIFIED"});render()}catch(err){projectMessage="发行证据未登记："+errorKind(err);const status=main.querySelector("#project-status");if(status)status.textContent=projectMessage}};
-
- }else if(page=="wallet"){
+  const ticket=++importTicket;
+  mountProjectSetup(main,{
+   initialProjectId:activeProjectId,
+   initialMessage:projectMessage,
+   onActiveProjectId:id=>{activeProjectId=id;},
+   isActive:()=>page==="create"&&importTicket===ticket,
+   screenHeading,panel,note,table,esc,download,projectRegistry,record,errorKind
+  });
+  }else if(page=="wallet"){
  const d=report.terminal_state,t=d.treasury;
  main.innerHTML=screenHeading("Treasury / 资金中心","项目账本 · 报价资产原始单位")+
  metrics([["期末现金",a.closing_cash_base_units],["已实现盈亏",a.realized_project_pnl_base_units],["创作者费",a.creator_cash_income_base_units],["独立费用",t.recorded_expenses_base_units]])+
