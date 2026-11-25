@@ -1,13 +1,21 @@
 async function request(path, { method = "GET", body } = {}) {
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),15000);
+  try{
   const response = await fetch(path, {
-    method, cache: "no-store",
+    method, cache: "no-store", signal:controller.signal,
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   let result;
   try { result = await response.json(); } catch { throw Error("PROJECT_API_INVALID_RESPONSE"); }
   if (!response.ok) throw Error(result?.code || "PROJECT_API_REQUEST_FAILED");
+  if(!result||typeof result!=="object"||Array.isArray(result))throw Error("PROJECT_API_INVALID_RESPONSE");
   return result;
+  }catch(error){
+    if(controller.signal.aborted)throw Error("PROJECT_API_REQUEST_TIMEOUT");
+    throw error;
+  }finally{clearTimeout(timer);}
 }
 export async function getProjectDirectory() {
  const result=await request("/api/projects");
@@ -37,7 +45,7 @@ export async function appendProjectCommand(projectId, command, expectedRevision)
       payload: command.payload, expected_revision: expectedRevision
     }
   });
-  if (!result.aggregate || !["APPLIED", "ALREADY_APPLIED"].includes(result.status)) throw Error("PROJECT_API_INVALID_RESPONSE");
+  if (result.aggregate?.project_id!==projectId || !Number.isSafeInteger(result.aggregate?.revision) || result.aggregate.revision<=expectedRevision || !["APPLIED", "ALREADY_APPLIED"].includes(result.status)) throw Error("PROJECT_API_INVALID_RESPONSE");
   return result;
 }
 export async function getProjectConfig() {

@@ -223,7 +223,9 @@ export function mountProjectSetup(container, {
           members: [{ wallet_address: creator, role: "DEV", enabled: true, allocation_limit_base_units: null }]
         } : null;
         if (activeProjectId) {
-          project = await getProject(activeProjectId);
+          // Use the displayed revision, not a newly fetched revision paired with stale form values.
+          project = current;
+          if(!project||project.project_id!==activeProjectId)throw Error("PROJECT_REVISION_CONFLICT");
           if (project.lifecycle.stage !== "DRAFT") throw Error("PROJECT_DRAFT_CONFIGURATION_LOCKED");
           if (project.token.creator_wallet_address && !creator) throw Error("PROJECT_DEV_WALLET_REQUIRED");
           const network = {
@@ -237,13 +239,16 @@ export function mountProjectSetup(container, {
           };
           project = await createProject({ profile, network, token, wallet_group: walletGroup });
         }
-        projects = await listProjects();
+        // The mutation succeeded. A subsequent list failure must not invite a duplicate create.
+        if (!isActive() || version !== viewVersion) return;
+        projects=[...projects.filter(p=>p.project_id!==project.project_id),project];
         setActive(project.project_id);
         message = "项目配置已保存到本机 SQLite；当前状态：" + project.lifecycle.stage + "。";
         record("project.aggregate.saved", { project_id: project.project_id, revision: project.revision, stage: project.lifecycle.stage });
         render();
       } catch (error) {
-        message = "项目未保存：" + errorKind(error);
+        if (!isActive() || version !== viewVersion) return;
+        message = "保存未确认，请先重新读取项目：" + errorKind(error);
         const status = container.querySelector("#project-status");
         if (status) status.textContent = message;
         button.disabled = false;
@@ -268,10 +273,12 @@ export function mountProjectSetup(container, {
       if (!activeProjectId) return;
       const button = container.querySelector("#project-mark-ready"); button.disabled = true;
       try {
-        const project = await getProject(activeProjectId);
+        const project = current;
+        if(!project||project.project_id!==activeProjectId)throw Error("PROJECT_REVISION_CONFLICT");
         await append(project, "TRANSITION_LIFECYCLE", { to: "READY" });
-        projects = await listProjects(); message = "项目配置已完成，状态进入 READY。"; render();
+        const updated=await listProjects(); if(!isActive()||version!==viewVersion)return; projects=updated; message = "项目配置已完成，状态进入 READY。"; render();
       } catch (error) {
+        if(!isActive()||version!==viewVersion)return;
         message = "状态推进失败：" + errorKind(error);
         const status = container.querySelector("#project-status"); if (status) status.textContent = message;
         button.disabled = false;
@@ -281,14 +288,16 @@ export function mountProjectSetup(container, {
       if (!activeProjectId) return;
       const button = container.querySelector("#project-launch-submitted"); button.disabled = true;
       try {
-        const project = await getProject(activeProjectId);
+        const project = current;
+        if(!project||project.project_id!==activeProjectId)throw Error("PROJECT_REVISION_CONFLICT");
         const evidence = {
           kind: "LAUNCH_TRANSACTION", source: "local_execution",
           verification: "SUBMITTED", reference: project.token.issuance_signature
         };
         await append(project, "TRANSITION_LIFECYCLE", { to: "LAUNCH_SUBMITTED", evidence });
-        projects = await listProjects(); message = "发行交易已登记为 SUBMITTED，等待独立链上核验。"; render();
+        const updated=await listProjects(); if(!isActive()||version!==viewVersion)return; projects=updated; message = "发行交易已登记为 SUBMITTED，等待独立链上核验。"; render();
       } catch (error) {
+        if(!isActive()||version!==viewVersion)return;
         message = "发行状态未推进：" + errorKind(error);
         const status = container.querySelector("#project-status"); if (status) status.textContent = message;
         button.disabled = false;
@@ -298,13 +307,15 @@ export function mountProjectSetup(container, {
       event.preventDefault();
       const input = Object.fromEntries(new FormData(event.currentTarget));
       try {
-        const project = await getProject(input.project_id);
+        const project = current;
+        if(!project||project.project_id!==input.project_id||project.project_id!==activeProjectId)throw Error("PROJECT_REVISION_CONFLICT");
         await append(project, "RECORD_ISSUANCE_EVIDENCE", { mint: input.mint.trim(), signature: input.signature.trim() });
-        projects = await listProjects(); setActive(project.project_id);
+        const updated=await listProjects(); if(!isActive()||version!==viewVersion)return; projects=updated; setActive(project.project_id);
         message = "发行证据已登记为 UNVERIFIED，尚未完成链上核验。";
         record("project.issuance_evidence.recorded", { project_id: project.project_id, status: "UNVERIFIED" });
         render();
       } catch (error) {
+        if(!isActive()||version!==viewVersion)return;
         message = "发行证据未登记：" + errorKind(error);
         const status = container.querySelector("#project-status"); if (status) status.textContent = message;
       }

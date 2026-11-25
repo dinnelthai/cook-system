@@ -296,3 +296,15 @@ test("dedicated risk API and business risk use the same retrospective findings",
  assert.equal(r.portfolio.current_exposure,null);
  assert.equal((await (await fetch(root+"/global-risk-http")).json()).project.revision,1);
 });
+
+test("report archive mutations require the rendered revision before resolving evidence",async t=>{
+ let calls=0;
+ const base=await setup(t,{resolveReportLink:()=>{calls++;throw Error("UNEXPECTED_RESOLUTION");}});
+ const root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"link-revision",profile:{name:"Link",symbol:"LINK"}})).status,201);
+ const url=root+"/link-revision/report-links";
+ const missing=await json(url,"POST",{});assert.equal(missing.status,400);
+ assert.equal((await missing.json()).code,"EXPECTED_PROJECT_REVISION_REQUIRED");
+ const stale=await json(url,"POST",{expected_revision:2});assert.equal(stale.status,409);
+ assert.equal(calls,0);
+});

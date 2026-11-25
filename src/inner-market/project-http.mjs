@@ -279,7 +279,8 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(typeof resolveReportLink!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         const selection=await bodyJson(req,readRequestJson,maxBodyBytes);
         const project=store.get(projectId);
-        if(selection.expected_revision!==undefined&&selection.expected_revision!==project.revision)throw Error("PROJECT_REVISION_CONFLICT");
+        if(!Number.isSafeInteger(selection.expected_revision)||selection.expected_revision<1)throw Error("EXPECTED_PROJECT_REVISION_REQUIRED");
+         if(selection.expected_revision!==project.revision)throw Error("PROJECT_REVISION_CONFLICT");
         const {expected_revision,...reference}=selection;
         const link=resolveReportLink(project,reference);
         const archive=store.recordArchive(projectId,"HISTORICAL_REPORT_LINK",link,project.revision);

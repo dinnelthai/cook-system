@@ -218,6 +218,9 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         }
         const latest = current(projectId);
         if (latest.aggregate.revision !== expected_revision) throw Error("PROJECT_REVISION_CONFLICT");
+        // Apply the stricter policy only to new writes, not to replay of immutable v1 history.
+        if(command.type==="SET_OPERATIONAL_STATUS"&&command.payload.status==="ACTIVE"&&
+           ["EXIT_IN_PROGRESS","SETTLEMENT_PENDING"].includes(latest.aggregate.lifecycle.stage))throw Error("PROJECT_CANNOT_ACTIVATE");
         const at = now();
         if (!Number.isSafeInteger(at) || at < latest.aggregate.updated_at_ms) throw Error("INVALID_PROJECT_STORE_CLOCK");
         const applied = applyProjectCommand(latest.aggregate, { type: command.type, payload: command.payload }, { now: () => at });
