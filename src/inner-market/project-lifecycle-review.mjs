@@ -11,7 +11,7 @@ export function buildProjectLifecycleReview({financialInput,graduationHistory}){
  const graduation=reviewGraduationHistory(graduationHistory);
  const explicit=financialInput.projectIdentity??{},market=financialInput.market?.candleEvidence?.market??{};
  const values=(...v)=>v.filter(x=>x!=null);
- const networkValues=values(s.network,explicit.network,market.network);
+ const networkValues=values(s.network,explicit.network,market.network).map(v=>v==="localnet"?"local_sim":v);
  const quoteValues=values(explicit.quoteMint,explicit.quote_mint,market.quote_mint);
  const tokenValues=values(explicit.tokenMint,explicit.token_mint,market.token_mint);
  const chainValues=values(explicit.chainId,explicit.chain_id,market.chain_id);
@@ -49,7 +49,7 @@ export function buildProjectLifecycleReview({financialInput,graduationHistory}){
  const poolFeeBuckets=graduation.pools.filter(p=>p.metrics).map(p=>({pool_address:p.pool_address,creator_fee_bucket_base_units:p.metrics.creator_fee_bucket_base_units,accounting_treatment:"POOL_BUCKET_ONLY_NOT_CASH_RECEIPT"}));
  return {schema_version:"cook-project-lifecycle-review.1",status,
   project_identity:{project_id:s.projectId,token_mint:s.tokenMint,quote_asset:s.quoteAsset,network:graduation.scope.network,quote_mint:graduation.scope.quote_mint,opening_cutoff:s.openingCutoff,closing_cutoff:s.closingCutoff,cross_source_identity_status:identityMismatch?"MISMATCH":identityPartial?"PARTIAL":"MATCHED",identity_checks:checks},
-  lifecycle:{recorded_phase:g.phase,milestones,pool_count:graduation.pools.length,linked_migration_pool:g.migration_pool_address??null},
+  lifecycle:{recorded_phase:g.phase,milestones,pool_replay_record_count:graduation.pools.length,created_pool_address:g.migration_pool_address??null,linked_migration_pool:g.migration_pool_address??null},
   graduation,financial_close:financial,creator_fee_ledger:creatorFees,pool_fee_buckets:poolFeeBuckets,
   completeness:{checks:milestones.length+checks.length,passed:milestones.filter(x=>["RECORDED","LINKED","REPLAY_AND_SNAPSHOT_MATCHED","ACCOUNTING_AND_ENDPOINTS_CONSISTENT","RECONCILED"].includes(x.status)).length+checks.filter(x=>x.status==="PASS").length,independent_source_verification:"UNKNOWN",wallet_ownership:"UNKNOWN",valuation_attestation:"UNKNOWN"},
   issues:[...new Set(issues)],source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",actual_settlement_allowed:false,execution_enabled:false,
