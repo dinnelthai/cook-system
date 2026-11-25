@@ -1,4 +1,7 @@
 import { createServer } from "node:http";
+import { homedir } from "node:os";
+import { openProjectStore } from "../src/inner-market/project-store.mjs";
+import { createProjectHttpHandler } from "../src/inner-market/project-http.mjs";
 import {createWalletStore} from "../src/inner-market/local-wallet-store.mjs";
 import {createLocalTrading} from "../src/inner-market/local-trading.mjs";
 import {createLocalTransfer} from "../src/inner-market/local-transfer.mjs";
@@ -10,7 +13,7 @@ import { realpath } from "node:fs/promises";
 import {readBoundedRegularFile} from "../src/core/bounded-private-file.mjs";
 import {resolveLocalFeatureFlags} from "../src/core/local-feature-flags.mjs";
 import { fileURLToPath } from "node:url";
-import { resolve,extname,sep,relative as relativePath,isAbsolute } from "node:path";
+import { resolve,extname,sep,relative as relativePath,isAbsolute,join } from "node:path";
 const root=await realpath(fileURLToPath(new URL("../",import.meta.url)));
 const allowed=["web/","src/inner-market/","src/core/","fixtures/synthetic/"];
 const types={".html":"text/html; charset=utf-8",".mjs":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8"};
@@ -26,6 +29,9 @@ async function readRequestJson(req,maxBytes){
  if(tooLarge)throw Error("BODY_TOO_LARGE");
  try{return new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(chunks,total));}catch{throw Error("INVALID_BODY_ENCODING");}
 }
+const projectStorePath=process.env.COOK_PROJECT_DB??join(homedir(),".cook-system","projects.sqlite");
+const projectStore=openProjectStore(projectStorePath);
+const projectHttp=createProjectHttpHandler({store:projectStore,readRequestJson});
 const port=Number(process.env.PORT??4173);
 if(!Number.isInteger(port)||port<1||port>65535)throw new Error("invalid PORT");
 const wallets=createWalletStore();
@@ -37,6 +43,8 @@ const server=createServer(async(req,res)=>{
  try{
   const requestHost=req.headers.host,requestOrigin=req.headers.origin;
   if(!["127.0.0.1:"+port,"localhost:"+port].includes(requestHost)||req.headers["sec-fetch-site"]==="cross-site"||(requestOrigin&&requestOrigin!=="http://"+requestHost)){res.writeHead(403,{"Cache-Control":"no-store","Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"FORBIDDEN"}));return;}
+  const requestPath=new URL(req.url,"http://127.0.0.1").pathname;
+  if(requestPath==="/api/projects"||requestPath.startsWith("/api/projects/")){await projectHttp(req,res);return;}
   if(["/api/historical-workspace","/api/historical-workspace/revisions","/api/historical-workspace/query"].includes(req.url)){
    if(!workspaceHandler){res.writeHead(503,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"WORKSPACE_DISABLED"}));return;}
    await workspaceHandler(req,res);return;
@@ -94,4 +102,5 @@ server.requestTimeout=15_000;
 server.keepAliveTimeout=5_000;
 server.maxRequestsPerSocket=100;
 server.maxConnections=64;
+server.on("close",()=>projectStore.close());
 server.listen(port,"127.0.0.1",()=>console.log("Offline MVP: http://127.0.0.1:"+port));
