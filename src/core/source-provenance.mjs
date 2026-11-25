@@ -77,3 +77,19 @@ export function compareArchivedSourceReceipts({scope,left,right}={}){
   left_count:a.size,right_count:b.size,missing_left:missingLeft.sort(),missing_right:missingRight.sort(),conflicting_signatures:conflicts.sort(),
   distinct_declared_sources:distinct,source_attestation:"UNKNOWN",history_complete_attested:false};
 }
+
+// Local labels are aliases only at an explicit read-only input boundary.
+// Never rewrite persisted event scopes or infer network identity from labels.
+export function isLocalHistoricalNetwork(network){
+ return network==="localnet"||network==="local_sim";
+}
+/** Reject a known contradictory public cluster label; this is not authentication.
+ * Prefixes are the existing public-genesis identifiers used by local read preflight.
+ * Unknown or unavailable observations remain unverified by this check. */
+export function assertNoKnownClusterConflict(network,observedGenesis){
+ const known=typeof observedGenesis==="string"?
+  observedGenesis.startsWith("5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp")?"mainnet":
+  observedGenesis.startsWith("EtWTRABZaYq6iMfeYKouRu166VU2xqa1")?"devnet":
+  observedGenesis.startsWith("4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z")?"testnet":null:null;
+ if(known&&known!==network)throw Error("HISTORICAL_NETWORK_GENESIS_CONFLICT");
+}

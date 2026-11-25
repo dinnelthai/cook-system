@@ -1,3 +1,4 @@
+import {isLocalHistoricalNetwork} from "../core/source-provenance.mjs";
 import {parseBaseUnits,U64_MAX} from "../core/integer.mjs";
 
 const label=(v,name)=>{if(typeof v!=="string"||!v.trim()||v!==v.trim()||v.length>256)throw new TypeError("invalid "+name);return v;};
@@ -63,7 +64,7 @@ export function normalizeArchivedReceipt(record,expectedGenesis){
  */
 export function auditArchivedAccountInterval(input){
  const {scope,opening,closing,receipts,historyComplete}=input??{};
- if(scope?.network!=="localnet"||scope?.mode!=="READ_ONLY")fail("LOCALNET_READ_ONLY_REQUIRED");
+ if(!isLocalHistoricalNetwork(scope?.network)||scope?.mode!=="READ_ONLY")fail("LOCALNET_READ_ONLY_REQUIRED");
  const genesis=label(scope.genesisHash,"genesis"),wallet=label(scope.wallet,"wallet"),tokenAccount=label(scope.tokenAccount,"token account"),mint=label(scope.mint,"mint");
  if(wallet===tokenAccount)fail("ACCOUNT_IDENTITY_CONFLICT");
  const start=index(scope.openingSlot,"opening slot"),end=index(scope.closingSlot,"closing slot");

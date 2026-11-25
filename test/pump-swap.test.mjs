@@ -277,8 +277,8 @@ test("PumpSwap BuyEvent decodes, normalizes and reconciles actor and pool-vault 
   const current=reconcilePumpSwapPoolSnapshot({
     replayedState:replay.state,
     decodedPool:decodedPoolSnapshot,
-    baseVault:{amount_base_units:"900"},
-    quoteVault:{amount_base_units:"554"},
+    baseVault:{context_slot:25,amount_base_units:"900"},
+    quoteVault:{context_slot:25,amount_base_units:"554"},
   });
   assert.equal(current.status,"PASS");
 });

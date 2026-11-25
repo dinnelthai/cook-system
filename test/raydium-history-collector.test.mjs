@@ -332,3 +332,10 @@ test("collector follows a LaunchLab pool through CPMM migration, swaps, and vaul
   await assert.rejects(()=>fetchRaydiumMintHistory({rpc:{...rpc,getGenesisHash:async()=>"wrong"},mint:MINT,quoteMint:WSOL,expectedGenesisHash:"expected"}),/PINNED_GENESIS_MISMATCH/);
   assert.equal(result.vault_reconciliation_pass,true);
 });
+
+test("mainnet-only historical adapter refuses a known contradictory cluster before account reads",async()=>{
+ let accountReads=0;
+ const rpc={getGenesisHash:async()=>"EtWTRABZaYq6iMfeYKouRu166VU2xqa1",getAccountInfo:async()=>{accountReads++;throw Error("unexpected read");}};
+ await assert.rejects(()=>fetchRaydiumMintHistory({rpc,mint:MINT,quoteMint:WSOL}),/HISTORICAL_NETWORK_GENESIS_CONFLICT/);
+ assert.equal(accountReads,0);
+});

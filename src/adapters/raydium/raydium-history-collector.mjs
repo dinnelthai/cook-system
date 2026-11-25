@@ -15,7 +15,7 @@ import {
 import { buildRawCandles } from "../../core/candle-builder.mjs";
 import { auditObservedEventTimeline } from "../../core/event-timeline-audit.mjs";
 import { auditCandleEvidence } from "../../core/candle-integrity-audit.mjs";
-import { assessSourceProvenance, observeHistoricalGenesis } from "../../core/source-provenance.mjs";
+import { assessSourceProvenance, observeHistoricalGenesis, assertNoKnownClusterConflict } from "../../core/source-provenance.mjs";
 import { collectHistoricalSignaturePages, summarizeHistoricalReadEvidence } from "../../core/historical-signature-pages.mjs";
 
 export const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -368,7 +368,7 @@ function replayVaultDeltas(transactionRecords, vaultAddresses, currentAmounts) {
 }
 
 async function fetchTokenAccountSnapshot(rpc, address, expectedMint) {
-  const info = await rpc.getAccountInfo(address);
+  const info = await rpc.getAccountInfo(address, { commitment: "confirmed" });
   if (!info?.value) return { status: "MISSING", address, amount_base_units: null, mint: null };
   const decoded = decodeTokenAccount(info);
   return {
@@ -382,7 +382,7 @@ async function fetchTokenAccountSnapshot(rpc, address, expectedMint) {
 }
 
 async function fetchCurrentPoolAccount(rpc, address, programId) {
-  const info = await rpc.getAccountInfo(address);
+  const info = await rpc.getAccountInfo(address, { commitment: "confirmed" });
   if (!info?.value) return { status: "MISSING", address, context_slot: info?.context?.slot ?? null, data: null };
   if (info.value.owner !== programId) {
     return { status: "OWNER_MISMATCH", address, owner: info.value.owner, context_slot: info.context?.slot ?? null, data: null };
@@ -431,8 +431,9 @@ export async function fetchRaydiumMintHistory({
 } = {}) {
   if (!rpc) throw new TypeError("rpc client is required");
   const observedGenesisHash = await observeHistoricalGenesis(rpc, expectedGenesisHash);
-  const mintInfo = await rpc.getAccountInfo(mint);
-  const quoteInfo = await rpc.getAccountInfo(quoteMint);
+  assertNoKnownClusterConflict("mainnet", observedGenesisHash);
+  const mintInfo = await rpc.getAccountInfo(mint, { commitment: "confirmed" });
+  const quoteInfo = await rpc.getAccountInfo(quoteMint, { commitment: "confirmed" });
   const mintDecoded = decodeMintAccount(mintInfo);
   const quoteDecoded = decodeMintAccount(quoteInfo);
   const launchLabPda = deriveRaydiumLaunchLabPoolAddress({ mint, quoteMint });

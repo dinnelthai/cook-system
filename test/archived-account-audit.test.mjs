@@ -50,3 +50,13 @@ test("supports explicitly loaded account keys and new token accounts",()=>{
  r.transaction.meta.preTokenBalances=[];r.transaction.meta.postTokenBalances=[{...row(1),accountIndex:2}];
  assert.equal(normalizeArchivedReceipt(r,g).tokens[0].before,0n);
 });
+
+test("local read-only archive audit accepts the existing local_sim label without changing evidence scope",()=>{
+ const i=fixture();i.scope={...i.scope,network:"local_sim"};
+ const r=auditArchivedAccountInterval(i);
+ assert.equal(r.status,"INTERNALLY_CONSISTENT");
+ assert.equal(r.source_attestation,"UNKNOWN");assert.equal(r.execution_enabled,false);
+ assert.equal(i.scope.network,"local_sim");
+ i.scope={...i.scope,mode:"EXECUTION"};
+ assert.throws(()=>auditArchivedAccountInterval(i),/LOCALNET_READ_ONLY_REQUIRED/);
+});
