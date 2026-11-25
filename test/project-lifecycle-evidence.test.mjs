@@ -17,3 +17,25 @@ test("contradictions override matching observations; stale and foreign records a
  const v=describeProjectLifecycleEvidence(p,[row("OBSERVATIONS_MATCH",{project_revision:0,stale:true}),row("OBSERVATIONS_MATCH",{project_id:"other"})]);
  assert.equal(v.issuance.status,"MISSING");assert.equal(v.stale_archive_count,1);
 });
+
+test("same-revision identity and scope contradictions are explicit even alongside matching records",()=>{
+ const good=row("OBSERVATIONS_MATCH"),wrong=structuredClone(good);wrong.archive_id="wrong";wrong.payload.mint=pin;
+ const invalid=structuredClone(good);invalid.archive_id="invalid";invalid.payload.project_revision=99;
+ const r=describeProjectLifecycleEvidence(p,[good,wrong,invalid]);
+ assert.equal(r.issuance.status,"REVIEW_REQUIRED");assert.ok(r.issuance.archive_ids.includes("wrong"));
+ assert.ok(r.blockers.includes("CURRENT_ARCHIVE_SCOPE_CONFLICT"));assert.ok(r.blockers.includes("CURRENT_OBSERVATION_IDENTITY_CONFLICT"));
+ assert.equal(r.evidence_conflicts.length,2);assert.equal(r.execution_enabled,false);
+});
+test("unresolved old-revision orders cannot disappear from lifecycle review",()=>{
+ const r=describeProjectLifecycleEvidence(p,[],[
+ {project_id:p.project_id,project_revision:0,stale:true,order_id:"old",status:"OUTCOME_UNKNOWN"},
+ {project_id:"other",project_revision:0,stale:true,order_id:"foreign",status:"OUTCOME_UNKNOWN"}]);
+ assert.equal(r.order_review_count,0);assert.equal(r.stale_order_count,1);assert.equal(r.unresolved_order_count,1);
+ assert.ok(r.blockers.includes("ORDER_EVIDENCE_UNRESOLVED"));assert.ok(r.blockers.includes("STALE_ORDER_EVIDENCE"));
+ assert.equal(r.historical_stage_path_inferred,false);
+});
+test("unknown market observations do not silently count as matched evidence",()=>{
+ const a={...row("OBSERVATIONS_MATCH"),kind:"MARKET_OBSERVATION",payload:{...row("OBSERVATIONS_MATCH").payload,market_id:"unregistered"}};
+ const r=describeProjectLifecycleEvidence(p,[a]);
+ assert.ok(r.blockers.includes("CURRENT_OBSERVATION_IDENTITY_CONFLICT"));assert.equal(r.evidence_conflicts.length,1);
+});

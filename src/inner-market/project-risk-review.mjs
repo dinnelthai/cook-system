@@ -17,7 +17,7 @@ export function describeProjectRiskReview(projectInput,archives=[],orders=[]){
   if(reference&&!old.references.includes(reference))old.references.push(reference);
  }
  for(const code of lifecycle.blockers){
-  const severity=code==="PROJECT_REVIEW_REQUIRED"||code==="GRADUATION_HISTORY_CONFLICT"||code==="PROJECT_CLOSE_REVIEW_REQUIRED"||code.endsWith("_REVIEW_REQUIRED")?"CRITICAL":"UNKNOWN";
+  const severity=code==="PROJECT_REVIEW_REQUIRED"||code==="GRADUATION_HISTORY_CONFLICT"||code==="PROJECT_CLOSE_REVIEW_REQUIRED"||code==="CURRENT_ARCHIVE_SCOPE_CONFLICT"||code==="CURRENT_OBSERVATION_IDENTITY_CONFLICT"||code.endsWith("_REVIEW_REQUIRED")?"CRITICAL":"UNKNOWN";
   add("LIFECYCLE",code,severity);
  }
  if(p.lifecycle.operational_status==="HALTED")add("LIFECYCLE","PROJECT_RECORDED_HALTED","WARNING");

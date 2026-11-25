@@ -33,3 +33,9 @@ test("market evidence contradictions propagate to unified risk without trusting 
  assert.equal(stale.coverage.market_evidence_review_count,0);
  assert.ok(!stale.findings.some(f=>f.code==="CANDLE_EVENT_CONTRADICTION"));
 });
+
+test("current archive scope contradictions are critical risk findings",()=>{
+ const a=archive("PARTIAL");a.payload.project_revision=99;
+ const r=describeProjectRiskReview(p,[a]);
+ assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.findings.some(f=>f.code==="CURRENT_ARCHIVE_SCOPE_CONFLICT"&&f.severity==="CRITICAL"));
+});
