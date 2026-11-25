@@ -1,36 +1,73 @@
-# Final engineering acceptance — review candidate
+# Cook System — post-merge engineering acceptance
 
-Scope: PR #9, branch codex/overnight-market-quality-completion, based on master da6e1c6. The preceding tested commit is 64f3df5 (311 passing, no failures/skips, registry validation and synthetic regression passed in GitHub Actions run 45528560965). Verify the final head separately; this document is not evidence of a subsequent CI pass.
+**Repository:** `dinnelthai/cook-system`  
+**Branch:** `master`  
+**Reviewed commit:** `9522ffdd9d260dad7a0315bca12ca335a06750ce`  
+**Latest CI:** [Run 45530375980](https://github.com/dinnelthai/cook-system/actions/runs/45530375980)  
+**CI result:** 326 tests passed, 0 failed, 0 skipped; JSON Schema registry validation and held-out defensive regression passed.
 
-| Workstream | Code status | Acceptance boundary |
-|---|---|---|
-| Historical event archive/index | implemented | bounded file-backed index; no transactional multi-writer guarantee |
-| Source/coverage | implemented collector-side checks | independent dual-source agreement on real receipts and UI binding pending |
-| Financial integrity | integrated historical account set | independent ownership, valuation and real receipt parity pending |
-| Reliability | local journal, archive, paper halt | no automatic server logging, notification or distributed recovery |
-| Market quality | descriptive analysis and synthetic tests | independent demand, execution-depth evidence and real model calibration unavailable |
-| Localnet | read-only preflight | real environment, closed evidence interval and browser checks pending |
-| Final engineering review | schema contract hardening and handoff | operator review and latest CI required before merge |
+## Delivered implementation
 
-## Reproduction
+| Workstream | Delivered |
+|---|---|
+| Historical event integrity | bounded event archive/index, replay checks and integrity audit |
+| Evidence and provenance | source/coverage checks, explicit unknown states, historical report boundaries |
+| Financial audit | cash, inventory, cost basis, receivables, liabilities, NAV and closing account-set cross-checks |
+| Reliability | hash-chained alert journal, diagnostic snapshot restore/archive, file-backed paper halt state |
+| Market quality | historical descriptive metrics, attribution uncertainty, scenario isolation, synthetic conservation regression |
+| Local validator preflight | loopback-only read-only RPC checks, genesis pin, retention bounds and receipt samples |
+| Offline terminal | local-only HTTP server, report bridge, bounded regular-file reads, path and request controls |
+| Paper risk gate | stale-data, halt, drawdown, inventory, volatility and numeric-input fail-closed checks |
+| Capability isolation | faucet, transfer and trading each have separate explicit opt-in flags; all default off |
 
-Run npm ci, npm test, npm run validate:schemas. Run the defensive evaluation with a new private output path. Run the local read acceptance only against a pre-existing approved loopback RPC with independently supplied genesis and a closed interval evidence file; see local-read-acceptance-v1.md.
+## Reproduction on master
 
-Do not commit private fixtures, keyfiles, secrets, endpoints containing credentials or raw diagnostic exports. Rotate any previously exposed read key. Existing history is not scrubbed by these changes.
+```bash
+git checkout master
+git pull --ff-only origin master
+npm ci
+npm test
+npm run validate:schemas
+mkdir -p .cook-system/acceptance
+npm run evaluate:defensive -- .cook-system/acceptance/defensive-evaluation.json 901,902,903
+```
 
-Review the PR diff, run browser checks on the offline terminal with execution controls disabled, verify contradictory financial reports hide derived totals, verify all evidence limitations, and test archive recovery and performance in the operator environment. Do not reset a validator for acceptance. No claim of actual localnet parity, production readiness, independent source attestation or complete historical coverage is made.
+The repository ignores `.cook-system/`. Keep all wallet files, private evidence, diagnostic exports and RPC credentials outside Git.
 
-Merge gate: latest CI green, operator review completed, outstanding limitations explicitly accepted for the offline research scope. Production deployment is out of scope.
+## Localnet read-only acceptance
 
-## Post-merge follow-up
+Use an existing operator-managed loopback validator. Do not reset the ledger or create transactions for this check. Obtain the expected genesis hash independently from the operator's known local environment; do not trust a value merely because the endpoint reports it.
 
-Master merge e0031bb passed 314/314 tests and both auxiliary CI steps in run 45528929553. The report bridge, CLI validator and local read preflight now share a bounded regular-file reader; it rejects leaf symlinks and non-regular files and caps actual bytes read, including when files grow during reading. Static serving retains its existing path checks. The configured report must be an actual private regular file; a symlink is no longer accepted. Trusted parent directories and operator-controlled file permissions are still required; this is not a complete filesystem sandbox. The bridge still serves raw report inputs to the local terminal, so operators must not place secrets or unrelated sensitive fields in them. Actual local Validator and browser acceptance remain pending.
+Prepare a private JSON file with a closed slot interval, up to 20 known transaction signature/slot pairs, and optionally an archived historical report input. Then run:
 
+```bash
+COOK_ACCEPT_RPC=http://127.0.0.1:8899 \
+COOK_ACCEPT_GENESIS='<independently-confirmed-local-genesis>' \
+node scripts/accept-local-read.mjs ./private-evidence.json
+```
 
-## Local capability isolation follow-up
+A `PARTIAL` result is expected when history is outside retention, receipt samples are absent/unavailable, or report-to-receipt interval binding is incomplete. The tool deliberately does not certify source authenticity, complete history, ownership or financial parity.
 
-The local faucet, wallet transfer and PumpSwap trading adapters now have separate explicit environment opt-ins (`COOK_LOCAL_FAUCET`, `COOK_LOCAL_TRANSFER`, `COOK_LOCAL_TRADING`); all default disabled. Setting the faucet flag no longer enables transfer or trading. The offline HTTP server also sets bounded header/request/keep-alive timeouts and connection/request caps. Tests cover the independent feature flags and the faucet-only server configuration. Actual localnet transactions remain disabled unless the operator separately enables the corresponding local-only adapter and supplies a pinned private genesis.
+## Local execution capability flags
 
-## Latest master verification — 2026-11-25
+All are independent and default disabled:
 
-Commit 08a0ea904ac45e477b58471386081d99ad2d7a4f is green in GitHub Actions run 45529640566: 320 tests passed, 0 failed, 0 skipped; schema registry validation and held-out defensive regression steps also passed. Local capability flags are separated and all default off; the HTTP request body is capped by bytes and invalid UTF-8 is rejected. CI does not exercise an actual local Validator, wallet-funded transaction, browser session on the operator machine, or production-scale performance.
+- `COOK_LOCAL_FAUCET=1`: local validator airdrop only.
+- `COOK_LOCAL_TRANSFER=1`: local validator wallet transfers only.
+- `COOK_LOCAL_TRADING=1`: local PumpSwap adapter only.
+
+Each additionally requires the private non-public genesis pin and loopback RPC checks. Do not enable these against public clusters or production funds. The local server is not a multi-user authenticated custody service.
+
+## Outstanding acceptance — not represented as passed
+
+1. Run the read-only preflight against the operator's actual Localnet and inspect its returned range/receipt statuses.
+2. Reconcile independently exported wallet balances, transaction fees, inventory and NAV against the archived report for a closed interval.
+3. Open the offline terminal in the operator's browser and verify the evidence status, financial contradiction handling, log export and all disabled execution controls.
+4. Run an operator-controlled soak/load test and inspect memory, file growth, recovery after process termination and stale lock handling.
+5. Perform a human security review of local wallet custody, host permissions, private report contents, RPC exposure and the exact opt-in flags before any local transaction testing.
+
+## Acceptance boundary
+
+CI validates deterministic repository tests and synthetic defensive scenarios. It does **not** prove actual Localnet connectivity, independent source attestation, real wallet ownership, historical completeness, live market quality, production performance, custody security or production readiness. The market-quality engine is descriptive/research-oriented; paper quote planning cannot sign or submit orders. The trading adapter is a separate local-only opt-in and must not be treated as production-approved.
+
+No production deployment or live-market manipulation capability is certified by this acceptance record.
