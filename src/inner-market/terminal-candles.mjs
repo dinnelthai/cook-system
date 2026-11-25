@@ -3,6 +3,7 @@ import {sortForReplay} from "../core/event-order.mjs";
 const SIDES={CURVE_BUY_EXECUTED:"BUY",CURVE_SELL_EXECUTED:"SELL"};
 const scopeKeys=["projectId","quoteAsset","tokenMint","openingCutoff","closingCutoff"];
 const marketKeys=["chain_id","network","token_mint","quote_mint","curve_program_id","market_phase"];
+const WRAPPED_SOL_MINT="So11111111111111111111111111111111111111112";
 const intervals=new Set([60000,300000,900000,3600000]);
 const result=(status,reason,candles=[])=>({status,reason,candles,external_attestation:"UNKNOWN"});
 
@@ -26,6 +27,9 @@ export function buildTerminalCandles(input,intervalMs=60000){
   const expectedNetwork=provenance==="synthetic"?"synthetic":declaredNetwork==="localnet"?"local_sim":declaredNetwork;
   if(expectedNetwork!=null&&identity.network!==expectedNetwork)return result("REVIEW","NETWORK_IDENTITY_MISMATCH");
   if(!provenance)return result("REVIEW","PROVENANCE_MISMATCH");
+  if(identity.chain_id!=="solana")return result("REVIEW","CHAIN_IDENTITY_MISMATCH");
+  if(provenance==="observed_chain"&&input.scope.quoteAsset==="SOL_LAMPORTS"&&identity.quote_mint!==WRAPPED_SOL_MINT)return result("REVIEW","QUOTE_ASSET_MISMATCH");
+  if(identity.curve_account!=null&&(typeof identity.curve_account!=="string"||!identity.curve_account.trim()))return result("REVIEW","CURVE_IDENTITY_INVALID");
   const trades=input.market.trades;
   if(trades.some(t=>t.status!=="FINALIZED"||t.reconciliation!=="PASS"))return result("REVIEW","UNCONFIRMED_REPORT_TRADE");
   const byId=new Map(trades.map(t=>[t.id,t]));
@@ -36,8 +40,13 @@ export function buildTerminalCandles(input,intervalMs=60000){
    if(!t||ids.has(e.event_id)||SIDES[e.event_kind]!==t.side||e.payload?.quote_amount_base_units!==t.quoteNotionalBaseUnits)return result("REVIEW","EVENT_PARITY_MISMATCH");
    ids.add(e.event_id);
    if(e.schema_version!=="1.0.0"||e.provenance!==provenance||!marketKeys.every(k=>e.market?.[k]===identity[k])||e.payload?.quote_mint!==identity.quote_mint)return result("REVIEW","EVENT_IDENTITY_MISMATCH");
+   if((e.market.curve_account??null)!==(identity.curve_account??null))return result("REVIEW","CURVE_IDENTITY_MISMATCH");
    if(e.quality?.is_complete!==true||e.quality?.validation_status!=="valid"||!Number.isSafeInteger(e.event_time_ms)||e.event_time_ms<evidence.startTimeMs||e.event_time_ms>=evidence.endTimeMs)return result("REVIEW","EVENT_QUALITY_INVALID");
-   if(provenance==="synthetic"){if(!e.synthetic_metadata?.scenario_id)return result("REVIEW","SCENARIO_MISSING");scenarios.add(e.synthetic_metadata.scenario_id);}
+   if(provenance==="synthetic"){
+    const m=e.synthetic_metadata;
+    if(!m?.scenario_id||!Number.isSafeInteger(m.random_seed)||typeof m.generator_version!=="string"||!m.generator_version.trim())return result("REVIEW","SCENARIO_MISSING");
+    scenarios.add(JSON.stringify([m.scenario_id,m.random_seed,m.generator_version]));
+   }
   }
   if(scenarios.size>1)return result("REVIEW","MIXED_SCENARIOS");
   const ordered=sortForReplay(evidence.events);

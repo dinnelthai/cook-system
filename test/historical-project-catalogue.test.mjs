@@ -25,3 +25,11 @@ test("reject mismatched scope and derived reports without mutating catalogue",()
  assert.throws(()=>c.add(c.get(r.key).report));
  assert.equal(c.list().length,1);assert.equal(c.remove(r.key),true);assert.equal(c.list().length,0);
 });
+
+test("identical interval labels on distinct declared networks or genesis hashes remain separate",()=>{
+ const c=createHistoricalProjectCatalogue();
+ const make=(network,genesisHash)=>{const i=fixture();i.sourceMode="ARCHIVED_HISTORICAL";i.scope.network=network;i.scope.genesisHash=genesisHash;return i};
+ const a=c.add(make("localnet","genesis-a")),b=c.add(make("localnet","genesis-b")),d=c.add(make("mainnet","genesis-c"));
+ assert.equal(new Set([a.key,b.key,d.key]).size,3);
+ assert.equal(c.list().length,3);assert.equal(c.get(b.key).input.scope.genesisHash,"genesis-b");
+});

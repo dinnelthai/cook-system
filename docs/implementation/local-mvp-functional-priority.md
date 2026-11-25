@@ -79,3 +79,7 @@ Added bounded retrospective batch review of existing synthetic reports with per-
 ## M01 — session closed-interval project catalogue
 
 The project archive page supports multiple independently audited historical input records, keyed by source mode, project, token, quote asset and both interval cutoffs. Exact serialized duplicates are idempotent; contradictory same-key input is rejected instead of overwritten. Inputs are cloned and reports recomputed on selection; derived reports are not accepted as source records. Session-only limit eight records and 16 Mi UTF-16 code units total; original JSON can be exported. Catalogue selection never changes the terminal, live mint, wallet or execution state. Durable archives, authenticated chain identity and browser acceptance remain open. No live lifecycle or trading features are added.
+
+## M02 — closed-report identity consistency
+
+Terminal candle evidence now checks Solana chain identity, reported curve account parity, the wrapped-SOL quote mint for archived SOL-lamport reports, and synthetic scenario/seed/generator consistency. The catalogue identity now includes declared optional network, genesis hash, wallet and token account labels (unknown remains null). These are declared labels, not source authentication. Four regressions cover curve mismatch, mixed synthetic metadata, incompatible quote mint and separate genesis scopes. Actual event-to-cutoff attestation, PumpSwap history integration and browser acceptance remain open. No live discovery, trading, wallet routing or order logic changed.

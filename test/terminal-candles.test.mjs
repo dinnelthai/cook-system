@@ -65,3 +65,19 @@ test("contradictory candle evidence cannot coexist with a ready unified report",
  assert.ok(Object.values(r.accounting).every(v=>v===null));
  assert.equal(r.settlement_allowed,false);
 });
+
+test("different curve accounts cannot be mixed into one report candle series",()=>{
+ const i=withEvidence();i.market.candleEvidence.events[1].market={...i.market.candleEvidence.events[1].market,curve_account:"other-curve"};
+ const r=buildTerminalCandles(i);assert.equal(r.reason,"CURVE_IDENTITY_MISMATCH");assert.deepEqual(r.candles,[]);
+ assert.equal(buildTerminalState(i).status,"REVIEW_REQUIRED");
+});
+test("synthetic candle evidence cannot mix generator versions or seeds",()=>{
+ for(const [field,value] of [["random_seed",1],["generator_version","other.1"]]){
+  const i=withEvidence();i.market.candleEvidence.events[1].synthetic_metadata[field]=value;
+  assert.equal(buildTerminalCandles(i).reason,"MIXED_SCENARIOS");
+ }
+});
+test("historical SOL report rejects a non-SOL candle quote mint",()=>{
+ const i=withEvidence();i.sourceMode="ARCHIVED_HISTORICAL";i.market.candleEvidence.market.network="local_sim";
+ assert.equal(buildTerminalCandles(i).reason,"QUOTE_ASSET_MISMATCH");
+});

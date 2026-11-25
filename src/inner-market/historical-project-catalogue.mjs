@@ -1,5 +1,6 @@
 import {buildUnifiedHistoricalReport} from "./unified-historical-report.mjs";
 const fields=["projectId","tokenMint","quoteAsset","openingCutoff","closingCutoff"];
+const optional=["network","genesisHash","wallet","tokenAccount"];
 /** Session-only closed-interval report catalogue. No live market selection,
  * wallet association, execution or lifecycle commands. */
 export function createHistoricalProjectCatalogue(){
@@ -9,7 +10,8 @@ export function createHistoricalProjectCatalogue(){
   const copy=structuredClone(input);
   const scope=copy?.scope;
   if(!["SYNTHETIC","ARCHIVED_HISTORICAL"].includes(copy?.sourceMode)||fields.some(k=>typeof scope?.[k]!=="string"||!scope[k].trim()||scope[k].length>512))throw Error("INVALID_CATALOGUE_SCOPE");
-  const key=JSON.stringify([copy.sourceMode,...fields.map(k=>scope[k])]);
+  const report=buildUnifiedHistoricalReport(copy);
+  const key=JSON.stringify([copy.sourceMode,...fields.map(k=>scope[k]),...optional.map(k=>scope[k]??null)]);
   const serialized=JSON.stringify(copy);
   if(serialized.length>maxChars)throw Error("CATALOGUE_SIZE_LIMIT");
   const previous=records.get(key);
@@ -18,8 +20,7 @@ export function createHistoricalProjectCatalogue(){
    return {key,status:"ALREADY_PRESENT"};
   }
   if(records.size>=8||total+serialized.length>maxChars)throw Error("CATALOGUE_CAPACITY");
-  const report=buildUnifiedHistoricalReport(copy);
-  const summary={key,source_mode:copy.sourceMode,...Object.fromEntries(fields.map(k=>[k,scope[k]])),audit_status:report.status,issue_count:report.issues.length,source_attestation:"UNKNOWN"};
+  const summary={key,source_mode:copy.sourceMode,...Object.fromEntries([...fields,...optional].map(k=>[k,scope[k]??null])),audit_status:report.status,issue_count:report.issues.length,source_attestation:"UNKNOWN"};
   records.set(key,{serialized,summary});total+=serialized.length;
   return {key,status:"ADDED"};
  }
