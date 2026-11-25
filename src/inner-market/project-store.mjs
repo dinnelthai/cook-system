@@ -81,6 +81,19 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       "CREATE TRIGGER IF NOT EXISTS project_event_no_delete BEFORE DELETE ON project_event " +
       "BEGIN SELECT RAISE(ABORT, 'PROJECT_EVENT_IMMUTABLE'); END;"
     );
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS project_archive (" +
+      "archive_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES project_snapshot(project_id), " +
+      "project_revision INTEGER NOT NULL, project_head_hash TEXT NOT NULL, kind TEXT NOT NULL, " +
+      "content TEXT NOT NULL, recorded_at_ms INTEGER NOT NULL, record_hash TEXT NOT NULL);" +
+      "CREATE INDEX IF NOT EXISTS project_archive_project ON project_archive(project_id,recorded_at_ms);" +
+      "CREATE TRIGGER IF NOT EXISTS project_archive_no_update BEFORE UPDATE ON project_archive BEGIN SELECT RAISE(ABORT,'PROJECT_ARCHIVE_IMMUTABLE'); END;" +
+      "CREATE TRIGGER IF NOT EXISTS project_archive_no_delete BEFORE DELETE ON project_archive BEGIN SELECT RAISE(ABORT,'PROJECT_ARCHIVE_IMMUTABLE'); END;"
+    );
+    const archiveById = db.prepare("SELECT * FROM project_archive WHERE archive_id=?");
+    const archiveRows = db.prepare("SELECT * FROM project_archive WHERE project_id=? ORDER BY recorded_at_ms DESC,archive_id");
+    const archiveInsert = db.prepare("INSERT INTO project_archive VALUES(?,?,?,?,?,?,?,?)");
+    const archiveCount = db.prepare("SELECT COUNT(*) AS count FROM project_archive WHERE project_id=?");
     const snapshotGet = db.prepare("SELECT project_id,revision,aggregate_json,aggregate_hash,updated_at_ms FROM project_snapshot WHERE project_id=?");
     const snapshotList = db.prepare("SELECT project_id FROM project_snapshot ORDER BY updated_at_ms DESC, project_id");
     const eventGet = db.prepare("SELECT * FROM project_event WHERE project_id=? ORDER BY revision");
@@ -195,7 +208,49 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         head_hash: latest.head_hash
       };
     }
-    return { create, append, get, list, events, verify, close: () => db.close() };
+    // Only server-generated observations and server-resolved report links enter this journal.
+    // They never change a Project aggregate or constitute verified chain provenance.
+    function archiveCore(row) {
+      return {archive_id:row.archive_id,project_id:row.project_id,project_revision:row.project_revision,
+        project_head_hash:row.project_head_hash,kind:row.kind,content:row.content,recorded_at_ms:row.recorded_at_ms};
+    }
+    function decodeArchive(row, latest) {
+      if (row.record_hash !== hash(canonicalJson(archiveCore(row))) ||
+          latest.events[row.project_revision-1]?.event_hash !== row.project_head_hash ||
+          row.archive_id !== hash(canonicalJson({project_id:row.project_id,revision:row.project_revision,kind:row.kind,content:row.content}))) throw Error("PROJECT_ARCHIVE_INTEGRITY_FAILURE");
+      return {archive_id:row.archive_id,project_id:row.project_id,project_revision:row.project_revision,
+        project_head_hash:row.project_head_hash,kind:row.kind,recorded_at_ms:row.recorded_at_ms,record_hash:row.record_hash,
+        payload:JSON.parse(row.content),current_revision:latest.aggregate.revision,stale:row.project_revision!==latest.aggregate.revision,
+        source_attestation:"UNKNOWN",execution_enabled:false};
+    }
+    function recordArchive(projectId, kind, payload, expectedRevision) {
+      if (!["ISSUANCE_OBSERVATION","HISTORICAL_REPORT_LINK"].includes(kind) ||
+          !payload || payload.project_id!==projectId || payload.project_revision!==expectedRevision ||
+          payload.source_attestation!=="UNKNOWN" || payload.execution_enabled!==false) throw Error("INVALID_PROJECT_ARCHIVE");
+      const content=canonicalJson(payload);
+      if (Buffer.byteLength(content)>64*1024) throw Error("PROJECT_ARCHIVE_SIZE_LIMIT");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const latest=current(projectId);
+        if(latest.aggregate.revision!==expectedRevision) throw Error("PROJECT_REVISION_CONFLICT");
+        const archive_id=hash(canonicalJson({project_id:projectId,revision:expectedRevision,kind,content}));
+        const prior=archiveById.get(archive_id);
+        if(prior){const result=decodeArchive(prior,latest);db.exec("COMMIT");return result;}
+        if(archiveCount.get(projectId).count>=256)throw Error("PROJECT_ARCHIVE_CAPACITY");
+        const at=now();
+        if(!Number.isSafeInteger(at)||at<latest.aggregate.updated_at_ms)throw Error("INVALID_PROJECT_STORE_CLOCK");
+        const row={archive_id,project_id:projectId,project_revision:expectedRevision,project_head_hash:latest.head_hash,kind,content,recorded_at_ms:at};
+        const record_hash=hash(canonicalJson(archiveCore(row)));
+        archiveInsert.run(archive_id,projectId,expectedRevision,latest.head_hash,kind,content,at,record_hash);
+        const result=decodeArchive({...row,record_hash},latest);
+        db.exec("COMMIT");return result;
+      }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
+    }
+    function listArchive(projectId){
+      const latest=current(projectId);
+      return archiveRows.all(projectId).map(row=>decodeArchive(row,latest));
+    }
+    return { create, append, get, list, events, verify, recordArchive, listArchive, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

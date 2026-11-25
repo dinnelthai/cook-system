@@ -1,4 +1,4 @@
-import { listProjects, getProject, createProject, appendProjectCommand, getProjectConfig, inspectProjectEvidence } from "./project-client.mjs";
+import { listProjects, getProject, createProject, appendProjectCommand, getProjectConfig, inspectProjectEvidence, listProjectArchive } from "./project-client.mjs";
 
 const U64_MAX = 18446744073709551615n;
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -108,7 +108,19 @@ export function mountProjectSetup(container, {
         '<div class="row"><button type="submit" ' + (projects.length ? "" : "disabled") + '>登记发行证据（UNVERIFIED）</button></div></form>' +
         '<p class="muted">手工登记只产生待核验记录。只有受信任的链上读取器完成核验，才能推进到 LAUNCHED。</p>') +
       panel("发行证据记录", table(["项目", "Mint", "交易签名", "状态", "核验证据"], issuanceRows) +
-        '<div class="row"><button id="project-inspect-evidence"' + (current?.token.mint ? "" : " disabled") + '>只读核验当前项目发行证据</button></div><p id="project-evidence-result" role="status" class="muted">观察结果不自动推进生命周期。</p>');
+        '<div class="row"><button id="project-inspect-evidence"' + (current?.token.mint ? "" : " disabled") + '>只读核验当前项目发行证据</button></div><p id="project-evidence-result" role="status" class="muted">观察结果不自动推进生命周期。</p><div id="project-evidence-archive"></div>');
+    async function loadEvidenceArchive(){
+      if(!current)return;
+      const target=container.querySelector("#project-evidence-archive");
+      try{
+        const records=await listProjectArchive(current.project_id);
+        if(!isActive()||version!==viewVersion)return;
+        target.innerHTML=table(["档案类型","Project Revision","记录时间","结果","状态"],records.map(r=>[r.kind,r.project_revision,new Date(r.recorded_at_ms).toISOString(),r.payload.status,r.stale?"旧版本":"当前版本"]))+
+          '<button id="project-archive-export">导出证据档案 JSON</button>';
+        target.querySelector("#project-archive-export").onclick=()=>download("project-evidence-archive.json",JSON.stringify(records,null,2));
+      }catch(error){if(isActive()&&version===viewVersion)target.textContent="档案读取失败："+errorKind(error);}
+    }
+    loadEvidenceArchive();
     const inspectButton = container.querySelector("#project-inspect-evidence");
     inspectButton.onclick = async () => {
       inspectButton.disabled = true;
@@ -117,7 +129,8 @@ export function mountProjectSetup(container, {
       try {
         const result = await inspectProjectEvidence(current.project_id);
         if (!isActive() || version !== viewVersion) return;
-        output.textContent = result.status + " · " + result.checks.join(" / ") + " · 来源未独立认证；不会变更发行状态。";
+        output.textContent = result.status + " · " + result.checks.join(" / ") + " · 来源未独立认证；不会变更发行状态。" + (result.archive_id?" · 已归档":"");
+        await loadEvidenceArchive();
       } catch (error) {
         if (isActive() && version === viewVersion) output.textContent = "读取失败：" + errorKind(error);
       } finally { if (isActive() && version === viewVersion) inspectButton.disabled = false; }

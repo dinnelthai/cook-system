@@ -75,3 +75,21 @@ test("store rejects duplicate project IDs", t => {
     assert.throws(() => store.create(base), /PROJECT_ALREADY_EXISTS/);
   } finally { store.close(); }
 });
+
+test("project archive is immutable, revision-pinned, deduplicated and survives reopening",t=>{
+ const path=setup(t);let store=openProjectStore(path,{now:()=>1000});
+ const p=store.create(base);
+ const payload={project_id:p.project_id,project_revision:1,status:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false};
+ const first=store.recordArchive(p.project_id,"ISSUANCE_OBSERVATION",payload,1);
+ assert.equal(store.recordArchive(p.project_id,"ISSUANCE_OBSERVATION",payload,1).archive_id,first.archive_id);
+ assert.equal(store.listArchive(p.project_id).length,1);
+ assert.equal(store.get(p.project_id).revision,1);
+ store.append(p.project_id,{command_id:"archive-test-revision",type:"UPSERT_WALLET_GROUP",payload:{group:group()}},{expected_revision:1});
+ assert.throws(()=>store.recordArchive(p.project_id,"ISSUANCE_OBSERVATION",payload,1),/PROJECT_REVISION_CONFLICT/);
+ store.close();store=openProjectStore(path);
+ try{const row=store.listArchive(p.project_id)[0];assert.equal(row.stale,true);assert.equal(row.project_head_hash,first.project_head_hash);assert.equal(row.record_hash,first.record_hash);}
+ finally{store.close();}
+ const db=new DatabaseSync(path);
+ try{assert.throws(()=>db.exec("DELETE FROM project_archive"),/PROJECT_ARCHIVE_IMMUTABLE/);assert.throws(()=>db.exec("UPDATE project_archive SET content='{}'"),/PROJECT_ARCHIVE_IMMUTABLE/);}
+ finally{db.close();}
+});

@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { openProjectStore } from "../src/inner-market/project-store.mjs";
 import { createProjectHttpHandler } from "../src/inner-market/project-http.mjs";
 import { createProjectEvidenceReader } from "../src/inner-market/project-evidence-reader.mjs";
+import { createProjectWorkspaceResolver } from "../src/inner-market/project-workspace-link.mjs";
 import {createWalletStore} from "../src/inner-market/local-wallet-store.mjs";
 import {createLocalTrading} from "../src/inner-market/local-trading.mjs";
 import {createLocalTransfer} from "../src/inner-market/local-transfer.mjs";
@@ -32,7 +33,7 @@ async function readRequestJson(req,maxBytes){
 }
 const projectStorePath=process.env.COOK_PROJECT_DB??join(homedir(),".cook-system","projects.sqlite");
 const projectStore=openProjectStore(projectStorePath);
-const projectHttp=createProjectHttpHandler({store:projectStore,readRequestJson,inspectEvidence:createProjectEvidenceReader({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),networkConfig:{chain_id:"solana",cluster:"localnet",genesis_hash:process.env.COOK_LOCAL_GENESIS_HASH??null,quote_mint:"So11111111111111111111111111111111111111112"}});
+const projectHttp=createProjectHttpHandler({store:projectStore,readRequestJson,resolveReportLink:createProjectWorkspaceResolver({path:workspacePath,enabled:workspaceEnabled}),inspectEvidence:createProjectEvidenceReader({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),networkConfig:{chain_id:"solana",cluster:"localnet",genesis_hash:process.env.COOK_LOCAL_GENESIS_HASH??null,quote_mint:"So11111111111111111111111111111111111111112"}});
 const port=Number(process.env.PORT??4173);
 if(!Number.isInteger(port)||port<1||port>65535)throw new Error("invalid PORT");
 const wallets=createWalletStore();

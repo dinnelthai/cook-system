@@ -47,6 +47,10 @@ async function bodyJson(req, readRequestJson, maxBytes) {
 function errorResponse(error) {
   const code = typeof error?.message === "string" ? error.message : "";
   if (error?.httpStatus) return { status: error.httpStatus, code };
+  if (["WORKSPACE_DISABLED","EVIDENCE_READER_UNAVAILABLE"].includes(code)) return {status:503,code};
+  if (["PROJECT_ARCHIVE_SIZE_LIMIT","PROJECT_ARCHIVE_CAPACITY"].includes(code)) return {status:413,code};
+  if (["WORKSPACE_REVISION_NOT_FOUND","CATALOGUE_RECORD_NOT_FOUND"].includes(code)) return {status:404,code};
+  if (code === "PROJECT_ARCHIVE_INTEGRITY_FAILURE") return {status:422,code};
   if (code === "BODY_TOO_LARGE") return { status: 413, code };
   if (code === "INVALID_BODY_ENCODING" || code === "INVALID_JSON" || code === "INVALID_JSON_OBJECT" ||
       code === "INVALID_REQUEST_BODY" || code === "JSON_CONTENT_TYPE_REQUIRED") {
@@ -61,7 +65,7 @@ function errorResponse(error) {
 
 /** Loopback HTTP adapter for Project CRUD, versioned commands and audit reads.
  * Host/origin enforcement is performed by the parent local-only server. */
-export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence } = {}) {
+export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence, resolveReportLink } = {}) {
   if (!store || typeof readRequestJson !== "function" || !Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1024) {
     throw Error("INVALID_PROJECT_HTTP_CONFIGURATION");
   }
@@ -108,12 +112,30 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         return true;
       }
       if (action === "evidence-observation") {
-        if (req.method !== "GET") { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }
+        if (!["GET","POST"].includes(req.method)) { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }
+        if(req.method==="POST"){
+          const body=await bodyJson(req,readRequestJson,maxBodyBytes);
+          if(Object.keys(body).length)throw Error("INVALID_PROJECT_OBSERVATION_REQUEST");
+        }
         if (typeof inspectEvidence !== "function") { send(res, 503, { code: "EVIDENCE_READER_UNAVAILABLE" }); return true; }
         const project = store.get(projectId);
         const observation = await inspectEvidence(project);
         if (store.get(projectId).revision !== project.revision) { send(res, 409, { code: "PROJECT_REVISION_CONFLICT" }); return true; }
-        send(res, 200, { observation }); return true;
+        const archive=req.method==="POST"?store.recordArchive(projectId,"ISSUANCE_OBSERVATION",observation,project.revision):null;
+        send(res, 200, { observation, archive }); return true;
+      }
+      if(action==="archive"){
+        if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        send(res,200,{records:store.listArchive(projectId),execution_enabled:false});return true;
+      }
+      if(action==="report-links"){
+        if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        if(typeof resolveReportLink!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
+        const selection=await bodyJson(req,readRequestJson,maxBodyBytes);
+        const project=store.get(projectId);
+        const link=resolveReportLink(project,selection);
+        const archive=store.recordArchive(projectId,"HISTORICAL_REPORT_LINK",link,project.revision);
+        send(res,200,{link,archive});return true;
       }
       if (action === "commands") {
         if (req.method !== "POST") { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }

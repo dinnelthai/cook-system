@@ -42,7 +42,15 @@ export async function getProjectConfig() {
 }
 
 export async function inspectProjectEvidence(projectId) {
-  const result = await request("/api/projects/" + encodeURIComponent(projectId) + "/evidence-observation");
+  const result = await request("/api/projects/" + encodeURIComponent(projectId) + "/evidence-observation",{method:"POST",body:{}});
   if (result.observation?.project_id !== projectId || result.observation.execution_enabled !== false || result.observation.lifecycle_mutated !== false) throw Error("PROJECT_API_INVALID_RESPONSE");
-  return result.observation;
+  return {...result.observation,archive_id:result.archive?.archive_id??null};
+}
+export async function listProjectArchive(projectId){
+  const result=await request("/api/projects/"+encodeURIComponent(projectId)+"/archive");
+  if(!Array.isArray(result.records)||result.execution_enabled!==false)throw Error("PROJECT_API_INVALID_RESPONSE");
+  return result.records;
+}
+export async function linkProjectReport(projectId,workspaceRevision,recordKey){
+  return request("/api/projects/"+encodeURIComponent(projectId)+"/report-links",{method:"POST",body:{workspace_revision:workspaceRevision,record_key:recordKey}});
 }

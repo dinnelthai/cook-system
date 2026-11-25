@@ -18,7 +18,7 @@ async function readRequestJson(req, maxBytes) {
   }
   return Buffer.concat(chunks, total).toString("utf8");
 }
-function setup(t) {
+function setup(t, extras={}) {
   const dir = mkdtempSync(join(tmpdir(), "cook-project-http-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = openProjectStore(join(realpathSync(dir), "projects.sqlite"), {
@@ -26,7 +26,7 @@ function setup(t) {
     now: () => 1000
   });
   t.after(() => store.close());
-  const handler = createProjectHttpHandler({ store, readRequestJson, maxBodyBytes: 2048 });
+  const handler = createProjectHttpHandler({ store, readRequestJson, maxBodyBytes: 2048, ...extras });
   const server = createServer(async (req, res) => {
     if (!await handler(req, res)) { res.writeHead(404); res.end(); }
   });
@@ -145,4 +145,20 @@ test("operator HTTP cannot manufacture verified evidence or bypass internal life
   assert.equal(project.lifecycle.stage, "DRAFT");
   assert.equal(project.token.issuance_status, "DRAFT");
   assert.equal((await (await fetch(root + "/trust-test/events")).json()).events.length, 1);
+});
+
+test("evidence archive accepts only server-produced observations and read-only GET does not save",async t=>{
+ const base=await setup(t,{inspectEvidence:async p=>({project_id:p.project_id,project_revision:p.revision,status:"UNKNOWN",source_attestation:"UNKNOWN",execution_enabled:false,lifecycle_mutated:false})});
+ const root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"archive-http",profile:{name:"Archive",symbol:"ARC"}})).status,201);
+ const url=root+"/archive-http";
+ assert.equal((await fetch(url+"/evidence-observation")).status,200);
+ assert.equal((await (await fetch(url+"/archive")).json()).records.length,0);
+ assert.equal((await json(url+"/evidence-observation","POST",{status:"VERIFIED"})).status,400);
+ const res=await json(url+"/evidence-observation","POST",{});assert.equal(res.status,200);
+ assert.ok((await res.json()).archive.archive_id);
+ assert.equal((await (await fetch(url+"/archive")).json()).records.length,1);
+ assert.equal((await (await fetch(url)).json()).project.revision,1);
+ assert.equal((await json(url+"/archive","POST",{})).status,405);
+ assert.equal((await json(url+"/report-links","POST",{})).status,503);
 });
