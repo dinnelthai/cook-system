@@ -121,3 +121,9 @@ export async function getProjectRiskReview(projectId,revision){
  if(r.project_id!==projectId||r.project_revision!==revision||r.execution_enabled!==false||r.settlement_allowed!==false||r.live_risk_assessed!==false||r.lifecycle_mutated!==false||!Array.isArray(r.findings))throw Error("PROJECT_RISK_SCOPE_MISMATCH");
  return r;
 }
+
+export async function reviewProjectMarketEvidence(projectId,revision,archiveId){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/market-evidence-review",{method:"POST",body:{expected_revision:revision,archive_id:archiveId}});
+ if(r.review?.project_id!==projectId||r.review.project_revision!==revision||r.review.report_link_archive_id!==archiveId||r.review.execution_enabled!==false||r.review.live_market_assessed!==false||r.review.settlement_allowed!==false)throw Error("PROJECT_MARKET_EVIDENCE_SCOPE_MISMATCH");
+ return r;
+}

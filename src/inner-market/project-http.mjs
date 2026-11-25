@@ -68,7 +68,7 @@ function errorResponse(error) {
 
 /** Loopback HTTP adapter for Project CRUD, versioned commands and audit reads.
  * Host/origin enforcement is performed by the parent local-only server. */
-export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence, inspectMarket, resolveReportLink, listReportCandidates, reviewOrderReceipt, importOrderReceipts, reviewProjectClose, reviewProjectTreasury } = {}) {
+export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence, inspectMarket, resolveReportLink, listReportCandidates, reviewOrderReceipt, importOrderReceipts, reviewProjectClose, reviewProjectTreasury, reviewProjectMarketEvidence } = {}) {
   if (!store || typeof readRequestJson !== "function" || !Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1024) {
     throw Error("INVALID_PROJECT_HTTP_CONFIGURATION");
   }
@@ -146,6 +146,19 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
       if(action==="risk-review"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         send(res,200,store.getRiskReview(projectId));return true;
+      }
+      if(action==="market-evidence-review"){
+        if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        if(typeof reviewProjectMarketEvidence!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
+        const input=await bodyJson(req,readRequestJson,maxBodyBytes);
+        if(Object.keys(input).some(k=>!["archive_id","expected_revision"].includes(k))||typeof input.archive_id!=="string"||!Number.isSafeInteger(input.expected_revision))throw Error("INVALID_MARKET_EVIDENCE_REVIEW_REQUEST");
+        const project=store.get(projectId);
+        if(project.revision!==input.expected_revision)throw Error("PROJECT_REVISION_CONFLICT");
+        const link=store.listArchive(projectId).find(a=>a.archive_id===input.archive_id);
+        if(!link)throw Error("PROJECT_ARCHIVE_NOT_FOUND");
+        const review=reviewProjectMarketEvidence(project,link);
+        const archive=store.recordArchive(projectId,"MARKET_EVIDENCE_REVIEW",review,project.revision);
+        send(res,200,{review,archive});return true;
       }
       if(action==="treasury-review"){
         if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}

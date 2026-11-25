@@ -181,3 +181,7 @@ A single SQLite read transaction derives the current Project risk view from life
 ## M13-09A — integrated historical treasury/risk acceptance
 
 The revision-pinned audit bundle now includes the same derived risk projection as the Project risk endpoint. Added an integration regression using a synthetic fixture relabeled as a test-only archived Localnet report, real temporary SQLite workspace/project stores, the actual report resolver, treasury reviewer, retrospective receipt importer/reviewer, close reviewer and audit export. The test covers unrelated-project rejection, duplicate import, missing RPC evidence, outstanding inventory, deterministic risk projection, digest checking and reopen persistence. It is not a real chain capture, independent financial certification, browser acceptance or live execution test. The original report is still external to the audit bundle.
+
+## M14-01/03A — historical market evidence review
+
+A current linked historical report is reloaded and audited against the existing terminal market and candle contracts. The review checks declared coverage, trade evidence, candle parity at 1/5/15/60-minute intervals, registered curve identity when present and snapshot status. Missing candles remain unknown, not fabricated zero values. It archives a bounded evidence summary and exposes an explicit terminal review action. This is retrospective data-quality verification, not independent source authentication, live market monitoring, a trading signal or a market intervention system. Real browser and Localnet acceptance remain open.

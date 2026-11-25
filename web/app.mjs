@@ -22,7 +22,7 @@ import {mountProjectLifecycleReview} from "./project-lifecycle-review-view.mjs";
 import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-workflow.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
-import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview} from "./project-client.mjs";
+import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview,reviewProjectMarketEvidence} from "./project-client.mjs";
 import {treasuryReviewSections} from "./treasury-review-view.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
@@ -139,6 +139,7 @@ function renderTerminal(){
  main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>项目操作台</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
  '<div id="terminal-project-context" class="pro-statebar">正在读取 Project 数据…</div>'+
  '<div id="terminal-context-notice" role="status"></div>'+ 
+ '<section id="terminal-market-evidence" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-risk-review" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-lifecycle-evidence" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-order-review" class="pro-pane" hidden></section>'+
@@ -168,6 +169,30 @@ function renderTerminal(){
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
     if(selected){
+      const marketArea=main.querySelector("#terminal-market-evidence");marketArea.hidden=false;
+      const marketCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&marketArea.isConnected;
+      marketArea.innerHTML="<h3>历史行情证据审计</h3>"+note("仅复核已关联历史报告；不提供实时行情或交易信号。")+
+       '<label>关联报告<select id="market-evidence-report"><option value="">读取报告中…</option></select></label><button id="market-evidence-review" disabled>复核并归档</button><p id="market-evidence-status" role="status"></p><div id="market-evidence-result"></div>';
+      const ms=marketArea.querySelector("#market-evidence-report"),mb=marketArea.querySelector("#market-evidence-review"),mt=marketArea.querySelector("#market-evidence-status"),mr=marketArea.querySelector("#market-evidence-result");
+      listProjectArchive(selected.project_id).then(rows=>{
+       if(!marketCurrent())return;
+       if(rows.some(a=>a.project_id!==selected.project_id||a.current_revision!==selected.revision))throw Error("PROJECT_ARCHIVE_SCOPE_MISMATCH");
+       ms.replaceChildren(new Option("选择当前版本报告",""));
+       for(const a of rows.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&!a.stale))ms.add(new Option("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff,a.archive_id));
+      }).catch(e=>{if(marketCurrent())mt.textContent=errorKind(e);});
+      ms.onchange=()=>{mb.disabled=!ms.value;mr.replaceChildren();mt.textContent="";};
+      mb.onclick=async()=>{
+       const a=ms.value;if(!a)return;mb.disabled=true;ms.disabled=true;mr.replaceChildren();mt.textContent="复核历史行情…";
+       try{
+        const {review:v}=await reviewProjectMarketEvidence(selected.project_id,selected.revision,a);
+        if(!marketCurrent())return;
+        mt.textContent=v.status+" · 已归档 · 来源未独立认证";
+        mr.innerHTML=table(["指标","证据状态"],[["历史覆盖",String(v.declared_history_complete)],["成交证据",v.trade_evidence_status],["K线证据",v.candle_evidence_status],["市场快照",v.market_snapshot_status],["记录数",v.observed_trade_record_count]])+
+        table(["周期（分钟）","状态","K线数量"],v.candle_intervals.map(x=>[x.interval_ms/60000,x.status,x.candle_count??"—"]))+
+        table(["待复核 / 未知"],[...v.issues,...v.unknown].map(x=>[x]));
+       }catch(e){if(marketCurrent())mt.textContent=errorKind(e);}
+       finally{if(marketCurrent()){ms.disabled=false;mb.disabled=!ms.value;}}
+      };
       const riskArea=main.querySelector("#terminal-risk-review");riskArea.hidden=false;
       const riskCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&riskArea.isConnected;
       let riskTicket=0;

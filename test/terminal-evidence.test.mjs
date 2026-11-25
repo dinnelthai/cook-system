@@ -225,3 +225,17 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
   assert.equal(reopened.getRiskReview(i.scope.projectId).status,"REVIEW_REQUIRED");
  }finally{reopened.close();}
 });
+
+test("market evidence review preserves missing candles as unknown and flags incomplete market history",async()=>{
+ const {reviewProjectMarketEvidence}=await import("../src/inner-market/project-market-evidence-review.mjs");
+ const {createProjectAggregate}=await import("../src/inner-market/project-aggregate.mjs");
+ const i=fixture(),pin="11111111111111111111111111111111",mint="11111111111111111111111111111112";
+ function relabel(x){if(Array.isArray(x)){x.forEach(relabel);return;}if(!x||typeof x!=="object")return;for(const k of Object.keys(x)){if(x[k]==="local-fixture")x[k]=pin;else if(x[k]==="synthetic-mint")x[k]=mint;else relabel(x[k]);}}
+ relabel(i);
+ const p=createProjectAggregate({project_id:i.scope.projectId,profile:{name:"Market",symbol:"MKT"},network:{cluster:"localnet",genesis_hash:pin},token:{mint,issuance_signature:"1".repeat(64)}});
+ const v=reviewProjectMarketEvidence(p,i);
+ assert.equal(v.status,"PARTIAL");assert.equal(v.candle_evidence_status,"UNAVAILABLE");
+ assert.ok(v.candle_intervals.every(x=>x.candle_count===null));assert.equal(v.execution_enabled,false);
+ i.market.historyComplete=false;assert.equal(reviewProjectMarketEvidence(p,i).status,"REVIEW_REQUIRED");
+ assert.throws(()=>reviewProjectMarketEvidence({...p,project_id:"other"},i),/PROJECT_MARKET_REPORT_SCOPE_MISMATCH/);
+});
