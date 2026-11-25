@@ -99,3 +99,7 @@ Batch review now exposes per-check PASS / REVIEW_REQUIRED / UNKNOWN / NOT_EVALUA
 ## M06 — browser batch review integration
 
 The market-risk experiment page imports a bounded array of completed synthetic reports (100 maximum, 4 MiB browser file limit), recomputes the batch review, and shows per-report status, observed record counts, check-state matrix and issue-category counts. Exports are derived audits, not original report inputs. Stale reads and failed imports cannot export a previous result. CLI and browser share the pure core review modules; original simulation import paths remain compatibility re-exports. Two view regressions verify CLI parity and derived-report rejection. No live discovery, execution, wallet routing, model behavior or market calibration changes. Actual browser acceptance and unified live project lifecycle remain open.
+
+## M07 — integrated operator acceptance handoff
+
+Baseline cf15b3c: GitHub Actions 45552430582 passed 433 tests on both Node 22 and 24; eight operator gates remain pending. See [M07 integrated review checklist](CODEX-INTEGRATED-REVIEW-M07.md) for the closed-interval catalogue, data identity, existing synthetic accounting and browser/CLI QA parity. No actual operator acceptance, new trading behavior, token issuance or live integration is claimed. Do not promote the QA results to a market-ready release.
