@@ -143,3 +143,36 @@ test("legacy normalized draft events can be replayed after reopen",t=>{
   assert.equal(s.verify(p.project_id).source_attestation,"UNKNOWN");
  }finally{s.close();}
 });
+
+test("integrity diagnostic isolates a corrupt project without returning an unverified aggregate",t=>{
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000});
+ try{s.create(base);s.create({...base,project_id:"healthy"});}finally{s.close();}
+ const db=new DatabaseSync(path);
+ try{db.prepare("UPDATE project_snapshot SET aggregate_hash=? WHERE project_id=?").run("bad",base.project_id);}finally{db.close();}
+ const r=openProjectStore(path,{now:()=>2000});
+ try{
+  const health=r.inspectIntegrity();
+  assert.equal(health.status,"REVIEW_REQUIRED");assert.equal(health.project_count,2);
+  assert.deepEqual(health.projects.find(x=>x.project_id===base.project_id),{project_id:base.project_id,revision:null,status:"REVIEW_REQUIRED",reason:"PROJECT_SNAPSHOT_INTEGRITY_FAILURE"});
+  assert.equal(health.projects.find(x=>x.project_id==="healthy").status,"INTERNALLY_CONSISTENT");
+  assert.throws(()=>r.list(),/PROJECT_SNAPSHOT_INTEGRITY_FAILURE/);
+  const applied=r.append("healthy",{command_id:"healthy-change",type:"UPDATE_PROFILE",payload:{profile:{name:"Healthy Updated"}}},{expected_revision:1});
+  assert.equal(applied.aggregate.revision,2);assert.equal(r.get("healthy").revision,2);
+  assert.equal(r.inspectIntegrity().projects.find(x=>x.project_id==="healthy").revision,2);
+ }finally{r.close();}
+});
+test("composite reads and rejected reads release their transaction boundaries",t=>{
+ const path=setup(t),a=openProjectStore(path,{now:()=>1000}),b=openProjectStore(path,{now:()=>2000});
+ try{
+  const p=a.create(base);
+  assert.throws(()=>a.get("missing"),/PROJECT_NOT_FOUND/);
+  assert.equal(a.inspectIntegrity().project_count,1);
+  const v=b.append(p.project_id,{command_id:"other-connection",type:"UPDATE_PROFILE",payload:{profile:{name:"Updated elsewhere"}}},{expected_revision:1});
+  assert.equal(v.aggregate.revision,2);
+  assert.equal(a.verify(p.project_id).revision,2);
+  assert.deepEqual(a.listArchive(p.project_id),[]);
+  assert.deepEqual(a.orderReview.list(p.project_id),[]);
+  assert.equal(a.exportAuditBundle(p.project_id,2).project_revision,2);
+  assert.equal(b.get(p.project_id).revision,2);
+ }finally{b.close();a.close();}
+});

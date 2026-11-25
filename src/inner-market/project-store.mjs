@@ -118,7 +118,25 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       }
       return { events, head_hash: previous };
     }
+    // SAVEPOINT also works within an existing write or composite read transaction.
+    // All callbacks are synchronous; no transaction survives an await.
+    let readSequence=0;
+    function readSnapshot(read) {
+      const name="project_read_"+(++readSequence);
+      db.exec("SAVEPOINT "+name);
+      try {
+        const result=read();
+        db.exec("RELEASE "+name);
+        return result;
+      } catch(error) {
+        try { db.exec("ROLLBACK TO "+name);db.exec("RELEASE "+name); } catch {}
+        throw error;
+      }
+    }
     function current(projectId) {
+      return readSnapshot(()=>currentInSnapshot(projectId));
+    }
+    function currentInSnapshot(projectId) {
       const snapshot = snapshotGet.get(projectId);
       if (!snapshot) throw Error("PROJECT_NOT_FOUND");
       const aggregate = parseSnapshot(snapshot);
@@ -203,7 +221,23 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       } catch (error) { try { db.exec("ROLLBACK"); } catch {} throw error; }
     }
     function get(projectId) { return clone(current(projectId).aggregate); }
-    function list() { return snapshotList.all().map(row => get(row.project_id)); }
+    function list() { return readSnapshot(()=>snapshotList.all().map(row => get(row.project_id))); }
+    // Separate diagnostic interface: normal list/get remain fail-closed.
+    function inspectIntegrity() {
+      return readSnapshot(()=>{
+        const projects=snapshotList.all().map(({project_id})=>{
+          try {
+            const v=verify(project_id);
+            return {project_id,revision:v.revision,status:"INTERNALLY_CONSISTENT",semantic_replay:v.semantic_replay};
+          } catch(error) {
+            const code=typeof error?.message==="string"&&/^[A-Z][A-Z0-9_]{2,100}$/.test(error.message)?error.message:"PROJECT_READ_FAILED";
+            return {project_id,revision:null,status:"REVIEW_REQUIRED",reason:code};
+          }
+        });
+        return {status:projects.every(p=>p.status==="INTERNALLY_CONSISTENT")?"INTERNALLY_CONSISTENT":"REVIEW_REQUIRED",
+          project_count:projects.length,projects,source_attestation:"UNKNOWN",execution_enabled:false};
+      });
+    }
     function events(projectId) { return clone(current(projectId).events); }
     function verify(projectId) {
       const latest = current(projectId);
@@ -252,10 +286,16 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
     function listArchive(projectId){
-      const latest=current(projectId);
-      return archiveRows.all(projectId).map(row=>decodeArchive(row,latest));
+      return readSnapshot(()=>{
+        const latest=current(projectId);
+        return archiveRows.all(projectId).map(row=>decodeArchive(row,latest));
+      });
     }
-    const orderReview=createOrderReviewJournal(db,{current,now});
+    const rawOrderReview=createOrderReviewJournal(db,{current,now});
+    const orderReview={...rawOrderReview,
+      list:projectId=>readSnapshot(()=>rawOrderReview.list(projectId)),
+      events:(projectId,orderId)=>readSnapshot(()=>rawOrderReview.events(projectId,orderId))
+    };
     function exportAuditBundle(projectId,expectedRevision){
       db.exec("BEGIN");
       try{
@@ -275,7 +315,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         db.exec("COMMIT");return result;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
-    return { create, append, get, list, events, verify, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, close: () => db.close() };
+    return { create, append, get, list, events, verify, inspectIntegrity, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

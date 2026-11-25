@@ -26,3 +26,24 @@ test("replay rejects inconsistent payloads, chronology and initial state",()=>{
  const bad=structuredClone(events);bad[0].payload.aggregate.lifecycle.stage="READY";
  assert.throws(()=>replayProjectEvents(bad),/PROJECT_EVENT_REPLAY_CREATION_INVALID/);
 });
+
+test("normalized v1 configuration commands all replay exactly",()=>{
+ const wallet="11111111111111111111111111111111";
+ let project=createProjectAggregate(base,{now:()=>100});
+ const events=[{event_type:"PROJECT_CREATED",project_id:project.project_id,revision:1,source:"application",occurred_at_ms:100,payload:{aggregate:project}}];
+ const group={group_id:"dev-wallets",name:"Dev",purpose:"DEV",members:[{wallet_address:wallet,role:"DEV",enabled:true,allocation_limit_base_units:null}]};
+ const config={supply_base_units:"1000000",decimals:6,creator_wallet_address:wallet};
+ for(const [type,payload] of [
+  ["SET_NETWORK_IDENTITY",{network:{cluster:"localnet",genesis_hash:wallet}}],
+  ["SET_TOKEN_CONFIGURATION",config],
+  ["UPSERT_WALLET_GROUP",{group}],
+  ["UPDATE_DRAFT_CONFIGURATION",{profile:{name:"Updated",symbol:"QA"},network:{cluster:"localnet",genesis_hash:wallet},token:config,wallet_group:group}],
+  ["TRANSITION_LIFECYCLE",{to:"READY"}],
+  ["SET_OPERATIONAL_STATUS",{status:"HALTED"}]
+ ]){
+  const at=100+events.length,r=applyProjectCommand(project,{type,payload},{now:()=>at});project=r.aggregate;
+  events.push({event_type:r.event_type,project_id:project.project_id,revision:project.revision,source:"application",occurred_at_ms:at,payload:r.payload});
+  assert.deepEqual(replayProjectEvents(events).aggregate,project);
+ }
+ assert.equal(project.execution_policy.enabled,false);
+});
