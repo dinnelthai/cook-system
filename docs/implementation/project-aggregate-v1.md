@@ -19,7 +19,7 @@ ProjectAggregate 1.0.0 contains:
 - wallet groups: explicit purpose, members, role, enabled state and optional base-unit allocation cap;
 - market bindings: venue, market account, canonical market identity and SHA-256 identity digest;
 - project budget limits;
-- lifecycle stage and operational halt/review status;
+- lifecycle stage and operational halt/active/review status (ACTIVE never enables execution);
 - execution policy hard-pinned to DISABLED.
 
 Private keys, seed phrases and signer objects are not accepted by the aggregate schema or commands.
@@ -43,7 +43,7 @@ No backward or skipped transition is accepted.
 - CLOSED requires a passing reconciliation, zero pending orders, zero unresolved assets and zero unresolved balance difference.
 - ARCHIVED requires an internal archive evidence reference.
 
-Manual evidence cannot satisfy a chain-verification gate. The current implementation records manual issuance evidence as UNVERIFIED. The VERIFY_* commands are internal domain contracts for a future trusted read-only chain verifier; they are not exposed as public HTTP endpoints.
+Manual evidence cannot satisfy a chain-verification gate. Project network and token supply configuration can only be changed while the project is in DRAFT. Clearing REVIEW_REQUIRED requires a verified internal-audit reference; setting operational status ACTIVE is only a monitoring/operations state and never enables transaction execution. The current implementation records manual issuance evidence as UNVERIFIED. The VERIFY_* commands are internal domain contracts for a future trusted read-only chain verifier; they are not exposed as public HTTP endpoints.
 
 ## 4. Persistence and audit
 
@@ -53,6 +53,7 @@ openProjectStore(path) uses Node's built-in SQLite database:
 - snapshot writes are atomic with their event append;
 - each command requires an expected aggregate revision;
 - command IDs are idempotency keys;
+- the PROJECT_CREATED event contains the complete initial aggregate, so the journal has a reconstructable starting state;
 - event rows are append-only (SQLite triggers reject UPDATE and DELETE);
 - each event hash commits to the previous event hash;
 - snapshot hash and full event chain are checked on reads;
