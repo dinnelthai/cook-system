@@ -38,6 +38,6 @@ export function runHeldOutDefensiveEvaluation({seeds=[701,702,703,704,705]}={}){
    precision:tp+fp?tp/(tp+fp):null,recall:positive.length?tp/positive.length:null};
  }
  return {schema_version:"cook-heldout-defensive-evaluation.1",status:"SYNTHETIC_REGRESSION_ONLY",split:"HELD_OUT_SEEDS",
-  seeds,case_count:cases.length,cases,metrics,real_market_accuracy_claimed:false,execution_enabled:false,
-  limitation:"Synthetic rule-regression cases test deterministic expected behavior only. They do not estimate real-world precision, recall, calibration or causal validity."};
+  seeds,case_count:cases.length,cases,metrics,template_count:4,independent_paths_claimed:false,real_market_accuracy_claimed:false,execution_enabled:false,
+  limitation:"Synthetic rule-regression cases repeat four fixed templates with different seed labels. Repetitions are not independent market paths. Metrics do not estimate real-world precision, recall, calibration or causal validity."};
 }

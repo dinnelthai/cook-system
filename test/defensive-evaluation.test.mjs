@@ -10,3 +10,10 @@ test("held-out synthetic defensive cases are deterministic and meet expected ale
  }
  assert.equal(a.real_market_accuracy_claimed,false);assert.equal(a.execution_enabled,false);
 });
+
+test("seed-labelled repetitions are not reported as independent scenario paths",()=>{
+ const r=runHeldOutDefensiveEvaluation({seeds:[1,2,3]});
+ assert.equal(r.template_count,4);assert.equal(r.case_count,12);
+ assert.equal(r.independent_paths_claimed,false);assert.equal(r.real_market_accuracy_claimed,false);
+ assert.match(r.limitation,/not independent market paths/);
+});

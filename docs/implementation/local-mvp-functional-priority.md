@@ -31,3 +31,7 @@ The existing historical cost audit now diagnoses duplicate source/journal event 
 ## F06 — historical NAV evidence arithmetic
 
 Compare available endpoint balance-sheet components independently. Missing or malformed valuation data must not hide a known cash or inventory contradiction or be silently converted into zero. Only complete supplied components are used for the NAV identity. Four integration regressions cover partial/malformed endpoint evidence. Independent valuation and real historical cash-flow evidence remain operator-side acceptance requirements.
+
+## F07 — synthetic regression evidence
+
+The existing offline participant simulator now emits an aggregate opening/closing asset conservation audit. The audit checks exact integer differences and rejects duplicate agent identities or malformed balances; it neither changes participant behavior nor generates trades. The different-seed regression compares event content rather than seed metadata. The defensive regression explicitly distinguishes its four fixed templates from repeated seed-labelled cases; repetitions do not represent independent market paths. Calibration against real markets is not claimed.

@@ -11,7 +11,8 @@ test("participant simulation is deterministic and keeps role labels outside dete
 });
 test("different seeds create different synthetic paths",()=>{
  const a=runParticipantSimulation({scenarioId:"test-run",seed:7,steps:100}),b=runParticipantSimulation({scenarioId:"test-run",seed:8,steps:100});
- assert.notDeepEqual(a.detector_input.events,b.detector_input.events);
+ const observedPath=r=>r.detector_input.events.map(e=>({kind:e.event_kind,time:e.event_time_ms,payload:e.payload}));
+ assert.notDeepEqual(observedPath(a),observedPath(b));
 });
 
 test("offline simulation conserves aggregate quote and token balances across fixed seeds",()=>{
@@ -22,5 +23,15 @@ test("offline simulation conserves aggregate quote and token balances across fix
   const final=r.detector_input.final_state;
   assert.equal(r.agent_states.reduce((n,a)=>n+BigInt(a.quote_balance_base_units),BigInt(final.quote_reserves_base_units)),quoteInitial);
   assert.equal(r.agent_states.reduce((n,a)=>n+BigInt(a.token_balance_base_units),BigInt(final.token_reserves_base_units)),tokenInitial);
+ }
+});
+
+test("synthetic conservation report matches aggregate opening and closing balances",()=>{
+ for(const seed of [0,7,8,701,702]){
+  const r=runParticipantSimulation({scenarioId:"conservation-report",seed,steps:120});
+  assert.equal(r.conservation_audit.status,"BALANCED");
+  assert.equal(r.conservation_audit.quote_difference_base_units,"0");
+  assert.equal(r.conservation_audit.token_difference_base_units,"0");
+  assert.equal(r.conservation_audit.real_market_validated,false);
  }
 });

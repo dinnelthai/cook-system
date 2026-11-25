@@ -1,3 +1,4 @@
+import {auditSyntheticConservation} from "./synthetic-conservation.mjs";
 const ROLES=new Set(["issuer_dev","early_holder","fast_entry","independent_trader","retail","kol_broadcaster","arbitrage","mev_ordering","observer"]);
 const asBig=(v,n)=>{if(typeof v!=="string"||!/^(0|[1-9][0-9]*)$/.test(v))throw Error("invalid "+n);return BigInt(v);};
 function rng(seed){let x=(seed>>>0)||0x9e3779b9;return ()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967296;};}
@@ -22,6 +23,7 @@ export function runParticipantSimulation({scenarioId="offline-scenario",seed=42,
  if(!states.length||new Set(states.map(a=>a.agent_id)).size!==states.length||states.some(a=>!ROLES.has(a.role_class)||a.scenario_id!==scenarioId))throw Error("INVALID_SIMULATION_AGENT");
  let quote=asBig(initialQuoteReserve,"initial quote reserve"),token=asBig(initialTokenReserve,"initial token reserve");
  if(quote<=0n||token<=0n)throw Error("INVALID_SIMULATION_RESERVES");
+ const openingTotals={quote:(quote+states.reduce((sum,a)=>sum+a.quote,0n)).toString(),token:(token+states.reduce((sum,a)=>sum+a.token,0n)).toString()};
  const random=rng(seed),events=[],groundTruth=states.map(a=>({schema_version:"1.0.0",scenario_id:scenarioId,agent_id:a.agent_id,simulated_role:a.role_class,
   latent_controller_group:null,ground_truth_behavior_labels:[a.role_class==="arbitrage"?"legitimate_arbitrage":a.role_class==="early_holder"?"early_inventory_holder":a.role_class==="kol_broadcaster"?"organic_public_signal_response":"unknown"]}));
  const market={chain_id:"solana",network:"synthetic",token_mint:"synthetic-token-"+scenarioId,quote_mint:"synthetic-quote",curve_program_id:"synthetic-constant-product",market_phase:"bonding_curve"};
@@ -64,8 +66,10 @@ export function runParticipantSimulation({scenarioId="offline-scenario",seed=42,
  }
  const detectorInput={scenario_id:scenarioId,seed,market,events,initial_state:{quote_reserves_base_units:initialQuoteReserve,token_reserves_base_units:initialTokenReserve},
   final_state:{quote_reserves_base_units:quote.toString(),token_reserves_base_units:token.toString()},execution_enabled:false};
+ const agentStates=states.map(a=>({agent_id:a.agent_id,role_class:a.role_class,quote_balance_base_units:a.quote.toString(),token_balance_base_units:a.token.toString()}));
+ const conservation=auditSyntheticConservation({openingTotals,finalState:detectorInput.final_state,agentStates});
  return {schema_version:"cook-participant-simulation.1",status:"SYNTHETIC_ONLY",detector_input:detectorInput,ground_truth:groundTruth,
-  agent_states:states.map(a=>({agent_id:a.agent_id,role_class:a.role_class,quote_balance_base_units:a.quote.toString(),token_balance_base_units:a.token.toString()})),
+  agent_states:agentStates,conservation_audit:conservation,
   summary:{steps,trade_count:tradeCount,event_count:events.length,agent_count:states.length,fee_bps:feeBps},
   execution_enabled:false,live_rpc_enabled:false,transaction_signing_enabled:false};
 }
