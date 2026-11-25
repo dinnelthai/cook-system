@@ -10,6 +10,7 @@ import { buildUnifiedHistoricalReport } from "../src/inner-market/unified-histor
 import {createDiagnosticLog,errorKind} from "./diagnostic-log.mjs";
 import {historicalReviewRows} from "./historical-review-view.mjs";
 import {reviewSyntheticLedgerInput} from "./synthetic-ledger-view.mjs";
+import {createHistoricalProjectCatalogue} from "../src/inner-market/historical-project-catalogue.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 // Session storage retains diagnostics across refreshes in the same tab, without cross-tab writers.
 const diagnostics=createDiagnosticLog({storage:(()=>{try{return window.sessionStorage;}catch{return null;}})()});
@@ -40,6 +41,7 @@ const fixture=await (async()=>{
  catch(e){record("fixture.failed",{error_kind:errorKind(e)},"ERROR");startupFailure(e);throw e;}
 })();
 const original=structuredClone(fixture);
+const projectCatalogue=createHistoricalProjectCatalogue();let catalogueSelection=null;
 let data=structuredClone(fixture),report,page="terminal",importTicket=0;
 const importCurrent=(ticket,startPage)=>ticket===importTicket&&page===startPage;
 try{report=auditedReport(data)}catch(e){startupFailure(e);throw e;}
@@ -150,7 +152,32 @@ function render(){
  main.innerHTML=screenHeading("钱包管理","创建钱包 · 余额与 SOL 充值")+'<section id="funding-panel" class="panel funding-panel"></section>';
  mountLocalFaucet(main.querySelector("#funding-panel"));
  }else if(page==="projects"){
- main.innerHTML=screenHeading("项目档案","当前会话 · 历史区间")+panel("项目记录",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status+" / "+reviewStage]]))+panel("资料",metadata?table(["字段","内容"],Object.entries(metadata)):emptyState("尚未保存项目资料","在操作台中整理资料"))+details("当前报告",report);
+ const catalogue=projectCatalogue.list();
+ main.innerHTML=screenHeading("项目档案","当前会话 · 独立历史区间")+
+ note("档案仅供历史审阅，不改变操作台、默认 Token 或钱包。最多 8 份；刷新页面后清空，请保留原始 JSON。")+
+ panel("当前报告",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status]])+'<button id="catalogue-add">将当前报告加入档案</button>')+
+ panel("历史档案",'<label for="catalogue-file">导入历史报告输入 JSON</label><input id="catalogue-file" type="file" accept=".json"><p id="catalogue-message" role="status"></p>'+
+ table(["项目","Token","来源","起始","结束","审计"],catalogue.map(r=>[r.projectId,r.tokenMint,r.source_mode,r.openingCutoff,r.closingCutoff,r.audit_status]))+
+ '<label for="catalogue-select">选择独立审阅记录</label><select id="catalogue-select"><option value="">请选择</option>'+catalogue.map((r,i)=>'<option value="'+i+'"'+(r.key===catalogueSelection?' selected':'')+'>'+esc(r.projectId+" · "+r.source_mode+" · "+r.openingCutoff+" → "+r.closingCutoff)+'</option>').join("")+'</select> <button id="catalogue-export" disabled>导出原始记录</button> <button id="catalogue-remove" disabled>移出会话档案</button><div id="catalogue-detail"></div>');
+ const msg=main.querySelector("#catalogue-message"),detail=main.querySelector("#catalogue-detail"),select=main.querySelector("#catalogue-select"),exportButton=main.querySelector("#catalogue-export"),removeButton=main.querySelector("#catalogue-remove");
+ let selected=null;
+ function showCatalogue(){
+  selected=null;exportButton.disabled=true;removeButton.disabled=true;detail.textContent="";
+  if(select.value==="")return;
+  const row=catalogue[Number(select.value)];if(!row)return;
+  try{selected=projectCatalogue.get(row.key);catalogueSelection=row.key;
+   const r=selected.report;detail.innerHTML=note(r.source_mode+" · "+r.status+" · 来源认证未知")+table(["检查","状态","证据"],historicalReviewRows(r.terminal_state).checks)+table(["异常"],r.issues.map(x=>[x]));exportButton.disabled=false;removeButton.disabled=false;
+  }catch{detail.textContent="档案复核失败"}
+ }
+ select.onchange=showCatalogue;showCatalogue();
+ main.querySelector("#catalogue-add").onclick=()=>{try{catalogueSelection=projectCatalogue.add(data).key;render()}catch(e){msg.textContent="未加入档案："+errorKind(e)}};
+ main.querySelector("#catalogue-file").onchange=async e=>{const ticket=++importTicket,file=e.target.files[0];if(!file)return;
+  try{if(file.size>16*1024*1024)throw Error("FILE_TOO_LARGE");const input=JSON.parse(await file.text());if(!importCurrent(ticket,"projects"))return;catalogueSelection=projectCatalogue.add(input).key;render()}
+  catch(err){if(importCurrent(ticket,"projects"))msg.textContent="未加入档案："+errorKind(err)}
+ };
+ exportButton.onclick=()=>{if(selected)download("historical-catalogue-input.json",JSON.stringify(selected.input,null,2))};
+ removeButton.onclick=()=>{if(selected&&catalogueSelection&&projectCatalogue.remove(catalogueSelection)){catalogueSelection=null;render()}};
+
  }else if(page==="dashboard"){
  const d=report.terminal_state,t=d.treasury,v=d.market;
  const reviewRows=historicalReviewRows(d);

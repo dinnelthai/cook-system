@@ -75,3 +75,7 @@ The existing offline simulator records opening participant balances alongside cl
 ## C08–C10 — completed-report batch QA and acceptance handoff
 
 Added bounded retrospective batch review of existing synthetic reports with per-report status, duplicate scenario rejection, isolated differences and a CLI JSON audit export. It does not generate experiments or assert independent market paths. See [Codex offline experiment acceptance](CODEX-OFFLINE-EXPERIMENT-ACCEPTANCE.md). Browser validation and the operator's actual report remain pending; no live discovery or execution is implemented.
+
+## M01 — session closed-interval project catalogue
+
+The project archive page supports multiple independently audited historical input records, keyed by source mode, project, token, quote asset and both interval cutoffs. Exact serialized duplicates are idempotent; contradictory same-key input is rejected instead of overwritten. Inputs are cloned and reports recomputed on selection; derived reports are not accepted as source records. Session-only limit eight records and 16 Mi UTF-16 code units total; original JSON can be exported. Catalogue selection never changes the terminal, live mint, wallet or execution state. Durable archives, authenticated chain identity and browser acceptance remain open. No live lifecycle or trading features are added.
