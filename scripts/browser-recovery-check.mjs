@@ -3,6 +3,7 @@ import {readFile,writeFile} from "node:fs/promises";
 import {join} from "node:path";
 import {once} from "node:events";
 import assert from "node:assert/strict";
+import {openProjectStore} from "../src/inner-market/project-store.mjs";
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function eventually(fn,timeout=12000,stage="browser-start"){
  const start=Date.now();
@@ -192,11 +193,56 @@ export async function checkBrowserRecovery({browser,dir,env,url,previewDir=null}
   const directory=await (await fetch(url+"/api/projects",{signal:AbortSignal.timeout(3000)})).json();
   assert.equal(directory.projects.length,1);
   assert.equal(directory.projects[0].execution_policy.enabled,false);
+  // Exercise a populated independent synthetic chart, not an actual token or live source.
+  await evaluate('document.querySelector("#workflow-sample").click()');
+  await wait("synthetic-candle-loaded",'document.querySelector(".ohlcv-chart g title")&&document.querySelector("#workflow-finance").disabled===false');
+  await evaluate('document.querySelector("#candle-window").value="30";document.querySelector("#candle-window").dispatchEvent(new Event("change"))');
+  await wait("synthetic-candle-window",'document.querySelector("#candle-window").value==="30"&&document.querySelector(".ohlcv-chart g title")');
+  assert.equal(await evaluate('document.querySelector(".ohlcv-chart").getAttribute("aria-label").includes("历史成交")'),true);
+  // Seed only the runner-owned disposable DB with synthetic presentation fixtures.
+  // Never expose a fixture-seeding endpoint or touch an operator's database.
+  assert.equal(env.COOK_PROJECT_DB,join(dir,"projects.sqlite"));
+  const seededStore=openProjectStore(join(dir,"projects.sqlite"));
+  let populated,first,conflict;
+  try{
+   const pin="11111111111111111111111111111111",mint="11111111111111111111111111111112";
+   populated=seededStore.create({project_id:"browser-populated-qa",profile:{name:"Synthetic Presentation QA",symbol:"QATEST"},network:{cluster:"localnet",genesis_hash:pin},token:{mint,issuance_signature:"1".repeat(64)}});
+   const put=(kind,payload)=>seededStore.recordArchive("browser-populated-qa",kind,{project_id:"browser-populated-qa",project_revision:1,source_attestation:"UNKNOWN",execution_enabled:false,...payload},1);
+   const scope={projectId:"browser-populated-qa",tokenMint:mint,genesisHash:pin,network:"local_sim",quoteAsset:"SOL_LAMPORTS",openingCutoff:"fixture:1",closingCutoff:"fixture:2"};
+   first=put("HISTORICAL_REPORT_LINK",{status:"DECLARED_MATCH",report_digest:"a".repeat(64),scope});
+   put("TREASURY_REVIEW",{status:"PARTIAL",report_link_archive_id:first.archive_id,report_digest:"a".repeat(64),cash_flow:{observed_closing_cash_base_units:"12345678901"},historical_valuation:{closing_nav_base_units:"-987654321"},inventory:{closing_quantity_base_units:"9007199254740993"}});
+   const badScope={...scope,openingCutoff:"fixture:2",closingCutoff:"fixture:3"};
+   conflict=put("HISTORICAL_REPORT_LINK",{status:"DECLARED_MATCH",report_digest:"b".repeat(64),scope:badScope});
+   put("TREASURY_REVIEW",{status:"PARTIAL",report_link_archive_id:conflict.archive_id,report_digest:"b".repeat(64),cash_flow:{observed_closing_cash_base_units:"777000000000"}});
+   put("HISTORICAL_REPORT_LINK",{status:"DECLARED_MATCH",report_digest:"c".repeat(64),scope:badScope});
+  }finally{seededStore.close();}
+  const populatedId="browser-populated-qa";
+  await evaluate('sessionStorage.setItem("cook.project.selection.v1",'+JSON.stringify(populatedId)+');window.__cookPopulatedReload=true');
+  await cdp.call("Page.reload");
+  await wait("populated-terminal",'window.__cookPopulatedReload!==true&&document.querySelector("#terminal-project-select")?.value==='+JSON.stringify(populatedId)+'&&document.querySelector("#runtime-interval")');
+  assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
+  const populatedChecks=[["terminal","#runtime-interval","#runtime-interval-detail"],["wallet","#asset-interval","#asset-interval-body"],["dashboard","#scoped-review-interval","#scoped-review-body"]];
+  for(const [id,select,body] of populatedChecks){
+   if(id!=="terminal")await evaluate('document.querySelector('+JSON.stringify('[data-page="'+id+'"]')+').click()');
+   await wait("populated-page-"+id,'document.querySelector('+JSON.stringify(select)+')&&!document.querySelector('+JSON.stringify(select)+').disabled');
+   const selectInterval=async value=>evaluate('(()=>{const s=document.querySelector('+JSON.stringify(select)+');s.value='+JSON.stringify(value)+';s.dispatchEvent(new Event("change"));})()');
+   await selectInterval(first.archive_id);
+   await wait("populated-exact-"+id,'document.querySelector('+JSON.stringify(body)+').textContent.includes("12.345678901")');
+   assert.equal(await evaluate('document.querySelector('+JSON.stringify(body)+').textContent.includes("-0.987654321")&&document.querySelector('+JSON.stringify(body)+').textContent.includes("9007199254740993")'),true);
+   await selectInterval(conflict.archive_id);
+   await wait("populated-conflict-"+id,'document.querySelector('+JSON.stringify(body)+').textContent.includes("证据冲突")');
+   assert.equal(await evaluate('!document.querySelector('+JSON.stringify(body)+').textContent.includes("777.00")&&!document.querySelector('+JSON.stringify(body)+').textContent.includes("12.345678901")'),true);
+   await selectInterval("");
+   assert.equal(await evaluate('!document.querySelector('+JSON.stringify(body)+').textContent.includes("12.345678901")'),true);
+  }
+  assert.equal(observations.filter(x=>x.kind==="exception").length,0);
+  const final=await (await fetch(url+"/api/projects/"+populatedId)).json();
+  assert.equal(final.project.revision,1);assert.equal(final.project.execution_policy.enabled,false);
   if(previewDir){
    assert.equal(previews.length,14);
    await writeFile(join(previewDir,"manifest.json"),JSON.stringify({schema_version:"cook-browser-preview.1",scope:"DISPOSABLE_METADATA_ONLY",manual_visual_review:"NOT_RUN",execution_enabled:false,previews},null,2),{flag:"wx"});
   }
-  return {status:"BROWSER_RECOVERY_PASS",scope:"DISPOSABLE_METADATA_RECOVERY_NAVIGATION_AND_MISSING_SELECTION",execution_enabled:false,full_browser_e2e_validated:false,preview_count:previews.length,manual_visual_review:"NOT_RUN"};
+  return {status:"BROWSER_RECOVERY_PASS",scope:"DISPOSABLE_METADATA_RECOVERY_NAVIGATION_AND_MISSING_SELECTION",execution_enabled:false,full_browser_e2e_validated:false,preview_count:previews.length,populated_historical_display:"PASS",synthetic_candle_display:"PASS",manual_visual_review:"NOT_RUN"};
  }catch(error){
   let state=null;
   if(cdp)try{
