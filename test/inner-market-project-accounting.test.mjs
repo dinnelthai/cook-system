@@ -59,3 +59,10 @@ test("opening cash and missing observed snapshot are explicit",()=>{
 test("unknown trade PnL remains unknown even when cash matches",()=>{
   assert.equal(summarizeProjectRealizedPnl({cashReport:report(),tradeHistoryComplete:false}).project_realized_net_pnl_base_units,null);
 });
+
+test("signed historical profit parsing preserves exact bounds and rejects oversized magnitudes",()=>{
+ const max=(1n<<128n)-1n,cashReport=report({entries:[],openingCashBaseUnits:"0",observedClosingCashBaseUnits:"0"});
+ for(const n of [max,-max,0n])assert.equal(summarizeProjectRealizedPnl({cashReport,tradeRealizedPnlBaseUnits:n.toString(),tradeHistoryComplete:true}).project_realized_net_pnl_base_units,n.toString());
+ for(const v of [(max+1n).toString(),(-max-1n).toString(),"-"+"9".repeat(100000)])assert.throws(()=>summarizeProjectRealizedPnl({cashReport,tradeRealizedPnlBaseUnits:v,tradeHistoryComplete:true}),RangeError);
+ for(const v of ["-0","-01","1e3"])assert.throws(()=>summarizeProjectRealizedPnl({cashReport,tradeRealizedPnlBaseUnits:v,tradeHistoryComplete:true}),TypeError);
+});

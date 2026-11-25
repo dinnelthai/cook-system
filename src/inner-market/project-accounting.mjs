@@ -6,9 +6,9 @@ const EXPENSE = new Set(["ISSUANCE_EXPENSE", "OPERATING_EXPENSE", "FAILED_TX_EXP
 const amount = (value, name) => parseBaseUnits(value, { name, max: U128_MAX });
 function signed(value, name) {
   if (typeof value !== "string" || !/^(0|-?[1-9][0-9]*)$/.test(value)) throw new TypeError(name + " must be a signed integer string");
-  const n = BigInt(value);
-  if (n < -U128_MAX || n > U128_MAX) throw new RangeError(name + " outside supported range");
-  return n;
+  const negative=value.startsWith("-");
+  const magnitude=amount(negative?value.slice(1):value,name);
+  return negative?-magnitude:magnitude;
 }
 
 /**

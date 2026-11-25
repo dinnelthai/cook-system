@@ -61,3 +61,13 @@ test("intermediate quantity and cost must remain inside supported integer range"
  const i=input([buy("a","1","1"),sell("b","1","1")],{tokens:max,costBasis:max},{tokens:max,costBasis:max});
  assert.ok(auditHistoricalCostBasis(i).issues.includes("COST_BASIS_INTERMEDIATE_RANGE_EXCEEDED:a"));
 });
+
+test("missing cost endpoint cannot conceal contradictory other endpoint",()=>{
+ const openingUnknown=input([],{tokens:"0",costBasis:null},{tokens:"0",costBasis:"1"});
+ const closingUnknown=input([],{tokens:"0",costBasis:"1"},{tokens:"0",costBasis:null});
+ assert.deepEqual(auditHistoricalCostBasis(openingUnknown).issues,["COST_BASIS_WITHOUT_CLOSING_INVENTORY"]);
+ assert.deepEqual(auditHistoricalCostBasis(closingUnknown).issues,["COST_BASIS_WITHOUT_OPENING_INVENTORY"]);
+ assert.equal(auditHistoricalCostBasis(openingUnknown).status,"REVIEW_REQUIRED");
+ assert.equal(auditHistoricalCostBasis(closingUnknown).status,"REVIEW_REQUIRED");
+ assert.equal(auditHistoricalCostBasis(input([],{tokens:"0",costBasis:null},{tokens:"0",costBasis:"0"})).status,"PARTIAL");
+});

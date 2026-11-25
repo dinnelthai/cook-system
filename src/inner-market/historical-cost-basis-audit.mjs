@@ -8,12 +8,14 @@ const result=(status,issues,checked)=>({status,issues,checked_trade_count:checke
 export function auditHistoricalCostBasis({inventory,market}){
  const {opening,closing,ledger,adjustments}=inventory;
  const issues=[];
- if(opening.costBasis==null||closing.costBasis==null)return result("PARTIAL",["COST_BASIS_ENDPOINT_UNKNOWN"],0);
- let qty=amount(opening.tokens,"opening quantity"),basis=amount(opening.costBasis,"opening basis");
- const closingQty=amount(closing.tokens,"closing quantity"),closingBasis=amount(closing.costBasis,"closing basis");
- if(qty===0n&&basis!==0n)issues.push("COST_BASIS_WITHOUT_OPENING_INVENTORY");
- if(closingQty===0n&&closingBasis!==0n)issues.push("COST_BASIS_WITHOUT_CLOSING_INVENTORY");
+ // Validate each available endpoint independently before returning PARTIAL.
+ // Missing basis at one endpoint cannot hide a known contradiction at the other.
+ let qty=amount(opening.tokens,"opening quantity"),basis=opening.costBasis==null?null:amount(opening.costBasis,"opening basis");
+ const closingQty=amount(closing.tokens,"closing quantity"),closingBasis=closing.costBasis==null?null:amount(closing.costBasis,"closing basis");
+ if(qty===0n&&basis!==null&&basis!==0n)issues.push("COST_BASIS_WITHOUT_OPENING_INVENTORY");
+ if(closingQty===0n&&closingBasis!==null&&closingBasis!==0n)issues.push("COST_BASIS_WITHOUT_CLOSING_INVENTORY");
  if(issues.length)return result("REVIEW_REQUIRED",issues,0);
+ if(basis===null||closingBasis===null)return result("PARTIAL",["COST_BASIS_ENDPOINT_UNKNOWN"],0);
  if(adjustments.some(a=>a.kind!=="INTERNAL_TRANSFER"||a.status!=="FINALIZED"||a.reconciliation!=="PASS"||a.verifiedAggregateTokenDelta!=="0"||a.verifiedAggregateBasisDelta!=="0"))
   return result("PARTIAL",["COST_BASIS_ADJUSTMENT_ORDER_UNAVAILABLE"],0);
  if(inventory.historyComplete!==true||market.historyComplete!==true)
