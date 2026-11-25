@@ -30,7 +30,8 @@
     "benchmark:project-replay": "node scripts/benchmark-project-replay.mjs",
     "accept:all": "node scripts/run-unified-acceptance.mjs",
     "simulate:offline-risk": "node scripts/run-offline-risk-laboratory.mjs",
-    "accept:browser-smoke": "node scripts/accept-browser-smoke.mjs"
+    "accept:browser-smoke": "node scripts/accept-browser-smoke.mjs",
+    "accept:browser-recovery": "node scripts/accept-browser-smoke.mjs --interactions"
   },
   "devDependencies": {
     "@pump-fun/pump-sdk": "4.3.1",

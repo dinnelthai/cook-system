@@ -6,6 +6,7 @@ import {join} from "node:path";
 import {createServer} from "node:net";
 import {once} from "node:events";
 import {fileURLToPath} from "node:url";
+import {checkBrowserRecovery} from "./browser-recovery-check.mjs";
 const root=fileURLToPath(new URL("../",import.meta.url));
 const run=promisify(execFile);
 const browser=process.env.COOK_BROWSER_BINARY;
@@ -29,11 +30,15 @@ try{
   await new Promise(resolve=>setTimeout(resolve,100));
  }
  if(!ready)throw Error("BROWSER_SMOKE_SERVER_NOT_READY");
+ if(process.argv.includes("--interactions")){
+  console.log(JSON.stringify(await checkBrowserRecovery({browser,dir,env,url})));
+ }else{
  const {stdout}=await run(browser,["--headless","--disable-background-networking","--disable-sync","--no-first-run","--user-data-dir="+join(dir,"browser"),"--virtual-time-budget=5000","--dump-dom",url],{env,timeout:30000,maxBuffer:8*1024*1024});
  // These are rendered DOM markers, not static source-code regular expressions.
  if(!/id="terminal-project-select"/.test(stdout)||!stdout.includes("Execution: DISABLED")||!stdout.includes('data-page="terminal"'))
   throw Error("BROWSER_SMOKE_RENDER_MISMATCH");
  console.log(JSON.stringify({status:"BROWSER_SMOKE_PASS",scope:"EMPTY_OFFLINE_TERMINAL",execution_enabled:false,full_browser_e2e_validated:false}));
+ }
 }finally{
  if(child&&child.exitCode===null){const closed=once(child,"exit").catch(()=>{});child.kill();await Promise.race([closed,new Promise(resolve=>setTimeout(resolve,2000))]);if(child.exitCode===null)child.kill("SIGKILL");}
  await rm(dir,{recursive:true,force:true});
