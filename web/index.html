@@ -320,6 +320,41 @@ body:has(main[data-page=terminal]) .header-meta #global-project-context{display:
 .trade-detail>summary{cursor:pointer;color:var(--text);font-weight:600;font-size:12px}.trade-detail[open]>summary{margin-bottom:9px}.trade-detail:not([open])>:not(summary){display:none}
 .trade-filters{display:flex;gap:4px}.trade-filters button{flex:1;min-width:0;font-size:11px;padding:5px 4px}.trade-filters button[aria-pressed=true]{background:#314440;border-color:#587770}
 .meme-control .trade-log-empty{padding:15px 4px}.trade-log .scroll{max-height:160px}
+
+/* Reference Trade layout. 772px source is a 2x-style capture of a narrow panel. */
+.meme-control:has(.smith-trade){background:#0c0e0e;border-color:#293b3b;padding:12px 0;gap:0}
+.meme-control:has(.smith-trade) .meme-mode{margin:0 16px 6px;background:#101616;padding:6px;border-radius:12px}
+.meme-control .smith-trade{font-size:12px;line-height:1.4;color:#f5f6f6}
+.smith-trade .smith-section{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:23px 23px 24px;border-bottom:1px solid #284040;min-width:0}
+.smith-trade .trade-heading{gap:5px;align-items:center;min-height:29px}
+main[data-page=terminal] .meme-control .smith-trade h3{font-size:17px;font-weight:600;line-height:1.25;letter-spacing:-.35px;white-space:nowrap}
+.smith-wallet-count{padding:7px 10px;background:#193536;color:#8bb5b7;font-size:11px;font-weight:600;border-radius:12px;white-space:nowrap}
+.meme-control .smith-trade .bundle-direction{padding:8px;gap:7px;border-radius:12px;background:#101616}
+.meme-control .smith-trade .bundle-direction button{font-size:12px;font-weight:600;background:transparent;color:#929999;border:0;border-radius:8px;padding:7px 3px;min-height:28px}
+.meme-control .smith-trade .bundle-direction button[data-direction=BUY][aria-pressed=true]{background:#0b2d0b;color:#83e477}
+.meme-control .smith-trade .bundle-direction button[data-direction=SELL][aria-pressed=true]{background:#351b1c;color:#f08f91}
+.smith-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.smith-trade-card{min-width:0;min-height:61px;display:grid;align-content:center;gap:5px;padding:10px 12px;border:1px solid #315354;border-radius:6px;background:#101616}
+.smith-trade-card>span{color:#bdc3c4;font-size:11px;line-height:1.35}
+.smith-trade-card>strong{font-size:14px;font-weight:600;line-height:1.35;letter-spacing:-.15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.smith-stepper{display:grid;grid-template-columns:1fr 2.15fr 1fr;gap:8px;min-width:0}
+.meme-control .smith-stepper>button,.meme-control .smith-stepper>input{height:44px;min-width:0;width:100%;margin:0;border:1px solid #315354;border-radius:12px;background:#0c0e0e;text-align:center;color:#f5f6f6;font-size:12px;padding:0}
+.meme-control .smith-stepper>button{font-size:23px;color:#9ca4a5;line-height:1}
+.meme-control .smith-stepper>:disabled{opacity:1;cursor:not-allowed}
+.meme-control .smith-action{width:100%;min-height:48px;border:0;border-radius:12px;font-size:14px;font-weight:600;text-align:center}
+.meme-control .smith-primary{background:#0c210c;color:#598c49}
+.meme-control .smith-trade[data-side=SELL] .smith-primary{background:#2e191b;color:#b57579}
+.meme-control .smith-dump{background:#132323;color:#648082}
+.meme-control .smith-action:disabled{opacity:1;cursor:not-allowed}
+.smith-trade .smith-exit{padding-top:23px;padding-bottom:24px}
+.smith-profit{min-height:62px}.smith-profit strong,.smith-session strong{color:#8de480}
+.smith-session{color:#c4caca;font-size:11px;margin:0;padding:0 4px}
+.smith-status{padding:9px 23px 0;margin:0;font-size:10px;color:#8a9999}
+.smith-trade .smith-log,.smith-trade .trade-detail{padding:15px 23px;gap:8px}
+.smith-trade .trade-detail:not([open])>:not(summary){display:none}
+@media(min-width:1201px){.meme-desk:has(.smith-trade){grid-template-columns:minmax(0,1fr) minmax(365px,386px)}}
+@media(min-width:981px) and (max-width:1200px){.meme-desk:has(.smith-trade){grid-template-columns:minmax(0,1fr) minmax(320px,345px)}.smith-trade .smith-section{padding-left:16px;padding-right:16px}.smith-status{padding-left:16px;padding-right:16px}main[data-page=terminal] .meme-control .smith-trade h3{font-size:15px}.smith-wallet-count{padding:7px 8px;font-size:10px}}
+@media(max-width:400px){.smith-trade .smith-section{padding-left:12px;padding-right:12px}.smith-wallet-count{padding:6px;font-size:10px}main[data-page=terminal] .meme-control .smith-trade h3{font-size:15px}}
 </style></head>
 <body><a class="skip-link" href="#main">跳转到主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="主导航"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="我的 Meme" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
