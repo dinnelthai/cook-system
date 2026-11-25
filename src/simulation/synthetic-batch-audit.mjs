@@ -1,4 +1,4 @@
-import {reviewRecordedSyntheticSimulation} from "./synthetic-report-ledger.mjs";
+import {buildUnifiedSyntheticReview} from "./unified-synthetic-review.mjs";
 /** Review completed offline reports independently; never generate market actions. */
 export function auditRecordedSyntheticBatch(reports){
  if(!Array.isArray(reports)||reports.length<1||reports.length>100)throw Error("INVALID_REPORT_BATCH");
@@ -12,8 +12,8 @@ export function auditRecordedSyntheticBatch(reports){
   const scenario=typeof id==="string"&&id.length<=256?id:null;
   if(scenario!==null&&counts.get(scenario)>1)return {index,scenario_id:scenario,status:"REJECTED",reason:"DUPLICATE_SCENARIO_ID"};
   try{
-   const {audit}=reviewRecordedSyntheticSimulation(report);
-   return {index,scenario_id:audit.scenario_id,status:audit.status,audit};
+   const review=buildUnifiedSyntheticReview(report);
+   return {index,scenario_id:review.scenario_id,status:review.status,audit:review.accounting,checks:review.checks,issues:review.issues};
   }catch{
    return {index,scenario_id:scenario,status:"REJECTED",reason:"INVALID_OR_INCOMPLETE_REPORT"};
   }

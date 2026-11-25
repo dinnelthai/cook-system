@@ -33,3 +33,12 @@ test("empty and oversized batch inputs fail explicitly",()=>{
  assert.throws(()=>auditRecordedSyntheticBatch([]),/INVALID_REPORT_BATCH/);
  assert.throws(()=>auditRecordedSyntheticBatch(Array(101).fill(null)),/INVALID_REPORT_BATCH/);
 });
+
+test("unified batch detects summary contradictions even with a balanced ledger",()=>{
+ const a=report("a");a.summary.trade_count+=1;
+ const r=auditRecordedSyntheticBatch([a,report("b")]);
+ assert.equal(r.summary.review_required_count,1);assert.equal(r.summary.consistent_count,1);
+ assert.equal(r.results[0].audit.status,"INTERNALLY_CONSISTENT");
+ assert.ok(r.results[0].issues.includes("SUMMARY_COUNT_MISMATCH:trade_count"));
+ assert.equal(r.results[0].checks.find(c=>c.id==="historical_calibration").status,"UNKNOWN");
+});
