@@ -165,3 +165,63 @@ test("Project treasury retains one interval, suppresses contradictory values and
  i.archivedEvidence.accountInterval.closing.tokenAmount="49";
  const bad=buildProjectTreasuryReview(p,i);assert.equal(bad.status,"REVIEW_REQUIRED");assert.equal(bad.inventory,null);assert.equal(bad.cash_flow,null);
 });
+
+test("M13 integration: saved historical workspace, linked report, treasury, receipt review, risk and audit export share project scope",async t=>{
+ const {mkdtempSync,rmSync,realpathSync}=await import("node:fs");
+ const {tmpdir}=await import("node:os");
+ const {join}=await import("node:path");
+ const {openProjectStore}=await import("../src/inner-market/project-store.mjs");
+ const {openHistoricalWorkspaceStore}=await import("../src/inner-market/historical-workspace-store.mjs");
+ const {createHistoricalProjectCatalogue}=await import("../src/inner-market/historical-project-catalogue.mjs");
+ const {exportHistoricalWorkspace}=await import("../src/inner-market/historical-project-workspace.mjs");
+ const {createProjectWorkspaceResolver,createProjectWorkspaceCandidates}=await import("../src/inner-market/project-workspace-link.mjs");
+ const {createProjectTreasuryReviewer}=await import("../src/inner-market/project-treasury-review.mjs");
+ const {createOrderReceiptImporter,createOrderReceiptReviewer}=await import("../src/inner-market/order-receipt-review.mjs");
+ const {createProjectCloseReviewer}=await import("../src/inner-market/project-close-evidence.mjs");
+ const {checkProjectAuditBundleDigest}=await import("../src/inner-market/project-audit-bundle.mjs");
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),"cook-m13-integrated-")));
+ t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const i=fixture(),pin="11111111111111111111111111111111",mint="11111111111111111111111111111112";
+ function relabel(x){if(Array.isArray(x)){x.forEach(relabel);return;}if(!x||typeof x!=="object")return;for(const k of Object.keys(x)){if(x[k]==="local-fixture")x[k]=pin;else if(x[k]==="synthetic-mint")x[k]=mint;else relabel(x[k]);}}
+ relabel(i);
+ for(let n=0;n<i.cash.entries.length;n++){const sig=String(n+1).repeat(64);i.cash.entries[n].signature=sig;i.archivedEvidence.accountInterval.receipts[n].signature=sig;i.archivedEvidence.accountInterval.receipts[n].transaction.transaction.signatures=[sig];}
+ const path=join(dir,"workspace.sqlite"),storePath=join(dir,"project.sqlite"),opts={path,enabled:true};
+ const c=createHistoricalProjectCatalogue(),{key}=c.add(i);
+ const w=openHistoricalWorkspaceStore(path);
+ try{assert.equal(w.save(exportHistoricalWorkspace(c),{expectedRevision:0}).revision,1);}finally{w.close();}
+ const s=openProjectStore(storePath,{now:()=>1000});
+ try{
+  const p=s.create({project_id:i.scope.projectId,profile:{name:"Integrated treasury",symbol:"INT"},network:{cluster:"localnet",genesis_hash:pin},token:{mint,issuance_signature:"1".repeat(64)}});
+  const other=s.create({project_id:"unrelated",profile:{name:"Unrelated",symbol:"OTHER"},network:{cluster:"localnet",genesis_hash:pin},token:{mint,issuance_signature:"1".repeat(64)}});
+  const candidates=createProjectWorkspaceCandidates(opts);
+  assert.equal(candidates(p).records.length,1);assert.equal(candidates(other).records.length,0);
+  const resolve=createProjectWorkspaceResolver(opts),selection={workspace_revision:1,record_key:key};
+  assert.throws(()=>resolve(other,selection),/PROJECT_REPORT_IDENTITY_MISMATCH/);
+  const link=s.recordArchive(p.project_id,"HISTORICAL_REPORT_LINK",resolve(p,selection),1);
+  const treasury=createProjectTreasuryReviewer(opts)(p,link);
+  assert.equal(treasury.cash_flow.observed_closing_cash_base_units,"887");
+  s.recordArchive(p.project_id,"TREASURY_REVIEW",treasury,1);
+  const samples=createOrderReceiptImporter(opts)(p,link).samples;
+  assert.equal(s.orderReview.importReceipts(p.project_id,1,link.archive_id,samples).imported,2);
+  assert.equal(s.orderReview.importReceipts(p.project_id,1,link.archive_id,samples).already_present,2);
+  const orders=s.orderReview.list(p.project_id);
+  const review=await createOrderReceiptReviewer(opts)(p,orders[0],link);
+  assert.equal(review.status,"INTERNAL_MATCH");assert.equal(review.rpc_observation.status,"UNKNOWN");
+  s.recordArchive(p.project_id,"ORDER_RECEIPT_REVIEW",{...review,order_head_hash:orders[0].head_hash},1);
+  const close=createProjectCloseReviewer(opts)(p,link,orders,s.listArchive(p.project_id));
+  assert.ok(close.blockers.includes("TOKEN_INVENTORY_OUTSTANDING"));
+  s.recordArchive(p.project_id,"PROJECT_CLOSE_REVIEW",close,1);
+  const risk=s.getRiskReview(p.project_id),bundle=s.exportAuditBundle(p.project_id,1);
+  assert.equal(risk.status,"REVIEW_REQUIRED");assert.deepEqual(bundle.risk,risk);
+  assert.ok(risk.findings.some(f=>f.code==="RECEIPT_EVIDENCE_INCOMPLETE"));
+  assert.equal(bundle.orders.length,2);assert.equal(bundle.archives.length,4);assert.equal(bundle.settlement_allowed,false);
+  assert.equal(checkProjectAuditBundleDigest(bundle).status,"DIGEST_MATCH_NOT_AUTHENTICATED");
+  assert.equal(s.exportAuditBundle(other.project_id,1).orders.length,0);
+  assert.equal(s.get(p.project_id).revision,1);
+ }finally{s.close();}
+ const reopened=openProjectStore(storePath);
+ try{
+  assert.equal(reopened.exportAuditBundle(i.scope.projectId,1).orders.length,2);
+  assert.equal(reopened.getRiskReview(i.scope.projectId).status,"REVIEW_REQUIRED");
+ }finally{reopened.close();}
+});
