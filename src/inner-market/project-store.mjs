@@ -7,6 +7,7 @@ import { createOrderReviewJournal } from "./order-review-journal.mjs";
 import { describeProjectRiskReview } from "./project-risk-review.mjs";
 import { buildProjectAuditBundle } from "./project-audit-bundle.mjs";
 import { createProjectAggregate, applyProjectCommand, assertProjectAggregate } from "./project-aggregate.mjs";
+import { replayProjectEvents } from "./project-event-replay.mjs";
 
 const MAX_AGGREGATE_BYTES = 1024 * 1024;
 const hash = value => createHash("sha256").update(value, "utf8").digest("hex");
@@ -58,7 +59,7 @@ function parseSnapshot(row) {
   let aggregate;
   try { aggregate = JSON.parse(row.aggregate_json); } catch { throw Error("PROJECT_SNAPSHOT_CORRUPT"); }
   aggregate = assertProjectAggregate(aggregate);
-  if (aggregate.project_id !== row.project_id || aggregate.revision !== row.revision) throw Error("PROJECT_SNAPSHOT_REVISION_MISMATCH");
+  if (aggregate.project_id !== row.project_id || aggregate.revision !== row.revision || aggregate.updated_at_ms !== row.updated_at_ms) throw Error("PROJECT_SNAPSHOT_REVISION_MISMATCH");
   return aggregate;
 }
 
@@ -122,7 +123,9 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       if (!snapshot) throw Error("PROJECT_NOT_FOUND");
       const aggregate = parseSnapshot(snapshot);
       const chain = verifyRows(projectId, aggregate);
-      return { aggregate, events: chain.events, head_hash: chain.head_hash };
+      const replay = replayProjectEvents(chain.events);
+      if (canonicalJson(replay.aggregate) !== canonicalJson(aggregate)) throw Error("PROJECT_SNAPSHOT_REPLAY_MISMATCH");
+      return { aggregate, events: chain.events, head_hash: chain.head_hash, aggregate_hash: snapshot.aggregate_hash };
     }
     function makeEvent({ eventId, projectId, revision, type, payload, actorId, at, previousHash, requestDigest }) {
       const event = {
@@ -204,11 +207,10 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
     function events(projectId) { return clone(current(projectId).events); }
     function verify(projectId) {
       const latest = current(projectId);
-      const snapshot = snapshotGet.get(projectId);
       return {
         status: "VERIFIED", project_id: projectId, revision: latest.aggregate.revision,
-        event_count: latest.events.length, aggregate_hash: snapshot.aggregate_hash,
-        head_hash: latest.head_hash
+        event_count: latest.events.length, aggregate_hash: latest.aggregate_hash,
+        head_hash: latest.head_hash, semantic_replay: "MATCHED", original_request_attestation: "UNKNOWN", source_attestation: "UNKNOWN"
       };
     }
     // Only server-generated observations and server-resolved report links enter this journal.

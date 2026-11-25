@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, realpathSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { createHash } from "node:crypto";
+import { canonicalJson } from "../src/core/canonical-json.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openProjectStore } from "../src/inner-market/project-store.mjs";
@@ -110,5 +112,34 @@ test("audit export is a scoped, stable read snapshot and detects digest changes"
   assert.throws(()=>s.exportAuditBundle(p.project_id,2),/PROJECT_REVISION_CONFLICT/);
   const changed=structuredClone(b);changed.exceptions=[];assert.throws(()=>checkProjectAuditBundleDigest(changed),/PROJECT_AUDIT_BUNDLE_DIGEST_MISMATCH/);
   assert.equal(s.get(p.project_id).revision,1);
+ }finally{s.close();}
+});
+
+test("valid snapshot digest cannot hide a divergent project state",t=>{
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000});let p;
+ try{p=s.create(base);s.append(p.project_id,{command_id:"profile-change",type:"UPDATE_PROFILE",payload:{profile:{name:"Correct Name"}}},{expected_revision:1});}
+ finally{s.close();}
+ const db=new DatabaseSync(path);
+ try{
+  const row=db.prepare("SELECT aggregate_json FROM project_snapshot WHERE project_id=?").get(p.project_id);
+  const value=JSON.parse(row.aggregate_json);value.profile.name="Different Name";
+  const content=canonicalJson(value),digest=createHash("sha256").update(content,"utf8").digest("hex");
+  db.prepare("UPDATE project_snapshot SET aggregate_json=?,aggregate_hash=? WHERE project_id=?").run(content,digest,p.project_id);
+ }finally{db.close();}
+ const reopened=openProjectStore(path);
+ try{
+  assert.throws(()=>reopened.get(p.project_id),/PROJECT_SNAPSHOT_REPLAY_MISMATCH/);
+  assert.throws(()=>reopened.verify(p.project_id),/PROJECT_SNAPSHOT_REPLAY_MISMATCH/);
+  assert.throws(()=>reopened.append(p.project_id,{command_id:"later",type:"SET_OPERATIONAL_STATUS",payload:{status:"HALTED"}},{expected_revision:2}),/PROJECT_SNAPSHOT_REPLAY_MISMATCH/);
+ }finally{reopened.close();}
+});
+test("legacy normalized draft events can be replayed after reopen",t=>{
+ const path=setup(t),s=openProjectStore(path,{now:()=>1000});
+ try{
+  const p=s.create({project_id:"draft",profile:{name:"Draft",symbol:"DRAFT"}});
+  const v=s.append(p.project_id,{command_id:"configure",type:"UPDATE_DRAFT_CONFIGURATION",payload:{profile:base.profile,network:base.network,token:base.token,wallet_group:group()}},{expected_revision:1});
+  assert.deepEqual(s.get(p.project_id),v.aggregate);
+  assert.equal(s.verify(p.project_id).semantic_replay,"MATCHED");
+  assert.equal(s.verify(p.project_id).source_attestation,"UNKNOWN");
  }finally{s.close();}
 });
