@@ -65,14 +65,20 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
    if(r.exceptionDetails)throw Error("BROWSER_EVALUATION_FAILED");
    return r.result.value;
   };
-  const wait=expr=>eventually(()=>evaluate("Boolean("+expr+")"));
+  const wait=expr=>eventually(async()=>{
+   try{return await evaluate("Boolean("+expr+")");}
+   catch(error){
+    if(error.message==="BROWSER_COMMAND_FAILED:Runtime.evaluate"||error.message==="BROWSER_EVALUATION_FAILED")return false;
+    throw error;
+   }
+  });
   await cdp.call("Page.enable");
   await cdp.call("Page.navigate",{url});
   await wait('location.origin==='+JSON.stringify(url)+' && document.querySelector("#terminal-project-select")');
   assert.equal(await evaluate('document.querySelector("#terminal-project-context").textContent.includes("Execution: DISABLED")'),true);
-  await evaluate('sessionStorage.setItem("cook.project.create.pending.v1",'+JSON.stringify(key)+')');
+  await evaluate('sessionStorage.setItem("cook.project.create.pending.v1",'+JSON.stringify(key)+');window.__cookQaBeforeReload=true');
   await cdp.call("Page.reload");
-  await wait('document.querySelector("#terminal-project-select")');
+  await wait('location.origin==='+JSON.stringify(url)+' && window.__cookQaBeforeReload!==true && document.querySelector("#terminal-project-select")');
   await evaluate('document.querySelector(\'[data-page="create"]\').click()');
   await wait('document.querySelector("#project-recovery-check")');
   await evaluate('document.querySelector("#project-recovery-check").click()');

@@ -26,4 +26,4 @@ The browser smoke test uses a temporary home, temporary project store, and loopb
 
 ## Remaining operator acceptance
 
-The optional browser interactions must be executed in a disposable, non-root Chromium environment. Archived receipt review is read-only and does not resolve missing signatures or establish source authenticity. A passing CI run does not attest a live RPC, transaction execution, real-market behavior or production performance.
+The Node 22 CI job now requests the isolated Chromium metadata recovery interaction test using the runner's installed browser, without disabling its sandbox. A successful run is required to claim this specific browser path passed. Full page and layout acceptance still requires an operator. Archived receipt review is read-only and does not resolve missing signatures or establish source authenticity. A passing CI run does not attest a live RPC, transaction execution, real-market behavior or production performance.
