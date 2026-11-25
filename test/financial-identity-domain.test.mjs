@@ -27,3 +27,15 @@ test("unknown inventory and negative net NAV remain distinct from invalid gross 
  assert.equal(r.checks.find(c=>c.id==="closing_nav").status,"PASS");
  assert.ok(!r.checks.some(c=>c.reason==="NEGATIVE_GROSS_AMOUNT"));
 });
+
+test("new identities preserve precision, missing values and nonzero economic residuals",()=>{
+ const huge="900719925474099300000000000000001";
+ const r=auditFinancialIdentities({cash_flow:{opening_cash_base_units:huge,net_external_capital_base_units:"-1",operating_net_cash_flow_base_units:"2",expected_closing_cash_base_units:"900719925474099300000000000000002"},nav_bridge:{unexplained_by_cash_basis_pnl_and_inventory_unrealized_change_base_units:"10",receivable_change_base_units:"2",other_asset_change_base_units:"3",liability_change_base_units:"1",remaining_unexplained_base_units:"6"}});
+ assert.equal(r.checks.find(c=>c.id==="expected_closing_cash").status,"PASS");
+ assert.equal(r.checks.find(c=>c.id==="nav_bridge_remaining").status,"PASS");
+ assert.equal(r.checks.find(c=>c.id==="nav_bridge_residual").status,"UNKNOWN");
+ assert.equal(r.status,"PARTIAL");
+ const bad=auditFinancialIdentities({nav_bridge:{remaining_unexplained_base_units:0}});
+ assert.equal(bad.checks.find(c=>c.id==="nav_bridge_remaining").reason,"MALFORMED_AMOUNT");
+ assert.equal(bad.status,"REVIEW_REQUIRED");
+});

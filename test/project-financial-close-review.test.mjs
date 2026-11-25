@@ -50,7 +50,7 @@ test("independent financial identities distinguish incomplete valuations from di
  const {auditFinancialIdentities}=await import("../src/inner-market/financial-identity-audit.mjs");
  const r=buildProjectFinancialCloseReview(endpoints(fixture()));
  assert.equal(r.mathematical_audit.status,"ARITHMETIC_MATCH");
- assert.equal(r.mathematical_audit.checks.length,17);
+ assert.equal(r.mathematical_audit.checks.length,22);
  const incomplete=buildProjectFinancialCloseReview(fixture());
  assert.equal(incomplete.mathematical_audit.status,"PARTIAL");
  assert.equal(incomplete.mathematical_audit.checks.find(c=>c.id==="closing_nav").status,"UNKNOWN");
@@ -77,4 +77,15 @@ test("financial audit rejects malformed amounts rather than silently classifying
  const a=auditFinancialIdentities(r);
  assert.equal(a.status,"REVIEW_REQUIRED");
  assert.equal(a.checks.find(c=>c.id==="operating_cash").reason,"MALFORMED_AMOUNT");
+});
+
+test("independent auditor detects drift in every newly checked financial identity",async()=>{
+ const {auditFinancialIdentities}=await import("../src/inner-market/financial-identity-audit.mjs");
+ const original=buildProjectFinancialCloseReview(endpoints(fixture()));
+ const cases=[["cash_flow","expected_closing_cash_base_units","expected_closing_cash"],["assets","interval_inventory_unrealized_change_base_units","interval_inventory_unrealized_change"],["nav_bridge","unexplained_by_cash_basis_pnl_and_inventory_unrealized_change_base_units","nav_bridge_residual"],["nav_bridge","receivable_change_base_units","nav_bridge_receivable_change"],["nav_bridge","remaining_unexplained_base_units","nav_bridge_remaining"]];
+ for(const [section,field,id] of cases){
+  const altered=structuredClone(original);altered[section][field]=(BigInt(altered[section][field])+1n).toString();
+  const result=auditFinancialIdentities(altered);
+  assert.equal(result.status,"REVIEW_REQUIRED",id);assert.equal(result.checks.find(c=>c.id===id).difference_base_units,"1",id);
+ }
 });
