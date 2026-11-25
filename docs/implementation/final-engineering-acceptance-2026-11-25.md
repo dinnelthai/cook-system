@@ -30,3 +30,7 @@ Master merge e0031bb passed 314/314 tests and both auxiliary CI steps in run 455
 ## Local capability isolation follow-up
 
 The local faucet, wallet transfer and PumpSwap trading adapters now have separate explicit environment opt-ins (`COOK_LOCAL_FAUCET`, `COOK_LOCAL_TRANSFER`, `COOK_LOCAL_TRADING`); all default disabled. Setting the faucet flag no longer enables transfer or trading. The offline HTTP server also sets bounded header/request/keep-alive timeouts and connection/request caps. Tests cover the independent feature flags and the faucet-only server configuration. Actual localnet transactions remain disabled unless the operator separately enables the corresponding local-only adapter and supplies a pinned private genesis.
+
+## Latest master verification — 2026-11-25
+
+Commit 08a0ea904ac45e477b58471386081d99ad2d7a4f is green in GitHub Actions run 45529640566: 320 tests passed, 0 failed, 0 skipped; schema registry validation and held-out defensive regression steps also passed. Local capability flags are separated and all default off; the HTTP request body is capped by bytes and invalid UTF-8 is rejected. CI does not exercise an actual local Validator, wallet-funded transaction, browser session on the operator machine, or production-scale performance.

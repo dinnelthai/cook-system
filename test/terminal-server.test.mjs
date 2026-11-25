@@ -14,8 +14,9 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  const fixture=fileURLToPath(new URL("../fixtures/synthetic/inner-market-mvp.json",import.meta.url));
  const reportDir=await mkdtemp(join(tmpdir(),"cook-bridge-")),report=join(reportDir,"report.json");
  t.after(()=>rm(reportDir,{recursive:true,force:true}));await copyFile(fixture,report);
+ const home=await mkdtemp(join(tmpdir(),"cook-server-home-"));t.after(()=>rm(home,{recursive:true,force:true}));
  const script=fileURLToPath(new URL("../scripts/serve-offline-mvp.mjs",import.meta.url));
- const child=spawn(process.execPath,[script],{env:{...process.env,PORT:String(port),COOK_TERMINAL_REPORT:report,COOK_LOCAL_RPC_URL:"",COOK_LOCAL_FAUCET:"1",COOK_LOCAL_TRANSFER:"0",COOK_LOCAL_TRADING:"0",COOK_PUMP_LAB_URL:""},stdio:["ignore","pipe","pipe"]});
+ const child=spawn(process.execPath,[script],{env:{...process.env,HOME:home,PORT:String(port),COOK_TERMINAL_REPORT:report,COOK_LOCAL_RPC_URL:"",COOK_LOCAL_FAUCET:"1",COOK_LOCAL_TRANSFER:"0",COOK_LOCAL_TRADING:"0",COOK_PUMP_LAB_URL:""},stdio:["ignore","pipe","pipe"]});
  t.after(()=>{if(child.exitCode===null)child.kill();});
  await new Promise((resolve,reject)=>{
   let output="";
@@ -45,6 +46,8 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  const health=await fetch(base+"/api/terminal/health");assert.equal(health.status,200);assert.deepEqual(await health.json(),{report_bridge:"CONFIGURED",rpc:{status:"NOT_CONFIGURED",network_verified:false},execution_enabled:false});
  const trade=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:"{}"});assert.equal(trade.status,400);assert.equal((await trade.json()).code,"TRADE_DISABLED");
  const faucet=await fetch(base+"/api/local-wallet/airdrop",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({address:"11111111111111111111111111111111",amount:"1"})});assert.equal(faucet.status,400);assert.equal((await faucet.json()).code,"FAUCET_DISABLED");
+ const created=await fetch(base+"/api/local-wallet/create",{method:"POST",headers:{"content-type":"application/json"},body:"{}"});assert.equal(created.status,200);const wallet=(await created.json()).address;
+ const transfer=await fetch(base+"/api/local-wallet/transfer",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({from:"11111111111111111111111111111111",to:wallet,amount:"1"})});assert.equal(transfer.status,400);assert.equal((await transfer.json()).code,"TRANSFER_DISABLED");
  const cross=await fetch(base+"/api/local-wallet/trade",{method:"POST",headers:{"content-type":"application/json","sec-fetch-site":"cross-site"},body:"{}"});assert.equal(cross.status,403);
  const unicodeOversize=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({note:"界".repeat(1400)})});assert.equal(unicodeOversize.status,413);assert.equal((await unicodeOversize.json()).code,"BODY_TOO_LARGE");
  const invalidUtf8=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:Buffer.from([0x7b,0x22,0x78,0x22,0x3a,0x22,0xff,0x22,0x7d])});assert.equal(invalidUtf8.status,400);assert.equal((await invalidUtf8.json()).code,"INVALID_BODY_ENCODING");
