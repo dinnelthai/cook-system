@@ -89,7 +89,7 @@ test("symbol cannot be changed after launch", () => {
   assert.equal(p.token.mint, mint);
 });
 test("network and token configuration can be set only before launch", () => {
-  let p = createProjectAggregate({ project_id: "draft-config", profile: base.profile });
+  let p = createProjectAggregate({ project_id: "draft-config", profile: base.profile }, { now: () => 1000 });
   p = run(p, "SET_NETWORK_IDENTITY", { network: { cluster: "localnet", genesis_hash: wallet } });
   p = run(p, "SET_TOKEN_CONFIGURATION", { supply_base_units: "1000000000", decimals: 6, creator_wallet_address: wallet });
   assert.equal(p.network.genesis_hash, wallet);
