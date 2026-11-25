@@ -1,3 +1,4 @@
+import {describeProjectRiskReview} from "./project-risk-review.mjs";
 import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs";
 import {reviewProjectGraduationEvidence} from "./project-graduation-evidence.mjs";
 const ROOT = "/api/projects";
@@ -141,6 +142,10 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         if(typeof listReportCandidates!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         send(res,200,listReportCandidates(store.get(projectId)));return true;
+      }
+      if(action==="risk-review"){
+        if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        send(res,200,store.getRiskReview(projectId));return true;
       }
       if(action==="treasury-review"){
         if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}

@@ -4,6 +4,7 @@ import { lstatSync, mkdirSync, openSync, closeSync, realpathSync } from "node:fs
 import { resolve, dirname } from "node:path";
 import { canonicalJson } from "../core/canonical-json.mjs";
 import { createOrderReviewJournal } from "./order-review-journal.mjs";
+import { describeProjectRiskReview } from "./project-risk-review.mjs";
 import { buildProjectAuditBundle } from "./project-audit-bundle.mjs";
 import { createProjectAggregate, applyProjectCommand, assertProjectAggregate } from "./project-aggregate.mjs";
 
@@ -264,7 +265,15 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         db.exec("COMMIT");return bundle;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
-    return { create, append, get, list, events, verify, recordArchive, listArchive, orderReview, exportAuditBundle, close: () => db.close() };
+    function getRiskReview(projectId){
+      db.exec("BEGIN");
+      try{
+        const project=current(projectId).aggregate;
+        const result=describeProjectRiskReview(project,listArchive(projectId),orderReview.list(projectId));
+        db.exec("COMMIT");return result;
+      }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
+    }
+    return { create, append, get, list, events, verify, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

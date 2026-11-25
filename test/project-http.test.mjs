@@ -224,3 +224,14 @@ test("treasury review accepts only an existing project report archive reference"
  assert.equal((await json(url,"POST",{expected_revision:2,archive_id:"missing"})).status,409);
  assert.equal((await json(url,"POST",{expected_revision:1,archive_id:"missing"})).status,404);
 });
+
+test("risk review is a project-scoped read-only evidence projection",async t=>{
+ const base=await setup(t),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"risk-http",profile:{name:"Risk",symbol:"RISK"}})).status,201);
+ const url=root+"/risk-http/risk-review";
+ const r=await fetch(url);assert.equal(r.status,200);const v=await r.json();
+ assert.equal(v.project_id,"risk-http");assert.equal(v.project_revision,1);assert.equal(v.execution_enabled,false);assert.equal(v.live_risk_assessed,false);
+ assert.ok(v.findings.some(f=>f.code==="CURRENT_EXPOSURE_UNAVAILABLE"));
+ assert.equal((await json(url,"POST",{status:"SAFE"})).status,405);
+ assert.equal((await (await fetch(root+"/risk-http")).json()).project.revision,1);
+});

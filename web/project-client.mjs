@@ -115,3 +115,9 @@ export async function reviewProjectTreasury(projectId,revision,archiveId){
  if(r.review?.project_id!==projectId||r.review.project_revision!==revision||r.review.report_link_archive_id!==archiveId||r.review.execution_enabled!==false||r.review.settlement_allowed!==false||r.review.live_balance!==null)throw Error("PROJECT_TREASURY_SCOPE_MISMATCH");
  return r;
 }
+
+export async function getProjectRiskReview(projectId,revision){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/risk-review");
+ if(r.project_id!==projectId||r.project_revision!==revision||r.execution_enabled!==false||r.settlement_allowed!==false||r.live_risk_assessed!==false||r.lifecycle_mutated!==false||!Array.isArray(r.findings))throw Error("PROJECT_RISK_SCOPE_MISMATCH");
+ return r;
+}

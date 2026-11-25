@@ -22,7 +22,7 @@ import {mountProjectLifecycleReview} from "./project-lifecycle-review-view.mjs";
 import {describeProjectReviewWorkflow} from "../src/inner-market/project-review-workflow.mjs";
 import {createProjectRegistry} from "./project-registry.mjs";
 import {mountProjectSetup} from "./project-setup-view.mjs";
-import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury} from "./project-client.mjs";
+import {listProjects,getProjectLifecycleEvidence,reviewProjectGraduationHistory,listProjectArchive,reviewProjectCloseEvidence,exportProjectAuditBundle,reviewProjectTreasury,getProjectRiskReview} from "./project-client.mjs";
 import {treasuryReviewSections} from "./treasury-review-view.mjs";
 import {mountOrderReview} from "./order-review-view.mjs";
 import {matchProjectReport} from "../src/inner-market/project-report-identity.mjs";
@@ -139,6 +139,7 @@ function renderTerminal(){
  main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>项目操作台</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
  '<div id="terminal-project-context" class="pro-statebar">正在读取 Project 数据…</div>'+
  '<div id="terminal-context-notice" role="status"></div>'+ 
+ '<section id="terminal-risk-review" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-lifecycle-evidence" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-order-review" class="pro-pane" hidden></section>'+
  '<div id="terminal-report-area"'+(activeProjectId?' hidden inert style="display:none"':'')+'>'+
@@ -167,6 +168,24 @@ function renderTerminal(){
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
     if(selected){
+      const riskArea=main.querySelector("#terminal-risk-review");riskArea.hidden=false;
+      const riskCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&riskArea.isConnected;
+      let riskTicket=0;
+      async function refreshRisk(){
+       const own=++riskTicket;
+       riskArea.textContent="读取项目历史风险与证据…";
+       try{
+        const r=await getProjectRiskReview(selected.project_id,selected.revision);
+        if(!riskCurrent()||own!==riskTicket)return;
+        riskArea.innerHTML="<h3>统一项目风险复核</h3>"+note("历史证据风险："+r.status+" · 实时风险未评估")+
+          table(["证据冲突","业务警告","未知事项"],[[r.counts.critical,r.counts.warning,r.counts.unknown]])+
+          table(["类别","级别","问题","记录引用数"],r.findings.map(f=>[f.category,f.severity,f.code,f.references.length]))+
+          '<button id="project-risk-refresh">刷新风险复核</button><button id="project-risk-export">导出风险清单</button>';
+        riskArea.querySelector("#project-risk-refresh").onclick=refreshRisk;
+        riskArea.querySelector("#project-risk-export").onclick=()=>download("project-risk-review.json",JSON.stringify(r,null,2));
+       }catch(e){if(riskCurrent()&&own===riskTicket){riskArea.textContent="风险证据不可用："+errorKind(e);const retry=document.createElement("button");retry.textContent="重新读取";retry.onclick=refreshRisk;riskArea.append(retry);}}
+      }
+      refreshRisk();
       const lifecycleArea=main.querySelector("#terminal-lifecycle-evidence");
       lifecycleArea.hidden=false;lifecycleArea.textContent="读取生命周期证据覆盖…";
       const stillCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&lifecycleArea.isConnected;
