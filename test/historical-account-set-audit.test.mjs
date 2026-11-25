@@ -19,3 +19,11 @@ test("reported NAV and cost discrepancies require review",()=>{
  const i=fixture();i.reportedTotals.navBaseUnits="261";i.reportedTotals.costBasisBaseUnits="39";
  const r=auditHistoricalAccountSet(i);assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.issues.includes("ACCOUNT_SET_TOTAL_MISMATCH:navBaseUnits"));assert.ok(r.issues.includes("ACCOUNT_SET_TOTAL_MISMATCH:costBasisBaseUnits"));assert.equal(r.totals,null);
 });
+
+test("explicit failed reconciliation is a contradiction",()=>{
+ const i=fixture();i.accounts[0].reconciliation="FAIL";assert.equal(auditHistoricalAccountSet(i).status,"REVIEW_REQUIRED");
+});
+test("unknown valuation does not mask a known cash discrepancy",()=>{
+ const i=fixture();i.accounts[0].inventoryValueBaseUnits=null;i.reportedTotals.cashBaseUnits="201";
+ const r=auditHistoricalAccountSet(i);assert.equal(r.status,"REVIEW_REQUIRED");assert.ok(r.issues.includes("ACCOUNT_SET_TOTAL_MISMATCH:cashBaseUnits"));
+});

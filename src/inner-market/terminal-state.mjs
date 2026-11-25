@@ -5,6 +5,7 @@ import {buildTerminalCandles} from "./terminal-candles.mjs";
 import {summarizeHistoricalNav} from "./historical-nav.mjs";
 import {describeHistoricalTrust} from "./historical-trust.mjs";
 import {describeHistoricalMarket} from "./historical-market-state.mjs";
+import {auditReportClosingAccounts} from "./historical-account-set-audit.mjs";
 
 export const REVIEW_STAGES=Object.freeze(["REVIEW","SETTLED","ARCHIVED"]);
 
@@ -14,8 +15,10 @@ export function buildTerminalState(input){
  const evidence=auditTerminalEvidence(input);
  const candles=buildTerminalCandles(input);
  const marketState=describeHistoricalMarket({input,market:d.market,candles});
- const issues=[...d.issues,...evidence.issues,...(candles.status==="REVIEW"?["CANDLE_EVIDENCE_CONTRADICTION"]:[])];
- const ready=d.status==="REPORT_READY"&&evidence.status!=="REVIEW_REQUIRED"&&candles.status!=="REVIEW";
+ const accountSet=auditReportClosingAccounts(input);
+ const accountSetReview=accountSet.status==="REVIEW_REQUIRED";
+ const issues=[...d.issues,...evidence.issues,...(candles.status==="REVIEW"?["CANDLE_EVIDENCE_CONTRADICTION"]:[]),...(accountSetReview?["CLOSING_ACCOUNT_SET_CONTRADICTION",...accountSet.issues]:[])];
+ const ready=d.status==="REPORT_READY"&&evidence.status!=="REVIEW_REQUIRED"&&candles.status!=="REVIEW"&&!accountSetReview;
  const n=summarizeHistoricalNav({projectId:input.scope.projectId,quoteAsset:input.scope.quoteAsset,snapshots:input.nav.snapshots,historyComplete:input.nav.historyComplete});
  const navEndpoints=d.nav_evidence;
  const sample=input.sourceMode==="SYNTHETIC";
@@ -25,6 +28,7 @@ export function buildTerminalState(input){
  const checks=[ 
   {id:"accounting",status:ready?"PASS":"REVIEW",evidence:issues},
   {id:"archived_evidence",status:evidence.status==="UNAVAILABLE"?"UNKNOWN":evidence.status==="REVIEW_REQUIRED"?"REVIEW":"PASS",evidence:evidence.issues},
+  {id:"closing_account_set",status:accountSetReview?"REVIEW":accountSet.status==="INTERNALLY_CONSISTENT"?"PASS":"UNKNOWN",evidence:[...accountSet.issues,...accountSet.missing]},
   {id:"cost_basis",status:d.cost_basis_evidence.status==="REVIEW_REQUIRED"?"REVIEW":"UNKNOWN",evidence:d.cost_basis_evidence.issues},
   {id:"economic_classification",status:evidence.classification.status==="REVIEW_REQUIRED"?"REVIEW":"UNKNOWN",evidence:evidence.classification.issues},
   {id:"trade_evidence",status:d.trade_evidence.status==="REVIEW_REQUIRED"?"REVIEW":d.trade_evidence.status==="INTERNALLY_CONSISTENT"?"PASS":"UNKNOWN",evidence:[...d.trade_evidence.issues,...d.trade_evidence.missing]},
@@ -35,8 +39,8 @@ export function buildTerminalState(input){
   {id:"wallet_attribution",status:"UNKNOWN",evidence:[]},
   {id:"live_execution",status:"UNAVAILABLE",evidence:[]}
  ];
- const trust=describeHistoricalTrust({sourceMode:input.sourceMode,ready,checks,navEndpoints,tradeEvidence:d.trade_evidence,costBasisEvidence:d.cost_basis_evidence,archivedEvidence:evidence});
- return {...d,schema_version:"terminal-state.1",status:ready?"REPORT_READY":"REVIEW_REQUIRED",issues,trust,market_state:marketState,
+ const trust=describeHistoricalTrust({sourceMode:input.sourceMode,ready,checks,navEndpoints,tradeEvidence:d.trade_evidence,costBasisEvidence:d.cost_basis_evidence,archivedEvidence:evidence,accountSet});
+ return {...d,schema_version:"terminal-state.1",status:ready?"REPORT_READY":"REVIEW_REQUIRED",issues,trust,market_state:marketState,closing_account_set:accountSet,
   treasury:ready?d.treasury:Object.fromEntries(Object.keys(d.treasury).map(k=>[k,null])),
   market:{...d.market,verified_real_reserve_base_units:marketState.snapshot.real_quote_reserves_base_units,gross_turnover_base_units:(buy+sell).toString(),buy_minus_sell_notional_base_units:(buy-sell).toString()},
   performance:{closing_nav_base_units:endpointReady?n.closing_nav_base_units:null,capital_adjusted_nav_change_base_units:endpointReady?n.capital_adjusted_nav_change_base_units:null,time_weighted_return_bps:pathReady?n.time_weighted_return_bps:null,observations:pathReady?n.observations:[],valuation_attestation:"UNKNOWN",endpoint_status:navEndpoints.status},

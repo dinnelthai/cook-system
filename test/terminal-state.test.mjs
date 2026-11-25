@@ -166,3 +166,29 @@ test("missing historical coverage suppresses canonical reserve snapshot",async()
  assert.equal(r.market_history.real_quote_reserves_base_units,null);
  assert.equal(r.terminal_state.market.verified_real_reserve_base_units,null);
 });
+
+function historicalWithAccountSet(){
+ const i=historicalWithEndpoints();
+ i.scope.network="local_sim";i.scope.genesisHash="test-genesis";
+ for(const row of [i.cash,i.inventory,i.creator,i.nav,i.market,i.inventory.opening,i.inventory.closing,i.inventory.tradeSummary]){row.scope.network=i.scope.network;row.scope.genesisHash=i.scope.genesisHash;}
+ i.nav.endpointEvidence.scope={...i.scope};
+ const scope={network:i.scope.network,genesisHash:i.scope.genesisHash,projectId:i.scope.projectId,quoteAsset:i.scope.quoteAsset,tokenMint:i.scope.tokenMint,cutoff:i.scope.closingCutoff};
+ i.closingAccountEvidence={schema_version:"cook-report-closing-accounts.1",scope,expectedAccounts:["a"],accounts:[{accountId:"a",scope,reconciliation:"PASS",cashBaseUnits:"887",tokenAmountBaseUnits:"50",costBasisBaseUnits:"100",inventoryValueBaseUnits:"90",receivableBaseUnits:"3",liabilitiesBaseUnits:"0",otherAssetsBaseUnits:"0"}]};
+ return i;
+}
+test("optional closing account evidence is bound to ledger and exported consistently",async()=>{
+ const {buildUnifiedHistoricalReport}=await import("../src/inner-market/unified-historical-report.mjs");
+ const r=buildUnifiedHistoricalReport(historicalWithAccountSet());assert.equal(r.status,"REPORT_READY");
+ assert.equal(r.closing_account_set.status,"INTERNALLY_CONSISTENT");assert.equal(r.closing_account_set.totals.navBaseUnits,"980");
+ assert.deepEqual(r.closing_account_set,r.terminal_state.closing_account_set);
+ assert.equal(r.trust.metrics.closing_account_set.status,"PROVISIONAL");assert.equal(r.settlement_allowed,false);
+});
+test("contradictory account set blocks derived finance despite caller supplied totals",()=>{
+ const i=historicalWithAccountSet();i.closingAccountEvidence.accounts[0].cashBaseUnits="888";i.closingAccountEvidence.reportedTotals={cashBaseUnits:"888"};
+ const s=buildTerminalState(i);assert.equal(s.status,"REVIEW_REQUIRED");assert.ok(s.issues.includes("CLOSING_ACCOUNT_SET_CONTRADICTION"));assert.equal(s.treasury.closing_cash_base_units,null);assert.equal(s.performance.closing_nav_base_units,null);assert.equal(s.risk.status,"REVIEW_REQUIRED");
+});
+test("missing account set evidence remains unknown without altering legacy reports",()=>{
+ const s=buildTerminalState(fixture());assert.equal(s.status,"REPORT_READY");assert.equal(s.closing_account_set.status,"UNAVAILABLE");
+ assert.equal(s.checks.find(x=>x.id==="closing_account_set").status,"UNKNOWN");
+ const i=historicalWithAccountSet();i.closingAccountEvidence.expectedAccounts.push("missing");assert.equal(buildTerminalState(i).closing_account_set.status,"PARTIAL");
+});

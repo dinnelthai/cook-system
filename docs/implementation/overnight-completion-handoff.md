@@ -51,3 +51,7 @@ Pump and Raydium use a shared bounded signature paginator. Malformed, oversized,
 ## Historical financial and risk follow-up
 
 Added a standalone closed-account-set reconciliation for operator-supplied historical balance sheets. It rejects duplicate accounts, contradictory scope, missing evidence and consolidated total mismatches. It never discovers wallets, infers ownership, allocates positions or values assets independently. The risk evaluator now compares configured concentration/depth thresholds with exact integer arithmetic and retains unknown evidence even when the stated amount is zero. These are offline checks, not trading authorization. The account-set audit is not yet connected to the unified terminal or actual Validator receipts.
+
+## Closing account evidence integration
+
+Optional closingAccountEvidence binds a supplied closed account set to the report scope and actual report closing cash, inventory, cost basis, receivables and NAV inputs. Explicit contradictions block unified financial output and enter the accounting risk check; absent or incomplete evidence is UNKNOWN and does not promote any historical report to certified status. Terminal and exported JSON include the audit; independent ownership and valuation remain unknown. No live account discovery or wallet actions are added.

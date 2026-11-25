@@ -18,7 +18,8 @@ export function auditHistoricalAccountSet({scope,expectedAccounts,accounts,repor
   seen.add(id);
   if(!expected.has(id))issues.push("UNEXPECTED_ACCOUNT:"+id);
   if(scopeKeys.some(k=>row.scope[k]!==scope[k]))issues.push("ACCOUNT_SCOPE_MISMATCH:"+id);
-  if(row.reconciliation!=="PASS")missing.push("ACCOUNT_RECONCILIATION_UNAVAILABLE:"+id);
+  if(row.reconciliation==="FAIL"||row.reconciliation==="REVIEW_REQUIRED")issues.push("ACCOUNT_RECONCILIATION_CONTRADICTION:"+id);
+  else if(row.reconciliation!=="PASS")missing.push("ACCOUNT_RECONCILIATION_UNAVAILABLE:"+id);
   const q=amt(row.tokenAmountBaseUnits,"token quantity");
   cash+=amt(row.cashBaseUnits,"cash");tokens+=q;
   receivable+=amt(row.receivableBaseUnits,"receivable");liabilities+=amt(row.liabilitiesBaseUnits,"liabilities");other+=amt(row.otherAssetsBaseUnits,"other assets");
@@ -30,7 +31,8 @@ export function auditHistoricalAccountSet({scope,expectedAccounts,accounts,repor
  for(const id of expected)if(!seen.has(id))missing.push("EXPECTED_ACCOUNT_MISSING:"+id);
  const totals={cashBaseUnits:cash,tokenAmountBaseUnits:tokens,costBasisBaseUnits:basisKnown?basis:null,inventoryValueBaseUnits:valueKnown?value:null,receivableBaseUnits:receivable,liabilitiesBaseUnits:liabilities,otherAssetsBaseUnits:other,navBaseUnits:valueKnown?cash+value+receivable+other-liabilities:null};
  if(!reportedTotals)missing.push("REPORTED_TOTALS_UNAVAILABLE");
- else if(!missing.length)for(const [key,v] of Object.entries(totals)){
+ else if(expected.size===seen.size&&[...expected].every(id=>seen.has(id))&&!issues.length)for(const [key,v] of Object.entries(totals)){
+  if(v===null)continue;
   if(reportedTotals[key]==null){missing.push("REPORTED_TOTAL_UNAVAILABLE:"+key);continue;}
   const actual=reportedTotals[key];
   if(key==="navBaseUnits"){
@@ -42,4 +44,19 @@ export function auditHistoricalAccountSet({scope,expectedAccounts,accounts,repor
  return {schema_version:"cook-historical-account-set-audit.1",status,issues,missing,expected_account_count:expected.size,observed_account_count:seen.size,
   totals:status==="INTERNALLY_CONSISTENT"?Object.fromEntries(Object.entries(totals).map(([k,v])=>[k,v?.toString()??null])):null,
   ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",source_attestation:"UNKNOWN",account_set_completeness_attested:false,execution_enabled:false};
+}
+
+/** Optional account evidence is bound to the existing report closing ledger,
+ * not an independently caller-selected set of reported aggregate totals. */
+export function auditReportClosingAccounts(input){
+ const evidence=input.closingAccountEvidence;
+ const unavailable={schema_version:"cook-historical-account-set-audit.1",status:"UNAVAILABLE",issues:[],missing:["ACCOUNT_SET_EVIDENCE_UNAVAILABLE"],totals:null,ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",source_attestation:"UNKNOWN",account_set_completeness_attested:false,execution_enabled:false};
+ if(evidence==null)return unavailable;
+ if(!evidence.scope||evidence.schema_version!=="cook-report-closing-accounts.1")throw Error("INVALID_REPORT_ACCOUNT_EVIDENCE");
+ const scope=input.scope;
+ const expectedScope={network:scope.network,genesisHash:scope.genesisHash,projectId:scope.projectId,quoteAsset:scope.quoteAsset,tokenMint:scope.tokenMint,cutoff:scope.closingCutoff};
+ if(scopeKeys.some(k=>!valid(expectedScope[k])||evidence.scope[k]!==expectedScope[k]))throw Error("REPORT_ACCOUNT_SCOPE_MISMATCH");
+ const nav=input.nav?.endpointEvidence?.closing;
+ const totals={cashBaseUnits:input.cash.observedClosingCashBaseUnits,tokenAmountBaseUnits:input.inventory.closing.tokens,costBasisBaseUnits:input.inventory.closing.costBasis,receivableBaseUnits:input.creator.observedClosingReceivableBaseUnits,inventoryValueBaseUnits:nav?.inventoryValueBaseUnits??null,liabilitiesBaseUnits:nav?.liabilitiesBaseUnits??null,otherAssetsBaseUnits:nav?.otherAssetsBaseUnits??null,navBaseUnits:input.nav.snapshots.at(-1)?.navAfterFlowBaseUnits??null};
+ return auditHistoricalAccountSet({scope:expectedScope,expectedAccounts:evidence.expectedAccounts,accounts:evidence.accounts,reportedTotals:totals});
 }

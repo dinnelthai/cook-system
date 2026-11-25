@@ -99,7 +99,7 @@ function renderTerminal(){
  cash:()=>table(["事件","类型","金额","对账"],data.cash.entries.map(x=>[x.id,x.kind,money(x.amountBaseUnits),x.reconciliation])),
  inventory:()=>metrics([["期末库存（base units）",a.closing_token_balance_base_units],["库存成本",money(a.remaining_cost_basis_base_units)]])+table(["事件","方向","数量","成本","净收入"],(ready?data.inventory.ledger.position_journal:[]).map(x=>[x.event_id,x.side,x.token_amount_base_units,money(x.cash_cost_quote_base_units),money(x.net_quote_proceeds_base_units)]))+emptyState("逐钱包持仓未接入","当前仅有项目级库存证据"),
  liquidity:()=>table(["储备","原始单位"],[["实际 SOL 储备",money(m.verified_real_reserve_base_units)],["虚拟曲线 SOL 储备",money(report.market_history.virtual_quote_reserves_base_units)],["真实 Token",report.market_history.real_token_reserves_base_units],["虚拟 Token",report.market_history.virtual_token_reserves_base_units]]),
- risk:()=>table(["级别","风险","原因"],d.risk.alerts.map(x=>[x.severity,x.label,x.reason]))+table(["检查","状态","证据"],d.checks.map(x=>[x.id,x.status,x.evidence.join(" / ")]))+details("历史市场状态",d.market_state)+details("数据可信状态",d.trust)+details("审计证据",report.audits)+details("历史回执与现金分录证据",d.archived_evidence),
+ risk:()=>table(["级别","风险","原因"],d.risk.alerts.map(x=>[x.severity,x.label,x.reason]))+table(["检查","状态","证据"],d.checks.map(x=>[x.id,x.status,x.evidence.join(" / ")]))+details("历史市场状态",d.market_state)+details("数据可信状态",d.trust)+details("审计证据",report.audits)+details("历史回执与现金分录证据",d.archived_evidence)+details("期末账户汇总审计",d.closing_account_set),
  logs:()=>table(["UTC","级别","事件"],diagnostics.snapshot().entries.slice(-30).reverse().map(x=>[x.time,x.level,x.event]))
  };
  const sourceLabel=isSample?"行情待检查 · 合成样本非链上证据":"历史报告 · "+d.trust.grade+" "+(d.trust.status==="REVIEW_REQUIRED"?"待复核":"内部一致 · 暂定数据");
