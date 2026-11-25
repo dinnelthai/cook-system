@@ -54,7 +54,13 @@ async function main(){
  try{
   const evalPath=join(temp,"heldout.json");
   const heldout=command("heldout_synthetic_regression",["scripts/run-heldout-defensive-evaluation.mjs",evalPath,"901,902,903"]);
-    const casesValid=Array.isArray(data.cases)&&data.case_count===data.cases.length&&data.cases.every(x=>["TRUE_POSITIVE","TRUE_NEGATIVE"].includes(x.result));add("heldout_contract_detail",data.status==="SYNTHETIC_REGRESSION_ONLY"&&casesValid&&data.real_market_accuracy_claimed===false?"PASS":"FAIL","Synthetic regression only; not a real-market accuracy benchmark",{case_count:data.case_count,cases_valid:casesValid,metrics:data.metrics,real_market_accuracy_claimed:data.real_market_accuracy_claimed});
+  if(heldout.ok){
+   try{
+    const data=JSON.parse(await (await import("node:fs/promises")).readFile(evalPath,"utf8"));
+    const casesValid=Array.isArray(data.cases)&&data.case_count===data.cases.length&&data.cases.every(x=>["TRUE_POSITIVE","TRUE_NEGATIVE"].includes(x.result));
+    add("heldout_contract_detail",data.status==="SYNTHETIC_REGRESSION_ONLY"&&casesValid&&data.real_market_accuracy_claimed===false?"PASS":"FAIL","Synthetic regression only; not a real-market accuracy benchmark",{case_count:data.case_count,cases_valid:casesValid,metrics:data.metrics,real_market_accuracy_claimed:data.real_market_accuracy_claimed});
+   }catch{add("heldout_contract_detail","FAIL","Held-out artifact could not be parsed");}
+  }
  }finally{await rm(temp,{recursive:true,force:true});}
   const evidencePath=process.env.COOK_ACCEPT_EVIDENCE,rpc=process.env.COOK_ACCEPT_RPC,genesis=process.env.COOK_ACCEPT_GENESIS;
   let localReadGate={id:"localnet_read_only_preflight",status:"NOT_RUN",summary:"Read-only Localnet preflight was not configured."};
