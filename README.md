@@ -50,6 +50,7 @@ The first core slice currently includes:
 ## Business completeness baseline
 
 - [Cook System Business Completeness Review & MVP Acceptance Baseline](docs/implementation/BUSINESS-COMPLETENESS-REVIEW.md)
+- [M15 current business review and acceptance gaps](docs/implementation/M15-BUSINESS-REVIEW.md)
 
 ## Project business core
 
