@@ -286,3 +286,13 @@ test("runtime endpoint requires an exact revision and context for interval selec
  assert.equal((await fetch(url,{method:"DELETE"})).status,405);
  assert.equal((await (await fetch(root+"/runtime-http")).json()).project.revision,1);
 });
+
+test("dedicated risk API and business risk use the same retrospective findings",async t=>{
+ const base=await setup(t),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"global-risk-http",profile:{name:"Global Risk",symbol:"GRISK"}})).status,201);
+ const v=await (await fetch(root+"/global-risk-http/business-review")).json();
+ const r=await (await fetch(root+"/global-risk-http/risk-review")).json();
+ assert.deepEqual(r,v.global_risk);assert.equal(r.execution_enabled,false);
+ assert.equal(r.portfolio.current_exposure,null);
+ assert.equal((await (await fetch(root+"/global-risk-http")).json()).project.revision,1);
+});

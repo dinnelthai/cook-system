@@ -376,7 +376,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       db.exec("BEGIN");
       try{
         const {project,archives,orders}=evidenceSnapshotInTransaction(projectId,current(projectId));
-        const result=describeProjectRiskReview(project,archives,orders);
+        const result=buildProjectBusinessReview(project,archives,orders).global_risk;
         db.exec("COMMIT");return result;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }

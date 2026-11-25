@@ -51,3 +51,20 @@ test("receipt review preserves report digest on incomplete evidence",async()=>{
  assert.equal(result.status,"REVIEW_REQUIRED");
  assert.equal(result.report_digest,createHash("sha256").update(canonicalJson(input),"utf8").digest("hex"));
 });
+
+test("global risk includes runtime account contradictions and counts distinct codes",()=>{
+ const a=treasury();a.payload.cash_flow={observed_closing_cash_base_units:"10"};
+ a.payload.account_set={status:"INTERNALLY_CONSISTENT",totals:{cashBaseUnits:"9"},coverage:{status:"DECLARED_LABELS_MATCH"}};
+ const r=buildProjectBusinessReview(p,[link(),a]);
+ assert.equal(r.global_risk.status,"REVIEW_REQUIRED");assert.equal(r.runtime.risk.status,r.global_risk.status);
+ assert.equal(r.risk.critical,r.global_risk.counts.critical);
+ assert.ok(r.global_risk.findings.some(f=>f.code==="ACCOUNT_PROJECT_TOTAL_CONFLICT:cash"&&f.severity==="CRITICAL"));
+ assert.equal(new Set(r.global_risk.findings.map(f=>f.code)).size,r.global_risk.findings.length);
+ assert.equal(Object.values(r.global_risk.counts).reduce((n,x)=>n+x,0),r.global_risk.findings.length);
+});
+test("missing portfolio inputs do not imply zero risk or trading permission",()=>{
+ const r=buildProjectBusinessReview(p).global_risk;
+ assert.equal(r.portfolio.status,"NOT_ASSESSED_INPUTS_UNAVAILABLE");assert.equal(r.portfolio.current_exposure,null);assert.equal(r.portfolio.drawdown_bps,null);
+ assert.ok(r.findings.some(f=>f.code==="PORTFOLIO_DAILY_LOSS_INPUT_UNAVAILABLE"&&f.severity==="UNKNOWN"));
+ assert.equal(r.execution_enabled,false);assert.equal(r.live_risk_assessed,false);
+});

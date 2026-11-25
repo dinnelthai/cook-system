@@ -7,6 +7,7 @@ import {reviewProjectContinuity} from "./project-continuity-review.mjs";
 import {describeLaunchReview,describeHistoricalOperatingComponents} from "./project-governance-review.mjs";
 import {describeOperationalEvidence} from "./project-operational-evidence.mjs";
 import {buildProjectRuntime} from "./project-runtime.mjs";
+import {consolidateProjectRisk} from "./global-project-risk.mjs";
 import {indexProjectEvidence} from "./project-evidence-index.mjs";
 /** M18–24: read-only review projection, scoped to a single local snapshot.
  * A digest/link match establishes internal association, not source truth.
@@ -38,7 +39,10 @@ export function buildProjectBusinessReview(projectInput,archives=[],orders=[]){
  const runtime=buildProjectRuntime(p,{archives,intervals,lifecycle,configuration,risk,findings,receipts,operational:operational_evidence});
  findings.push(...runtime.issues);
  unknown.push(...runtime.unknown);
- const offline_workflow=describeOfflineWorkflow({configuration,lifecycle,intervals,receipts,risk,findings});
+ const global_risk=consolidateProjectRisk({historical:risk,configuration,findings,unknown,runtime});
+ runtime.risk={...runtime.risk,status:global_risk.status,counts:global_risk.counts};
+ if(global_risk.status==="REVIEW_REQUIRED")runtime.status="REVIEW_REQUIRED";
+ const offline_workflow=describeOfflineWorkflow({configuration,lifecycle,intervals,receipts,risk:global_risk,findings});
  const gates=[
   {id:"project_identity",status:p.token.mint&&p.network.genesis_hash?"DECLARED_PRESENT":"MISSING"},
   {id:"linked_closed_interval",status:intervals.length?"DECLARED_PRESENT":"MISSING"},
@@ -51,7 +55,8 @@ export function buildProjectBusinessReview(projectInput,archives=[],orders=[]){
   status:offline_workflow.status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":"EVIDENCE_INCOMPLETE",
   treasury:{...treasury,project_wide_total:null,live_balance:null},market:{...market,live_market_assessed:false},close,
   orders:{record_count:receipts.length,unresolved_count:receipts.filter(r=>!["DECLARED_SAMPLE_MATCH"].includes(r.status)).length,records:receipts},
-  risk:{...risk.counts,status:findings.length||configuration.issues.length?"REVIEW_REQUIRED":risk.status,cross_module_finding_count:findings.length,configuration_issue_count:configuration.issues.length},lifecycle:{recorded_stage:lifecycle.recorded_stage,blockers:lifecycle.blockers},
+  global_risk,
+  risk:{...global_risk.counts,status:global_risk.status,cross_module_finding_count:findings.length,configuration_issue_count:configuration.issues.length},lifecycle:{recorded_stage:lifecycle.recorded_stage,blockers:lifecycle.blockers},
   capacity:{archive_count:archives.length,archive_limit:256,order_count:orders.length,order_limit:256,
    status:archives.length>=256||orders.length>=256?"LIMIT_REACHED":archives.length>=230||orders.length>=230?"NEAR_LIMIT":"WITHIN_LIMIT"},
   intervals,findings,unknown,data_integration:{status:"EXTERNAL_ACCEPTANCE_PENDING",gates,real_data_connected:false,source_attestation:"UNKNOWN"},
