@@ -88,6 +88,25 @@ test("symbol cannot be changed after launch", () => {
   assert.throws(() => run(p, "UPDATE_PROFILE", { profile: { symbol: "OTHER" } }), /PROJECT_SYMBOL_LOCKED/);
   assert.equal(p.token.mint, mint);
 });
+test("network and token configuration can be set only before launch", () => {
+  let p = createProjectAggregate({ project_id: "draft-config", profile: base.profile });
+  p = run(p, "SET_NETWORK_IDENTITY", { network: { cluster: "localnet", genesis_hash: wallet } });
+  p = run(p, "SET_TOKEN_CONFIGURATION", { supply_base_units: "1000000000", decimals: 6, creator_wallet_address: wallet });
+  assert.equal(p.network.genesis_hash, wallet);
+  assert.equal(p.token.supply_base_units, "1000000000");
+  p = run(p, "UPSERT_WALLET_GROUP", { group });
+  p = run(p, "TRANSITION_LIFECYCLE", { to: "READY" });
+  assert.throws(() => run(p, "SET_TOKEN_CONFIGURATION", { supply_base_units: "2", decimals: 6, creator_wallet_address: wallet }), /PROJECT_TOKEN_CONFIGURATION_LOCKED/);
+});
+test("review clearance is evidence-gated and ACTIVE never enables execution", () => {
+  let p = readyProject();
+  p = run(p, "SET_OPERATIONAL_STATUS", { status: "REVIEW_REQUIRED" });
+  assert.throws(() => run(p, "SET_OPERATIONAL_STATUS", { status: "ACTIVE" }), /PROJECT_CANNOT_ACTIVATE/);
+  p = run(p, "CLEAR_REVIEW", { evidence: { kind: "FINAL_RECONCILIATION", source: "internal_audit", verification: "VERIFIED", reference: "audit-1" } });
+  p = run(p, "SET_OPERATIONAL_STATUS", { status: "ACTIVE" });
+  assert.equal(p.lifecycle.operational_status, "ACTIVE");
+  assert.equal(p.execution_policy.enabled, false);
+});
 test("unsupported execution enabling and non-SOL quote assets are rejected", () => {
   const p = createProjectAggregate(base, { now: () => 1000 });
   assert.throws(() => applyProjectCommand(p, { type: "SET_EXECUTION_POLICY", payload: { enabled: true } }), /UNSUPPORTED_PROJECT_COMMAND/);
