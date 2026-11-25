@@ -47,7 +47,9 @@ export function buildProjectRuntime(project,{archives,intervals,lifecycle,config
    status,assets,account_coverage,evidence_conflict_codes:evidenceConflicts,lp_assets:null,
    lp_evidence:{status:conflict?"REVIEW_REQUIRED":"UNAVAILABLE",position_count:null,position_value_base_units:null,
     fee_cash_base_units:null,fee_receivable_base_units:null,ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",
-    project_nav_inclusion:"NOT_ESTABLISHED",synthetic_statement_model_only:true,
+    project_nav_inclusion:"NOT_ESTABLISHED",other_assets_lp_attribution:"UNKNOWN",
+    pool_reserves_as_project_assets:"NOT_ESTABLISHED",pool_fee_bucket_cash_equivalence:"NOT_ESTABLISHED",
+    synthetic_statement_model_only:true,
     reason:conflict?"INTERVAL_EVIDENCE_CONFLICT":"HISTORICAL_POSITION_STATEMENT_NOT_AVAILABLE"},
    asset_unit_contract:"TOKEN_BASE_UNITS_FOR_TOKEN_QUANTITY; SOL_LAMPORTS_FOR_OTHER_FIELDS",archive_ids:linked.map(a=>a.archive_id)};
  });

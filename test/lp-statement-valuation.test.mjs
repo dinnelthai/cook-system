@@ -37,3 +37,26 @@ test("large amounts preserve integer precision and floor rounding",()=>{
  f.snapshot.distributable_quote_units="0";f.mark.quote_numerator="1";f.mark.base_denominator="2";
  const r=valueSyntheticLpStatement(f);assert.equal(r.status,"DECLARED_FIXTURE_MARK");assert.equal(r.values.position_mark_quote_units,"4503599627370496");
 });
+
+test("explicit fee unit mismatch cannot be hidden by equal numeric amounts",()=>{
+ const f=fixture();f.statement.fee_asset="quote";f.statement.cash_posting_asset="base";
+ const bad=valueSyntheticLpStatement(f);assert.equal(bad.status,"REVIEW_REQUIRED");assert.equal(bad.values,null);
+ assert.ok(bad.ledger.issues.includes("FEE_ASSET_MISMATCH"));
+ f.statement.cash_posting_asset="quote";const good=valueSyntheticLpStatement(f);
+ assert.equal(good.status,"DECLARED_FIXTURE_MARK");assert.equal(good.values.fee_asset_alignment,"DECLARED_MATCH");
+ f.statement.fee_asset="foreign";f.statement.cash_posting_asset="foreign";
+ assert.equal(valueSyntheticLpStatement(f).status,"REVIEW_REQUIRED");
+});
+test("explicit overlap between distributable assets and separate fees withholds fixture mark",()=>{
+ for(const key of ["includes_separately_recorded_fee_receivable","includes_separately_recorded_fee_cash"]){
+  for(const invalid of [true,"false",null]){
+   const f=fixture();f.snapshot[key]=invalid;
+   const r=valueSyntheticLpStatement(f);assert.equal(r.status,"REVIEW_REQUIRED");assert.equal(r.values,null);
+   assert.ok(r.issues.includes("LP_DISTRIBUTABLE_ASSET_BOUNDARY_CONFLICT"));
+  }
+ }
+ const f=fixture();assert.equal(valueSyntheticLpStatement(f).values.distributable_fee_separation,"UNKNOWN");
+ f.snapshot.includes_separately_recorded_fee_receivable=false;f.snapshot.includes_separately_recorded_fee_cash=false;
+ const r=valueSyntheticLpStatement(f);assert.equal(r.values.distributable_fee_separation,"DECLARED_SEPARATE");
+ assert.equal(r.values.position_mark_quote_units,"4400");assert.equal(r.project_nav_inclusion,"NOT_ESTABLISHED");
+});

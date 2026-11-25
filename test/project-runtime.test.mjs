@@ -118,3 +118,18 @@ test("wrong review digest invalidates the referenced interval even if another re
  assert.equal(v.runtime.asset_intervals[0].assets.cash,null);
  assert.ok(v.runtime.asset_intervals[0].evidence_conflict_codes.includes("INTERVAL_REPORT_DIGEST_CONFLICT"));
 });
+
+test("historical runtime never adds pool reserve or synthetic LP fields to declared NAV",()=>{
+ const t=treasury("t","100");
+ t.payload.other_assets_and_liabilities={closing_other_assets_base_units:"25",closing_liabilities_base_units:"0"};
+ t.payload.historical_valuation={closing_nav_base_units:"125"};
+ t.payload.lp_assets={position_value_base_units:"999",fee_cash_base_units:"777",fee_receivable_base_units:"888"};
+ t.payload.pool_reserves_base_units="1000000";
+ const row=buildProjectBusinessReview(p,[link(),t]).runtime.asset_intervals[0];
+ assert.equal(row.assets.nav,"125");assert.equal(row.assets.other_assets,"25");assert.equal(row.assets.cash,"100");
+ assert.equal(row.lp_assets,null);assert.equal(row.lp_evidence.position_value_base_units,null);
+ assert.equal(row.lp_evidence.fee_cash_base_units,null);assert.equal(row.lp_evidence.fee_receivable_base_units,null);
+ assert.equal(row.lp_evidence.other_assets_lp_attribution,"UNKNOWN");
+ assert.equal(row.lp_evidence.project_nav_inclusion,"NOT_ESTABLISHED");
+ assert.equal(row.lp_evidence.pool_fee_bucket_cash_equivalence,"NOT_ESTABLISHED");
+});
