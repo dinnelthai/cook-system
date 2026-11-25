@@ -61,6 +61,7 @@ test("wallets cannot be silently assigned to multiple project groups", () => {
 });
 test("issuance evidence remains unverified until a chain-verifier command", () => {
   let p = readyProject();
+  assert.throws(() => run(p, "TRANSITION_LIFECYCLE", { to: "LAUNCH_SUBMITTED", evidence: { kind: "LAUNCH_TRANSACTION", source: "local_execution", verification: "SUBMITTED", reference: signature } }), /ISSUANCE_EVIDENCE_REQUIRED/);
   p = run(p, "RECORD_ISSUANCE_EVIDENCE", { mint, signature }, 1002);
   assert.equal(p.token.issuance_status, "EVIDENCE_UNVERIFIED");
   assert.throws(() => run(p, "TRANSITION_LIFECYCLE", { to: "LAUNCH_SUBMITTED", evidence: { kind: "LAUNCH_TRANSACTION", source: "local_execution", verification: "SUBMITTED", reference: signature } }), /INVALID_LIFECYCLE_TRANSITION|ISSUANCE_EVIDENCE_REQUIRED/);
