@@ -61,7 +61,7 @@ function auditedReport(input){
   return r;
  }catch(e){record("report.failed",{error_kind:errorKind(e),duration_ms:Math.round(performance.now()-start)},"ERROR");throw e;}
 }
-const pages=[["terminal","01 操作台"],["create","02 项目准备与发行台账"],["wallet","03 资产与钱包"],["projects","04 项目档案"],["dashboard","05 复盘分析"],["participants","06 市场风险实验"],["logs","07 系统设置"]];
+const pages=[["terminal","操作台"],["wallet","资产与钱包"],["projects","Meme 档案"],["dashboard","复盘分析"],["participants","市场风险实验"],["logs","系统设置"]];
 const fixture=await (async()=>{
  const start=performance.now();
  try{const response=await fetch("../fixtures/synthetic/inner-market-mvp.json");if(!response.ok)throw new Error("Fixture unavailable");const value=await response.json();record("fixture.loaded",{duration_ms:Math.round(performance.now()-start)});return value;}
@@ -80,9 +80,7 @@ function renderGlobalContext(){
  const label=document.createElement("span");
  label.textContent=id?"读取当前项目…":"独立工作区 · 未选项目";
  host.append(label);
- const button=document.createElement("button");button.type="button";button.textContent="我的 Meme";
- button.onclick=()=>{importTicket++;page="terminal";render();};host.append(button);
- if(!id)return;
+  if(!id)return;
  getProjectDirectory().then(({projects})=>{
   if(ticket!==globalContextTicket||activeProjectId!==id)return;
   const p=projects.find(x=>x.project_id===id);
@@ -150,8 +148,7 @@ function mountMemeDesk(){
  const rail=document.createElement("section");rail.className="meme-rail";rail.setAttribute("aria-label","我的 Meme 项目");
  rail.innerHTML='<div class="meme-rail-head"><strong>我的 Meme</strong><button type="button" id="meme-new" aria-label="新建项目">＋</button></div><label for="meme-search">搜索项目</label><input id="meme-search" type="search" placeholder="名称 / Symbol / Mint"><div id="meme-list">读取项目目录…</div><button type="button" id="meme-create-footer">＋ 新建 Meme</button>';
  nav.prepend(rail);
- const other=document.createElement("details");other.className="meme-other-workspaces";other.innerHTML="<summary>其他工作区</summary>";for(const b of [...nav.querySelectorAll(":scope > button")])other.append(b);document.querySelector(".header-meta").prepend(other);
- const go=(target,id=activeProjectId)=>{importTicket++;selectProjectContext(id);page=target;render();};
+  const go=(target,id=activeProjectId)=>{importTicket++;selectProjectContext(id);page=target;render();};
  rail.querySelector("#meme-new").onclick=()=>{memeMode="launch";go("terminal",null);};
  rail.querySelector("#meme-create-footer").onclick=()=>{memeMode="launch";go("terminal",null);};
  rail.querySelector("#meme-search").value=memeFilter;
@@ -565,16 +562,24 @@ function renderTerminal(){
 }
 function render(){
  if(reviewInput!==data){reviewInput=data;reviewStage="REVIEW";metadata=null;reviewPaused=false;workflowMessage="";}
- document.querySelector(".meme-other-workspaces")?.remove();
- const pageChanged=main.dataset.page!==page;
+  const pageChanged=main.dataset.page!==page;
  main.dataset.page=page;
  if(pageChanged)window.scrollTo({top:0,left:0,behavior:"instant"});
  main.dataset.viewMode=operatorMode;
  // Detailed audit sections remain individually expandable.
  renderGlobalContext();
  document.querySelector(".tag").textContent=activeProjectId?"PROJECT REVIEW":offlineReview?"OFFLINE REVIEW":"LOCALNET";
- nav.innerHTML=pages.map(([id,label])=>'<button data-page="'+id+'" class="'+((page===id||id==="market"&&["lab","create"].includes(page))?"active":"")+'"'+(page===id?' aria-current="page"':'')+'><span class="nav-num" aria-hidden="true">'+label.slice(0,2)+'</span><span>'+esc(label.slice(3))+'</span></button>').join("");
- nav.querySelectorAll("button").forEach(b=>b.onclick=()=>{const keyboardFocus=document.activeElement===b;importTicket++;page=b.dataset.page;record("page.open",{page});render();const current=nav.querySelector('[aria-current="page"]');if(keyboardFocus)current?.focus({preventScroll:true});if(innerWidth<=700&&current){const n=nav.getBoundingClientRect(),c=current.getBoundingClientRect();if(c.left<n.left)nav.scrollLeft+=c.left-n.left;else if(c.right>n.right)nav.scrollLeft+=c.right-n.right;}});
+ nav.replaceChildren();
+ nav.hidden=page!=="terminal";
+ const topNav=document.querySelector("#top-nav");
+ const activeNavPage=page==="create"?"terminal":page;
+ topNav.innerHTML=pages.map(([id,label])=>'<button type="button" data-page="'+id+'"'+(activeNavPage===id?' class="active" aria-current="page"':'')+'>'+esc(label)+'</button>').join("");
+ topNav.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  const keyboardFocus=document.activeElement===b;importTicket++;page=b.dataset.page;record("page.open",{page});render();
+  const current=topNav.querySelector('[aria-current="page"]');if(keyboardFocus)current?.focus({preventScroll:true});
+  if(current){const n=topNav.getBoundingClientRect(),c=current.getBoundingClientRect();if(c.left<n.left)topNav.scrollLeft+=c.left-n.left;else if(c.right>n.right)topNav.scrollLeft+=c.right-n.right;}
+ });
+
  const a=report.accounting,m=report.market_history;
  const links=(items)=>'<div class="row subnav">'+items.map(([id,label])=>'<button data-subpage="'+id+'">'+esc(label)+'</button>').join("")+'</div>';
  const context=()=>note("数据来源："+report.source_mode+" · 离线区间报告；Localnet 实时接口尚未接入。未知值不作估算。");

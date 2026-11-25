@@ -229,7 +229,79 @@ main[data-page=terminal] .meme-mode button{font-size:13px;padding:11px 6px;borde
 @media(max-width:1200px){.layout:has(main[data-page=terminal]){grid-template-columns:185px minmax(0,1fr)}.meme-desk{grid-template-columns:minmax(0,1fr) minmax(260px,320px)}}
 @media(max-width:980px){.meme-desk{grid-template-columns:1fr}.meme-control{position:static;max-height:none}}
 @media(max-width:700px){.layout:has(main[data-page=terminal]){display:block}body:has(main[data-page=terminal]) nav{height:auto;max-height:44vh}.meme-rail #meme-list{max-height:24vh}}
+
+/* Cook terminal design system: shared top navigation and restrained workspace surfaces. */
+:root{--bg:#101414;--surface:#171c1c;--surface2:#141919;--line:#303b3b;--text:#e3e8e7;--muted:#a3afae;--cyan:#84c0bb;--green:#8ad39c;--red:#e69898;--amber:#e0b77b;--header-h:58px}
+body,body:has(main[data-page=terminal]){--bg:#101414;--surface:#171c1c;--surface2:#141919;--line:#303b3b;--text:#e3e8e7;--muted:#a3afae;--cyan:#84c0bb;color:var(--text);background:var(--bg);font:13px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+body>header,body:has(main[data-page=terminal])>header{display:flex;align-items:center;justify-content:space-between;gap:22px;height:var(--header-h);min-height:var(--header-h);padding:0 20px;background:#151b1b;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:15;flex-wrap:nowrap}
+.brand{gap:9px;flex:0 0 auto}.brand-mark{width:31px;height:31px;background:#233e3e;border:1px solid #456461;border-radius:7px;color:var(--cyan);font-size:17px;box-shadow:none}.brand h1{font-size:14px;letter-spacing:.04em;color:#dfe8e7}.brand-sub{display:none}
+#top-nav{display:flex;align-items:stretch;align-self:stretch;gap:5px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none}
+#top-nav::-webkit-scrollbar{display:none}
+#top-nav button{flex:0 0 auto;position:relative;display:flex;align-items:center;justify-content:center;white-space:nowrap;border:0;border-radius:0;padding:0 12px;margin:0;background:transparent;color:#a4b0af;font-size:13px;font-weight:500;min-height:44px}
+#top-nav button:hover{background:#1d2727;color:#e3e8e7}
+#top-nav button.active{background:#1a2525;color:#a6d5d0;font-weight:650}
+#top-nav button.active::after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:2px;background:#84c0bb;border-radius:2px 2px 0 0}
+.header-meta{display:flex;flex:0 0 auto;align-items:center;gap:8px}.header-meta .build{display:none}.header-meta .tag{margin:0;padding:4px 8px;white-space:nowrap;font-size:10px;border-color:#3b5551;background:#1c2c29;color:#b5d4c4;box-shadow:none}.header-meta .tag:before{box-shadow:none;background:#a0c7a8}
+#global-project-context{display:none!important}
+.layout{grid-template-columns:minmax(0,1fr);min-height:calc(100vh - var(--header-h))}
+.layout:has(main[data-page=terminal]){grid-template-columns:220px minmax(0,1fr)}
+#nav[hidden]{display:none!important}
+body:has(main[data-page=terminal]) #nav{position:sticky;top:var(--header-h);height:calc(100vh - var(--header-h));background:#121818;border-right:1px solid var(--line);padding:15px 10px}
+#nav:has(.meme-rail)::before{display:none}
+.meme-rail-head{padding:0 3px}.meme-rail-head strong{font-size:14px;color:#e2e8e7}.meme-rail #meme-search{height:33px;border-radius:5px;margin:10px 0 8px;font-size:12px}.meme-list-empty{padding:18px 3px;color:var(--muted)}
+#nav button.meme-project{background:transparent;min-height:54px;border:1px solid transparent;border-bottom-color:#263130;border-radius:5px;padding:8px;margin:0;gap:9px}
+#nav button.meme-project:hover{background:#1c2928}
+#nav button.meme-project.selected{background:#213533;border-color:#436461;box-shadow:none}
+.meme-avatar{background:#293d3b;color:#b7d5d1;border-radius:50%;width:34px;height:34px}
+#nav button#meme-create-footer{background:#254643;border-color:#527975;color:#d1e7e4;font-size:13px;font-weight:600;min-height:38px}
+main{max-width:1600px;padding:22px 24px}
+main[data-page=terminal]{padding:0;min-height:calc(100vh - var(--header-h))}
+h2{font-size:23px;font-weight:650;letter-spacing:-.02em}h3{font-size:14px;font-weight:600;letter-spacing:0}h3:before{display:none}
+.panel,.pro-pane,.workspace-content,.workspace-side,.operator-treasury,.operator-sidebar>section{background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:none}
+.stat,.project-stat,.project-work-grid>div,.asset-metric{background:var(--surface2);border-color:var(--line);box-shadow:none}
+button,input,select,textarea{background:#151b1b;border:1px solid #394b49;color:var(--text);border-radius:5px}
+button:hover:not(:disabled){background:#243332;border-color:#577672}
+button.primary,main[data-page=terminal] button.primary{background:#35615d;color:#edf5f3;border-color:#527d78}
+button.primary:hover:not(:disabled){background:#487773}
+input::placeholder,textarea::placeholder{color:#778887}
+.scroll{border-color:var(--line);border-radius:4px}
+th,td{border-bottom:1px solid #2b3635;padding:9px 10px}
+th,.scroll th{background:#1b2322;color:#a9b8b5;font-size:11px;font-weight:550;letter-spacing:0;text-transform:none}
+tbody tr:hover,.scroll tbody tr:not(:has(.table-empty)):hover{background:#202d2b}
+.notice{background:#27231c;border:1px solid #514634;border-left:2px solid #b49a69;border-radius:4px;color:#dac7a5}
+.empty-state{background:transparent;border:0;gap:7px;color:#9aa9a6}.empty-state strong{font-size:13px;font-weight:550;color:#ccd7d4}.empty-state span{font-size:12px}
+.meme-desk{padding:12px;gap:12px;grid-template-columns:minmax(0,1fr) minmax(300px,365px)}
+.meme-center{gap:10px}.meme-center #terminal-project-context{padding:9px 12px;background:#171d1d;border:1px solid var(--line);border-radius:5px}
+.meme-chart-toolbar{padding:0 3px}.meme-chart-toolbar strong{font-size:13px;color:#dce6e3}
+.meme-center .pro-chart,.meme-chart-empty{background:#141a1a;border-color:var(--line);border-radius:6px;min-height:350px}
+.meme-chart-empty .empty-state{min-height:305px}
+.meme-center .pro-chart .pro-pane-head{padding:12px;border-bottom:1px solid var(--line)}
+.meme-center .pro-chart-body{min-height:245px}
+.meme-lower{background:#151b1b;border-color:var(--line);padding:0 12px 12px}
+.meme-lower-tabs{gap:14px;margin:0 0 10px}
+main[data-page=terminal] .meme-lower-tabs button{font-size:12px;padding:12px 1px}
+.meme-lower .meme-wallet{min-height:170px}
+.meme-control{top:calc(var(--header-h) + 12px);max-height:calc(100vh - var(--header-h) - 24px);background:#151b1b;border:1px solid var(--line);border-radius:6px;padding:12px;gap:6px}
+.meme-control .meme-mode{background:#1d2726;padding:4px;border-radius:6px;gap:4px}
+main[data-page=terminal] .meme-mode button{font-size:13px;font-weight:600;padding:10px 5px;border-radius:4px;color:#aebbb8;background:transparent}
+main[data-page=terminal] .meme-mode button[aria-pressed=true]{background:#294a47;color:#c0ded9}
+.meme-control .meme-control-section{padding:16px 0;gap:10px}
+main[data-page=terminal] .meme-control h3{font-size:14px;font-weight:600}
+.meme-control .bundle-mode-label{font-size:10px;color:#c5b18b}
+.meme-control .bundle-direction{background:#202927;border-radius:6px}
+.meme-control .bundle-metrics>div{padding:12px 10px;background:#1b2322;border-color:#405653;border-radius:5px}
+.bundle-metrics strong{font-size:16px}.bundle-metrics small{font-size:11px}
+.meme-control .bundle-submit{min-height:38px;border-radius:5px}
+.meme-control .trade-log{border-top:1px solid var(--line)}
+.meme-execution-note{padding:10px 0;color:var(--muted)}
+.meme-report-extra,.project-secondary{border-color:var(--line);border-radius:5px;background:var(--surface2)}
+#meme-launch-host .panel{background:#171d1d;border-color:var(--line)}
+#meme-launch-host .setup-workspace{gap:8px}
+body:has(main[data-page=terminal]) .header-meta #global-project-context{display:none}
+@media(max-width:1200px){body>header,body:has(main[data-page=terminal])>header{gap:12px;padding:0 12px}#top-nav button{padding:0 9px;font-size:12px}.layout:has(main[data-page=terminal]){grid-template-columns:185px minmax(0,1fr)}.meme-desk{grid-template-columns:minmax(0,1fr) minmax(265px,315px)}}
+@media(max-width:980px){.meme-desk{grid-template-columns:1fr}.meme-control{position:static;max-height:none}.header-meta .tag{display:none}}
+@media(max-width:700px){:root{--header-h:94px}body>header,body:has(main[data-page=terminal])>header{height:auto;min-height:var(--header-h);flex-wrap:wrap;gap:0;padding:8px 12px 0}.brand{min-height:33px}#top-nav{order:3;flex:1 0 100%;height:44px}.header-meta{display:flex;flex:0 0 auto}.header-meta .tag{display:flex}.layout:has(main[data-page=terminal]){display:block}body:has(main[data-page=terminal]) #nav{position:static;height:auto;max-height:40vh;padding:10px;border-right:0}.meme-rail #meme-list{max-height:22vh}.meme-desk{padding:8px;gap:8px}main{padding:14px}.meme-center .pro-chart,.meme-chart-empty{min-height:250px}.meme-chart-empty .empty-state{min-height:200px}}
 </style></head>
-<body><a class="skip-link" href="#main">跳转到主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
-<div class="layout"><nav aria-label="页面导航" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
+<body><a class="skip-link" href="#main">跳转到主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="主导航"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
+<div class="layout"><nav aria-label="我的 Meme" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
 <script type="module" src="/web/app.mjs"></script></body></html>
