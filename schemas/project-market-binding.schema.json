@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/project-market-binding.schema.json",
+  "title": "ProjectMarketBinding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "market_id",
+    "venue",
+    "market_account",
+    "identity",
+    "identity_digest",
+    "verification_status",
+    "verification_evidence_ref"
+  ],
+  "properties": {
+    "market_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "venue": {
+      "type": "string",
+      "enum": [
+        "PUMP_BONDING_CURVE",
+        "PUMP_SWAP",
+        "RAYDIUM_CPMM"
+      ]
+    },
+    "market_account": {
+      "type": "string",
+      "minLength": 1
+    },
+    "identity": {
+      "$ref": "market-identity.schema.json"
+    },
+    "identity_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": [
+        "UNVERIFIED",
+        "VERIFIED"
+      ]
+    },
+    "verification_evidence_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

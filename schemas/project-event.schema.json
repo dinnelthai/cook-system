@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/project-event.schema.json",
+  "title": "ProjectEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "project_id",
+    "revision",
+    "event_type",
+    "occurred_at_ms",
+    "actor_id",
+    "source",
+    "payload",
+    "request_digest",
+    "previous_hash",
+    "event_hash"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "occurred_at_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "const": "application"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "request_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "previous_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "event_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

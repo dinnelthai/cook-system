@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dinnelthai/cook-system/blob/main/schemas/project-wallet-group.schema.json",
+  "title": "ProjectWalletGroup",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "group_id",
+    "name",
+    "purpose",
+    "members"
+  ],
+  "properties": {
+    "group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "purpose": {
+      "type": "string",
+      "enum": [
+        "DEV",
+        "TREASURY",
+        "OPERATIONS",
+        "MARKET_OPERATIONS",
+        "OBSERVER"
+      ]
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "wallet_address",
+          "role",
+          "enabled",
+          "allocation_limit_base_units"
+        ],
+        "properties": {
+          "wallet_address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "DEV",
+              "TREASURY",
+              "OPERATOR",
+              "EXECUTOR",
+              "OBSERVER"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "allocation_limit_base_units": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(0|[1-9][0-9]*)$"
+          }
+        }
+      }
+    }
+  }
+}

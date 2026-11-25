@@ -13,20 +13,57 @@
     "market_phase"
   ],
   "properties": {
-    "chain_id": { "type": "string", "minLength": 1 },
+    "chain_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "network": {
       "type": "string",
-      "enum": ["mainnet", "devnet", "local_sim", "synthetic"]
+      "enum": [
+        "mainnet",
+        "devnet",
+        "local_sim",
+        "synthetic",
+        "localnet"
+      ]
     },
-    "token_mint": { "type": "string", "minLength": 1 },
-    "quote_mint": { "type": "string", "minLength": 1 },
-    "curve_program_id": { "type": "string", "minLength": 1 },
-    "curve_account": { "type": ["string", "null"] },
-    "program_version": { "type": ["string", "null"] },
-    "idl_revision": { "type": ["string", "null"] },
+    "token_mint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "quote_mint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "curve_program_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "curve_account": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "program_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "idl_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "market_phase": {
       "type": "string",
-      "enum": ["bonding_curve", "graduated", "post_graduation"]
+      "enum": [
+        "bonding_curve",
+        "graduated",
+        "post_graduation"
+      ]
     }
   }
 }

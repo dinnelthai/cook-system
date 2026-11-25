@@ -51,6 +51,10 @@ The first core slice currently includes:
 
 - [Cook System Business Completeness Review & MVP Acceptance Baseline](docs/implementation/BUSINESS-COMPLETENESS-REVIEW.md)
 
+## Project business core
+
+- [Project Aggregate & Event Store — V1](docs/implementation/project-aggregate-v1.md)
+
 ## Implementation contracts
 
 - [Canonical Schema Contract — V1](docs/implementation/canonical-schema-contract-v1.md)
