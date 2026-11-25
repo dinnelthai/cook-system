@@ -46,6 +46,8 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  const trade=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:"{}"});assert.equal(trade.status,400);assert.equal((await trade.json()).code,"TRADE_DISABLED");
  const faucet=await fetch(base+"/api/local-wallet/airdrop",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({address:"11111111111111111111111111111111",amount:"1"})});assert.equal(faucet.status,400);assert.equal((await faucet.json()).code,"FAUCET_DISABLED");
  const cross=await fetch(base+"/api/local-wallet/trade",{method:"POST",headers:{"content-type":"application/json","sec-fetch-site":"cross-site"},body:"{}"});assert.equal(cross.status,403);
+ const unicodeOversize=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({note:"界".repeat(1400)})});assert.equal(unicodeOversize.status,413);assert.equal((await unicodeOversize.json()).code,"BODY_TOO_LARGE");
+ const invalidUtf8=await fetch(base+"/api/local-wallet/market",{method:"POST",headers:{"content-type":"application/json"},body:Buffer.from([0x7b,0x22,0x78,0x22,0x3a,0x22,0xff,0x22,0x7d])});assert.equal(invalidUtf8.status,400);assert.equal((await invalidUtf8.json()).code,"INVALID_BODY_ENCODING");
  assert.equal((await fetch(base+"/api/terminal/report",{method:"POST"})).status,405);
  assert.equal((await fetch(base+"/api/terminal/report",{headers:{"sec-fetch-site":"cross-site"}})).status,403);
  if(process.platform!=="win32"){

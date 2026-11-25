@@ -19,3 +19,5 @@ COOK_LOCAL_FAUCET=1
 ```
 
 The offline server also applies bounded HTTP header/request timeouts, keep-alive limits and a per-process connection cap. These controls reduce accidental resource exhaustion; they are not a substitute for OS-level isolation.
+
+The local HTTP API now measures request bodies in bytes (not UTF-16 characters), drains oversized requests without retaining them, enforces the 4 KiB body cap, and rejects malformed UTF-8. Request/header timeouts bound slow-client resource use.

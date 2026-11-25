@@ -16,6 +16,12 @@ const types={".html":"text/html; charset=utf-8",".mjs":"text/javascript; charset
 const reportPath=process.env.COOK_TERMINAL_REPORT;
 const localFeatures=resolveLocalFeatureFlags();
 const maxReportBytes=16*1024*1024;
+async function readRequestJson(req,maxBytes){
+ const chunks=[];let total=0,tooLarge=false;
+ for await(const part of req){const chunk=Buffer.isBuffer(part)?part:Buffer.from(part);total+=chunk.length;if(total>maxBytes){tooLarge=true;chunks.length=0;continue;}if(!tooLarge)chunks.push(chunk);}
+ if(tooLarge)throw Error("BODY_TOO_LARGE");
+ try{return new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(chunks,total));}catch{throw Error("INVALID_BODY_ENCODING");}
+}
 const port=Number(process.env.PORT??4173);
 if(!Number.isInteger(port)||port<1||port>65535)throw new Error("invalid PORT");
 const wallets=createWalletStore();
@@ -32,7 +38,7 @@ const server=createServer(async(req,res)=>{
    if(!["127.0.0.1:"+port,"localhost:"+port].includes(host)||req.headers["sec-fetch-site"]==="cross-site"||(origin&&origin!=="http://"+host)){send(403,{code:"FORBIDDEN"});return}
    if(req.method!=="POST"||req.headers["content-type"]!=="application/json"){send(405,{code:"POST_JSON_REQUIRED"});return}
    try{
-    let raw="";for await(const part of req){raw+=part.toString();if(raw.length>4096){send(413,{code:"BODY_TOO_LARGE"});return}}
+    const raw=await readRequestJson(req,4096);
     const data=JSON.parse(raw),fund=req.url.endsWith("/airdrop");
     if(req.url.endsWith("/list")||req.url.endsWith("/create")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length)throw Error("INVALID_BODY");send(200,req.url.endsWith("/list")?{wallets:await wallets.list()}:await wallets.create());return;}
     if(req.url.endsWith("/market-data")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>k!=="interval"))throw Error("INVALID_BODY");send(200,await trading.snapshot(data.interval));return;}
@@ -45,7 +51,7 @@ const server=createServer(async(req,res)=>{
     }
     if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>!(fund?["address","amount"]:["address"]).includes(k)))throw Error("INVALID_BODY");
     send(200,await (fund?faucet.airdrop(data.address,data.amount):faucet.balance(data.address)));
-   }catch(e){const allowed=new Set(["INVALID_BODY","INVALID_PUBLIC_KEY","INVALID_AMOUNT","AMOUNT_OUT_OF_RANGE","FAUCET_DISABLED","INVALID_LOCAL_CONFIGURATION","GENESIS_MISMATCH","FAUCET_BUSY","RPC_UNAVAILABLE","RPC_REJECTED","SIGNATURE_UNKNOWN","BALANCE_INVALID","WALLET_DIRECTORY_UNSAFE","WALLET_CREATE_BUSY","WALLET_LIMIT","WALLET_KEY_INVALID","WALLET_NOT_FOUND","TRANSFER_DISABLED","TRANSFER_BUSY","SAME_WALLET","TRADE_DISABLED","TRADE_BUSY","LAB_UNAVAILABLE","UNSUPPORTED_MARKET","MARKET_CHANGED"]);send(400,{code:allowed.has(e.message)?e.message:"LOCAL_RPC_REQUEST_FAILED"})}return;
+   }catch(e){if(e.message==="BODY_TOO_LARGE"){send(413,{code:e.message});return;}if(e.message==="INVALID_BODY_ENCODING"){send(400,{code:e.message});return;}const allowed=new Set(["INVALID_BODY","INVALID_PUBLIC_KEY","INVALID_AMOUNT","AMOUNT_OUT_OF_RANGE","FAUCET_DISABLED","INVALID_LOCAL_CONFIGURATION","GENESIS_MISMATCH","FAUCET_BUSY","RPC_UNAVAILABLE","RPC_REJECTED","SIGNATURE_UNKNOWN","BALANCE_INVALID","WALLET_DIRECTORY_UNSAFE","WALLET_CREATE_BUSY","WALLET_LIMIT","WALLET_KEY_INVALID","WALLET_NOT_FOUND","TRANSFER_DISABLED","TRANSFER_BUSY","SAME_WALLET","TRADE_DISABLED","TRADE_BUSY","LAB_UNAVAILABLE","UNSUPPORTED_MARKET","MARKET_CHANGED"]);send(400,{code:allowed.has(e.message)?e.message:"LOCAL_RPC_REQUEST_FAILED"})}return;
   }
   if(req.method!=="GET"){res.writeHead(405);res.end();return}
   const url=new URL(req.url,"http://127.0.0.1");
