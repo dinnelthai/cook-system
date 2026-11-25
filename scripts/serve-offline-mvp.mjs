@@ -31,7 +31,7 @@ async function readRequestJson(req,maxBytes){
 }
 const projectStorePath=process.env.COOK_PROJECT_DB??join(homedir(),".cook-system","projects.sqlite");
 const projectStore=openProjectStore(projectStorePath);
-const projectHttp=createProjectHttpHandler({store:projectStore,readRequestJson});
+const projectHttp=createProjectHttpHandler({store:projectStore,readRequestJson,networkConfig:{chain_id:"solana",cluster:"localnet",genesis_hash:process.env.COOK_LOCAL_GENESIS_HASH??null,quote_mint:"So11111111111111111111111111111111111111112"}});
 const port=Number(process.env.PORT??4173);
 if(!Number.isInteger(port)||port<1||port>65535)throw new Error("invalid PORT");
 const wallets=createWalletStore();
