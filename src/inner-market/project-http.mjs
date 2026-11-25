@@ -1,3 +1,4 @@
+import {sendJson as send} from "./local-http-common.mjs";
 import {describeProjectDirectory} from "./project-governance-review.mjs";
 import {describeProjectRiskReview} from "./project-risk-review.mjs";
  import {reviewProjectGraduationEvidence} from "./project-graduation-evidence.mjs";
@@ -24,14 +25,6 @@ const CONFLICTS = new Set([
   "MARKET_ALREADY_VERIFIED", "ISSUANCE_ALREADY_VERIFIED"
 ]);
 const NOT_FOUND = new Set(["PROJECT_NOT_FOUND", "MARKET_NOT_FOUND", "ORDER_NOT_FOUND", "PROJECT_ARCHIVE_NOT_FOUND"]);
-function send(res, status, body) {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff"
-  });
-  res.end(JSON.stringify(body));
-}
 async function bodyJson(req, readRequestJson, maxBytes) {
   if ((req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() !== "application/json") {
     throw Object.assign(Error("JSON_CONTENT_TYPE_REQUIRED"), { httpStatus: 415 });

@@ -126,3 +126,12 @@ test("schema length limits apply to Unicode code points and validate nested gene
  assert.equal(inspectSchemaContract({type:"string",maxLength:-1},registry).valid,false);
  assert.equal(inspectSchemaContract({type:"string",maxLength:"2"},registry).valid,false);
 });
+
+test("timeline refuses mixed pinned genesis and missing genesis evidence",()=>{
+ const a=event(1),b=event(2);
+ a.market={...a.market,genesis_hash:"g1"};b.market={...b.market,genesis_hash:"g2"};
+ assert.equal(auditObservedEventTimeline({events:[a,b]}).status,"REVIEW_REQUIRED");
+ delete b.market.genesis_hash;
+ assert.equal(auditObservedEventTimeline({events:[a,b]}).status,"REVIEW_REQUIRED");
+ b.market.genesis_hash="g1";assert.notEqual(auditObservedEventTimeline({events:[a,b]}).status,"REVIEW_REQUIRED");
+});

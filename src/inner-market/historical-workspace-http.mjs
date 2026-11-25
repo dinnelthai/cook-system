@@ -1,3 +1,4 @@
+import {sendJson} from "./local-http-common.mjs";
 import {openHistoricalWorkspaceStore} from "./historical-workspace-store.mjs";
 import {WORKSPACE_MAX_BYTES} from "./historical-project-workspace.mjs";
 import {queryHistoricalWorkspace,validateHistoricalWorkspaceQuery} from "./historical-workspace-query.mjs";
@@ -5,7 +6,7 @@ import {queryHistoricalWorkspace,validateHistoricalWorkspaceQuery} from "./histo
  * must enforce Host/Origin/fetch-site restrictions before dispatch. No live operations. */
 export function createHistoricalWorkspaceHandler({path,readRequestJson}){
  return async(req,res)=>{
-  const send=(status,body)=>{res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify(body));};
+  const send=(status,body)=>sendJson(res,status,body);
   const revisions=req.url==="/api/historical-workspace/revisions",query=req.url==="/api/historical-workspace/query";
   if(query&&(req.method!=="POST"||req.headers["content-type"]!=="application/json")){send(405,{code:"WORKSPACE_METHOD_NOT_ALLOWED"});return;}
   if(req.method!=="GET"&&(revisions||req.method!=="POST"||req.headers["content-type"]!=="application/json")){send(405,{code:"WORKSPACE_METHOD_NOT_ALLOWED"});return;}

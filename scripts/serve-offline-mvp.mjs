@@ -1,3 +1,4 @@
+import {sendJson,readRequestJson} from "../src/inner-market/local-http-common.mjs";
 import { createServer } from "node:http";
 import { homedir } from "node:os";
 import { openProjectStore } from "../src/inner-market/project-store.mjs";
@@ -29,12 +30,6 @@ const maxReportBytes=16*1024*1024;
 const workspaceEnabled=process.env.COOK_HISTORICAL_WORKSPACE==="1";
 const workspacePath=process.env.COOK_HISTORICAL_WORKSPACE_DB??resolve(root,".cook-system","historical-workspace","workspace.sqlite");
 const workspaceHandler=workspaceEnabled?(await import("../src/inner-market/historical-workspace-http.mjs")).createHistoricalWorkspaceHandler({path:workspacePath,readRequestJson}):null;
-async function readRequestJson(req,maxBytes){
- const chunks=[];let total=0,tooLarge=false;
- for await(const part of req){const chunk=Buffer.isBuffer(part)?part:Buffer.from(part);total+=chunk.length;if(total>maxBytes){tooLarge=true;chunks.length=0;continue;}if(!tooLarge)chunks.push(chunk);}
- if(tooLarge)throw Error("BODY_TOO_LARGE");
- try{return new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(chunks,total));}catch{throw Error("INVALID_BODY_ENCODING");}
-}
 const projectStorePath=process.env.COOK_PROJECT_DB??join(homedir(),".cook-system","projects.sqlite");
 const projectStore=openProjectStore(projectStorePath);
 const projectHttp=createProjectHttpHandler({store:projectStore,readRequestJson,reviewProjectMarketEvidence:createProjectMarketEvidenceReviewer({path:workspacePath,enabled:workspaceEnabled}),reviewProjectTreasury:createProjectTreasuryReviewer({path:workspacePath,enabled:workspaceEnabled}),reviewProjectClose:createProjectCloseReviewer({path:workspacePath,enabled:workspaceEnabled}),importOrderReceipts:createOrderReceiptImporter({path:workspacePath,enabled:workspaceEnabled}),reviewOrderReceipt:createOrderReceiptReviewer({path:workspacePath,enabled:workspaceEnabled,endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),inspectMarket:createProjectMarketReader({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),listReportCandidates:createProjectWorkspaceCandidates({path:workspacePath,enabled:workspaceEnabled}),resolveReportLink:createProjectWorkspaceResolver({path:workspacePath,enabled:workspaceEnabled}),inspectEvidence:createProjectEvidenceReader({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),networkConfig:{chain_id:"solana",cluster:"localnet",genesis_hash:process.env.COOK_LOCAL_GENESIS_HASH??null,quote_mint:"So11111111111111111111111111111111111111112"}});
@@ -56,7 +51,7 @@ const server=createServer(async(req,res)=>{
    await workspaceHandler(req,res);return;
   }
   if(["/api/local-wallet/balance","/api/local-wallet/airdrop","/api/local-wallet/list","/api/local-wallet/create","/api/local-wallet/transfer","/api/local-wallet/portfolio","/api/local-wallet/market","/api/local-wallet/market-data","/api/local-wallet/trade"].includes(req.url)){
-   const send=(status,body)=>{res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify(body))};
+   const send=(status,body)=>sendJson(res,status,body);
    const host=req.headers.host,origin=req.headers.origin;
    if(!["127.0.0.1:"+port,"localhost:"+port].includes(host)||req.headers["sec-fetch-site"]==="cross-site"||(origin&&origin!=="http://"+host)){send(403,{code:"FORBIDDEN"});return}
    if(req.method!=="POST"||req.headers["content-type"]!=="application/json"){send(405,{code:"POST_JSON_REQUIRED"});return}
@@ -82,7 +77,7 @@ const server=createServer(async(req,res)=>{
   if(["/api/terminal/report","/api/terminal/health"].includes(url.pathname)){
    const host=req.headers.host;
    if(!["127.0.0.1:"+port,"localhost:"+port].includes(host)||req.headers["sec-fetch-site"]==="cross-site"){res.writeHead(403);res.end();return}
-   const json=(status,payload)=>{res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify(payload));};
+   const json=(status,payload)=>sendJson(res,status,payload);
    if(url.pathname==="/api/terminal/health"){json(200,{report_bridge:reportPath?"CONFIGURED":"NOT_CONFIGURED",rpc:await checkLocalRpcHealth(process.env.COOK_LOCAL_RPC_URL),execution_enabled:false});return}
    if(!reportPath){json(503,{code:"REPORT_BRIDGE_NOT_CONFIGURED"});return}
    try{
