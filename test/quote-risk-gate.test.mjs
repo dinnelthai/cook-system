@@ -94,3 +94,11 @@ test("a stale resume cannot overwrite a more recent halt",async()=>{
  await assert.rejects(()=>c.resume({operatorConfirmed:true,reason:"stale",atMs:20}),/HALT_STATE_STALE_OR_UNVERIFIED/);
  assert.equal((await c.load()).halted,true);
 });
+
+test("a malformed stored halt cannot be cleared by a resume request",async()=>{
+ let writes=0;
+ const c=createEmergencyHaltController({readState:async()=>({schema_version:"cook-emergency-halt.1",halted:true,reason:"",at_ms:10}),writeState:async()=>{writes++;}});
+ assert.equal((await c.load()).halted,true);
+ await assert.rejects(()=>c.resume({operatorConfirmed:true,reason:"review",atMs:20}),/HALT_STATE_STALE_OR_UNVERIFIED/);
+ assert.equal(writes,0);
+});

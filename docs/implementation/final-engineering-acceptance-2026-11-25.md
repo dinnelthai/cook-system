@@ -1,8 +1,8 @@
 # Cook System — engineering handoff and Codex acceptance baseline
 
 **Repository:** `dinnelthai/cook-system`  
-**Branch:** `master`  
-**Current master:** `c758975c4db05b66e38a632207963ae688853377`  
+**Historical baseline branch:** `master`  
+**Historical baseline commit:** `c758975c4db05b66e38a632207963ae688853377`  
 **CI run:** [45534513693](https://github.com/dinnelthai/cook-system/actions/runs/45534513693)  
 **CI result:** Node 22 and Node 24 both passed; each run completed 334 tests, 0 failed, 0 skipped, 12 automated acceptance checks passed and 0 failed.
 
@@ -44,7 +44,7 @@ The command creates a report similar to:
 
 Expected automated result:
 
-- 334 tests passed, 0 failed, 0 skipped
+- All tests for the checked-out commit passed, 0 failed, 0 skipped (use the current report for counts)
 - JSON Schema registry validation passed
 - Held-out synthetic defensive regression passed
 - All local money-moving capabilities default disabled
