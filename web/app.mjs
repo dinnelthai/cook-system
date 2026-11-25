@@ -12,6 +12,7 @@ import {historicalReviewRows} from "./historical-review-view.mjs";
 import {reviewSyntheticLedgerInput} from "./synthetic-ledger-view.mjs";
 import {reviewSyntheticBatchInput} from "./synthetic-batch-view.mjs";
 import {createHistoricalProjectCatalogue} from "../src/inner-market/historical-project-catalogue.mjs";
+import {listHistoricalProjects,exportHistoricalWorkspace,restoreHistoricalWorkspace,WORKSPACE_MAX_BYTES} from "../src/inner-market/historical-project-workspace.mjs";
 const main=document.querySelector("#main"),nav=document.querySelector("#nav");
 // Session storage retains diagnostics across refreshes in the same tab, without cross-tab writers.
 const diagnostics=createDiagnosticLog({storage:(()=>{try{return window.sessionStorage;}catch{return null;}})()});
@@ -42,7 +43,7 @@ const fixture=await (async()=>{
  catch(e){record("fixture.failed",{error_kind:errorKind(e)},"ERROR");startupFailure(e);throw e;}
 })();
 const original=structuredClone(fixture);
-const projectCatalogue=createHistoricalProjectCatalogue();let catalogueSelection=null;
+let projectCatalogue=createHistoricalProjectCatalogue(),catalogueSelection=null;
 let data=structuredClone(fixture),report,page="terminal",importTicket=0;
 const importCurrent=(ticket,startPage)=>ticket===importTicket&&page===startPage;
 try{report=auditedReport(data)}catch(e){startupFailure(e);throw e;}
@@ -153,9 +154,10 @@ function render(){
  main.innerHTML=screenHeading("钱包管理","创建钱包 · 余额与 SOL 充值")+'<section id="funding-panel" class="panel funding-panel"></section>';
  mountLocalFaucet(main.querySelector("#funding-panel"));
  }else if(page==="projects"){
- const catalogue=projectCatalogue.list();
- main.innerHTML=screenHeading("项目档案","当前会话 · 独立历史区间")+
- note("档案仅供历史审阅，不改变操作台、默认 Token 或钱包。最多 8 份；刷新页面后清空，请保留原始 JSON。")+
+ const catalogue=projectCatalogue.list(),projects=listHistoricalProjects(projectCatalogue);
+ main.innerHTML=screenHeading("项目档案","项目实体 · 独立历史区间 · 工作区文件")+
+ note("档案仅供历史审阅，不改变操作台、默认 Token 或钱包。最多 8 份；刷新前请导出工作区文件，重新导入即可恢复。仅导入脱敏报告，不包含凭据或私钥。")+
+ panel("项目工作区",table(["项目","Token","网络","身份","区间数","待复核"],projects.map(p=>[p.project_id,p.token_mint,p.network,p.identity_status,p.record_count,p.review_required_count]))+'<button id="workspace-export">保存工作区 JSON</button> <label for="workspace-import">合并工作区 JSON</label><input id="workspace-import" type="file" accept=".json"><p class="muted">只保存原始输入；恢复时重新审计。冲突则整批不变。</p>')+
  panel("当前报告",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status]])+'<button id="catalogue-add">将当前报告加入档案</button>')+
  panel("历史档案",'<label for="catalogue-file">导入历史报告输入 JSON</label><input id="catalogue-file" type="file" accept=".json"><p id="catalogue-message" role="status"></p>'+
  table(["项目","Token","来源","起始","结束","审计"],catalogue.map(r=>[r.projectId,r.tokenMint,r.source_mode,r.openingCutoff,r.closingCutoff,r.audit_status]))+
@@ -171,13 +173,19 @@ function render(){
   }catch{detail.textContent="档案复核失败"}
  }
  select.onchange=showCatalogue;showCatalogue();
- main.querySelector("#catalogue-add").onclick=()=>{try{catalogueSelection=projectCatalogue.add(data).key;render()}catch(e){msg.textContent="未加入档案："+errorKind(e)}};
+ main.querySelector("#workspace-export").onclick=()=>download("historical-project-workspace.json",JSON.stringify(exportHistoricalWorkspace(projectCatalogue)));
+ main.querySelector("#workspace-import").onchange=async e=>{const ticket=++importTicket,file=e.target.files[0];if(!file)return;
+  try{if(file.size>WORKSPACE_MAX_BYTES)throw Error("FILE_TOO_LARGE");const bundle=JSON.parse(await file.text());if(!importCurrent(ticket,"projects"))return;
+   const next=restoreHistoricalWorkspace(bundle,{mergeInto:projectCatalogue});projectCatalogue=next;catalogueSelection=null;render();}
+  catch(err){if(importCurrent(ticket,"projects"))msg.textContent="工作区未合并："+errorKind(err)}
+ };
+ main.querySelector("#catalogue-add").onclick=()=>{importTicket++;try{catalogueSelection=projectCatalogue.add(data).key;render()}catch(e){msg.textContent="未加入档案："+errorKind(e)}};
  main.querySelector("#catalogue-file").onchange=async e=>{const ticket=++importTicket,file=e.target.files[0];if(!file)return;
   try{if(file.size>16*1024*1024)throw Error("FILE_TOO_LARGE");const input=JSON.parse(await file.text());if(!importCurrent(ticket,"projects"))return;catalogueSelection=projectCatalogue.add(input).key;render()}
   catch(err){if(importCurrent(ticket,"projects"))msg.textContent="未加入档案："+errorKind(err)}
  };
  exportButton.onclick=()=>{if(selected)download("historical-catalogue-input.json",JSON.stringify(selected.input,null,2))};
- removeButton.onclick=()=>{if(selected&&catalogueSelection&&projectCatalogue.remove(catalogueSelection)){catalogueSelection=null;render()}};
+ removeButton.onclick=()=>{importTicket++;if(selected&&catalogueSelection&&projectCatalogue.remove(catalogueSelection)){catalogueSelection=null;render()}};
 
  }else if(page==="dashboard"){
  const d=report.terminal_state,t=d.treasury,v=d.market;

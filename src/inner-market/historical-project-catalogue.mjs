@@ -3,7 +3,7 @@ import {canonicalJson} from "../core/canonical-json.mjs";
 import {assertHistoricalReportScope} from "./historical-market-state.mjs";
 const fields=["projectId","tokenMint","quoteAsset","openingCutoff","closingCutoff"];
 const optional=["network","genesisHash","wallet","tokenAccount"];
-/** Session-only closed-interval report catalogue. No live market selection,
+/** In-memory closed-interval report catalogue with explicit portable workspace persistence. No live market selection,
  * wallet association, execution or lifecycle commands. */
 export function createHistoricalProjectCatalogue(){
  const records=new Map();let total=0;
@@ -27,7 +27,7 @@ export function createHistoricalProjectCatalogue(){
   records.set(key,{serialized,summary});total+=serialized.length;
   return {key,status:"ADDED"};
  }
- return {add,list:()=>[...records.values()].map(r=>structuredClone(r.summary)),
+ return {add,exportInputs:()=>[...records.values()].map(r=>JSON.parse(r.serialized)),list:()=>[...records.values()].map(r=>structuredClone(r.summary)),
   get:key=>{const r=records.get(key);if(!r)throw Error("CATALOGUE_RECORD_NOT_FOUND");const input=JSON.parse(r.serialized);return {input,report:buildUnifiedHistoricalReport(input)}},
   remove:key=>{const r=records.get(key);if(!r)return false;total-=r.serialized.length;return records.delete(key)}};
 }
