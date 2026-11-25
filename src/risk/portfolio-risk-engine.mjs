@@ -2,13 +2,24 @@ const units=(v,n)=>{if(typeof v!=="string"||v.length>78||!/^(0|[1-9][0-9]*)$/.te
 const ratio=(n,d)=>d===0n?null:Number(n*1000000n/d)/1000000;
 /** Evidence-aware portfolio guard. It reports configured exposure checks, not safety
  * certification or a permission to trade. Unknown inputs remain UNKNOWN. */
-export function assessPortfolioRisk({positions,account,marketSnapshots,limits,nowMs}={}){
+export function assessPortfolioRisk({positions,account,marketSnapshots,limits,nowMs,valuationScope=null}={}){
  if(!Array.isArray(positions)||!Array.isArray(marketSnapshots)||!account||!limits||!Number.isSafeInteger(nowMs)||nowMs<0)throw Error("INVALID_PORTFOLIO_RISK_INPUT");
  for(const k of ["max_total_exposure_quote_base_units","max_daily_loss_quote_base_units"])units(limits[k],k);
  for(const k of ["max_market_exposure_bps","max_drawdown_bps","max_data_age_ms","max_liquidation_depth_ratio_bps"])
   if(!Number.isSafeInteger(limits[k])||limits[k]<0)throw Error("INVALID_PORTFOLIO_RISK_LIMIT:"+k);
  const findings=[],byMarket=new Map();let totalExposure=0n,unknownExposure=0n,unknownPositionCount=0;
  if(limits.max_market_exposure_bps>10000||limits.max_drawdown_bps>10000)throw Error("INVALID_PORTFOLIO_PERCENT_LIMIT");
+ // Scope is a declared unit contract, not proof of asset valuation.
+ const scopeFields=["network","genesis_hash","quote_asset","quote_decimals"];
+ const validScope=v=>v&&typeof v==="object"&&!Array.isArray(v)&&scopeFields.every(k=>k==="quote_decimals"?Number.isSafeInteger(v[k])&&v[k]>=0&&v[k]<=18:typeof v[k]==="string"&&v[k].length>0&&v[k].length<=256&&v[k].trim()===v[k]);
+ if(valuationScope!==null&&!validScope(valuationScope))throw Error("INVALID_PORTFOLIO_VALUATION_SCOPE");
+ const scopeRows=[account,limits,...positions,...marketSnapshots];
+ for(const row of scopeRows){
+  if(!row||typeof row!=="object")throw Error("INVALID_PORTFOLIO_SCOPE_ROW");
+  if(row.valuation_scope!==undefined&&(!validScope(row.valuation_scope)||valuationScope===null||scopeFields.some(k=>row.valuation_scope[k]!==valuationScope[k])))throw Error("PORTFOLIO_VALUATION_SCOPE_MISMATCH");
+ }
+ const scopeComplete=valuationScope!==null&&scopeRows.every(row=>row.valuation_scope!==undefined);
+ if(!scopeComplete)findings.push({code:"PORTFOLIO_VALUATION_SCOPE_UNVERIFIED",severity:"UNKNOWN"});
  const positionIds=new Set();
  for(const p of positions){
   const value=units(p.exposure_quote_base_units,"position exposure");totalExposure+=value;
@@ -53,5 +64,5 @@ export function assessPortfolioRisk({positions,account,marketSnapshots,limits,no
  return {schema_version:"cook-portfolio-risk.1",status:blocked?"BLOCKED":unknown?"UNKNOWN":"WITHIN_CONFIGURED_LIMITS",
   metrics:{total_exposure_quote_base_units:totalExposure.toString(),unknown_exposure_quote_base_units:unknownExposure.toString(),
    market_count:byMarket.size,unknown_position_count:unknownPositionCount,drawdown_bps:Number.isSafeInteger(drawdown)?drawdown:null,daily_loss_quote_base_units:dailyLoss?.toString()??null},
-  findings,source_attestation:"UNKNOWN",production_ready:false,execution_enabled:false};
+  valuation_scope:valuationScope,valuation_scope_status:scopeComplete?"DECLARED_MATCH":"UNKNOWN",findings,source_attestation:"UNKNOWN",production_ready:false,execution_enabled:false};
 }

@@ -1,5 +1,5 @@
 import {createHash,randomUUID} from "node:crypto";
-import {mkdir,open,rm,rename,unlink,rmdir} from "node:fs/promises";
+import {mkdir,open,rename,unlink,rmdir,lstat} from "node:fs/promises";
 import {readBoundedRegularFile} from "../core/bounded-private-file.mjs";
 import {dirname,join} from "node:path";
 const stable=v=>v===null||typeof v!=="object"?JSON.stringify(v):Array.isArray(v)?"["+v.map(stable).join(",")+"]":"{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+stable(v[k])).join(",")+"}";
@@ -50,14 +50,15 @@ export function createAlertStore(path,{maxBytes=64*1024*1024,lockAttempts=80,loc
    if(type==="ALERT_RESOLVED"&&(!current||!["OPEN","ACKNOWLEDGED"].includes(current.status)))throw Error("ALERT_NOT_RESOLVABLE");
    const body={sequence:records.length+1,type,alert_id:alertId,at_ms:atMs,payload,previous_hash:chain.previous};
    const record={...body,record_hash:hash(body)},line=stable(record)+"\n";
-   const existing=records.reduce((n,r)=>n+Buffer.byteLength(stable(r)+"\n"),0);
+   const serialized=records.map(r=>stable(r)+"\n").join("");
+   const existing=Buffer.byteLength(serialized);
    if(existing+Buffer.byteLength(line)>maxBytes)throw Error("ALERT_JOURNAL_SIZE_LIMIT");
    // Publish a complete replacement under the writer lock. The existing journal
    // remains intact if a crash happens before rename. No automatic lock breaking.
    const temp=join(dirname(path),"."+randomUUID()+".alert.tmp");
    try{
     const file=await open(temp,"wx",0o600);
-    try{await file.writeFile(records.map(r=>stable(r)+"\n").join("")+line,"utf8");await file.sync();}finally{await file.close();}
+    try{await file.writeFile(serialized+line,"utf8");await file.sync();}finally{await file.close();}
     await rename(temp,path);
    }finally{await unlink(temp).catch(e=>{if(e.code!=="ENOENT")throw e;});}
    return record;
@@ -72,6 +73,13 @@ export function createAlertStore(path,{maxBytes=64*1024*1024,lockAttempts=80,loc
   async acknowledge(alertId,{actor,atMs}={}){if(typeof actor!=="string"||!actor.trim())throw Error("ALERT_ACTOR_REQUIRED");return append("ALERT_ACKNOWLEDGED",alertId,{actor},atMs);},
   async resolve(alertId,{reason,atMs}={}){if(typeof reason!=="string"||!reason.trim())throw Error("ALERT_RESOLUTION_REQUIRED");return append("ALERT_RESOLVED",alertId,{reason},atMs);},
   async list(){const records=await readRecords(),r=replay(records);return [...r.state.entries()].map(([alert_id,value])=>({alert_id,...value}));},
+  async inspectWriterLock(){
+   try{
+    const stat=await lstat(lockPath);
+    if(!stat.isDirectory()||stat.isSymbolicLink())return {status:"UNSAFE_LOCK_PATH",automatic_removal_allowed:false};
+    return {status:"LOCK_PRESENT_OWNER_UNVERIFIED",age_ms:Math.max(0,Date.now()-stat.mtimeMs),automatic_removal_allowed:false};
+   }catch(e){if(e.code==="ENOENT")return {status:"NO_LOCK_OBSERVED",automatic_removal_allowed:false};throw e;}
+  },
   async audit(){const records=await readRecords(),r=replay(records),counts={open:0,acknowledged:0,resolved:0};for(const x of r.state.values())counts[x.status.toLowerCase()]++;
    return {schema_version:"cook-alert-journal-audit.1",status:"INTERNALLY_CONSISTENT",record_count:records.length,alert_count:r.state.size,counts,last_hash:r.previous};}
  };

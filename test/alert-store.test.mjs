@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {mkdtemp,rm,writeFile,readFile,symlink} from "node:fs/promises";
+import {mkdtemp,rm,writeFile,readFile,symlink,mkdir} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {createAlertStore} from "../src/risk/alert-store.mjs";
@@ -57,4 +57,17 @@ test("alert journal enforces the configured byte cap on reads",async()=>{
  const dir=await mkdtemp(join(tmpdir(),"cook-alert-limit-")),path=join(dir,"alerts.jsonl");
  try{await writeFile(path,Buffer.alloc(17,0x20));await assert.rejects(()=>createAlertStore(path,{maxBytes:16}).audit(),/FILE_INVALID_OR_TOO_LARGE/);}
  finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test("orphaned writer lock is diagnosable without unsafe automatic removal",async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"cook-alert-lock-")),path=join(dir,"alerts.jsonl");
+ try{
+  const store=createAlertStore(path,{lockAttempts:1,lockDelayMs:0});
+  assert.equal((await store.inspectWriterLock()).status,"NO_LOCK_OBSERVED");
+  await mkdir(path+".lock");
+  assert.equal((await store.inspectWriterLock()).status,"LOCK_PRESENT_OWNER_UNVERIFIED");
+  await assert.rejects(()=>store.openAlert(alert,10),/ALERT_STORE_LOCK_TIMEOUT/);
+  assert.equal((await store.audit()).record_count,0);
+  assert.equal((await store.inspectWriterLock()).automatic_removal_allowed,false);
+ }finally{await rm(dir,{recursive:true,force:true});}
 });
