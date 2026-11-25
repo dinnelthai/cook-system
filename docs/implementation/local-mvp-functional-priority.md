@@ -43,3 +43,7 @@ Historical risk summaries now include independent closing-account-set and trade-
 ## F09 — historical dashboard integration
 
 The review dashboard renders the same backend risk alerts and check evidence as the terminal, including closing account set and trade evidence. A distinct input-record export supports later reimport; the existing derived report export remains separate. Historical cash/NAV labels no longer imply a current spendable balance. The dashboard labels its data as offline; diagnostic retention text matches session storage behavior. Tests cover the presentation contract, not a real browser interaction. No transaction controls or live strategy logic are added.
+
+## F10 — second-round functional acceptance handoff
+
+See [Codex second-round functional acceptance](CODEX-FUNCTIONAL-ACCEPTANCE-R2.md). F01–F09 code changes are in master; baseline Node 22/24 CI has 390 tests passing each. F10 is an acceptance plan, not a completed Localnet/browser/financial acceptance. Production infrastructure remains deferred. State-changing functionality and execution are not part of this read-only acceptance pass.
