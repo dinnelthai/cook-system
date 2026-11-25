@@ -175,3 +175,12 @@ test("market observations and report candidates use server-side project scope",a
  assert.equal((await (await fetch(url+"/report-candidates")).json()).project_revision,1);
  assert.equal((await (await fetch(url)).json()).project.revision,1);
 });
+
+test("order review endpoint exposes read-only project scope",async t=>{
+ const base=await setup(t),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"review-http",profile:{name:"Review",symbol:"REV"}})).status,201);
+ const route=root+"/review-http/order-review";
+ const result=await (await fetch(route)).json();
+ assert.deepEqual(result.orders,[]);assert.equal(result.execution_enabled,false);assert.equal(result.settlement_allowed,false);
+ assert.equal((await json(route,"POST",{type:"REGISTER_OBSERVATION"})).status,405);
+});

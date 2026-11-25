@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, mkdirSync, openSync, closeSync, realpathSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { canonicalJson } from "../core/canonical-json.mjs";
+import { createOrderReviewJournal } from "./order-review-journal.mjs";
 import { createProjectAggregate, applyProjectCommand, assertProjectAggregate } from "./project-aggregate.mjs";
 
 const MAX_AGGREGATE_BYTES = 1024 * 1024;
@@ -250,7 +251,8 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       const latest=current(projectId);
       return archiveRows.all(projectId).map(row=>decodeArchive(row,latest));
     }
-    return { create, append, get, list, events, verify, recordArchive, listArchive, close: () => db.close() };
+    const orderReview=createOrderReviewJournal(db,{current,now});
+    return { create, append, get, list, events, verify, recordArchive, listArchive, orderReview, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

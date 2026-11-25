@@ -140,6 +140,10 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         if(typeof listReportCandidates!=="function"){send(res,503,{code:"WORKSPACE_DISABLED"});return true;}
         send(res,200,listReportCandidates(store.get(projectId)));return true;
       }
+      if(action==="order-review"){
+        if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
+        send(res,200,{orders:store.orderReview.list(projectId),source_attestation:"UNKNOWN",settlement_allowed:false,execution_enabled:false});return true;
+      }
       if(action==="archive"){
         if(req.method!=="GET"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         send(res,200,{records:store.listArchive(projectId),execution_enabled:false});return true;
