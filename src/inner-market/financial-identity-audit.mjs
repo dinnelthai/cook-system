@@ -31,12 +31,13 @@ export function auditFinancialIdentities(report){
  identity("balance_sheet_receivable_crosscheck",a.closing_creator_receivable_base_units,[[r.closing_receivable_base_units,1]]);
  // Gross amounts are nonnegative; net cash, PnL and NAV remain signed.
  for(const [section,obj,keys] of [
-  ["cash_flow",c,["external_capital_in_base_units","external_capital_out_base_units","recorded_net_trade_receipts_base_units","recorded_trade_cash_cost_base_units","creator_fee_cash_receipts_base_units","other_income_base_units","total_separate_expenses_base_units","issuance_expenses_base_units","operating_expenses_base_units","failed_tx_expenses_base_units","other_expenses_base_units"]],
+  ["cash_flow",c,["opening_cash_base_units","expected_closing_cash_base_units","observed_closing_cash_base_units","external_capital_in_base_units","external_capital_out_base_units","recorded_net_trade_receipts_base_units","recorded_trade_cash_cost_base_units","creator_fee_cash_receipts_base_units","other_income_base_units","total_separate_expenses_base_units","issuance_expenses_base_units","operating_expenses_base_units","failed_tx_expenses_base_units","other_expenses_base_units"]],
   ["creator_receivables",r,["opening_receivable_base_units","closing_receivable_base_units","accrued_base_units","cash_received_base_units","written_off_base_units"]],
-  ["assets",a,["remaining_inventory_cost_base_units","closing_inventory_supplied_value_base_units","closing_liabilities_base_units"]]
+  ["assets",a,["closing_cash_base_units","closing_token_quantity_base_units","remaining_inventory_cost_base_units","closing_inventory_supplied_value_base_units","closing_creator_receivable_base_units","closing_other_assets_base_units","closing_liabilities_base_units"]],
+  ["realized_pnl",p,["creator_cash_income_base_units","other_cash_income_base_units","separate_expenses_base_units"]]
  ])for(const key of keys){
-  const value=int(obj[key]);
-  if(value!==null&&value<0n)rows.push({id:"nonnegative/"+section+"/"+key,status:"REVIEW_REQUIRED",difference_base_units:null,reason:"NEGATIVE_GROSS_AMOUNT"});
+  const raw=obj[key],value=int(raw);
+  if(raw!=null&&(value===null||value<0n))rows.push({id:"nonnegative/"+section+"/"+key,status:"REVIEW_REQUIRED",difference_base_units:null,reason:value===null?"MALFORMED_AMOUNT":"NEGATIVE_GROSS_AMOUNT"});
  }
  const counts={pass:rows.filter(x=>x.status==="PASS").length,review_required:rows.filter(x=>x.status==="REVIEW_REQUIRED").length,unknown:rows.filter(x=>x.status==="UNKNOWN").length};
  return {schema_version:"cook-financial-identity-audit.1",status:counts.review_required?"REVIEW_REQUIRED":counts.unknown?"PARTIAL":"ARITHMETIC_MATCH",counts,checks:rows,source_attestation:"UNKNOWN",execution_enabled:false};
