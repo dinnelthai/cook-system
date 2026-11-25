@@ -191,8 +191,9 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
       if(action==="audit-bundle"){
         if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}
         const input=await bodyJson(req,readRequestJson,maxBodyBytes);
-        if(Object.keys(input).some(k=>k!=="expected_revision")||!Number.isSafeInteger(input.expected_revision)||input.expected_revision<1)throw Error("INVALID_PROJECT_AUDIT_REQUEST");
-        send(res,200,{bundle:store.exportAuditBundle(projectId,input.expected_revision)});return true;
+        if(Object.keys(input).some(k=>!["expected_revision","expected_context_id"].includes(k))||!Number.isSafeInteger(input.expected_revision)||input.expected_revision<1||
+          (Object.hasOwn(input,"expected_context_id")&&(typeof input.expected_context_id!=="string"||!/^[a-f0-9]{64}$/.test(input.expected_context_id))))throw Error("INVALID_PROJECT_AUDIT_REQUEST");
+        send(res,200,{bundle:store.exportAuditBundle(projectId,input.expected_revision,input.expected_context_id??null)});return true;
       }
       if(action==="close-evidence-review"){
         if(req.method!=="POST"){send(res,405,{code:"METHOD_NOT_ALLOWED"});return true;}

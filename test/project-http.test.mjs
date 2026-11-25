@@ -216,6 +216,12 @@ test("audit bundle endpoint is a revision-pinned export, not a closure command",
  assert.equal((await json(url,"POST",{expected_revision:1,stage:"ARCHIVED"})).status,400);
  const r=await json(url,"POST",{expected_revision:1});assert.equal(r.status,200);
  const {bundle}=await r.json();assert.equal(bundle.project_id,"audit-http");assert.equal(bundle.execution_enabled,false);assert.equal(bundle.settlement_allowed,false);
+ const review=await (await fetch(root+"/audit-http/business-review")).json();
+ assert.equal(bundle.runtime_context_id,review.runtime_context_id);assert.deepEqual(bundle.business_review,review);
+ assert.equal((await json(url,"POST",{expected_revision:1,expected_context_id:"0".repeat(64)})).status,409);
+ assert.equal((await json(url,"POST",{expected_revision:1,expected_context_id:"bad"})).status,400);
+ const pinned=await json(url,"POST",{expected_revision:1,expected_context_id:review.runtime_context_id});
+ assert.equal(pinned.status,200);assert.deepEqual((await pinned.json()).bundle,bundle);
  assert.equal((await (await fetch(root+"/audit-http")).json()).project.revision,1);
 });
 

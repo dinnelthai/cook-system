@@ -6,11 +6,17 @@ import {describeProjectLifecycleEvidence} from "./project-lifecycle-evidence.mjs
 import {describeRecordedProjectTimeline,describeLifecycleExceptions} from "./project-lifecycle-timeline.mjs";
 const digest=x=>createHash("sha256").update(canonicalJson(x),"utf8").digest("hex");
 export const PROJECT_AUDIT_BUNDLE_MAX_BYTES=32*1024*1024;
+// Same identity for runtime, lifecycle, review and export. Includes all archives.
+export function projectRuntimeContextId({project,archives,orders}){
+ return digest({project,archives:archives.map(a=>a.record_hash).sort(),
+  orders:orders.map(o=>[o.order_id,o.revision,o.head_hash]).sort((a,b)=>a[0].localeCompare(b[0],"en"))});
+}
 /** Export of internally checked local records, not a source attestation,
  * backup of original report bytes, or lifecycle archive transition. */
 export function buildProjectAuditBundle({project,integrity,events,archives,orders}){
  const lifecycle=describeProjectLifecycleEvidence(project,archives,orders.map(o=>o.order));
- const business_review=buildProjectBusinessReview(project,archives,orders.map(o=>o.order));
+ const runtime_context_id=projectRuntimeContextId({project,archives,orders:orders.map(o=>o.order)});
+ const business_review={...buildProjectBusinessReview(project,archives,orders.map(o=>o.order)),runtime_context_id};
  const risk=business_review.global_risk;
  const exceptions=[
   ...lifecycle.blockers.map(code=>({category:"LIFECYCLE",code})),
@@ -28,7 +34,7 @@ export function buildProjectAuditBundle({project,integrity,events,archives,order
  const recorded_timeline=describeRecordedProjectTimeline(project,events);
  const exception_review=describeLifecycleExceptions(project,lifecycle,risk);
  const content={schema_version:"cook-project-audit-bundle.1",project_id:project.project_id,project_revision:project.revision,
-  project,business_review,integrity:{...integrity,status:"INTERNAL_HASH_CHAIN_CHECKED"},events,archives,orders,lifecycle,risk,exceptions,recorded_timeline,exception_review,
+  project,business_review,runtime_context_id,integrity:{...integrity,status:"INTERNAL_HASH_CHAIN_CHECKED"},events,archives,orders,lifecycle,risk,exceptions,recorded_timeline,exception_review,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",
   original_report_bytes_included:false,settlement_allowed:false,lifecycle_mutated:false,execution_enabled:false};
  if(Buffer.byteLength(canonicalJson(content))>PROJECT_AUDIT_BUNDLE_MAX_BYTES)throw Error("PROJECT_AUDIT_BUNDLE_SIZE_LIMIT");
@@ -42,5 +48,11 @@ export function checkProjectAuditBundleDigest(bundle){
  if(content_sha256!==digest(content))throw Error("PROJECT_AUDIT_BUNDLE_DIGEST_MISMATCH");
  if(content.project_id!==content.project?.project_id||content.project_revision!==content.project?.revision||
     content.source_attestation!=="UNKNOWN"||content.settlement_allowed!==false||content.lifecycle_mutated!==false||content.execution_enabled!==false)throw Error("PROJECT_AUDIT_BUNDLE_SCOPE_MISMATCH");
+ // Legacy exports without a context id retain digest-only verification.
+ if(Object.hasOwn(content,"runtime_context_id")){
+  if(!Array.isArray(content.archives)||!Array.isArray(content.orders)||content.runtime_context_id!==projectRuntimeContextId({project:content.project,archives:content.archives,orders:content.orders.map(o=>o.order)})||
+    content.business_review?.runtime_context_id!==content.runtime_context_id||content.business_review?.project_id!==content.project_id||content.business_review?.project_revision!==content.project_revision)
+   throw Error("PROJECT_AUDIT_BUNDLE_CONTEXT_MISMATCH");
+ }
  return {status:"DIGEST_MATCH_NOT_AUTHENTICATED",project_id:content.project_id,project_revision:content.project_revision,source_attestation:"UNKNOWN",execution_enabled:false,settlement_allowed:false};
 }

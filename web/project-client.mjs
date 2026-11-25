@@ -129,10 +129,10 @@ export async function reviewProjectCloseEvidence(projectId,revision,archiveId){
  return r;
 }
 
-export async function exportProjectAuditBundle(projectId,revision){
- const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/audit-bundle",{method:"POST",body:{expected_revision:revision}});
+export async function exportProjectAuditBundle(projectId,revision,contextId){
+ const r=await request("/api/projects/"+encodeURIComponent(projectId)+"/audit-bundle",{method:"POST",body:{expected_revision:revision,...(contextId===undefined?{}:{expected_context_id:contextId})}});
  const b=r.bundle;
- if(b?.schema_version!=="cook-project-audit-bundle.1"||b.project_id!==projectId||b.project_revision!==revision||b.execution_enabled!==false||b.settlement_allowed!==false||b.lifecycle_mutated!==false||typeof b.content_sha256!=="string")throw Error("PROJECT_AUDIT_BUNDLE_SCOPE_MISMATCH");
+ if(b?.schema_version!=="cook-project-audit-bundle.1"||b.project_id!==projectId||b.project_revision!==revision||b.execution_enabled!==false||b.settlement_allowed!==false||b.lifecycle_mutated!==false||typeof b.content_sha256!=="string"||(contextId!==undefined&&(b.runtime_context_id!==contextId||b.business_review?.runtime_context_id!==contextId)))throw Error("PROJECT_AUDIT_BUNDLE_SCOPE_MISMATCH");
  return b;
 }
 

@@ -353,7 +353,9 @@ function renderTerminal(){
         auditButton.disabled=true;const status=lifecycleArea.querySelector("#project-audit-status");
         status.textContent="读取一致性快照…";
         try{
-         const bundle=await exportProjectAuditBundle(selected.project_id,selected.revision);
+         const snapshot=await getProjectBusinessReview(selected.project_id,selected.revision);
+         if(!stillCurrent())return;
+         const bundle=await exportProjectAuditBundle(selected.project_id,selected.revision,snapshot.runtime_context_id);
          if(!stillCurrent())return;
          download("project-audit-bundle.json",JSON.stringify(bundle,null,2));
          status.textContent="已导出 · "+bundle.exceptions.length+" 项待复核记录 · 内容摘要 "+bundle.content_sha256;

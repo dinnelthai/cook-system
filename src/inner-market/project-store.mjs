@@ -6,7 +6,7 @@ import { resolve, dirname } from "node:path";
 import { canonicalJson } from "../core/canonical-json.mjs";
 import { createOrderReviewJournal } from "./order-review-journal.mjs";
 import { describeProjectRiskReview } from "./project-risk-review.mjs";
-import { buildProjectAuditBundle } from "./project-audit-bundle.mjs";
+import { buildProjectAuditBundle, projectRuntimeContextId as runtimeContextId } from "./project-audit-bundle.mjs";
 import { createProjectAggregate, applyProjectCommand, assertProjectAggregate } from "./project-aggregate.mjs";
 import { replayProjectEvents } from "./project-event-replay.mjs";
 import { evidenceApplicability } from "./project-evidence-scope.mjs";
@@ -347,25 +347,19 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       list:projectId=>readSnapshot(()=>rawOrderReview.list(projectId)),
       events:(projectId,orderId)=>readSnapshot(()=>rawOrderReview.events(projectId,orderId))
     };
-    function exportAuditBundle(projectId,expectedRevision){
+    function exportAuditBundle(projectId,expectedRevision,expectedContextId=null){
       db.exec("BEGIN");
       try{
         const latest=current(projectId);
         if(latest.aggregate.revision!==expectedRevision)throw Error("PROJECT_REVISION_CONFLICT");
         const integrity=describeVerified(projectId,latest),snapshot=evidenceSnapshotInTransaction(projectId,latest);
         const archives=snapshot.archives,orders=snapshot.journal;
+        if(expectedContextId!==null&&expectedContextId!==runtimeContextId(snapshot))throw Error("PROJECT_EVIDENCE_SNAPSHOT_CONFLICT");
         const bundle=buildProjectAuditBundle({project:latest.aggregate,integrity,events:latest.events,archives,orders});
         db.exec("COMMIT");return bundle;
       }catch(error){try{db.exec("ROLLBACK");}catch{}throw error;}
     }
-    // Include close-review archives, unlike the close-review guard digest.
-    // Selection is read-only and pinned to all evidence, not just project revision.
-    function runtimeContextId(snapshot){
-      return hash(canonicalJson({project:snapshot.project,
-        archives:snapshot.archives.map(a=>a.record_hash).sort(),
-        orders:snapshot.orders.map(o=>[o.order_id,o.revision,o.head_hash]).sort((a,b)=>a[0].localeCompare(b[0],"en"))}));
-    }
-    function getBusinessReview(projectId){
+     function getBusinessReview(projectId){
       const snapshot=getEvidenceSnapshot(projectId);
       return {...buildProjectBusinessReview(snapshot.project,snapshot.archives,snapshot.orders),runtime_context_id:runtimeContextId(snapshot)};
     }
@@ -386,7 +380,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         const lifecycle=describeProjectLifecycleEvidence(project,archives,orders);
         const risk=buildProjectBusinessReview(project,archives,orders).global_risk;
         return {...lifecycle,recorded_timeline:describeRecordedProjectTimeline(project,latest.events),
-          exception_review:describeLifecycleExceptions(project,lifecycle,risk)};
+          exception_review:describeLifecycleExceptions(project,lifecycle,risk),runtime_context_id:runtimeContextId({project,archives,orders})};
       });
     }
     function getRiskReview(projectId){

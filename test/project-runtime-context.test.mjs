@@ -54,3 +54,25 @@ test("persisted conflicting interval versions are withheld from runtime selectio
   assert.equal(ctx.execution_enabled,false);assert.equal(s.get("p").revision,1);
  }finally{s?.close();}
 });
+
+test("audit export pins full evidence context and remains identical to business review after reopen",async t=>{
+ const dir=mkdtempSync(join(tmpdir(),"cook-audit-context-"));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const path=join(realpathSync(dir),"p.sqlite");let s=openProjectStore(path,{now:()=>1000});
+ try{
+  s.create({project_id:"p",profile:{name:"Audit QA",symbol:"QA"}});
+  const before=s.getBusinessReview("p"),bundle=s.exportAuditBundle("p",1,before.runtime_context_id);
+  assert.equal(bundle.runtime_context_id,before.runtime_context_id);
+  assert.deepEqual(bundle.business_review,before);
+  assert.equal(s.getLifecycleReview("p").runtime_context_id,before.runtime_context_id);
+  s.orderReview.append("p","o",{event_id:"register",expected_revision:0,expected_project_revision:1,type:"REGISTER_OBSERVATION",payload:{source_mode:"SYNTHETIC",signature:"1".repeat(64)}});
+  assert.throws(()=>s.exportAuditBundle("p",1,before.runtime_context_id),/PROJECT_EVIDENCE_SNAPSHOT_CONFLICT/);
+  const after=s.getBusinessReview("p");assert.notEqual(after.runtime_context_id,before.runtime_context_id);assert.equal(after.project_revision,1);
+  const latest=s.exportAuditBundle("p",1,after.runtime_context_id);assert.deepEqual(latest.business_review,after);
+  s.close();s=null;s=openProjectStore(path,{now:()=>1000});assert.deepEqual(s.exportAuditBundle("p",1,after.runtime_context_id),latest);
+  const {checkProjectAuditBundleDigest}=await import("../src/inner-market/project-audit-bundle.mjs");
+  const {createHash}=await import("node:crypto");const {canonicalJson}=await import("../src/core/canonical-json.mjs");
+  assert.equal(checkProjectAuditBundleDigest(latest).status,"DIGEST_MATCH_NOT_AUTHENTICATED");
+  const changed=structuredClone(latest);changed.runtime_context_id="0".repeat(64);delete changed.content_sha256;changed.content_sha256=createHash("sha256").update(canonicalJson(changed),"utf8").digest("hex");
+  assert.throws(()=>checkProjectAuditBundleDigest(changed),/PROJECT_AUDIT_BUNDLE_CONTEXT_MISMATCH/);
+ }finally{s?.close();}
+});
