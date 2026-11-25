@@ -1,3 +1,4 @@
+import {mountProjectAssets} from "./project-assets-view.mjs";
 import {lifecycleLabel,operationalLabel,projectWalletRegistrationRows} from "./project-operator-view.mjs";
 import {historicalSeriesRange} from "./terminal-display.mjs";
 import {projectOverviewModel,projectIntervalMetrics} from "./project-overview-view.mjs";
@@ -55,7 +56,7 @@ function auditedReport(input){
   return r;
  }catch(e){record("report.failed",{error_kind:errorKind(e),duration_ms:Math.round(performance.now()-start)},"ERROR");throw e;}
 }
-const pages=[["terminal","01 操作台"],["create","02 项目准备与发行台账"],["wallet","03 钱包管理"],["projects","04 项目档案"],["dashboard","05 复盘分析"],["participants","06 市场风险实验"],["logs","07 系统设置"]];
+const pages=[["terminal","01 操作台"],["create","02 项目准备与发行台账"],["wallet","03 资产与钱包"],["projects","04 项目档案"],["dashboard","05 复盘分析"],["participants","06 市场风险实验"],["logs","07 系统设置"]];
 const fixture=await (async()=>{
  const start=performance.now();
  try{const response=await fetch("../fixtures/synthetic/inner-market-mvp.json");if(!response.ok)throw new Error("Fixture unavailable");const value=await response.json();record("fixture.loaded",{duration_ms:Math.round(performance.now()-start)});return value;}
@@ -399,8 +400,15 @@ function render(){
  const context=()=>note("数据来源："+report.source_mode+" · 离线区间报告；Localnet 实时接口尚未接入。未知值不作估算。");
  if(page==="terminal"){renderTerminal();
  }else if(page==="wallet"){
- main.innerHTML=screenHeading("钱包管理","创建钱包 · 余额与 SOL 充值")+'<section id="funding-panel" class="panel funding-panel"></section>';
- mountLocalFaucet(main.querySelector("#funding-panel"));
+ main.innerHTML=screenHeading("资产与钱包","项目资产证据 · 独立本地钱包工具")+
+ '<section id="project-assets" class="panel"></section>'+
+ '<details id="local-wallet-tools" class="panel"'+(activeProjectId?"":" open")+'><summary>独立 Localnet 钱包工具（非项目资产）</summary>'+note("下方钱包余额和测试资金工具不绑定当前 Project，不计入项目 NAV 或可用预算。")+'<section id="funding-panel" class="funding-panel"></section></details>';
+ const assetHost=main.querySelector("#project-assets"),fundingHost=main.querySelector("#funding-panel");
+ const localTools=main.querySelector("#local-wallet-tools"),scope=activeProjectId;
+ mountProjectAssets(assetHost,{projectId:scope,isActive:()=>page==="wallet"&&activeProjectId===scope&&assetHost.isConnected,esc,table,note,openTerminal:()=>{importTicket++;page="terminal";render();}});
+ let fundingMounted=false;
+ const mountFunding=()=>{if(!fundingMounted&&localTools.open&&fundingHost.isConnected){fundingMounted=true;mountLocalFaucet(fundingHost);}};
+ localTools.addEventListener("toggle",mountFunding);mountFunding();
  }else if(page==="projects"){
  const catalogue=projectCatalogue.list(),projects=listHistoricalProjects(projectCatalogue);
  main.innerHTML=screenHeading("项目档案","项目实体 · 独立历史区间 · 工作区文件")+
@@ -410,7 +418,7 @@ function render(){
  panel("已保存项目复盘",'<div id="saved-project-review"></div>')+
  panel("毕业与 PumpSwap 历史审阅",'<div id="graduation-review"></div>')+
  panel("项目全生命周期复盘",'<div id="project-lifecycle-review"></div>')+
- panel("当前报告",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status]])+'<button id="catalogue-add">将当前报告加入档案</button>')+
+ panel("独立报告缓冲区（非当前 Project）",table(["项目","Token","来源","审计"],[[data.scope.projectId,data.scope.tokenMint,report.source_mode,report.status]])+'<button id="catalogue-add">将当前报告加入档案</button>')+
  panel("历史档案",'<label for="catalogue-file">导入历史报告输入 JSON</label><input id="catalogue-file" type="file" accept=".json"><p id="catalogue-message" role="status"></p>'+
  table(["项目","Token","来源","起始","结束","审计"],catalogue.map(r=>[r.projectId,r.tokenMint,r.source_mode,r.openingCutoff,r.closingCutoff,r.audit_status]))+
  '<label for="catalogue-select">选择独立审阅记录</label><select id="catalogue-select"><option value="">请选择</option>'+catalogue.map((r,i)=>'<option value="'+i+'"'+(r.key===catalogueSelection?' selected':'')+'>'+esc(r.projectId+" · "+r.source_mode+" · "+r.openingCutoff+" → "+r.closingCutoff)+'</option>').join("")+'</select> <button id="catalogue-open" disabled>在操作台审阅</button> <button id="catalogue-export" disabled>导出原始记录</button> <button id="catalogue-remove" disabled>移出会话档案</button><div id="catalogue-detail"></div>');
@@ -433,7 +441,7 @@ function render(){
  dbLoad.disabled=workspaceBusy;dbSave.disabled=workspaceBusy||workspaceRevision===null;dbVersions.disabled=workspaceBusy;
  for(const id of ["workspace-import","catalogue-add","catalogue-file","catalogue-select"])main.querySelector("#"+id).disabled=workspaceBusy;
  if(workspaceBusy){removeButton.disabled=true;openReview.disabled=true;}
- openReview.onclick=()=>{if(!selected||workspaceBusy)return;if(!window.confirm("在离线审阅模式打开该记录？不会绑定钱包。"))return;const next=structuredClone(selected.input),nextReport=auditedReport(next);importTicket++;offlineReview=true;data=next;report=nextReport;page="terminal";record("page.open",{page});render()};
+ openReview.onclick=()=>{if(!selected||workspaceBusy)return;if(!window.confirm("在离线审阅模式打开该记录？不会绑定钱包。"))return;const next=structuredClone(selected.input),nextReport=auditedReport(next);importTicket++;activeProjectId=null;offlineReview=true;data=next;report=nextReport;page="terminal";record("page.open",{page});render()};
  async function databaseAction(action){
   if(workspaceBusy)return;
   if(action==="load"&&projectCatalogue.list().length&&!window.confirm("读取数据库将替换当前会话档案。请先导出未保存记录。继续？"))return;
@@ -506,13 +514,6 @@ function render(){
    isActive:()=>page==="create"&&importTicket===ticket,
    screenHeading,panel,note,table,esc,download,projectRegistry,record,errorKind
   });
-  }else if(page=="wallet"){
- const d=report.terminal_state,t=d.treasury;
- main.innerHTML=screenHeading("Treasury / 资金中心","项目账本 · 报价资产原始单位")+
- metrics([["期末现金",a.closing_cash_base_units],["已实现盈亏",a.realized_project_pnl_base_units],["创作者费",a.creator_cash_income_base_units],["独立费用",t.recorded_expenses_base_units]])+
- splitView(panel("资金收支",compareBars([["交易支出",t.actual_trade_spend_base_units,"red"],["交易回款",t.actual_trade_receipts_base_units,"green"],["创作者收入",a.creator_cash_income_base_units,"green"],["独立费用",t.recorded_expenses_base_units,"red"]],"base units")),panel("财务对账",table(["检查","结果"],[["总账",report.status],["资本流入",t.recorded_capital_in_base_units],["资本流出",t.recorded_capital_out_base_units]]))+emptyState("钱包余额未接入","当前报告仅包含项目级资金证据"))+
- panel("资金流水",table(["记录","类型","金额","对账"],data.cash.entries.map(x=>[x.id,x.kind,x.amountBaseUnits,x.reconciliation])));
-
  }else if(page==="lab"){
  main.innerHTML='<h2>历史成交测试</h2>'+note("读取固定的合成或已归档历史报告数据，仅进行离线核算。")+'<div class="panel"><div class="row"><button id="reset">恢复默认样本</button><button id="bad">测试缺失交易</button><button id="export">导出报告</button></div><label>导入已标准化历史 JSON</label><input id="load" type="file" accept=".json"><p id="error" class="negative"></p></div>'+panel("逐笔成交记录",table(["事件","序号","方向","金额（base units）","状态"],data.market.trades.map(t=>[t.id,t.sequence,t.side,t.quoteNotionalBaseUnits,t.status])))+details("核算结果原始数据",report);
  document.querySelector("#reset").onclick=()=>{importTicket++;record("sample.reset",{page});offlineReview=false;data=structuredClone(original);report=auditedReport(data);render()};
@@ -638,7 +639,7 @@ function render(){
  }
  main.insertAdjacentHTML("beforeend",'<div class="row"><button id="quick-log-export">导出诊断日志</button></div>');
  document.querySelector("#quick-log-export").onclick=exportDiagnostics;
- const extras=page==="market"?[["lab","历史回放 / 导入"],["create","发行资料"]]:page==="lab"||page==="create"?[["market","返回市场中心"]]:page==="logs"?[["terminal","返回操作台"]]:[];
+ const extras=page==="market"?[["lab","历史回放 / 导入"],["create","发行资料"]]:page==="lab"?[["market","返回市场中心"]]:["create","logs"].includes(page)?[["terminal","返回操作台"]]:[];
  if(extras.length){main.insertAdjacentHTML("afterbegin",links(extras));main.querySelectorAll("[data-subpage]").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.subpage;record("page.open",{page});render()});}
  main.insertAdjacentHTML("beforeend",'<p class="foot">Cook System · Localnet · 仅 Localnet 测试交易</p>');
 }

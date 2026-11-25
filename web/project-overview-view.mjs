@@ -4,7 +4,7 @@ const labels={historical_lp_evidence:"历史 LP 证据",configuration:"项目配
 const states={REVIEW_REQUIRED:"待复核",EVIDENCE_INCOMPLETE:"证据不足",INCOMPLETE:"不完整",MISSING:"缺失",NOT_RUN:"未验收",UNKNOWN:"未知",WARNING:"警告",DECLARED_ENDPOINT_PRESENT:"声明期末数据齐备",DECLARED_MATCH:"声明一致",DECLARED_EVIDENCE_PRESENT:"声明证据存在",DECLARED_ENDPOINTS_PRESENT:"声明期末数据齐备",REGISTRATION_OR_EVIDENCE_INCOMPLETE:"登记或证据不完整",OBSERVED_NOT_ATTESTED:"已记录，未认证",CONFIGURATION_INCOMPLETE:"配置不完整",DECLARATIONS_PRESENT:"声明齐备",REVIEW_RECOMMENDED:"建议复核"};
 const display=v=>states[v]??v??"未知";
 const raw=v=>typeof v==="string"&&/^(0|-?[1-9][0-9]*)$/.test(v)?v:"—";
-const names=[["cash","期末现金","lamports"],["nav","期末 NAV","lamports"],["realized_pnl","区间已实现损益","lamports"],["token_quantity","期末 Token 库存","Token 原始单位"],["inventory_cost","库存成本","lamports"],["creator_receivable","Creator 应收","lamports"]];
+const names=[["cash","期末现金","lamports"],["nav","期末 NAV","lamports"],["realized_pnl","区间已实现损益","lamports"],["token_quantity","期末 Token 库存","Token 原始单位"],["inventory_cost","库存成本","lamports"],["creator_receivable","Creator 应收","lamports"],["capital_in","区间外部资本投入","lamports"],["inventory_value","历史库存估值","lamports"],["unrealized_value_minus_cost","库存估值与成本差","lamports"],["creator_cash_income","Creator 到账收入","lamports"],["other_assets","期末其他资产","lamports"],["liabilities","期末负债","lamports"]];
 export function projectOverviewModel(review){
  const r=review?.runtime;
  if(!r||r.execution_enabled!==false||r.live_assets!==null||r.project_revision!==review.project_revision||r.project_id!==review.project_id)throw Error("INVALID_PROJECT_OVERVIEW");

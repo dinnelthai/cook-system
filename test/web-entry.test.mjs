@@ -56,3 +56,12 @@ test("operator workspace exposes declared budget and keeps raw order evidence se
  const order=await readFile(new URL("../web/order-review-view.mjs",import.meta.url),"utf8");
  assert.match(order,/order-summary/);assert.match(order,/原始复核证据 JSON/);
 });
+
+test("single wallet route separates scoped historical assets from local wallet tools",async()=>{
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");
+ assert.equal((app.match(/else if\(page==={0,1}"wallet"\)/g)||[]).length,1);
+ assert.match(app,/mountProjectAssets\(assetHost/);assert.match(app,/独立 Localnet 钱包工具/);
+ const assets=await readFile(new URL("../web/project-assets-view.mjs",import.meta.url),"utf8");
+ assert.match(assets,/selectProjectRuntimeInterval\(projectId,project.revision,v.runtime_context_id,archiveId\)/);
+ assert.doesNotMatch(assets,/mountLocalFaucet|sendTransaction|signTransaction/);
+});
