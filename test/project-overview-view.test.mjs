@@ -26,3 +26,13 @@ test("display distinguishes missing, conflicting and declared unverified amounts
  assert.equal(m.find(x=>x.id==="nav").evidence_label,"未取得声明值");
  assert.ok(projectIntervalMetrics({status:"REVIEW_REQUIRED",assets:{cash:"123"}}).every(x=>x.value==="—"&&x.evidence_label==="证据冲突 · 金额隐藏"));
 });
+
+test("display values convert SOL exactly but retain original audit values and unknowns",()=>{
+ const m=projectIntervalMetrics({status:"INCOMPLETE",assets:{cash:"9007199254740993",nav:"-10",realized_pnl:"0",token_quantity:"42"}});
+ assert.equal(m.find(x=>x.id==="cash").display_value,"9007199.254740993");
+ assert.equal(m.find(x=>x.id==="nav").display_value,"-0.00000001");
+ assert.equal(m.find(x=>x.id==="realized_pnl").display_value,"0.00");
+ assert.equal(m.find(x=>x.id==="token_quantity").display_value,"42");
+ assert.equal(m.find(x=>x.id==="cash").display_unit,"SOL");
+ assert.ok(projectIntervalMetrics(null).every(x=>x.display_value==="—"));
+});

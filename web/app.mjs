@@ -1,3 +1,4 @@
+import {historicalSeriesRange} from "./terminal-display.mjs";
 import {projectOverviewModel,projectIntervalMetrics} from "./project-overview-view.mjs";
 import {mountLocalFaucet} from "./local-faucet.mjs";
 import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-report.mjs";
@@ -76,16 +77,16 @@ const note=s=>'<div class="notice">'+esc(s)+'</div>';
 const panel=(title,body)=>'<section class="panel"><h3>'+esc(title)+'</h3>'+body+'</section>';
 function download(name,text){record("file.export");const a=document.createElement("a");const url=URL.createObjectURL(new Blob([text],{type:"application/json"}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 function seriesChart(points,kind){
- const values=points.map(p=>Number(p.value));
- if(!points.length||values.some(v=>!Number.isFinite(v)||v<0))return '<div class="chart-empty">暂无可验证数据</div>';
- const p=points.slice(-60),v=p.map(x=>Number(x.value)),max=Math.max(1,...v),min=kind==="NAV"?Math.min(...v):0,span=Math.max(1,max-min);
+ const p=points.slice(-60),range=historicalSeriesRange(p,kind);
+ if(!range)return '<div class="chart-empty">暂无可验证数据</div>';
+ const {values:v,max,min,span}=range;
  const X=i=>40+i*520/Math.max(1,p.length-1),Y=n=>125-(n-min)/span*100;
  let svg='<svg class="series-chart" viewBox="0 0 600 150" role="img" aria-label="'+esc(kind==="NAV"?"资产净值历史快照":"已确认成交金额")+'">';
  for(const y of [25,75,125])svg+='<path d="M40 '+y+' H560" stroke="#263449" stroke-width="1"/>';
- if(kind==="NAV"){svg+='<polyline fill="none" stroke="#55d6f4" stroke-width="2" points="'+v.map((n,i)=>X(i)+','+Y(n)).join(" ")+'"/>';v.forEach((n,i)=>svg+='<circle cx="'+X(i)+'" cy="'+Y(n)+'" r="3" fill="#55d6f4"/>');}
+ if(kind==="NAV"){svg+='<path d="M40 '+Y(0)+' H560" stroke="#92a6c0" stroke-dasharray="3 3"/><text x="35" y="'+(Y(0)+3)+'" text-anchor="end" fill="#92a6c0" font-size="9">0</text>';svg+='<polyline fill="none" stroke="#55d6f4" stroke-width="2" points="'+v.map((n,i)=>X(i)+','+Y(n)).join(" ")+'"/>';v.forEach((n,i)=>svg+='<circle cx="'+X(i)+'" cy="'+Y(n)+'" r="3" fill="#55d6f4"/>');}
  else{const bw=Math.min(32,480/p.length);v.forEach((n,i)=>svg+='<rect x="'+(X(i)-bw/2)+'" y="'+Y(n)+'" width="'+bw+'" height="'+(125-Y(n))+'" fill="'+(p[i].side==="BUY"?"#42dfb1":"#ff8293")+'"/>');}
  svg+='<text x="40" y="145" fill="#92a6c0" font-size="10">'+esc(p[0].label)+'</text><text x="560" y="145" text-anchor="end" fill="#92a6c0" font-size="10">'+esc(p.at(-1).label)+'</text></svg>';
- return svg+'<p class="muted">事件序号 · 原始报价资产 base units · '+p.length+' 个观测点 · 最大 '+esc(max)+'</p>';
+ return svg+'<p class="muted">事件序号 · 原始报价资产 base units · '+p.length+' 个观测点 · 轴范围 '+esc(min)+' → '+esc(max)+'</p>';
 }
 function details(title,value){return '<details class="raw-details"><summary>'+esc(title)+'</summary><pre>'+esc(JSON.stringify(value,null,2))+'</pre></details>'}
 function metrics(items){return '<div class="stats">'+items.map(([k,v])=>stat(k,v)).join("")+'</div>'}
@@ -148,6 +149,7 @@ function renderTerminal(){
  '<section id="terminal-risk-review" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-lifecycle-evidence" class="pro-pane" hidden></section>'+ 
  '<section id="terminal-order-review" class="pro-pane" hidden></section></details>'+
+ '<section id="terminal-scoped-placeholder" class="pro-pane"'+(activeProjectId?"":" hidden")+'><h3>当前项目行情与资产</h3>'+emptyState("尚无已绑定的可展示行情报告","选择项目关联的历史报告并完成身份核对；不会使用其他项目或合成样本代替。")+'</section>'+
  '<div id="terminal-report-area"'+(activeProjectId?' hidden inert style="display:none"':'')+'>'+
  '<section class="pro-pane"><h3>独立离线报告</h3><p class="muted">报告项目：'+esc(scope.projectId)+' · Mint：'+esc(scope.tokenMint)+' · '+esc(sourceLabel)+'</p></section>'+
   '<div class="pro-statebar"><span><i class="status-dot"></i> '+(isSample?"SYNTHETIC SAMPLE":"OFFLINE REVIEW")+'</span><span>'+esc(sourceLabel)+'</span><span>'+(isSample?"仅展示合成样本 · 执行禁用":"离线审阅 · 禁止交易")+'</span><span>阶段：'+esc(workflow.review_status)+'</span></div>'+
@@ -177,7 +179,7 @@ function renderTerminal(){
       const businessArea=main.querySelector("#terminal-business-review");businessArea.hidden=false;
       main.querySelector("#terminal-project-details").hidden=false;
       const riskArea=main.querySelector("#terminal-risk-review");riskArea.hidden=false;
-      const assetCards=row=>'<div class="project-asset-grid">'+projectIntervalMetrics(row).map(x=>'<div class="project-stat"><span>'+esc(x.label)+'</span><strong>'+esc(x.value)+'</strong><small>'+esc(x.unit)+'</small><small>'+esc(x.evidence_label)+'</small></div>').join("")+'</div>';
+      const assetCards=row=>'<div class="project-asset-grid">'+projectIntervalMetrics(row).map(x=>'<div class="project-stat"><span>'+esc(x.label)+'</span><strong>'+esc(x.display_value)+'</strong><small>'+esc(x.display_unit)+'</small><small>'+esc(x.evidence_label)+'</small></div>').join("")+'</div>';
       const businessCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&businessArea.isConnected;
       let businessTicket=0;
       async function refreshBusiness(){
@@ -188,6 +190,8 @@ function renderTerminal(){
         const model=projectOverviewModel(v);
         businessArea.innerHTML='<div class="project-overview-heading"><div><h3>项目运行概览 · v'+esc(v.project_revision)+'</h3><p class="muted">'+esc(model.status)+' · 历史声明数据 · 执行禁用</p></div><button id="business-refresh">刷新项目</button></div>'+
          '<div class="project-overview-grid"><div class="project-stat"><span>登记阶段</span><strong>'+esc(model.stage)+'</strong></div><div class="project-stat"><span>严重 / 警告 / 未知</span><strong>'+esc([model.counts.critical,model.counts.warning,model.counts.unknown].join(" / "))+'</strong></div><div class="project-stat"><span>待核对订单</span><strong>'+esc(v.orders.unresolved_count)+'</strong></div><div class="project-stat"><span>实时资产 / 市场</span><strong>未接入</strong></div></div>'+
+         '<div class="row"><button id="project-show-risk">查看风险与证据</button></div>'+
+         (v.global_risk.findings.some(f=>f.severity==="CRITICAL")?'<section class="notice" role="status"><strong>严重证据风险 · '+esc(model.counts.critical)+'</strong>'+table(["类别","风险原因"],v.global_risk.findings.filter(f=>f.severity==="CRITICAL").slice(0,5).map(f=>[f.category,f.code]))+'<p>完整风险见风险与证据；不代表实时市场风险。</p></section>':"")+
          '<div class="project-work-grid">'+model.work.map(x=>'<div><span>'+esc(x.label)+'</span><strong>'+esc(x.status)+'</strong></div>').join("")+'</div>'+
          '<div class="project-interval-head"><h3>历史资产区间</h3>'+(v.runtime_context_id&&model.intervals.length?'<label>选择区间 <select id="runtime-interval"><option value="">请选择区间</option>'+model.intervals.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.label)+'</option>').join("")+'</select></label>':'<span class="muted">暂无关联区间</span>')+'</div><div id="runtime-interval-detail" role="status">'+assetCards(null)+note("请选择一个历史区间。未选择时不显示金额；不代表当前可用资产。")+'</div>'+
          '<div class="project-work-grid"><div><span>历史市场证据</span><strong>'+esc(model.market.status)+'</strong></div><div><span>内盘报告区间 / 外盘快照</span><strong>'+esc(model.market.interval_count+" / "+model.market.pool_count)+'</strong></div><div><span>当前市场</span><strong>未知</strong></div></div>'+
@@ -209,6 +213,7 @@ function renderTerminal(){
          '<button id="business-export">导出复核 JSON</button></details>';
         const gr=v.global_risk;
         riskArea.innerHTML="<h3>统一项目风险复核</h3>"+note("同一运行快照 · "+gr.status+" · 实时风险未评估")+table(["类别","级别","问题","记录引用数"],gr.findings.map(f=>[f.category,f.severity,f.code,f.references.length]))+'<button id="project-risk-export">导出风险清单</button>';
+        businessArea.querySelector("#project-show-risk").onclick=()=>{main.querySelector("#terminal-project-details").open=true;riskArea.scrollIntoView({block:"start"});};
         riskArea.querySelector("#project-risk-export").onclick=()=>download("project-risk-review.json",JSON.stringify(gr,null,2));
         const intervalSelect=businessArea.querySelector("#runtime-interval");
         if(intervalSelect){
@@ -340,6 +345,7 @@ function renderTerminal(){
     if(match.status==="DECLARED_MATCH"){
      const area=main.querySelector("#terminal-report-area");
      area.hidden=false;area.removeAttribute("inert");area.style.removeProperty("display");
+     main.querySelector("#terminal-scoped-placeholder").hidden=true;
      // The independent report viewer remains explicitly labelled as historical.
      for(const id of ["workflow-sample","terminal-settle","terminal-archive","workflow-save"]){const control=main.querySelector("#"+id);if(control)control.disabled=true;}
     }
@@ -463,6 +469,11 @@ function render(){
  removeButton.onclick=()=>{importTicket++;if(selected&&catalogueSelection&&projectCatalogue.remove(catalogueSelection)){catalogueSelection=null;render()}};
 
  }else if(page==="dashboard"){
+ if(activeProjectId){
+  main.innerHTML=screenHeading("复盘分析","项目上下文与独立报告隔离")+note("当前已选择 Project；此独立报告工作区不会显示其他项目或合成样本。请返回操作台进行项目级复核，或明确退出项目上下文。")+'<div class="row"><button id="dashboard-return-project" class="primary">返回项目操作台</button><button id="dashboard-open-independent">退出项目上下文，打开独立复盘</button></div>';
+  main.querySelector("#dashboard-return-project").onclick=()=>{importTicket++;page="terminal";render();};
+  main.querySelector("#dashboard-open-independent").onclick=()=>{importTicket++;activeProjectId=null;render();};
+ }else{
  const d=report.terminal_state,t=d.treasury,v=d.market;
  const reviewRows=historicalReviewRows(d);
  const sol=x=>{if(x==null)return "未知";if(d.scope.quoteAsset!=="SOL_LAMPORTS")return x+" base units";const n=BigInt(x),abs=n<0n?-n:n;return (n<0n?"-":"")+(abs/1000000000n).toString()+"."+(abs%1000000000n).toString().padStart(9,"0")+" SOL"};
@@ -482,6 +493,7 @@ function render(){
  document.querySelector("#dashboard-export").onclick=()=>download("historical-dashboard.json",JSON.stringify(d,null,2));
  document.querySelector("#dashboard-export-input").onclick=()=>download("historical-report-input.json",JSON.stringify(data,null,2));
  document.querySelector("#dashboard-import").onchange=async e=>{const ticket=++importTicket,startPage=page;try{const file=e.target.files[0];if(!file)return;if(file.size>16*1024*1024)throw Error("报告文件超过 16 MiB");record("report.import.started",{page,file_bytes:file.size});const next=JSON.parse(await file.text());const nextReport=auditedReport(next);if(!importCurrent(ticket,startPage))return;offlineReview=true;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#dashboard-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
+ }
  }else if(page==="create"){
   const ticket=++importTicket;
   mountProjectSetup(main,{

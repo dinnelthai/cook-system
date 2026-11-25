@@ -41,3 +41,11 @@ test("Project terminal mounts a scoped retrospective order review only",async()=
  assert.match(view,/own!==ticket/);assert.match(view,/source_attestation:"UNKNOWN"/);
  assert.doesNotMatch(view,/sendTransaction|signTransaction/);
 });
+
+test("project context does not silently show an independent review dashboard",async()=>{
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");
+ assert.match(app,/dashboard-return-project/);
+ assert.match(app,/dashboard-open-independent/);
+ assert.match(app,/terminal-scoped-placeholder/);
+ assert.match(app,/project-show-risk/);
+});

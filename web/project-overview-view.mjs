@@ -1,5 +1,6 @@
+import {formatHistoricalSol} from "./terminal-display.mjs";
 // Historical display only. No automatic interval selection or asset calculation.
-const labels={configuration:"项目配置",issuance_evidence:"发行证据",historical_market:"历史市场",financial_interval:"财务区间",order_exceptions:"订单异常",independent_source:"独立数据核验"};
+const labels={historical_lp_evidence:"历史 LP 证据",configuration:"项目配置",issuance_evidence:"发行证据",historical_market:"历史市场",financial_interval:"财务区间",order_exceptions:"订单异常",independent_source:"独立数据核验"};
 const states={REVIEW_REQUIRED:"待复核",EVIDENCE_INCOMPLETE:"证据不足",INCOMPLETE:"不完整",MISSING:"缺失",NOT_RUN:"未验收",UNKNOWN:"未知",WARNING:"警告",DECLARED_ENDPOINT_PRESENT:"声明期末数据齐备",DECLARED_MATCH:"声明一致",DECLARED_EVIDENCE_PRESENT:"声明证据存在",DECLARED_ENDPOINTS_PRESENT:"声明期末数据齐备",REGISTRATION_OR_EVIDENCE_INCOMPLETE:"登记或证据不完整",OBSERVED_NOT_ATTESTED:"已记录，未认证",CONFIGURATION_INCOMPLETE:"配置不完整",DECLARATIONS_PRESENT:"声明齐备",REVIEW_RECOMMENDED:"建议复核"};
 const display=v=>states[v]??v??"未知";
 const raw=v=>typeof v==="string"&&/^(0|-?[1-9][0-9]*)$/.test(v)?v:"—";
@@ -17,6 +18,6 @@ export function projectIntervalMetrics(row){
  const blocked=!row||row.status==="REVIEW_REQUIRED";
  return names.map(([id,label,unit])=>{
   const value=blocked?"—":raw(row.assets?.[id]);
-  return {id,label,unit,value,evidence_label:row?.status==="REVIEW_REQUIRED"?"证据冲突 · 金额隐藏":value==="—"?"未取得声明值":"历史声明值 · 未独立认证"};
+  return {id,label,unit,value,display_value:unit==="lamports"?formatHistoricalSol(value):value,display_unit:unit==="lamports"?"SOL":unit,evidence_label:row?.status==="REVIEW_REQUIRED"?"证据冲突 · 金额隐藏":value==="—"?"未取得声明值":"历史声明值 · 未独立认证"};
  });
 }
