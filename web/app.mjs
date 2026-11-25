@@ -172,7 +172,7 @@ function renderTerminal(){
       const marketArea=main.querySelector("#terminal-market-evidence");marketArea.hidden=false;
       const marketCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&marketArea.isConnected;
       marketArea.innerHTML="<h3>历史行情证据审计</h3>"+note("仅复核已关联历史报告；不提供实时行情或交易信号。")+
-       '<label>关联报告<select id="market-evidence-report"><option value="">读取报告中…</option></select></label><button id="market-evidence-review" disabled>复核并归档</button><p id="market-evidence-status" role="status"></p><div id="market-evidence-result"></div>';
+       '<label>关联报告<select id="market-evidence-report"><option value="">读取报告中…</option></select></label><button id="market-evidence-review" disabled>复核并归档</button><button id="market-evidence-export" disabled>导出本次复核</button><p id="market-evidence-status" role="status"></p><div id="market-evidence-result"></div>';
       const ms=marketArea.querySelector("#market-evidence-report"),mb=marketArea.querySelector("#market-evidence-review"),mt=marketArea.querySelector("#market-evidence-status"),mr=marketArea.querySelector("#market-evidence-result");
       listProjectArchive(selected.project_id).then(rows=>{
        if(!marketCurrent())return;
@@ -180,13 +180,18 @@ function renderTerminal(){
        ms.replaceChildren(new Option("选择当前版本报告",""));
        for(const a of rows.filter(a=>a.kind==="HISTORICAL_REPORT_LINK"&&!a.stale))ms.add(new Option("工作区 v"+a.payload.workspace_revision+" · "+a.payload.scope.openingCutoff+" → "+a.payload.scope.closingCutoff,a.archive_id));
       }).catch(e=>{if(marketCurrent())mt.textContent=errorKind(e);});
-      ms.onchange=()=>{mb.disabled=!ms.value;mr.replaceChildren();mt.textContent="";};
+      const me=marketArea.querySelector("#market-evidence-export");
+      let lastMarketReview=null;
+      me.onclick=()=>{if(marketCurrent()&&lastMarketReview)download("project-market-evidence-review.json",JSON.stringify(lastMarketReview,null,2));};
+      ms.onchange=()=>{lastMarketReview=null;me.disabled=true;mb.disabled=!ms.value;mr.replaceChildren();mt.textContent="";};
       mb.onclick=async()=>{
-       const a=ms.value;if(!a)return;mb.disabled=true;ms.disabled=true;mr.replaceChildren();mt.textContent="复核历史行情…";
+       const a=ms.value;if(!a)return;lastMarketReview=null;me.disabled=true;mb.disabled=true;ms.disabled=true;mr.replaceChildren();mt.textContent="复核历史行情…";
        try{
-        const {review:v}=await reviewProjectMarketEvidence(selected.project_id,selected.revision,a);
+        const {review:v,archive}=await reviewProjectMarketEvidence(selected.project_id,selected.revision,a);
         if(!marketCurrent())return;
+        lastMarketReview={review:v,archive};me.disabled=false;
         mt.textContent=v.status+" · 已归档 · 来源未独立认证";
+        void refreshRisk();
         mr.innerHTML=table(["指标","证据状态"],[["历史覆盖",String(v.declared_history_complete)],["成交证据",v.trade_evidence_status],["K线证据",v.candle_evidence_status],["市场快照",v.market_snapshot_status],["记录数",v.observed_trade_record_count]])+
         table(["周期（分钟）","状态","K线数量"],v.candle_intervals.map(x=>[x.interval_ms/60000,x.status,x.candle_count??"—"]))+
         table(["参与记录证据","数量 / 状态"],[["已对账记录",v.participant_coverage?.reconciled_record_count??"—"],["有地址标签记录",v.participant_coverage?.declared_address_record_count??"—"],["缺失地址标签记录",v.participant_coverage?.missing_address_record_count??"—"],["标签覆盖",v.participant_coverage?.status??"UNKNOWN"],["独立参与者数量","未知"]])+

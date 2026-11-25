@@ -235,3 +235,13 @@ test("risk review is a project-scoped read-only evidence projection",async t=>{
  assert.equal((await json(url,"POST",{status:"SAFE"})).status,405);
  assert.equal((await (await fetch(root+"/risk-http")).json()).project.revision,1);
 });
+
+test("market evidence endpoint validates archive scope and rejects client-supplied conclusions",async t=>{
+ const base=await setup(t,{reviewProjectMarketEvidence:()=>assert.fail("unexpected review")}),root=base+"/api/projects";
+ assert.equal((await json(root,"POST",{project_id:"market-review-http",profile:{name:"Market Review",symbol:"MREV"}})).status,201);
+ const url=root+"/market-review-http/market-evidence-review";
+ assert.equal((await fetch(url)).status,405);
+ assert.equal((await json(url,"POST",{expected_revision:1,archive_id:"missing",status:"VERIFIED"})).status,400);
+ assert.equal((await json(url,"POST",{expected_revision:2,archive_id:"missing"})).status,409);
+ assert.equal((await json(url,"POST",{expected_revision:1,archive_id:"missing"})).status,404);
+});

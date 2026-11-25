@@ -176,6 +176,7 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
  const {exportHistoricalWorkspace}=await import("../src/inner-market/historical-project-workspace.mjs");
  const {createProjectWorkspaceResolver,createProjectWorkspaceCandidates}=await import("../src/inner-market/project-workspace-link.mjs");
  const {createProjectTreasuryReviewer}=await import("../src/inner-market/project-treasury-review.mjs");
+ const {createProjectMarketEvidenceReviewer}=await import("../src/inner-market/project-market-evidence-review.mjs");
  const {createOrderReceiptImporter,createOrderReceiptReviewer}=await import("../src/inner-market/order-receipt-review.mjs");
  const {createProjectCloseReviewer}=await import("../src/inner-market/project-close-evidence.mjs");
  const {checkProjectAuditBundleDigest}=await import("../src/inner-market/project-audit-bundle.mjs");
@@ -211,10 +212,18 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
   const close=createProjectCloseReviewer(opts)(p,link,orders,s.listArchive(p.project_id));
   assert.ok(close.blockers.includes("TOKEN_INVENTORY_OUTSTANDING"));
   s.recordArchive(p.project_id,"PROJECT_CLOSE_REVIEW",close,1);
+  const market=createProjectMarketEvidenceReviewer(opts)(p,link);
+  assert.equal(market.status,"PARTIAL");
+  const marketArchive=s.recordArchive(p.project_id,"MARKET_EVIDENCE_REVIEW",market,1);
+  const marketRisk=s.getRiskReview(p.project_id);
+  assert.equal(marketRisk.coverage.market_evidence_review_count,1);
+  assert.ok(marketRisk.findings.some(f=>f.code==="CANDLE_EVIDENCE_UNAVAILABLE"&&f.references.includes(marketArchive.archive_id)));
+  assert.ok(!marketRisk.findings.some(f=>f.code==="MARKET_EVIDENCE_REVIEW_MISSING"));
+  assert.throws(()=>createProjectMarketEvidenceReviewer(opts)(other,link),/ORDER_REPORT_LINK_SCOPE_MISMATCH/);
   const risk=s.getRiskReview(p.project_id),bundle=s.exportAuditBundle(p.project_id,1);
   assert.equal(risk.status,"REVIEW_REQUIRED");assert.deepEqual(bundle.risk,risk);
   assert.ok(risk.findings.some(f=>f.code==="RECEIPT_EVIDENCE_INCOMPLETE"));
-  assert.equal(bundle.orders.length,2);assert.equal(bundle.archives.length,4);assert.equal(bundle.settlement_allowed,false);
+  assert.equal(bundle.orders.length,2);assert.equal(bundle.archives.length,5);assert.equal(bundle.settlement_allowed,false);
   assert.equal(checkProjectAuditBundleDigest(bundle).status,"DIGEST_MATCH_NOT_AUTHENTICATED");
   assert.equal(s.exportAuditBundle(other.project_id,1).orders.length,0);
   assert.equal(s.get(p.project_id).revision,1);
@@ -223,6 +232,7 @@ test("M13 integration: saved historical workspace, linked report, treasury, rece
  try{
   assert.equal(reopened.exportAuditBundle(i.scope.projectId,1).orders.length,2);
   assert.equal(reopened.getRiskReview(i.scope.projectId).status,"REVIEW_REQUIRED");
+  assert.equal(reopened.getRiskReview(i.scope.projectId).coverage.market_evidence_review_count,1);
  }finally{reopened.close();}
 });
 
