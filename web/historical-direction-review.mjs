@@ -50,12 +50,12 @@ export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
    '<div class="smith-stepper" role="group" aria-label="交易参数（待接入）"><button type="button" aria-label="减少交易参数" disabled>−</button><input aria-label="交易参数" type="text" value="5" disabled><button type="button" aria-label="增加交易参数" disabled>+</button></div>'+
    '<div class="smith-card-grid">'+tile("Estimated Interval","—")+tile("Estimated Time","—")+'</div>'+
    '<button class="smith-action smith-primary" type="button" disabled>'+ (side==="BUY"?"Buy":"Sell") +'</button></section>'+
-   '<section class="smith-section smith-exit">'+heading("Dump It")+
+   '<section class="smith-section smith-exit">'+heading("Exit Position",'<small>持仓退出</small>')+
    '<div class="smith-card-grid">'+tile("Tokens To Sell","—")+tile("SOL Amount to Receive","—")+'</div>'+
-   tile("Play Profit","—","smith-profit")+
+   tile("Estimated Profit","—","smith-profit")+
    '<p class="smith-session">Session on this token: <strong>—</strong></p>'+
-   '<button class="smith-action smith-dump" type="button" disabled>Dump It</button></section>'+
-   '<p class="smith-status" role="status">交易执行与实时数据待接入</p>'+
+   '<button class="smith-action smith-dump" type="button" disabled>Exit / Sell</button></section>'+
+   '<p class="smith-status" role="status"><span aria-hidden="true"></span> 实时执行未接入</p>'+
    '<section class="smith-section smith-log trade-log">'+heading("Trades Log",'<small>当前 Meme · 历史</small>')+
    '<div class="trade-filters" role="group" aria-label="成交记录筛选">'+["ALL","BUY","SELL"].map(k=>'<button type="button" data-trade-filter="'+k+'" aria-pressed="'+(filter===k)+'">'+({ALL:"全部",BUY:"买入",SELL:"卖出"}[k])+'</button>').join("")+'</div>'+
    (trades&&trades.length?table(["方向","记录","序号","金额"],trades.slice(-12).reverse().map(t=>[t.side,t.id,t.sequence,quoteAmount(t.quoteNotionalBaseUnits,"SOL_LAMPORTS")])):'<div class="trade-log-empty">暂无成交记录</div>')+

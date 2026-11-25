@@ -1,4 +1,4 @@
-import {mountHistoricalDirectionReview} from "./historical-direction-review.mjs";
+import {mountHistoricalDirectionReview,historicalTradePosition} from "./historical-direction-review.mjs";
 import {historicalReportDigest,linkedReportMatches} from "./project-integrity-view.mjs";
 import {readProjectSelection,writeProjectSelection,projectStageStrip,projectReviewTasks,riskEvidenceRows,operatorTaskStatus} from "./operator-workspace.mjs";
 import {mountScopedProjectReview} from "./project-review-dashboard.mjs";
@@ -146,7 +146,7 @@ const issuedMemeStages=new Set(["LAUNCHED","BONDING_CURVE_ACTIVE","GRADUATION_PE
 let memeFilter="",memeMode="operations",memeChartMinimized=false,memePanelHidden=false,memeWalletFirst=false;
 function mountMemeDesk(){
  const rail=document.createElement("section");rail.className="meme-rail";rail.setAttribute("aria-label","我的 Meme 项目");
- rail.innerHTML='<div class="desk-overview"><div class="desk-overview-title"><strong>Overview</strong><span>Solana</span></div><div class="desk-balance"><small>SOL Balance</small><strong>— <small>SOL</small></strong></div><div class="desk-overview-stats"><div><small>Meme</small><strong id="desk-token-count">—</strong></div><div><small>登记钱包</small><strong id="desk-wallet-count">—</strong></div></div><button type="button" id="desk-wallet-manage">Wallets / 钱包管理</button></div><div class="meme-rail-head"><strong>我的 Meme</strong><button type="button" id="meme-new" aria-label="新建项目">＋</button></div><label for="meme-search">搜索项目</label><input id="meme-search" type="search" placeholder="名称 / Symbol / Mint"><div id="meme-list">读取项目目录…</div><button type="button" id="meme-create-footer">＋ 新建 Meme</button>';
+ rail.innerHTML='<div class="desk-overview"><div class="desk-overview-title"><strong>我的资产</strong><span>Solana</span></div><div class="desk-balance"><small>SOL Balance</small><strong>— <small>SOL</small></strong></div><div class="desk-overview-stats"><div><small>Meme</small><strong id="desk-token-count">—</strong></div><div><small>登记钱包</small><strong id="desk-wallet-count">—</strong></div></div><button type="button" id="desk-wallet-manage">钱包管理 ↗</button></div><div class="meme-rail-head"><strong>我的 Meme</strong><button type="button" id="meme-new" aria-label="新建项目">＋</button></div><label for="meme-search">搜索项目</label><input id="meme-search" type="search" placeholder="名称 / Symbol / Mint"><div id="meme-list">读取项目目录…</div><button type="button" id="meme-create-footer">＋ 发行 Meme</button>';
  nav.prepend(rail);
   const go=(target,id=activeProjectId)=>{importTicket++;selectProjectContext(id);page=target;render();};
  rail.querySelector("#meme-new").onclick=()=>{memeMode="launch";memePanelHidden=false;go("terminal",null);};
@@ -187,18 +187,24 @@ function mountMemeDesk(){
  const dataButton=main.querySelector("#open-data");chartTools.append(dataButton);
  marketFrame.append(chartToolbar,chartTools,placeholder,reportArea);
  const context=main.querySelector("#terminal-project-context");
+ const overview=document.createElement("section");overview.className="cook-position-strip";
+ const overviewFields=[["buy_cost","买入成本"],["net_sell_proceeds","净回收"],["remaining_cost","库存成本"],["realized_pnl","已实现交易损益"]];
+ function drawPositionStrip(project,position=null){
+  overview.innerHTML='<div class="cook-position-head"><div><small>MEME WORKSPACE</small><h2>'+esc(project?.profile?.symbol||"未选择 Meme")+'</h2></div><span class="cook-data-label">'+esc(position?"历史区间 · 未独立认证":project?lifecycleLabel(project.lifecycle.stage):"等待选择")+'</span></div><div class="cook-position-grid">'+overviewFields.map(([key,label])=>'<div><small>'+label+'</small><strong>'+esc(position?.[key]!=null?solAmount(position[key]):"—")+'</strong></div>').join("")+'</div>';
+ }
+ drawPositionStrip(null);
  const showPanel=()=>{shell.classList.toggle("desk-panel-hidden",memePanelHidden);side.hidden=memePanelHidden;const b=chartToolbar.querySelector("#meme-panel-toggle");b.textContent=memePanelHidden?"Trade / Launch":"隐藏交易区";b.setAttribute("aria-expanded",String(!memePanelHidden));};
  chartToolbar.querySelector("#meme-panel-toggle").onclick=()=>{memePanelHidden=!memePanelHidden;showPanel();};showPanel();
  chartToolbar.querySelector("#meme-wallet-swap").onclick=()=>{memeWalletFirst=!memeWalletFirst;center.classList.toggle("desk-wallet-first",memeWalletFirst);};
  center.classList.toggle("desk-wallet-first",memeWalletFirst);
  const toggleChart=()=>{center.classList.toggle("meme-chart-minimized",memeChartMinimized);const b=chartToolbar.querySelector("#meme-chart-toggle");b.textContent=memeChartMinimized?"展开":"收起";b.setAttribute("aria-expanded",String(!memeChartMinimized));};
  chartToolbar.querySelector("#meme-chart-toggle").onclick=()=>{memeChartMinimized=!memeChartMinimized;toggleChart();};toggleChart();
- center.append(context,marketFrame,wallet,main.querySelector("#terminal-context-notice"),main.querySelector("#terminal-business-review"),main.querySelector("#terminal-project-details"));
+ center.append(overview,context,marketFrame,wallet,main.querySelector("#terminal-context-notice"),main.querySelector("#terminal-business-review"),main.querySelector("#terminal-project-details"));
  main.insertBefore(shell,main.querySelector("#launch-dialog"));
  let selected=null,projects=[],loaded=false,failed=false;
  const controls=side.querySelector("#meme-control-body"),list=rail.querySelector("#meme-list"),launchHost=side.querySelector("#meme-launch-host");
  const lower=document.createElement("section");lower.className="meme-lower";
- lower.innerHTML='<div class="meme-lower-tabs" role="group" aria-label="当前 Meme 明细"><button data-meme-tab="wallet">Wallets</button><button data-meme-tab="assets">资金 / 损益</button><button data-meme-tab="risk">市场 / 风险</button><button data-meme-tab="orders">Orders</button></div><div id="meme-live-summary" aria-label="资金与风险"></div>';
+ lower.innerHTML='<div class="meme-lower-tabs" role="group" aria-label="当前 Meme 明细"><button data-meme-tab="wallet">Wallets</button><button data-meme-tab="orders">Orders</button><button data-meme-tab="assets">资金损益</button><button data-meme-tab="risk">风险分析</button></div><div id="meme-live-summary" aria-label="资金与风险"></div>';
  const summary=lower.querySelector("#meme-live-summary");
  wallet.before(lower);lower.append(wallet);
  const tabState={value:"wallet"};
@@ -250,13 +256,13 @@ function mountMemeDesk(){
   memeMode=next;drawControls();mountLaunch();
  });
  drawControls();if(memeMode==="launch")mountLaunch();
- return {selectLowerTab,update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();bundleReview.setProject(current);
+ return {selectLowerTab,update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();bundleReview.setProject(current);drawPositionStrip(current);
   chartToolbar.querySelector("#desk-market-symbol").textContent=current?current.profile.symbol+" · "+lifecycleLabel(current.lifecycle.stage):"未选择 Meme";
   drawWallet(current);
  },error(){failed=true;drawList();bundleReview.clear("项目目录不可用。");summaryState("项目目录不可用，未显示资产与风险。");},
-  pending(){bundleReview.clear("正在读取当前 Meme 的历史成交。");summaryState("读取项目核算与风险…");},
-  historicalTrades(input){if(selected&&input.scope?.projectId===selected.project_id&&input.scope?.tokenMint===selected.token?.mint)bundleReview.show(input);},
-  unavailable(){bundleReview.clear("项目复核不可用。");summaryState("项目复核不可用，请刷新。");},
+  pending(){drawPositionStrip(selected);bundleReview.clear("正在读取当前 Meme 的历史成交。");summaryState("读取项目核算与风险…");},
+  historicalTrades(input){if(selected&&input.scope?.projectId===selected.project_id&&input.scope?.tokenMint===selected.token?.mint){bundleReview.show(input);drawPositionStrip(selected,historicalTradePosition(input));}},
+  unavailable(){drawPositionStrip(selected);bundleReview.clear("项目复核不可用。");summaryState("项目复核不可用，请刷新。");},
   showReview(v,model,treasury){
    if(!selected||v.project_id!==selected.project_id||v.project_revision!==selected.revision)return;
    const kv=rows=>'<div class="meme-kv">'+rows.map(([label,value])=>"<span>"+esc(label)+"</span><strong>"+esc(value??"未知")+"</strong>").join("")+"</div>";

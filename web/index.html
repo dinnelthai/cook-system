@@ -422,6 +422,97 @@ main[data-page=terminal] .meme-mode button[aria-pressed=true]{background:#1a3535
 @media(min-width:981px) and (max-width:1200px){main[data-page=terminal] .meme-desk{grid-template-columns:minmax(0,1fr) 330px}main[data-page=terminal] .meme-desk.desk-panel-hidden{grid-template-columns:minmax(0,1fr)}.meme-center .desk-market-title small{display:none}.meme-chart-toolbar{flex-wrap:wrap}}
 @media(max-width:980px){main[data-page=terminal] .meme-desk{grid-template-columns:minmax(0,1fr)}main[data-page=terminal] .meme-control{position:static;max-height:none;border-left:0;border-top:1px solid #294040}.desk-market-title small{max-width:100px}}
 @media(max-width:700px){body:has(main[data-page=terminal]) #nav{padding:12px;max-height:42vh}.desk-overview{gap:8px}.desk-balance{display:none}.desk-market-actions{gap:4px}.meme-center .desk-market-frame .meme-chart-empty,.meme-center .desk-market-frame .meme-chart-empty .empty-state{min-height:250px}}
+
+/* COOK TERMINAL V2: neutral blue-black workstation. */
+body:has(main[data-page=terminal]){
+ --bg:#0b0f13;--surface:#12181e;--surface2:#151c23;--line:#2b3740;
+ --text:#e4eef2;--muted:#8696a0;--cyan:#77cfad;--green:#64c69b;--red:#e07882;
+ background:var(--bg);color:var(--text);font-variant-numeric:tabular-nums;
+}
+body:has(main[data-page=terminal])>header{background:#12181e;border-color:#2b3740;box-shadow:none}
+body:has(main[data-page=terminal]) .brand-mark{background:#77cfad;color:#0b1715;border-color:#77cfad;box-shadow:none}
+body:has(main[data-page=terminal]) #top-nav button.active{color:#a4e3ca;border-bottom-color:#77cfad;background:transparent}
+body:has(main[data-page=terminal]) .header-meta .tag{background:#192923;border-color:#385248;color:#a4c8b8}
+body:has(main[data-page=terminal]) #nav{background:#0f1419;border-color:#2b3740;padding:16px 14px}
+body:has(main[data-page=terminal]) .layout{grid-template-columns:220px minmax(0,1fr)}
+main[data-page=terminal] .meme-desk{grid-template-columns:minmax(0,1fr) 380px;gap:0}
+main[data-page=terminal] .meme-desk.desk-panel-hidden{grid-template-columns:minmax(0,1fr)}
+main[data-page=terminal] .meme-center{padding:12px 12px 20px;gap:10px}
+.desk-overview{gap:10px;border-color:var(--line);padding-bottom:16px;margin-bottom:16px}
+.desk-overview-title strong{font-size:14px;font-weight:600}
+.desk-overview-title span{background:#1b2928;border-color:#344b48;color:#9fc6bb}
+.desk-balance{background:transparent;border:0;padding:6px 0}
+.desk-balance strong{font-size:27px;letter-spacing:-.6px}.desk-balance small{color:var(--muted)}
+.desk-overview-stats>div{background:#161e25;border-color:#2b3740;border-radius:6px;padding:10px}
+#nav #desk-wallet-manage{background:#192229;border-color:#34424a;color:#b6c8d0}
+#nav .meme-rail #meme-search{background:#171e25;border-color:#303b43}
+#nav button.meme-project{border-radius:6px}
+#nav button.meme-project:hover{background:#1a242c}
+#nav button.meme-project.selected{background:#1a2d2a;border-color:#36584d}
+#nav button#meme-create-footer{background:#1b3c32;border-color:#345c4d;color:#a0dec7;border-radius:6px}
+.cook-position-strip{order:-2;background:#12191f;border:1px solid #28333b;border-radius:7px;padding:12px 14px;min-width:0}
+.cook-position-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.cook-position-head>div{min-width:0}
+.cook-position-head small{color:#8297a2;font-size:9px;letter-spacing:1.15px}
+main[data-page=terminal] .cook-position-head h2{font-size:18px;font-weight:650;margin:3px 0 0;overflow-wrap:anywhere}
+.cook-data-label{color:#879ca6;font-size:10px;text-align:right}
+.cook-position-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+.cook-position-grid>div{display:grid;gap:5px;min-width:0;padding:0 9px;border-left:1px solid #2b3740}
+.cook-position-grid>div:first-child{padding-left:0;border:0}
+.cook-position-grid small{color:#8696a0;font-size:11px}
+.cook-position-grid strong{color:#e4eef2;font-size:16px;font-weight:600;overflow-wrap:anywhere}
+.meme-center #terminal-project-context{order:-1;margin:0;padding:5px 10px;background:#10161b;border-color:#28333b;font-size:10px}
+.meme-center #terminal-project-context .row{gap:6px 12px}
+.desk-market-frame{background:#0d1217;border-color:#2a353e;border-radius:7px}
+.meme-chart-toolbar{background:#12181e;border-color:#2b3740;padding:10px 13px}
+.desk-market-title strong{color:#e4eef2;font-weight:600}
+.desk-market-actions button,.desk-chart-tools button,.desk-wallet-actions button{background:#192229;border-color:#304049;color:#b8c6cf;font-size:11px}
+.desk-chart-tools{background:#11171d;border-color:#2b3740}
+.desk-chart-tools .candle-controls button{background:transparent}
+.desk-chart-tools .candle-controls button[aria-pressed=true]{background:#233a36;color:#ace3ce}
+.desk-chart-tools select{background:#192229;border-color:#304049}
+.meme-center .desk-market-frame .pro-chart,.meme-center .desk-market-frame .meme-chart-empty{background-color:#0d1217}
+.meme-center .desk-market-frame .meme-chart-empty{background-image:linear-gradient(#1c2933 1px,transparent 1px),linear-gradient(90deg,#1c2933 1px,transparent 1px)}
+.meme-center .desk-market-frame .empty-state{background:transparent}
+.desk-market-frame .meme-report-extra,.meme-center #terminal-context-notice .notice{background:#12181e;border-color:#28343d}
+.meme-center .meme-lower{margin-top:0;background:#12181e;border-color:#2a353e;border-radius:7px}
+.meme-lower-tabs{border-color:#2b3740;gap:16px}
+main[data-page=terminal] .meme-lower-tabs button[aria-pressed=true]{color:#a1e1c6;border-bottom-color:#80d0ae}
+.meme-wallet table th{background:#19222a;border-color:#2a353e;color:#8f9fa9}
+.meme-wallet table td{border-color:#27313a}
+.desk-wallet-empty button{background:#203630;border-color:#35584d;color:#b7dccc}
+main[data-page=terminal] .meme-control{background:#10161b;border-left-color:#2c383f;padding:12px 0}
+main[data-page=terminal] .meme-control .meme-mode{background:#1a232a;margin:0 12px 6px;border-radius:7px;padding:4px}
+main[data-page=terminal] .meme-mode button{border-radius:5px;color:#82939f}
+main[data-page=terminal] .meme-mode button[aria-pressed=true]{background:#2b3f3d;color:#b8e0d4}
+.meme-control .smith-trade{color:#e4eef2}
+.smith-trade .smith-section{padding:15px 14px;gap:10px;border-color:#2a3b43}
+main[data-page=terminal] .meme-control .smith-trade h3{font-size:15px;letter-spacing:-.15px}
+.smith-wallet-count{background:#19272c;color:#91a7ae;border-radius:5px;font-size:10px;padding:6px 8px}
+.meme-control .smith-trade .bundle-direction{background:#1b242c;border-radius:6px;padding:4px}
+.meme-control .smith-trade .bundle-direction button{border-radius:4px;min-height:31px;color:#9aa8b2}
+.meme-control .smith-trade .bundle-direction button[data-direction=BUY][aria-pressed=true]{background:#1d4434;color:#a2dfb9}
+.meme-control .smith-trade .bundle-direction button[data-direction=SELL][aria-pressed=true]{background:#46292f;color:#f2afb5}
+.smith-trade-card{background:#182128;border-color:#304049;border-radius:6px;min-height:56px;padding:9px 10px;gap:4px}
+.smith-trade-card>span{color:#95a6b0;font-size:11px}
+.smith-trade-card>strong{color:#e4eef2;font-size:15px;font-weight:600}
+.meme-control .smith-stepper>button,.meme-control .smith-stepper>input{height:34px;background:#12191f;border-color:#304049;border-radius:6px;color:#9aa8b2}
+.meme-control .smith-action{min-height:39px;border-radius:6px;font-size:13px}
+.meme-control .smith-primary{background:#1b382b;color:#83b49a}
+.meme-control .smith-trade[data-side=SELL] .smith-primary,.meme-control .smith-dump{background:#32282d;color:#c097a0}
+.smith-profit{background:#17231f;border-color:#304b40;min-height:56px}
+.smith-profit strong,.smith-session strong{color:#b6cbc2}
+.smith-session{font-size:11px;color:#95a6b0}
+.smith-status{padding:9px 14px;font-size:10px;color:#a7a09a;display:flex;align-items:center;gap:6px}
+.smith-status>span{width:6px;height:6px;border-radius:50%;background:#a99d85;flex:none}
+.smith-trade .trade-detail{background:#151c23}.smith-trade .trade-detail>summary{font-size:12px}
+#meme-launch-host .panel{background:#151c23;border-color:#304049}
+#meme-launch-host input,#meme-launch-host select,#meme-launch-host textarea{background:#0d1217;border-color:#304049}
+main[data-page=terminal] button:focus-visible,main[data-page=terminal] input:focus-visible,#nav button:focus-visible,#nav input:focus-visible{outline:2px solid #77cfad;outline-offset:2px}
+@media(max-width:1350px) and (min-width:981px){body:has(main[data-page=terminal]) .layout{grid-template-columns:190px minmax(0,1fr)}main[data-page=terminal] .meme-desk{grid-template-columns:minmax(0,1fr) 340px}main[data-page=terminal] .meme-desk.desk-panel-hidden{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:1100px){.cook-position-grid{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:12px}.cook-position-grid>div:nth-child(3){border:0;padding-left:0}}
+@media(max-width:980px){main[data-page=terminal] .meme-desk{grid-template-columns:minmax(0,1fr)}main[data-page=terminal] .meme-control{border-left:0;border-top:1px solid var(--line)}}
+@media(max-width:700px){body:has(main[data-page=terminal]) .layout{display:block}main[data-page=terminal] .meme-center{padding:8px;gap:8px}}
 </style></head>
 <body><a class="skip-link" href="#main">跳转到主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="主导航"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="我的 Meme" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">正在初始化工作台。如果此提示持续存在，请检查浏览器 Console 和 Network 中的模块加载错误。</p></main></div>
