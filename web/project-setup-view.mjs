@@ -1,8 +1,8 @@
+import {formatDeclaredSupply,parseDeclaredSupply,preserveDraftRegistration} from "./project-integrity-view.mjs";
 import {lifecycleLabel,operationalLabel,limitFields,budgetInputValue,parseBudgetDeclaration,projectWalletRegistrationRows} from "./project-operator-view.mjs";
 import {createProjectRequestRecovery} from "./project-request-recovery.mjs";
 import { lookupCreateRequest, listProjects, getProject, createProject, appendProjectCommand, getProjectConfig, inspectProjectEvidence, listProjectArchive, inspectProjectMarket, listProjectReportCandidates, linkProjectReport } from "./project-client.mjs";
 
-const U64_MAX = 18446744073709551615n;
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 const commandId = () => globalThis.crypto?.randomUUID?.() ?? ("project-ui-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 
@@ -81,8 +81,7 @@ export function mountProjectSetup(container, {
       '>' + esc(x.profile.name + " · " + x.profile.symbol + " · " + x.lifecycle.stage) + '</option>').join("");
     let legacyCount = 0;
     try { legacyCount = projectRegistry?.list?.().length ?? 0; } catch {}
-    const currentSupply = !current || current.token.supply_base_units === null ? "1000000000" :
-      (BigInt(current.token.supply_base_units) / (10n ** BigInt(current.token.decimals))).toString();
+    const currentSupply = current ? formatDeclaredSupply(current.token.supply_base_units,current.token.decimals) : "1000000000";
     const readyAllowed = Boolean(current && current.lifecycle.stage === "DRAFT" &&
       current.network.genesis_hash && current.token.supply_base_units && current.token.creator_wallet_address &&
       current.wallet_groups.some(g => g.purpose === "DEV" &&
@@ -101,8 +100,8 @@ export function mountProjectSetup(container, {
       panel("项目配置", '<form id="project-draft-form"><div class="grid">' +
         '<div><label>项目名称</label><input name="name" required maxlength="32" value="' + esc(current?.profile.name ?? "") + '" placeholder="Project name"' + lock + '></div>' +
         '<div><label>Token Symbol</label><input name="symbol" required maxlength="10" pattern="[A-Za-z0-9]{1,10}" value="' + esc(current?.profile.symbol ?? "") + '" placeholder="TOKEN"' + lock + '></div>' +
-        '<div><label>总供应量（整币）</label><input name="supply" required inputmode="numeric" pattern="[0-9]{1,20}" value="' + esc(currentSupply) + '"' + lock + '></div>' +
-        '<div><label>Decimals</label><input name="decimals" type="number" min="0" max="9" step="1" required value="' + esc(current?.token.decimals ?? 6) + '"' + lock + '></div>' +
+        '<div><label>总供应量（Token）</label><input name="supply" inputmode="decimal" maxlength="30" value="' + esc(currentSupply) + '"' + lock + '></div>' +
+        '<div><label>Decimals</label><input name="decimals" type="number" min="0" max="9" step="1" value="' + esc(current ? current.token.decimals??"" : 6) + '"' + lock + '></div>' +
         '<div><label>报价资产</label><input value="SOL" disabled><input type="hidden" name="quote_asset" value="SOL"></div>' +
         '<div><label>网络</label><input value="Localnet（本地验证）" disabled><input type="hidden" name="network" value="localnet"></div>' +
         '<div><label>本地 Genesis Hash</label><input value="' + esc(current?.network.genesis_hash ?? config?.network?.genesis_hash ?? "未配置") + '" disabled></div>' +
@@ -111,7 +110,7 @@ export function mountProjectSetup(container, {
         '<div><label>Telegram</label><input name="telegram" type="url" value="' + esc(current?.profile.telegram ?? "") + '" placeholder="https://"' + lock + '></div>' +
         '<div><label>Twitter / X</label><input name="twitter" type="url" value="' + esc(current?.profile.twitter ?? "") + '" placeholder="https://"' + lock + '></div>' +
         '<div style="grid-column:1/-1"><label>项目描述</label><textarea name="description" maxlength="1000"' + lock + '>' + esc(current?.profile.description ?? "") + '</textarea></div>' +
-        '</div><p class="muted">供应量按整币填写，系统按 decimals 转换为 base units 并检查 u64。Dev Wallet 只保存公钥地址，不保存私钥。</p>' +
+        '</div><p class="muted">供应量按 Token 单位精确转换为 base units；供应量和 decimals 均为空时表示未配置，不进行取整。Dev Wallet 只保存公钥地址，不保存私钥。</p>' +
         '<div class="row"><button type="submit" class="primary"' + (editable ? "" : " disabled") + '>保存项目配置</button><button type="button" id="project-new">新建项目</button></div></form>' +
         '<p id="project-wallet-status" class="muted" role="status">钱包列表尚未读取</p><p id="project-status" role="status" class="muted">' + esc(message) + '</p>') +
       panel("项目列表与状态", table(["项目", "Symbol", "供应量", "Dev Wallet", "生命周期 / 运行状态", "发行核验"], projectRows) +
@@ -246,16 +245,13 @@ export function mountProjectSetup(container, {
       button.disabled = true;
       try {
         const input = Object.fromEntries(new FormData(event.currentTarget));
-        const decimals = Number(input.decimals);
-        if (!/^[0-9]{1,20}$/.test(input.supply) || !Number.isInteger(decimals) || decimals < 0 || decimals > 9) throw Error("INVALID_TOKEN_SUPPLY");
-        const supplyBaseUnits = BigInt(input.supply) * (10n ** BigInt(decimals));
-        if (supplyBaseUnits > U64_MAX) throw Error("TOKEN_SUPPLY_EXCEEDS_U64");
+        const supply=parseDeclaredSupply(input.supply,input.decimals);
         const creator = input.creator_wallet || null;
         const profile = {
           name: input.name, symbol: input.symbol, description: input.description || "",
           website: input.website || null, telegram: input.telegram || null, twitter: input.twitter || null
         };
-        const token = { supply_base_units: supplyBaseUnits.toString(), decimals, creator_wallet_address: creator };
+        const token = {...supply, creator_wallet_address: creator };
         let project;
         const walletGroup = creator ? {
           group_id: "dev-wallets", name: "Dev Wallets", purpose: "DEV",
@@ -271,7 +267,7 @@ export function mountProjectSetup(container, {
             ...project.network,
             genesis_hash: project.network.genesis_hash ?? config?.network?.genesis_hash ?? null
           };
-          project = await append(project, "UPDATE_DRAFT_CONFIGURATION", { profile, network, token, wallet_group: walletGroup });
+          project = await append(project, "UPDATE_DRAFT_CONFIGURATION", { profile, network, token, wallet_group: preserveDraftRegistration(project,creator,walletGroup) });
         } else {
           const network = config?.network ?? {
             chain_id: "solana", cluster: "localnet", genesis_hash: null, quote_mint: WRAPPED_SOL_MINT

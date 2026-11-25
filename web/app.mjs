@@ -1,3 +1,4 @@
+import {historicalReportDigest,linkedReportMatches} from "./project-integrity-view.mjs";
 import {readProjectSelection,writeProjectSelection,projectStageStrip,projectReviewTasks,riskEvidenceRows} from "./operator-workspace.mjs";
 import {mountScopedProjectReview} from "./project-review-dashboard.mjs";
 import {experimentDisplayRows} from "./experiment-display.mjs";
@@ -217,10 +218,23 @@ function renderTerminal(){
       let businessTicket=0;
       async function refreshBusiness(){
        const ticket=++businessTicket;businessArea.textContent="读取统一项目复核…";riskArea.textContent="读取同一项目快照…";
+       const area=main.querySelector("#terminal-report-area");area.hidden=true;area.inert=true;area.style.display="none";
+       main.querySelector("#terminal-scoped-placeholder").hidden=false;
        try{
         const v=await getProjectBusinessReview(selected.project_id,selected.revision);
         if(!businessCurrent()||ticket!==businessTicket)return;
         const model=projectOverviewModel(v);
+        const reportArea=main.querySelector("#terminal-report-area"),placeholder=main.querySelector("#terminal-scoped-placeholder");
+        if(matchProjectReport(selected,data).status==="DECLARED_MATCH"){
+         const digest=await historicalReportDigest(data);
+         if(!businessCurrent()||ticket!==businessTicket)return;
+         if(linkedReportMatches(v,digest,data.scope)){
+          reportArea.hidden=false;reportArea.removeAttribute("inert");reportArea.style.removeProperty("display");placeholder.hidden=true;
+          main.querySelector("#terminal-context-notice").innerHTML=note("历史报告身份与已关联摘要一致；仅内部证据匹配，不代表独立认证或结算许可。");
+         }else{
+          main.querySelector("#terminal-context-notice").innerHTML=note("声明身份匹配，但报告摘要未关联、证据冲突或无法验证；独立报告保持隔离。");
+         }
+        }
         businessArea.innerHTML='<div class="project-overview-heading"><div><h3>项目运行概览 · v'+esc(v.project_revision)+'</h3><p class="muted">'+esc(model.status)+' · 历史声明数据 · 执行禁用</p></div><button id="business-refresh">刷新项目</button></div>'+
          '<div class="operator-stage-strip" aria-label="登记生命周期">'+projectStageStrip(model.stage).map(s=>'<div class="operator-stage '+s.state.toLowerCase()+'"'+(s.state==="CURRENT"?' aria-current="step"':'')+'><strong>'+esc(s.label)+'</strong><small>'+esc(({CURRENT:"当前登记",EARLIER:"先前阶段",LATER:"后续阶段",UNKNOWN:"未知"})[s.state])+'</small></div>').join("")+'</div>'+
          '<div class="project-overview-grid"><div class="project-stat"><span>登记阶段</span><strong>'+esc(lifecycleLabel(model.stage))+'</strong></div><div class="project-stat"><span>严重 / 警告 / 未知</span><strong>'+esc([model.counts.critical,model.counts.warning,model.counts.unknown].join(" / "))+'</strong></div><div class="project-stat"><span>待核对订单</span><strong>'+esc(v.orders.unresolved_count)+'</strong></div><div class="project-stat"><span>实时资产 / 市场</span><strong>未接入</strong></div></div>'+
@@ -390,14 +404,9 @@ function renderTerminal(){
       const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download});}
     if(!selected){notice.innerHTML=note("此前选择的项目无法在当前数据库核对，历史报告继续隔离。请选择其他项目或明确退出。")+'<button id="clear-missing-project">退出项目上下文</button>';notice.querySelector("#clear-missing-project").onclick=()=>{importTicket++;selectProjectContext(null);render();};}
     const match=matchProjectReport(selected,data);
-    if(selected)notice.innerHTML=note(match.status==="DECLARED_MATCH"?"当前报告与 Project 的声明身份一致（Project ID、Mint、网络、Genesis、SOL）。仅为历史复盘；未独立认证，不是实时余额或结算证据。":"历史报告保持隔离："+match.reasons.join(" / ")+"。清除项目选择后可继续独立复盘。");
-    if(match.status==="DECLARED_MATCH"){
-     const area=main.querySelector("#terminal-report-area");
-     area.hidden=false;area.removeAttribute("inert");area.style.removeProperty("display");
-     main.querySelector("#terminal-scoped-placeholder").hidden=true;
-     // The independent report viewer remains explicitly labelled as historical.
-     for(const id of ["workflow-sample","terminal-settle","terminal-archive","workflow-save"]){const control=main.querySelector("#"+id);if(control)control.disabled=true;}
-    }
+    if(selected)notice.innerHTML=note(match.status==="DECLARED_MATCH"?"当前报告声明身份一致，正在核对已关联报告摘要；未核对前保持隔离。":"历史报告保持隔离："+match.reasons.join(" / ")+"。清除项目选择后可继续独立复盘。");
+    // Scope equality is insufficient; only the matching archived digest may open the report area.
+    for(const id of ["workflow-sample","terminal-settle","terminal-archive","workflow-save"]){const control=main.querySelector("#"+id);if(control)control.disabled=true;}
     main.querySelector("#open-data").disabled=true;
    }else{
     notice.innerHTML=note("当前为独立历史复盘模式，不代表任何 Project 的实时资产或市场状态。");
@@ -413,28 +422,28 @@ function renderTerminal(){
     }
    }
   });
-  main.querySelector("#workflow-sample").onclick=async()=>{if(!isSample&&!window.confirm("切换到离线样本？请先导出当前报告。"))return;const ticket=++importTicket;try{const response=await fetch("../fixtures/synthetic/terminal-candle-report.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("SAMPLE_UNAVAILABLE");const next=await response.json(),nextReport=auditedReport(next);if(!importCurrent(ticket,"terminal"))return;offlineReview=true;data=next;report=nextReport;render()}catch(e){if(importCurrent(ticket,"terminal")){workflowMessage="离线样本载入失败："+errorKind(e);render()}}};
+  main.querySelector("#workflow-sample").onclick=async()=>{if(activeProjectId)return;if(!isSample&&!window.confirm("切换到离线样本？请先导出当前报告。"))return;const ticket=++importTicket;try{const response=await fetch("../fixtures/synthetic/terminal-candle-report.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("SAMPLE_UNAVAILABLE");const next=await response.json(),nextReport=auditedReport(next);if(!importCurrent(ticket,"terminal"))return;offlineReview=true;data=next;report=nextReport;render()}catch(e){if(importCurrent(ticket,"terminal")){workflowMessage="离线样本载入失败："+errorKind(e);render()}}};
  main.querySelector("#workflow-cash").onclick=()=>{terminalTab="cash";reviewPaused=false;render()};
  main.querySelector("#workflow-finance").onclick=()=>{if(isSample)return;terminalTab="finance";reviewPaused=false;render()};
  const closeExport=main.querySelector("#financial-close-export");if(closeExport)closeExport.onclick=()=>{if(!isSample)download("project-financial-close-review.json",JSON.stringify(getCloseReview(),null,2));};
  const feeExport=main.querySelector("#creator-fee-export");if(feeExport)feeExport.onclick=()=>{if(!isSample)download("creator-fee-ledger.json",JSON.stringify(getFeeReview(),null,2));};
  main.querySelector("#workflow-risk").onclick=()=>{terminalTab="risk";reviewPaused=false;render()};
  main.querySelector("#workflow-graduation").onclick=()=>{importTicket++;page="projects";record("page.open",{page});render();};
- main.querySelector("#workflow-save").onclick=()=>{try{if(isSample||workspaceBusy)return;catalogueSelection=projectCatalogue.add(data).key;workflowMessage="报告已加入会话档案；请到项目档案保存数据库版本。";render()}catch(e){workflowMessage="档案添加失败："+errorKind(e);render()}};
+ main.querySelector("#workflow-save").onclick=()=>{try{if(activeProjectId||isSample||workspaceBusy)return;catalogueSelection=projectCatalogue.add(data).key;workflowMessage="报告已加入会话档案；请到项目档案保存数据库版本。";render()}catch(e){workflowMessage="档案添加失败："+errorKind(e);render()}};
  main.querySelector("#workflow-export").onclick=()=>{if(!isSample)download("historical-report-input.json",JSON.stringify(data,null,2))};
  main.querySelector("#open-launch").onclick=()=>{page="create";record("page.open",{page});render()};
  main.querySelector("#open-data").onclick=()=>main.querySelector("#data-dialog").showModal();
  main.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>main.querySelector("#"+b.dataset.close).close());
  main.querySelectorAll("[data-candle-interval]").forEach(b=>b.onclick=()=>{candleInterval=Number(b.dataset.candleInterval);render()});
  main.querySelector("#candle-window").onchange=e=>{const n=Number(e.target.value);if([30,80,160].includes(n)){candleWindow=n;render();}};
- main.querySelector("#terminal-local-load").onclick=async()=>{const before=data,ticket=++importTicket,startPage=page;try{const response=await fetch("/api/terminal/report",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("本地报告桥未配置或数据无效");const next=await response.json();const nextReport=auditedReport(next);if(data!==before||!importCurrent(ticket,startPage))return;offlineReview=true;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#terminal-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
+ main.querySelector("#terminal-local-load").onclick=async()=>{if(activeProjectId)return;const before=data,ticket=++importTicket,startPage=page;try{const response=await fetch("/api/terminal/report",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("本地报告桥未配置或数据无效");const next=await response.json();const nextReport=auditedReport(next);if(data!==before||!importCurrent(ticket,startPage))return;offlineReview=true;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#terminal-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
  main.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{terminalTab=b.dataset.tab;render()});
  main.querySelector("#terminal-meta").onsubmit=e=>{e.preventDefault();metadata=Object.fromEntries(new FormData(e.currentTarget));record("metadata.saved");render()};
  main.querySelector("#terminal-pause").onclick=()=>{reviewPaused=!reviewPaused;render()};
  main.querySelector("#terminal-export").onclick=()=>download("closed-interval-report.json",JSON.stringify({metadata,reviewStage,report},null,2));
- main.querySelector("#terminal-settle").onclick=()=>{reviewStage=advanceReview(reviewStage,"settle",d);record("review.settled",{page});render()};
- main.querySelector("#terminal-archive").onclick=()=>{if(reviewStage==="SETTLED")reviewStage=advanceReview(reviewStage,"archive",d);download("cook-review-archive.json",JSON.stringify(makeReviewArchive(data,metadata,reviewStage),null,2));record("review.archived",{page});render()};
- main.querySelector("#terminal-import").onchange=async e=>{const ticket=++importTicket,startPage=page;try{const f=e.target.files[0];if(!f)return;if(f.size>16*1024*1024)throw Error("报告文件超过 16 MiB");const raw=JSON.parse(await f.text());const restored=raw?.schema_version==="cook-review-archive.1"?restoreReviewArchive(raw):null;const next=restored?.input??raw;const nextReport=auditedReport(next);if(!importCurrent(ticket,startPage))return;offlineReview=true;data=next;report=nextReport;reviewInput=data;reviewStage=restored?.stage??"REVIEW";metadata=restored?.metadata??null;reviewPaused=false;workflowMessage="";if(restored)record("review.restored",{page});record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#terminal-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
+ main.querySelector("#terminal-settle").onclick=()=>{if(activeProjectId)return;reviewStage=advanceReview(reviewStage,"settle",d);record("review.settled",{page});render()};
+ main.querySelector("#terminal-archive").onclick=()=>{if(activeProjectId)return;if(reviewStage==="SETTLED")reviewStage=advanceReview(reviewStage,"archive",d);download("cook-review-archive.json",JSON.stringify(makeReviewArchive(data,metadata,reviewStage),null,2));record("review.archived",{page});render()};
+ main.querySelector("#terminal-import").onchange=async e=>{if(activeProjectId)return;const ticket=++importTicket,startPage=page;try{const f=e.target.files[0];if(!f)return;if(f.size>16*1024*1024)throw Error("报告文件超过 16 MiB");const raw=JSON.parse(await f.text());const restored=raw?.schema_version==="cook-review-archive.1"?restoreReviewArchive(raw):null;const next=restored?.input??raw;const nextReport=auditedReport(next);if(!importCurrent(ticket,startPage))return;offlineReview=true;data=next;report=nextReport;reviewInput=data;reviewStage=restored?.stage??"REVIEW";metadata=restored?.metadata??null;reviewPaused=false;workflowMessage="";if(restored)record("review.restored",{page});record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#terminal-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
 }
 function render(){
  if(reviewInput!==data){reviewInput=data;reviewStage="REVIEW";metadata=null;reviewPaused=false;workflowMessage="";}

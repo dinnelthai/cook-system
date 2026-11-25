@@ -79,3 +79,9 @@ test("project operator workspace retains only selection and provides review navi
  assert.match(app,/readProjectSelection\(contextStorage\)/);assert.match(app,/clear-missing-project/);
  assert.match(app,/projectStageStrip\(model.stage\)/);assert.match(app,/projectReviewTasks\(v.runtime\)/);assert.match(app,/riskEvidenceRows\(gr.findings,riskFilter.value\)/);
 });
+
+test("project report area is gated by linked archive digest, not identity alone",async()=>{
+ const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");
+ assert.match(app,/linkedReportMatches\(v,digest,data.scope\)/);
+ assert.match(app,/terminal-settle"\)\.onclick=\(\)=>\{if\(activeProjectId\)return/);
+});
