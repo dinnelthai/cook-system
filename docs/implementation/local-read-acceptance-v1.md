@@ -15,3 +15,7 @@ The script rejects public genesis identifiers, redirects, remote URLs and mismat
 Exit codes: 1 invalid input; 2 partial; 3 review required; 0 reserved for all checks passing (current report binding deliberately remains partial). No independently authenticated source, complete history, financial parity, production readiness or execution is asserted.
 
 CI uses mock RPC only. Actual validator connectivity, historical account and fee reconciliation, browser acceptance and load testing remain operator-environment tasks.
+
+## Independent sample comparison (next acceptance round)
+
+Each receiptSamples row may now contain an optional expected object: fee_lamports (canonical unsigned decimal string), outcome (SUCCESS or FAILED), and accounts (1–32 public addresses, each with pre_lamports and post_lamports as decimal strings). Derive these expectations from separately retained evidence, not from the very RPC response under test. The preflight checks the returned fee, execution outcome and exact native balance observations at mapped static/loaded account indices. Missing/unsafe numbers remain PARTIAL; contradictions require review. Reported sample indexes avoid printing addresses or raw receipt bodies. The reader also checks JSON-RPC version and response ID; legacy collector behavior is unchanged. This is not token balance, ownership, cost-basis or NAV reconciliation and cannot establish full financial parity. No transactions are submitted.

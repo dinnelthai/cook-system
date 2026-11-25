@@ -1,4 +1,5 @@
 import {SolanaRpcClient} from "../adapters/pump/solana-rpc.mjs";
+import {validateReceiptExpectation,auditReceiptObservation} from "./local-receipt-observation.mjs";
 import {buildUnifiedHistoricalReport} from "./unified-historical-report.mjs";
 const slot=v=>Number.isSafeInteger(v)&&v>=0;
 const base58=v=>typeof v==="string"&&/^[1-9A-HJ-NP-Za-km-z]+$/.test(v);
@@ -18,14 +19,16 @@ export async function auditLocalReadAcceptance({endpoint,expectedGenesisHash,ran
  const seen=new Set();
  for(const r of receiptSamples){
   if(!r||!base58(r.signature)||r.signature.length<64||r.signature.length>88||!slot(r.slot)||r.slot<range.start_slot||r.slot>range.end_slot||seen.has(r.signature))throw Error("INVALID_RECEIPT_SAMPLE");
+  validateReceiptExpectation(r.expected);
   seen.add(r.signature);
  }
- const rpc=new SolanaRpcClient({endpoint:url,commitment:"finalized",timeoutMs:3000,maxRetries:0,fetchImpl:(u,init)=>fetchImpl(u,{...init,redirect:"error"})});
+ const rpc=new SolanaRpcClient({endpoint:url,commitment:"finalized",timeoutMs:3000,maxRetries:0,strictEnvelope:true,fetchImpl:(u,init)=>fetchImpl(u,{...init,redirect:"error"})});
  const checks=[];
  const add=(id,status,code)=>checks.push({id,status,code});
+ const financialSamples=[];
  let observed=null,retention=null,receiptSummary={requested:receiptSamples.length,matched:0,unavailable:0,contradicted:0};
  const finish=()=>({schema_version:"cook-local-read-acceptance.1",status:checks.some(c=>c.status==="REVIEW_REQUIRED")?"REVIEW_REQUIRED":checks.some(c=>c.status==="UNKNOWN"||c.status==="PARTIAL")?"PARTIAL":"READ_PREFLIGHT_PASS",
-  checks,range:{start_slot:range.start_slot,end_slot:range.end_slot},observed,retention,receipts:receiptSummary,
+  checks,range:{start_slot:range.start_slot,end_slot:range.end_slot},observed,retention,receipts:receiptSummary,receipt_financial_observations:financialSamples,
   source_attestation:"UNKNOWN",history_complete_attested:false,financial_parity_attested:false,production_ready:false,execution_enabled:false});
  try{observed=await rpc.getGenesisHash();}catch{add("identity","UNKNOWN","GENESIS_UNAVAILABLE");return finish();}
  if(observed!==expectedGenesisHash){add("identity","REVIEW_REQUIRED","GENESIS_PIN_MISMATCH");return finish();}
@@ -44,10 +47,15 @@ export async function auditLocalReadAcceptance({endpoint,expectedGenesisHash,ran
   if(tx===null){receiptSummary.unavailable++;continue;}
   if(tx?.slot!==sample.slot||tx?.transaction?.signatures?.[0]!==sample.signature||!tx.meta||typeof tx.meta!=="object"||!Object.hasOwn(tx.meta,"err")||!slot(tx.meta.fee)){receiptSummary.contradicted++;continue;}
   receiptSummary.matched++;
+  const audit=auditReceiptObservation(tx,sample.expected);
+  financialSamples.push({sample_index:receiptSamples.indexOf(sample),...audit});
  }
  if(receiptSummary.contradicted)add("receipts","REVIEW_REQUIRED","RECEIPT_SAMPLE_CONTRADICTION");
  else if(!receiptSamples.length||receiptSummary.unavailable)add("receipts","PARTIAL","RECEIPT_SAMPLES_UNAVAILABLE_OR_MISSING");
  else add("receipts","PASS","DECLARED_SAMPLE_IDENTITIES_MATCHED");
+ if(financialSamples.some(x=>x.status==="REVIEW_REQUIRED"))add("receipt_financial","REVIEW_REQUIRED","SAMPLED_FINANCIAL_CONTRADICTION");
+ else if(!receiptSamples.length||financialSamples.length!==receiptSamples.length||financialSamples.some(x=>x.status!=="DECLARED_SAMPLE_MATCH"))add("receipt_financial","PARTIAL","SAMPLED_FINANCIAL_EVIDENCE_INCOMPLETE");
+ else add("receipt_financial","PASS","DECLARED_SAMPLE_AMOUNTS_MATCH_NOT_INDEPENDENTLY_ATTESTED");
  if(reportInput===null)add("report","UNKNOWN","HISTORICAL_REPORT_UNAVAILABLE");
  else {
   try{

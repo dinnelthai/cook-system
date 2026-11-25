@@ -15,6 +15,7 @@ export class SolanaRpcClient {
     timeoutMs = 30_000,
     maxRetries = 2,
     headers = {},
+    strictEnvelope = false,
   } = {}) {
     if (typeof endpoint !== "string" || !/^https?:\/\//.test(endpoint)) {
       throw new TypeError("an HTTP(S) Solana RPC endpoint is required");
@@ -29,6 +30,7 @@ export class SolanaRpcClient {
     this.maxRetries = maxRetries;
     this.headers = headers;
     this.nextId = 1;
+    this.strictEnvelope = strictEnvelope === true;
   }
 
   async request(method, params = []) {
@@ -37,12 +39,13 @@ export class SolanaRpcClient {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
       try {
+        const id = this.nextId++;
         const response = await this.fetchImpl(this.endpoint, {
           method: "POST",
           headers: { "content-type": "application/json", ...this.headers },
           body: JSON.stringify({
             jsonrpc: "2.0",
-            id: this.nextId++,
+            id,
             method,
             params,
           }),
@@ -58,6 +61,9 @@ export class SolanaRpcClient {
           throw error;
         }
         const payload = await response.json();
+        if (this.strictEnvelope && (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.jsonrpc !== "2.0" || payload.id !== id || Object.hasOwn(payload,"result") === Object.hasOwn(payload,"error"))) {
+          throw new SolanaRpcError(method, "invalid JSON-RPC response envelope");
+        }
         if (payload.error) {
           throw new SolanaRpcError(method, payload.error.message ?? "unknown JSON-RPC error", payload.error);
         }
