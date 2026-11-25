@@ -28,6 +28,7 @@ export function computeTerminalState(input){
   {id:"archived_evidence",status:evidence.status==="UNAVAILABLE"?"UNKNOWN":evidence.status==="REVIEW_REQUIRED"?"REVIEW":"PASS",evidence:evidence.issues},
   {id:"closing_account_set",status:accountSetReview?"REVIEW":accountSet.status==="INTERNALLY_CONSISTENT"?"PASS":"UNKNOWN",evidence:[...accountSet.issues,...accountSet.missing]},
   {id:"cost_basis",status:d.cost_basis_evidence.status==="REVIEW_REQUIRED"?"REVIEW":"UNKNOWN",evidence:d.cost_basis_evidence.issues},
+  {id:"creator_receipt_identity",status:fees.receipt_identity_coverage.status==="REVIEW_REQUIRED"?"REVIEW":fees.receipt_identity_coverage.status==="DECLARED_MATCH"?"PASS":"UNKNOWN",evidence:fees.issues.map(x=>x.code)},
   {id:"economic_classification",status:evidence.classification.status==="REVIEW_REQUIRED"?"REVIEW":"UNKNOWN",evidence:evidence.classification.issues},
   {id:"trade_evidence",status:d.trade_evidence.status==="REVIEW_REQUIRED"?"REVIEW":d.trade_evidence.status==="INTERNALLY_CONSISTENT"?"PASS":"UNKNOWN",evidence:[...d.trade_evidence.issues,...d.trade_evidence.missing]},
   {id:"market_coverage",status:d.market.history_complete?"PASS":"REVIEW",evidence:[]},

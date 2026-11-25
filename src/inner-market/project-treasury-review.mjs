@@ -28,6 +28,10 @@ export function buildProjectTreasuryReview(projectInput,input){
  if(coverage.status!=="DECLARED_LABELS_MATCH")unknown.push("REGISTERED_ACCOUNT_LABEL_COVERAGE_INCOMPLETE");
  if(f.review_checks.find(x=>x.id==="archived_evidence")?.status!=="PASS")unknown.push("ARCHIVED_RECEIPT_EVIDENCE_INCOMPLETE");
  if(f.valuation_status!=="SUPPLIED_ENDPOINT_ARITHMETIC_CONSISTENT")unknown.push("HISTORICAL_VALUATION_UNAVAILABLE");
+ if(f.evidence_coverage.creator_receipt_identity.status==="INCOMPLETE")unknown.push("CREATOR_RECEIPT_IDENTITY_INCOMPLETE");
+ if(f.evidence_coverage.cost_basis==="INCOMPLETE")unknown.push("COST_BASIS_COVERAGE_INCOMPLETE");
+ if(f.evidence_coverage.realized_pnl==="INCOMPLETE")unknown.push("REALIZED_PNL_COVERAGE_INCOMPLETE");
+ for(const issue of creator.issues)issues.push(issue.code);
  if(f.mathematical_audit.status==="REVIEW_REQUIRED")issues.push("FINANCIAL_IDENTITY_MISMATCH");
  const blocked=f.status==="REVIEW_REQUIRED"||a.status==="REVIEW_REQUIRED"||creator.status==="REVIEW_REQUIRED"||f.mathematical_audit.status==="REVIEW_REQUIRED";
  // Budget is a project configuration, not a lifetime cash-flow or current exposure measure.
@@ -60,7 +64,7 @@ export function buildProjectTreasuryReview(projectInput,input){
   creator_fee_audit:{status:creator.status,summary:show(creator.summary),pool_fee_bucket_cash_equivalence:"NOT_ESTABLISHED",
     source_attestation:"UNKNOWN",wallet_attribution:"UNKNOWN"},budget_review:budgetCheck,
   account_set:{status:a.status,totals:show(a.totals),expected_account_count:a.expected_account_count??null,observed_account_count:a.observed_account_count??null,coverage},
-  mathematical_audit:f.mathematical_audit,issues:[...new Set(issues)],unknown:[...new Set(unknown)],project_wide_total:null,live_balance:null,available_to_trade:null,
+  mathematical_audit:f.mathematical_audit,evidence_coverage:f.evidence_coverage,issues:[...new Set(issues)],unknown:[...new Set(unknown)],project_wide_total:null,live_balance:null,available_to_trade:null,
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",settlement_allowed:false,execution_enabled:false};
 }
 export function createProjectTreasuryReviewer({path,enabled}={}){

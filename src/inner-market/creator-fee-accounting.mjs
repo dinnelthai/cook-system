@@ -44,7 +44,7 @@ export function reconcileCreatorReceivables({
     if(e.kind==="CREATOR_WRITEOFF") writtenOff+=v;
     if(e.kind==="CREATOR_RECEIPT") {received+=v; receipts.set(e.id,{amount:v,matched:false,event:e});}
   }
-  const cashIds=new Set();
+  const cashIds=new Set(),identityResults=[];
   for(const p of cashEntries) {
     if(p.kind!=="CREATOR_FEE_RECEIVED") continue;
     if(typeof p.id!=="string"||!p.id.trim()||cashIds.has(p.id)) throw new Error("missing or duplicate cash receipt id");
@@ -56,7 +56,9 @@ export function reconcileCreatorReceivables({
     if(r.matched) {issues.push({code:"DUPLICATE_RECEIPT_REFERENCE",id:p.id});continue;}
     r.matched=true;
     if(r.amount!==amount(p.amountBaseUnits,"receipt amount")) issues.push({code:"RECEIPT_AMOUNT_MISMATCH",id:p.id});
-    for(const code of compareCreatorReceiptIdentity(r.event,p).issues)issues.push({code,id:p.id});
+    const identity=compareCreatorReceiptIdentity(r.event,p);
+    identityResults.push(identity);
+    for(const code of identity.issues)issues.push({code,id:p.id});
   }
   for(const [id,r] of receipts) if(!r.matched) issues.push({code:"MISSING_CASH_RECEIPT",id});
   const closing=opening+accrued-received-writtenOff;
@@ -66,7 +68,10 @@ export function reconcileCreatorReceivables({
   if(observed===null) issues.push({code:"RECEIVABLE_SNAPSHOT_MISSING"});
   else if(observed!==closing) issues.push({code:"RECEIVABLE_MISMATCH"});
   const ready=issues.length===0;
-  return {scope,status:ready?"RECONCILED":"REVIEW_REQUIRED",issues,
+  const identityMatches=identityResults.filter(r=>r.status==="DECLARED_MATCH").length;
+  const receipt_identity_coverage={status:!ready?"REVIEW_REQUIRED":receipts.size>0&&identityMatches===receipts.size?"DECLARED_MATCH":"INCOMPLETE",
+   receipt_count:receipts.size,matched_identity_count:identityMatches,source_attestation:"UNKNOWN"};
+  return {scope,status:ready?"RECONCILED":"REVIEW_REQUIRED",issues,receipt_identity_coverage,
     opening_receivable_base_units:opening.toString(),accrued_base_units:accrued.toString(),
     recorded_receipts_base_units:received.toString(),written_off_base_units:writtenOff.toString(),
     expected_closing_receivable_base_units:closing.toString(),

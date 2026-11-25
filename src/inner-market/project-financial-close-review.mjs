@@ -74,6 +74,7 @@ export function buildProjectFinancialCloseReview(input){
   nav_bridge:{unexplained_by_cash_basis_pnl_and_inventory_unrealized_change_base_units:residual,
    ...components,remaining_unexplained_base_units:remaining,interpretation:"RESIDUAL_NOT_PROFIT_OR_RECONCILIATION_PROOF; MAY_INCLUDE_RECEIVABLES_OTHER_ASSETS_LIABILITIES_AND_COST_BASIS_ADJUSTMENTS"},
   review_checks:state.checks.map(({id,status,evidence})=>({id,status,evidence})),issues:state.issues,
+  evidence_coverage:{creator_receipt_identity:fees.receipt_identity_coverage,cost_basis:state.trust.metrics.cost_basis.coverage_status,realized_pnl:state.trust.metrics.realized_pnl.coverage_status,independent_verification:"UNKNOWN"},
   source_attestation:"UNKNOWN",ownership_attestation:"UNKNOWN",valuation_attestation:"UNKNOWN",
   lifetime_funding_base_units:null,liquidation_value_base_units:null,actual_settlement_allowed:false,synthetic_test_settlement_allowed:sample&&state.settlement_allowed===true,execution_enabled:false,
   notes:["Opening cash is not lifetime funding. External capital is not profit.","Net trade receipts are not realized PnL; trade fees are already included in trade cash amounts.","Creator accruals and receivables are not cash receipts.","Inventory value is a supplied historical endpoint, not a realizable sale value. No independent valuation or source verification."]};

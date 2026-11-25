@@ -247,3 +247,20 @@ test("single-pass historical computations preserve public report/dashboard/termi
   assert.deepEqual(input,original);
  }
 });
+
+test("creator receipt identity evidence reaches terminal checks and risk without upgrading independent attestation",()=>{
+ const i=fixture(),e=i.creator.entries.find(x=>x.kind==="CREATOR_RECEIPT"),p=i.cash.entries.find(x=>x.kind==="CREATOR_FEE_RECEIVED");
+ const check=s=>s.checks.find(c=>c.id==="creator_receipt_identity");
+ assert.equal(check(buildTerminalState(i)).status,"UNKNOWN");
+ e.signature=p.signature="fixture-receipt";e.slot=p.slot=10;
+ const matched=buildTerminalState(i);
+ assert.equal(check(matched).status,"PASS");assert.equal(matched.trust.independent_attestation,"UNKNOWN");
+ p.slot=11;
+ const conflict=buildTerminalState(i);
+ assert.equal(conflict.status,"REVIEW_REQUIRED");
+ assert.equal(check(conflict).status,"REVIEW");
+ assert.ok(check(conflict).evidence.includes("RECEIPT_SLOT_MISMATCH"));
+ assert.ok(conflict.risk.alerts.some(x=>x.code==="CREATOR_RECEIPT_IDENTITY"&&x.severity==="CRITICAL"));
+ assert.equal(conflict.treasury.creator_cash_income_base_units,null);
+ assert.equal(conflict.settlement_allowed,false);
+});

@@ -6,6 +6,7 @@ const checks=[
  ["market_coverage","MARKET_HISTORY","市场历史覆盖","CRITICAL"],
  ["economic_classification","ECONOMIC_CLASSIFICATION","经济分类认证","CRITICAL"],
  ["cost_basis","COST_BASIS","库存成本认证","CRITICAL"],
+ ["creator_receipt_identity","CREATOR_RECEIPT_IDENTITY","Creator 收款证据","CRITICAL"],
  ["closing_account_set","ACCOUNT_SET_RECONCILIATION","期末账户集合对账","CRITICAL"],
  ["trade_evidence","TRADE_EVIDENCE","成交证据对账","CRITICAL"],
  ["valuation","VALUATION","资产估值","WARNING"],
