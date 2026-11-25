@@ -1,0 +1,359 @@
+[
+  {
+    "schema_version": "cook-participant-simulation.1",
+    "status": "SYNTHETIC_ONLY",
+    "fixture_purpose": "HAND_AUTHORED_ACCOUNTING_QA_NOT_OBSERVED_OR_SIMULATED_MARKET_HISTORY",
+    "detector_input": {
+      "scenario_id": "m07-fixed-a",
+      "seed": 0,
+      "market": {
+        "chain_id": "solana",
+        "network": "synthetic",
+        "token_mint": "synthetic-qa-m07-fixed-a",
+        "quote_mint": "synthetic-quote",
+        "curve_program_id": "synthetic-fixture",
+        "market_phase": "bonding_curve"
+      },
+      "events": [
+        {
+          "schema_version": "1.0.0",
+          "event_id": "m07-fixed-a:event:0",
+          "provenance": "synthetic",
+          "event_kind": "CURVE_BUY_EXECUTED",
+          "market": {
+            "chain_id": "solana",
+            "network": "synthetic",
+            "token_mint": "synthetic-qa-m07-fixed-a",
+            "quote_mint": "synthetic-quote",
+            "curve_program_id": "synthetic-fixture",
+            "market_phase": "bonding_curve"
+          },
+          "event_time_ms": 1,
+          "ordering": {
+            "event_sequence": 0,
+            "ordering_confidence": "synthetic"
+          },
+          "source": {
+            "source_type": "simulator",
+            "source_id": "fixed-accounting-qa"
+          },
+          "payload": {
+            "signature": "synthetic-qa-m07-fixed-a",
+            "actor_address": "sample-account",
+            "quote_amount_base_units": "10",
+            "token_amount_base_units": "5",
+            "quote_mint": "synthetic-quote",
+            "execution_price_decimal": "2",
+            "fee_components": []
+          },
+          "quality": {
+            "is_complete": true,
+            "validation_status": "valid"
+          },
+          "synthetic_metadata": {
+            "scenario_id": "m07-fixed-a",
+            "random_seed": 0,
+            "generator_version": "fixed-accounting-qa.1"
+          }
+        }
+      ],
+      "initial_state": {
+        "quote_reserves_base_units": "100",
+        "token_reserves_base_units": "100"
+      },
+      "final_state": {
+        "quote_reserves_base_units": "110",
+        "token_reserves_base_units": "95"
+      },
+      "execution_enabled": false
+    },
+    "opening_agent_states": [
+      {
+        "agent_id": "sample-account",
+        "quote_balance_base_units": "20",
+        "token_balance_base_units": "0"
+      }
+    ],
+    "agent_states": [
+      {
+        "agent_id": "sample-account",
+        "quote_balance_base_units": "10",
+        "token_balance_base_units": "5"
+      }
+    ],
+    "summary": {
+      "event_count": 1,
+      "trade_count": 1,
+      "agent_count": 1
+    },
+    "execution_enabled": false,
+    "live_rpc_enabled": false,
+    "transaction_signing_enabled": false
+  },
+  {
+    "schema_version": "cook-participant-simulation.1",
+    "status": "SYNTHETIC_ONLY",
+    "fixture_purpose": "HAND_AUTHORED_ACCOUNTING_QA_NOT_OBSERVED_OR_SIMULATED_MARKET_HISTORY",
+    "detector_input": {
+      "scenario_id": "m07-fixed-plus",
+      "seed": 0,
+      "market": {
+        "chain_id": "solana",
+        "network": "synthetic",
+        "token_mint": "synthetic-qa-m07-fixed-plus",
+        "quote_mint": "synthetic-quote",
+        "curve_program_id": "synthetic-fixture",
+        "market_phase": "bonding_curve"
+      },
+      "events": [
+        {
+          "schema_version": "1.0.0",
+          "event_id": "m07-fixed-plus:event:0",
+          "provenance": "synthetic",
+          "event_kind": "CURVE_BUY_EXECUTED",
+          "market": {
+            "chain_id": "solana",
+            "network": "synthetic",
+            "token_mint": "synthetic-qa-m07-fixed-plus",
+            "quote_mint": "synthetic-quote",
+            "curve_program_id": "synthetic-fixture",
+            "market_phase": "bonding_curve"
+          },
+          "event_time_ms": 1,
+          "ordering": {
+            "event_sequence": 0,
+            "ordering_confidence": "synthetic"
+          },
+          "source": {
+            "source_type": "simulator",
+            "source_id": "fixed-accounting-qa"
+          },
+          "payload": {
+            "signature": "synthetic-qa-m07-fixed-plus",
+            "actor_address": "sample-account",
+            "quote_amount_base_units": "10",
+            "token_amount_base_units": "5",
+            "quote_mint": "synthetic-quote",
+            "execution_price_decimal": "2",
+            "fee_components": []
+          },
+          "quality": {
+            "is_complete": true,
+            "validation_status": "valid"
+          },
+          "synthetic_metadata": {
+            "scenario_id": "m07-fixed-plus",
+            "random_seed": 0,
+            "generator_version": "fixed-accounting-qa.1"
+          }
+        }
+      ],
+      "initial_state": {
+        "quote_reserves_base_units": "100",
+        "token_reserves_base_units": "100"
+      },
+      "final_state": {
+        "quote_reserves_base_units": "110",
+        "token_reserves_base_units": "95"
+      },
+      "execution_enabled": false
+    },
+    "opening_agent_states": [
+      {
+        "agent_id": "sample-account",
+        "quote_balance_base_units": "20",
+        "token_balance_base_units": "0"
+      }
+    ],
+    "agent_states": [
+      {
+        "agent_id": "sample-account",
+        "quote_balance_base_units": "11",
+        "token_balance_base_units": "5"
+      }
+    ],
+    "summary": {
+      "event_count": 1,
+      "trade_count": 1,
+      "agent_count": 1
+    },
+    "execution_enabled": false,
+    "live_rpc_enabled": false,
+    "transaction_signing_enabled": false
+  },
+  {
+    "schema_version": "cook-participant-simulation.1",
+    "status": "SYNTHETIC_ONLY",
+    "fixture_purpose": "HAND_AUTHORED_ACCOUNTING_QA_NOT_OBSERVED_OR_SIMULATED_MARKET_HISTORY",
+    "detector_input": {
+      "scenario_id": "m07-fixed-minus",
+      "seed": 0,
+      "market": {
+        "chain_id": "solana",
+        "network": "synthetic",
+        "token_mint": "synthetic-qa-m07-fixed-minus",
+        "quote_mint": "synthetic-quote",
+        "curve_program_id": "synthetic-fixture",
+        "market_phase": "bonding_curve"
+      },
+      "events": [
+        {
+          "schema_version": "1.0.0",
+          "event_id": "m07-fixed-minus:event:0",
+          "provenance": "synthetic",
+          "event_kind": "CURVE_BUY_EXECUTED",
+          "market": {
+            "chain_id": "solana",
+            "network": "synthetic",
+            "token_mint": "synthetic-qa-m07-fixed-minus",
+            "quote_mint": "synthetic-quote",
+            "curve_program_id": "synthetic-fixture",
+            "market_phase": "bonding_curve"
+          },
+          "event_time_ms": 1,
+          "ordering": {
+            "event_sequence": 0,
+            "ordering_confidence": "synthetic"
+          },
+          "source": {
+            "source_type": "simulator",
+            "source_id": "fixed-accounting-qa"
+          },
+          "payload": {
+            "signature": "synthetic-qa-m07-fixed-minus",
+            "actor_address": "sample-account",
+            "quote_amount_base_units": "10",
+            "token_amount_base_units": "5",
+            "quote_mint": "synthetic-quote",
+            "execution_price_decimal": "2",
+            "fee_components": []
+          },
+          "quality": {
+            "is_complete": true,
+            "validation_status": "valid"
+          },
+          "synthetic_metadata": {
+            "scenario_id": "m07-fixed-minus",
+            "random_seed": 0,
+            "generator_version": "fixed-accounting-qa.1"
+          }
+        }
+      ],
+      "initial_state": {
+        "quote_reserves_base_units": "100",
+        "token_reserves_base_units": "100"
+      },
+      "final_state": {
+        "quote_reserves_base_units": "110",
+        "token_reserves_base_units": "95"
+      },
+      "execution_enabled": false
+    },
+    "opening_agent_states": [
+      {
+        "agent_id": "sample-account",
+        "quote_balance_base_units": "20",
+        "token_balance_base_units": "0"
+      }
+    ],
+    "agent_states": [
+      {
+        "agent_id": "sample-account",
+        "quote_balance_base_units": "9",
+        "token_balance_base_units": "5"
+      }
+    ],
+    "summary": {
+      "event_count": 1,
+      "trade_count": 1,
+      "agent_count": 1
+    },
+    "execution_enabled": false,
+    "live_rpc_enabled": false,
+    "transaction_signing_enabled": false
+  },
+  {
+    "schema_version": "cook-participant-simulation.1",
+    "status": "SYNTHETIC_ONLY",
+    "fixture_purpose": "HAND_AUTHORED_ACCOUNTING_QA_NOT_OBSERVED_OR_SIMULATED_MARKET_HISTORY",
+    "detector_input": {
+      "scenario_id": "m07-fixed-missing",
+      "seed": 0,
+      "market": {
+        "chain_id": "solana",
+        "network": "synthetic",
+        "token_mint": "synthetic-qa-m07-fixed-missing",
+        "quote_mint": "synthetic-quote",
+        "curve_program_id": "synthetic-fixture",
+        "market_phase": "bonding_curve"
+      },
+      "events": [
+        {
+          "schema_version": "1.0.0",
+          "event_id": "m07-fixed-missing:event:0",
+          "provenance": "synthetic",
+          "event_kind": "CURVE_BUY_EXECUTED",
+          "market": {
+            "chain_id": "solana",
+            "network": "synthetic",
+            "token_mint": "synthetic-qa-m07-fixed-missing",
+            "quote_mint": "synthetic-quote",
+            "curve_program_id": "synthetic-fixture",
+            "market_phase": "bonding_curve"
+          },
+          "event_time_ms": 1,
+          "ordering": {
+            "event_sequence": 0,
+            "ordering_confidence": "synthetic"
+          },
+          "source": {
+            "source_type": "simulator",
+            "source_id": "fixed-accounting-qa"
+          },
+          "payload": {
+            "signature": "synthetic-qa-m07-fixed-missing",
+            "actor_address": "sample-account",
+            "quote_amount_base_units": "10",
+            "token_amount_base_units": "5",
+            "quote_mint": "synthetic-quote",
+            "execution_price_decimal": "2",
+            "fee_components": []
+          },
+          "quality": {
+            "is_complete": true,
+            "validation_status": "valid"
+          },
+          "synthetic_metadata": {
+            "scenario_id": "m07-fixed-missing",
+            "random_seed": 0,
+            "generator_version": "fixed-accounting-qa.1"
+          }
+        }
+      ],
+      "initial_state": {
+        "quote_reserves_base_units": "100",
+        "token_reserves_base_units": "100"
+      },
+      "final_state": {
+        "quote_reserves_base_units": "110",
+        "token_reserves_base_units": "95"
+      },
+      "execution_enabled": false
+    },
+    "agent_states": [
+      {
+        "agent_id": "sample-account",
+        "quote_balance_base_units": "10",
+        "token_balance_base_units": "5"
+      }
+    ],
+    "summary": {
+      "event_count": 1,
+      "trade_count": 1,
+      "agent_count": 1
+    },
+    "execution_enabled": false,
+    "live_rpc_enabled": false,
+    "transaction_signing_enabled": false
+  }
+]

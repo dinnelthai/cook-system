@@ -33,3 +33,15 @@ CLI 批量输入上限 32 MiB / 100 份；浏览器批量和账簿文件上限 4
 ## 交付
 
 输出 .cook-system/acceptance/CODEX-INTEGRATED-REVIEW-M07-RESULT.md，包含每项 PASS / FAIL / PARTIAL / UNKNOWN / NOT_TESTED、实际结果、证据路径、复现步骤、确认的缺陷与证据缺口。保存脱敏截图和 JSON；不得提交含凭据或私有原始回执的文件。代码检查通过不等于真实市场、Localnet 交易或生产验收。本文仅为清单，不是验收结果。
+
+## M07-R1 — fixed QA inputs for missing-file acceptance gaps
+
+Operator report: PARTIAL, 433/433, six pages opened; no new confirmed defect. The fixtures under `fixtures/synthetic/m07/` are hand-authored accounting QA inputs (not reconstructed history or calibrated market paths). Their expected results are tested in `test/m07-acceptance-fixtures.test.mjs`.
+
+```sh
+node scripts/review-synthetic-simulation-ledger.mjs fixtures/synthetic/m07/report-single.json /tmp/m07-ledger-new.json
+node scripts/review-synthetic-report-batch.mjs fixtures/synthetic/m07/report-array-pass.json /tmp/m07-pass-new.json
+node scripts/review-synthetic-report-batch.mjs fixtures/synthetic/m07/report-array-mixed.json /tmp/m07-mixed-new.json
+```
+
+Use unused output paths. Expected CLI exit codes 0, 0, 2 respectively. Mixed batch: 1 internally consistent, 2 review required, 1 rejected. Two opposite account differences +1 and -1 remain separate. Import the exact same inputs and generated ledger into browser using the operator's permitted file chooser; do not bypass permission restrictions. For catalogue, add the existing inner-market-mvp sample, import catalogue-second.json, reimport the original, then import catalogue-conflict.json. Expect two records, duplicate idempotence, and conflict rejection. Verify no change to terminal/wallet state. Capture screenshots manually when automation is blocked. These fixture checks are not independent chain evidence, real market calibration, live competitor behavior or complete browser acceptance.

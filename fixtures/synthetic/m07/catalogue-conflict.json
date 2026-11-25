@@ -1,0 +1,258 @@
+{
+  "scope": {
+    "projectId": "synthetic-demo",
+    "quoteAsset": "SOL_LAMPORTS",
+    "tokenMint": "synthetic-mint",
+    "openingCutoff": "fixture:0",
+    "closingCutoff": "fixture:3"
+  },
+  "sourceMode": "SYNTHETIC",
+  "cash": {
+    "scope": {
+      "projectId": "synthetic-demo",
+      "quoteAsset": "SOL_LAMPORTS",
+      "tokenMint": "synthetic-mint",
+      "openingCutoff": "fixture:0",
+      "closingCutoff": "fixture:3"
+    },
+    "openingCashBaseUnits": "1000",
+    "observedClosingCashBaseUnits": "887",
+    "historyComplete": false,
+    "entries": [
+      {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "tokenMint": "synthetic-mint",
+        "openingCutoff": "fixture:0",
+        "closingCutoff": "fixture:3",
+        "id": "buy-cash",
+        "kind": "TRADE_CASH_COST",
+        "amountBaseUnits": "200",
+        "status": "FINALIZED",
+        "reconciliation": "PASS",
+        "tradeEventId": "b"
+      },
+      {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "tokenMint": "synthetic-mint",
+        "openingCutoff": "fixture:0",
+        "closingCutoff": "fixture:3",
+        "id": "sell-cash",
+        "kind": "TRADE_NET_RECEIPT",
+        "amountBaseUnits": "90",
+        "status": "FINALIZED",
+        "reconciliation": "PASS",
+        "tradeEventId": "s"
+      },
+      {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "tokenMint": "synthetic-mint",
+        "openingCutoff": "fixture:0",
+        "closingCutoff": "fixture:3",
+        "id": "fee-cash",
+        "kind": "CREATOR_FEE_RECEIVED",
+        "amountBaseUnits": "7",
+        "status": "FINALIZED",
+        "reconciliation": "PASS",
+        "feeEventId": "received"
+      },
+      {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "tokenMint": "synthetic-mint",
+        "openingCutoff": "fixture:0",
+        "closingCutoff": "fixture:3",
+        "id": "expense",
+        "kind": "OPERATING_EXPENSE",
+        "amountBaseUnits": "10",
+        "status": "FINALIZED",
+        "reconciliation": "PASS"
+      }
+    ]
+  },
+  "inventory": {
+    "scope": {
+      "projectId": "synthetic-demo",
+      "quoteAsset": "SOL_LAMPORTS",
+      "tokenMint": "synthetic-mint",
+      "openingCutoff": "fixture:0",
+      "closingCutoff": "fixture:3"
+    },
+    "historyComplete": true,
+    "opening": {
+      "scope": {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "tokenMint": "synthetic-mint",
+        "openingCutoff": "fixture:0",
+        "closingCutoff": "fixture:3"
+      },
+      "reconciliation": "PASS",
+      "tokens": "0",
+      "costBasis": "0"
+    },
+    "closing": {
+      "scope": {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "tokenMint": "synthetic-mint",
+        "openingCutoff": "fixture:0",
+        "closingCutoff": "fixture:3"
+      },
+      "reconciliation": "PASS",
+      "tokens": "50",
+      "costBasis": "100"
+    },
+    "tradeSummary": {
+      "scope": {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "tokenMint": "synthetic-mint",
+        "openingCutoff": "fixture:0",
+        "closingCutoff": "fixture:3"
+      },
+      "reconciliation": "PASS",
+      "boughtTokens": "100",
+      "soldTokens": "50",
+      "acquisitionCost": "200",
+      "disposedBasis": "100"
+    },
+    "adjustments": [],
+    "ledger": {
+      "position_journal": [
+        {
+          "event_id": "b",
+          "side": "BUY",
+          "cash_cost_quote_base_units": "200",
+          "token_amount_base_units": "100"
+        },
+        {
+          "event_id": "s",
+          "side": "SELL",
+          "net_quote_proceeds_base_units": "90",
+          "token_amount_base_units": "50",
+          "allocated_cost_basis_quote_base_units": "100"
+        }
+      ],
+      "total_buy_cost_quote_base_units": "200",
+      "total_net_sell_proceeds_quote_base_units": "90",
+      "ending_token_balance_base_units": "50",
+      "remaining_cost_basis_quote_base_units": "100",
+      "inventory_reconciliation": "MATCH",
+      "ignored_unconfirmed_count": 0,
+      "cost_basis_complete": true,
+      "realized_pnl_complete": true,
+      "realized_pnl_quote_base_units": "-10"
+    }
+  },
+  "creator": {
+    "scope": {
+      "projectId": "synthetic-demo",
+      "quoteAsset": "SOL_LAMPORTS",
+      "tokenMint": "synthetic-mint",
+      "openingCutoff": "fixture:0",
+      "closingCutoff": "fixture:3"
+    },
+    "openingReceivableBaseUnits": "0",
+    "observedClosingReceivableBaseUnits": "3",
+    "historyComplete": true,
+    "entries": [
+      {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "tokenMint": "synthetic-mint",
+        "openingCutoff": "fixture:0",
+        "closingCutoff": "fixture:3",
+        "id": "accrued",
+        "kind": "CREATOR_ACCRUAL",
+        "amountBaseUnits": "10",
+        "status": "FINALIZED",
+        "reconciliation": "PASS"
+      },
+      {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "tokenMint": "synthetic-mint",
+        "openingCutoff": "fixture:0",
+        "closingCutoff": "fixture:3",
+        "id": "received",
+        "kind": "CREATOR_RECEIPT",
+        "amountBaseUnits": "7",
+        "status": "FINALIZED",
+        "reconciliation": "PASS"
+      }
+    ]
+  },
+  "nav": {
+    "scope": {
+      "projectId": "synthetic-demo",
+      "quoteAsset": "SOL_LAMPORTS",
+      "tokenMint": "synthetic-mint",
+      "openingCutoff": "fixture:0",
+      "closingCutoff": "fixture:3"
+    },
+    "historyComplete": true,
+    "snapshots": [
+      {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "sequence": 0,
+        "navBeforeFlowBaseUnits": "1000",
+        "navAfterFlowBaseUnits": "1000",
+        "capitalInBaseUnits": "0",
+        "capitalOutBaseUnits": "0",
+        "reconciliation": "PASS",
+        "valuationStatus": "VERIFIED"
+      },
+      {
+        "projectId": "synthetic-demo",
+        "quoteAsset": "SOL_LAMPORTS",
+        "sequence": 3,
+        "navBeforeFlowBaseUnits": "980",
+        "navAfterFlowBaseUnits": "980",
+        "capitalInBaseUnits": "0",
+        "capitalOutBaseUnits": "0",
+        "reconciliation": "PASS",
+        "valuationStatus": "VERIFIED"
+      }
+    ]
+  },
+  "market": {
+    "scope": {
+      "projectId": "synthetic-demo",
+      "quoteAsset": "SOL_LAMPORTS",
+      "tokenMint": "synthetic-mint",
+      "openingCutoff": "fixture:0",
+      "closingCutoff": "fixture:3"
+    },
+    "historyComplete": true,
+    "snapshot": {
+      "reconciliation": "PASS",
+      "lifecycle": "bonding_curve",
+      "realQuoteReservesBaseUnits": "500",
+      "virtualQuoteReservesBaseUnits": "1500",
+      "virtualTokenReservesBaseUnits": "4000",
+      "realTokenReservesBaseUnits": "1000"
+    },
+    "trades": [
+      {
+        "id": "b",
+        "sequence": 1,
+        "side": "BUY",
+        "status": "FINALIZED",
+        "reconciliation": "PASS",
+        "quoteNotionalBaseUnits": "200"
+      },
+      {
+        "id": "s",
+        "sequence": 2,
+        "side": "SELL",
+        "status": "FINALIZED",
+        "reconciliation": "PASS",
+        "quoteNotionalBaseUnits": "90"
+      }
+    ]
+  }
+}
