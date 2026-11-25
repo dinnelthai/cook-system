@@ -2,7 +2,7 @@ import {reviewRecordedSyntheticSimulation} from "./synthetic-report-ledger.mjs";
 import {sortForReplay} from "./event-order.mjs";
 import {auditSyntheticRecordNumbers} from "./synthetic-record-numeric-audit.mjs";
 import {canonicalJson} from "./canonical-json.mjs";
-import {describeParticipantModel} from "../simulation/participant-model-contract.mjs";
+import {describeParticipantModel} from "./participant-model-contract.mjs";
 /** Unified retrospective QA of a supplied completed synthetic report.
  * No new actions, price forecasts, participant policies or live integration. */
 export function buildUnifiedSyntheticReview(report){

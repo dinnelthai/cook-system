@@ -38,6 +38,26 @@ test("localhost server serves terminal shell, modules and explicit report bridge
  }
  const html=await fetch(base);assert.equal(html.status,200);assert.match(await html.text(),/src="\/web\/app\.mjs"/);
  assert.equal((await fetch(base+"/web/app.mjs")).status,200);
+ // Recursively fetch static browser imports through the actual HTTP boundary.
+ // Do not widen the server's allowlist to make a browser test pass.
+ const visited=new Set(),queue=[base+"/web/app.mjs"];
+ const imports=/^\s*(?:import\s+(?:[^;'"()]*?\sfrom\s*)?|export\s+(?:\*|\{[^}]*\})\s+from\s*)['"]([^'"]+)['"]/gm;
+ while(queue.length){
+  const url=queue.shift();if(visited.has(url))continue;
+  visited.add(url);assert.ok(visited.size<=256,"unexpected browser module graph size");
+  assert.equal(new URL(url).origin,base);
+  const response=await fetch(url);
+  assert.equal(response.status,200,"browser module unavailable: "+new URL(url).pathname);
+  assert.match(response.headers.get("content-type")??"",/javascript/);
+  const source=await response.text();
+  for(const match of source.matchAll(imports)){
+   assert.match(match[1],/^\.\.?\//,"non-relative browser import: "+match[1]);
+   queue.push(new URL(match[1],url).href);
+  }
+ }
+ assert.ok(visited.has(base+"/src/core/participant-model-contract.mjs"));
+ assert.ok(visited.has(base+"/web/project-request-recovery.mjs"));
+ assert.equal((await fetch(base+"/src/simulation/participant-model-contract.mjs")).status,404);
  assert.equal((await fetch(base+"/web/project-client.mjs")).status,200);
  assert.equal((await fetch(base+"/web/project-setup-view.mjs")).status,200);
  assert.equal((await fetch(base+"/src/inner-market/terminal-state.mjs")).status,200);

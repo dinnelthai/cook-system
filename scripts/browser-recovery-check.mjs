@@ -4,13 +4,13 @@ import {join} from "node:path";
 import {once} from "node:events";
 import assert from "node:assert/strict";
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function eventually(fn,timeout=12000){
+async function eventually(fn,timeout=12000,stage="browser-start"){
  const start=Date.now();
  while(Date.now()-start<timeout){
   const value=await fn();if(value)return value;
   await sleep(100);
  }
- throw Error("BROWSER_INTERACTION_TIMEOUT");
+ throw Error("BROWSER_INTERACTION_TIMEOUT:"+stage);
 }
 async function connect(url){
  const ws=new WebSocket(url),pending=new Map();
@@ -65,28 +65,28 @@ export async function checkBrowserRecovery({browser,dir,env,url}){
    if(r.exceptionDetails)throw Error("BROWSER_EVALUATION_FAILED");
    return r.result.value;
   };
-  const wait=expr=>eventually(async()=>{
+  const wait=(stage,expr)=>eventually(async()=>{
    try{return await evaluate("Boolean("+expr+")");}
    catch(error){
     if(error.message==="BROWSER_COMMAND_FAILED:Runtime.evaluate"||error.message==="BROWSER_EVALUATION_FAILED")return false;
     throw error;
    }
-  });
+  },12000,stage);
   await cdp.call("Page.enable");
   await cdp.call("Page.navigate",{url});
-  await wait('location.origin==='+JSON.stringify(url)+' && document.querySelector("#terminal-project-select")');
+  await wait("initial-terminal",'location.origin==='+JSON.stringify(url)+' && document.querySelector("#terminal-project-select")');
   assert.equal(await evaluate('document.querySelector("#terminal-project-context").textContent.includes("Execution: DISABLED")'),true);
   await evaluate('sessionStorage.setItem("cook.project.create.pending.v1",'+JSON.stringify(key)+');window.__cookQaBeforeReload=true');
   await cdp.call("Page.reload");
-  await wait('location.origin==='+JSON.stringify(url)+' && window.__cookQaBeforeReload!==true && document.querySelector("#terminal-project-select")');
+  await wait("reload-terminal",'location.origin==='+JSON.stringify(url)+' && window.__cookQaBeforeReload!==true && document.querySelector("#terminal-project-select")');
   await evaluate('document.querySelector(\'[data-page="create"]\').click()');
-  await wait('document.querySelector("#project-recovery-check")');
+  await wait("recovery-panel",'document.querySelector("#project-recovery-check")');
   await evaluate('document.querySelector("#project-recovery-check").click()');
-  await wait('document.querySelector("#project-status")?.textContent.includes("已找到此前保存的项目")');
+  await wait("recovery-result",'document.querySelector("#project-status")?.textContent.includes("已找到此前保存的项目")');
   assert.equal(await evaluate('sessionStorage.getItem("cook.project.create.pending.v1")'),null);
   assert.equal(await evaluate('document.querySelector(\'#project-draft-form input[name="name"]\').value'),"Browser Recovery QA");
   await evaluate('document.querySelector(\'[data-page="terminal"]\').click()');
-  await wait('document.querySelector("#terminal-project-select")?.value==='+JSON.stringify(project.project_id));
+  await wait("selected-project",'document.querySelector("#terminal-project-select")?.value==='+JSON.stringify(project.project_id));
   assert.equal(await evaluate('document.querySelector("#terminal-report-area").hidden&&document.querySelector("#terminal-report-area").inert'),true);
   const events=await (await fetch(url+"/api/projects/"+encodeURIComponent(project.project_id)+"/events",{signal:AbortSignal.timeout(3000)})).json();
   assert.equal(events.events.length,1);
