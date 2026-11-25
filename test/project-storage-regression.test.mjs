@@ -1,3 +1,4 @@
+import {Worker} from "node:worker_threads";
 import {DatabaseSync} from "node:sqlite";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -53,4 +54,73 @@ test("audit export distinguishes compatible revisions from stale and preserves o
   assert.ok(v.exceptions.some(x=>x.code==="REVIEW_REPORT_LINK_CONFLICT"&&x.category==="CROSS_MODULE"));
   assert.equal(v.risk.status,"REVIEW_REQUIRED");
  }finally{s.close();}
+});
+
+test("concurrent SQLite writers deduplicate one metadata creation and append across connections", {timeout:20000},async t=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),"cook-concurrent-store-")));
+ const path=join(dir,"p.sqlite"),initial=openProjectStore(path,{now:()=>1000});
+ initial.close();
+ const workers=[];
+ t.after(async()=>{await Promise.all(workers.map(w=>w.terminate()));rmSync(dir,{recursive:true,force:true});});
+ const source=`
+ const {parentPort,workerData}=require("node:worker_threads");
+ (async()=>{
+  const {openProjectStore}=await import(workerData.module);
+  const store=openProjectStore(workerData.path,{now:()=>1000});
+  try{
+   parentPort.postMessage({ready:true});
+   await new Promise(resolve=>parentPort.once("message",resolve));
+   const p=store.create({profile:{name:"Concurrent QA",symbol:"QA"}},{create_request_id:"shared-create"});
+   const applied=store.append(p.project_id,{command_id:"shared-profile",type:"UPDATE_PROFILE",payload:{profile:{description:"Concurrent metadata"}}},{expected_revision:1});
+   parentPort.postMessage({id:p.project_id,status:applied.status,revision:applied.aggregate.revision});
+  }finally{store.close();}
+ })().catch(e=>{parentPort.postMessage({error:e.message});process.exitCode=1;});
+ `;
+ const ready=[],done=[];
+ for(let i=0;i<2;i++){
+  const worker=new Worker(source,{eval:true,workerData:{path,module:new URL("../src/inner-market/project-store.mjs",import.meta.url).href}});
+  workers.push(worker);
+  let readyResolve,readyReject,doneResolve,doneReject;
+  ready.push(new Promise((resolve,reject)=>{readyResolve=resolve;readyReject=reject;}));
+  done.push(new Promise((resolve,reject)=>{doneResolve=resolve;doneReject=reject;}));
+  // Attach rejection handlers immediately so a failure during setup cannot
+  // become an unhandled rejection while the other connection opens.
+  done.at(-1).catch(()=>{});
+  const fail=e=>{readyReject(e);doneReject(e);};
+  worker.on("error",fail);
+  worker.on("message",m=>{if(m.error)fail(Error(m.error));else if(m.ready)readyResolve();else doneResolve(m);});
+  worker.on("exit",code=>{if(code!==0)fail(Error("SQLITE_WORKER_EXIT_"+code));});
+ }
+ await Promise.all(ready);for(const worker of workers)worker.postMessage("start");
+ const results=await Promise.all(done);
+ assert.equal(results[0].id,results[1].id);
+ assert.deepEqual(results.map(r=>r.status).sort(),["ALREADY_APPLIED","APPLIED"]);
+ assert.ok(results.every(r=>r.revision===2));
+ const s=openProjectStore(path);
+ try{
+  assert.equal(s.list().length,1);
+  assert.equal(s.events(results[0].id).length,2);
+  assert.equal(s.verify(results[0].id).status,"VERIFIED");
+ }finally{s.close();}
+});
+test("bounded metadata replay remains stable across repeated database reopen", {timeout:20000},t=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),"cook-reopen-stress-")));
+ t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const path=join(dir,"p.sqlite");
+ for(let batch=0;batch<4;batch++){
+  const s=openProjectStore(path,{now:()=>1000});
+  try{
+   if(batch===0)s.create({project_id:"reopen-qa",profile:{name:"Reopen QA",symbol:"QA"}});
+   for(let i=0;i<25;i++){
+    const n=batch*25+i;
+    s.append("reopen-qa",{command_id:"meta-"+n,type:"UPDATE_PROFILE",payload:{profile:{description:"metadata "+n}}},{expected_revision:n+1});
+   }
+   const current=s.get("reopen-qa");
+   assert.equal(current.revision,(batch+1)*25+1);
+   assert.equal(s.verify("reopen-qa").status,"VERIFIED");
+  }finally{s.close();}
+ }
+ const s=openProjectStore(path);
+ try{assert.equal(s.events("reopen-qa").length,101);assert.equal(s.get("reopen-qa").profile.description,"metadata 99");}
+ finally{s.close();}
 });
