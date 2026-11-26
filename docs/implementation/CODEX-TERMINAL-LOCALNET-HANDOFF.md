@@ -30,3 +30,7 @@ ChatGPT 负责代码、回归用例及任务清单，直接提交 main。Codex �
 8. 输出 .cook-system/acceptance/TERMINAL-LOCALNET-HANDOFF-REPORT.md，逐项 PASS/FAIL/PARTIAL/BLOCKED，附实际证据、严重级别和文件/行号。未完成项继续保留。不要改 UI；不要把验收任务变成新功能开发。
 
 当前后端仅新增可独立启用的只读行情快照路径。T07 严格收据日志绑定已提交；覆盖有限（最近收据、单一且可核对的 PumpSwap 成交，不代表完整交易历史）。T08 已补历史已实现 PnL 算术核验与报表绑定；实时钱包 Profit 未接入，缺完整历史成本及独立估值证据时保持未知。T10–T16 仍属开发待办。未授权 Codex 自动执行本任务，由操作者在本地发起。
+
+## 新增需求评审任务（不实施）
+
+T19 — [Trade 多钱包买卖需求拆解与现状审查](T19-TRADE-REQUIREMENTS-REVIEW.md)。状态：文档已整理，待产品评审。仅审查，不进入 Codex 开发或联调队列，不变更 UI 或交易执行边界。
