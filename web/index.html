@@ -695,6 +695,20 @@ body:has(.current-terminal) #nav .reference-token-address button{background:tran
 
 /* Solana is the only supported chain in the current workspace. */
 .reference-token-rail .reference-chain-tabs{grid-template-columns:minmax(0,1fr)}
+
+.reference-generate-dialog{box-sizing:border-box;width:min(480px,calc(100vw - 32px));max-width:none;margin:auto;padding:32px;border:1px solid #294747;border-radius:24px;background:#101616;color:#f6f7f7;box-shadow:0 12px 40px #0006;font-family:inherit}
+.reference-generate-dialog::backdrop{background:#000b}
+.reference-generate-dialog h3{font-size:20px;font-weight:650;margin:0 30px 8px 0;line-height:1.4;color:#f6f7f7}
+.reference-generate-dialog .generate-description{font-size:16px;color:#c1c7c8;line-height:1.4;margin:0 0 26px}
+.reference-generate-dialog .generate-close{position:absolute;right:22px;top:18px;border:0;background:transparent;color:#c1c7c8;font-size:26px;line-height:1;padding:3px 5px;cursor:pointer}
+.reference-generate-dialog form{display:flex;flex-direction:column;gap:8px;margin:0}
+.reference-generate-dialog label{font-size:14px;font-weight:600;color:#f6f7f7;margin:0}
+.reference-generate-dialog input{box-sizing:border-box;width:100%;height:48px;padding:12px 17px;border:1px solid #294747;border-radius:12px;background:#101616;color:#f6f7f7;font:inherit;font-size:14px;outline-offset:2px}
+.reference-generate-dialog .generate-submit{height:48px;margin:16px 0 0;border:0;border-radius:12px;background:#193333;color:#83b1b1;font-size:17px;font-weight:600;cursor:pointer}
+.reference-generate-dialog .generate-submit:disabled{opacity:.5;cursor:not-allowed}
+.reference-generate-dialog .generate-feedback{font-size:11px;line-height:1.4;color:#a7b6b6;margin:4px 0 0;min-height:15px}
+@media(max-width:480px){.reference-generate-dialog{padding:24px;border-radius:18px}}
+
 </style></head>
 <body><a class="skip-link" href="#main">Skip to main content</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="Main navigation"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="My Memes" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">Initializing terminal. If this persists, check the browser console and network for module loading errors.</p></main></div>

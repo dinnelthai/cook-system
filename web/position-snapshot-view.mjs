@@ -50,10 +50,11 @@ export function sortPositionRows(rows,field,direction="asc"){
   return sign*String(x).localeCompare(String(y));
  });
 }
+export function validWalletPreviewCount(value){return typeof value==="string"&&/^[1-9][0-9]{0,2}$/.test(value)&&Number(value)<=100;}
 export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=false,onSummary=()=>{},adapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET})}){
  let project=null,rows=[],ticket=0,status="Select a Meme.",percent=25,selected=null;
  let checked=new Set(),query="",sortField="address",sortDirection="asc",busy=false,lastObserved=null;
- let timer=null,disposed=false;
+ let timer=null,disposed=false,generateDialog=null;
  const visibleRows=()=>sortPositionRows(rows.filter(r=>!query||r.address.toLowerCase().includes(query.toLowerCase())),sortField,sortDirection);
  function schedule(){
   clearTimeout(timer);
@@ -65,11 +66,24 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   },20000);
  }
  function onFocus(){if(!host.isConnected){dispose();return}if(!busy&&project?.token?.mint&&!host.contains(host.ownerDocument.activeElement))void refresh();}
- function dispose(){if(disposed)return;disposed=true;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
+ function dispose(){if(disposed)return;disposed=true;generateDialog?.remove();generateDialog=null;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
  let mounted=host.isConnected;
  const observer=typeof MutationObserver==="function"?new MutationObserver(()=>{if(!host.isConnected&&mounted)dispose();else if(host.isConnected)mounted=true}):null;
  if(host.ownerDocument?.documentElement)observer?.observe(host.ownerDocument.documentElement,{childList:true,subtree:true});
  globalThis.addEventListener?.("focus",onFocus);
+ function openGenerate(){
+  if(disposed||generateDialog)return;
+  const doc=host.ownerDocument,dialog=doc.createElement("dialog");
+  generateDialog=dialog;dialog.className="reference-generate-dialog";dialog.setAttribute("aria-labelledby","generate-wallet-title");
+  dialog.innerHTML='<button type="button" data-generate-close class="generate-close" aria-label="Close">×</button><h3 id="generate-wallet-title">Add Wallets</h3><p class="generate-description">This action will create several wallets at the same time.</p><form data-generate-form><label for="generate-wallet-count">Number of wallets to create</label><input id="generate-wallet-count" type="number" min="1" max="100" step="1" value="1" required autofocus><button type="submit" class="generate-submit">Add Wallets</button><p class="generate-feedback" role="status">Frontend preview only · No wallets will be created.</p></form>';
+  doc.body.append(dialog);
+  const input=dialog.querySelector("#generate-wallet-count"),submit=dialog.querySelector(".generate-submit"),feedback=dialog.querySelector(".generate-feedback");
+  dialog.querySelector("[data-generate-close]").onclick=()=>dialog.close();
+  dialog.addEventListener("close",()=>{dialog.remove();if(generateDialog===dialog)generateDialog=null;host.querySelector("#position-manage")?.focus({preventScroll:true})},{once:true});
+  input.oninput=()=>{submit.disabled=!validWalletPreviewCount(input.value);feedback.textContent="Frontend preview only · No wallets will be created."};
+  dialog.querySelector("form").onsubmit=e=>{e.preventDefault();if(!validWalletPreviewCount(input.value))return;feedback.textContent="Preview: "+input.value+" wallet(s) requested. No wallets created.";};
+  dialog.showModal();
+ }
  function draw(){
   const active=rows.find(r=>r.address===selected);
   const estimate=active?previewQuantity(active.tokens,percent):null;
@@ -85,7 +99,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
    '<div class="cook-position-grid"><div><small>Selected Token Holdings</small><strong>'+esc(displayToken(chosen.token_balance,chosen.token_decimals))+'</strong></div><div><small>Selected SOL Balance</small><strong>'+esc(formatUnits(chosen.sol_balance,9))+'</strong></div></div>'+
    '<div class="scroll"><table><thead><tr><th><input type="checkbox" data-position-all aria-label="Select all visible wallets" '+(visible.length&&visible.every(r=>checked.has(r.address))?"checked":"")+'></th><th>'+header("Wallet","address")+'</th><th>'+header("SOL Balance","sol")+'</th><th>'+header("Tokens","tokens")+'</th>'+(currentOnly?'<th>% of Supply</th><th>Profit</th>':'<th>Cost</th><th>Unrealized PnL</th><th>Realized PnL</th>')+'<th>'+header("Status","status")+'</th></tr></thead><tbody>'+
    visible.map(r=>'<tr><td><input type="checkbox" data-position-check="'+esc(r.address)+'" aria-label="Select wallet '+esc(r.address)+'" '+(checked.has(r.address)?"checked":"")+'></td><td><button type="button" data-position-wallet="'+esc(r.address)+'" aria-pressed="'+(selected===r.address)+'" title="'+esc(r.address)+'">'+esc(r.address.length>15?r.address.slice(0,6)+"…"+r.address.slice(-5):r.address)+'</button></td><td>'+esc(formatUnits(r.sol,9))+'</td><td>'+esc(displayToken(r.tokens,r.decimals))+'</td>'+(currentOnly?'<td>—</td><td>—</td>':'<td>—</td><td>—</td><td>—</td>')+'<td>'+esc(r.status)+'</td></tr>').join("")+
-   (!visible.length?'<tr><td colspan="'+(currentOnly?7:8)+'" class="muted">'+(currentOnly&&!rows.length?'<div class="reference-wallet-empty"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 6a3 3 0 0 1 3-3h14v2H6a1 1 0 0 0 0 2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a3 3 0 0 1-3-3zm15 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg><strong>No wallets found yet</strong><span>Create your first wallet in Wallets &amp; Assets.</span><button type="button" data-reference-new-wallet>＋ New Wallet</button></div>':rows.length?"No matching wallets":"No registered wallets")+'</td></tr>':"")+'</tbody></table></div>'+
+   (!visible.length?'<tr><td colspan="'+(currentOnly?7:8)+'" class="muted">'+(currentOnly&&!rows.length?'<div class="reference-wallet-empty"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 6a3 3 0 0 1 3-3h14v2H6a1 1 0 0 0 0 2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a3 3 0 0 1-3-3zm15 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg><strong>No wallets found yet</strong><span>Create your first wallet to get started.</span><button type="button" data-reference-new-wallet>＋ New Wallet</button></div>':rows.length?"No matching wallets":"No registered wallets")+'</td></tr>':"")+'</tbody></table></div>'+
    (currentOnly?'':'<section class="smith-section"><h3>Sell Quantity Preview</h3><p class="muted">Select a wallet to calculate a percentage of its observed token balance. Read-only; no order or quote is created.</p><div class="row">'+[10,25,50,75,100].map(p=>'<button type="button" data-position-percent="'+p+'" aria-pressed="'+(p===percent)+'">'+p+'%</button>').join("")+'</div>'+
    '<label>Custom percentage <input data-position-custom type="number" min="0" max="100" step="1" value="'+percent+'"></label>'+
    '<div class="trade-kv"><span>Selected Wallet</span><strong>'+esc(active?.address??"—")+'</strong><span>Tokens to Sell</span><strong>'+esc(estimate?displayToken(estimate.quantity,active.decimals):"—")+'</strong><span>Remaining Tokens</span><strong>'+esc(estimate?displayToken(estimate.remaining,active.decimals):"—")+'</strong><span>Estimated SOL Received</span><strong>Quote required</strong></div></section>');
@@ -98,7 +112,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   const search=host.querySelector("[data-position-search]");if(search)search.oninput=e=>{query=e.target.value;draw();const input=host.querySelector("[data-position-search]");input.focus();try{input.setSelectionRange(query.length,query.length)}catch{}};
   host.querySelectorAll("[data-position-sort]").forEach(b=>b.onclick=()=>{const key=b.dataset.positionSort;sortDirection=sortField===key&&sortDirection==="asc"?"desc":"asc";sortField=key;draw()});
   host.querySelector("#position-refresh").onclick=refresh;
-  host.querySelector("#position-manage").onclick=onManage;const newWallet=host.querySelector("[data-reference-new-wallet]");if(newWallet)newWallet.onclick=onManage;
+  host.querySelector("#position-manage").onclick=currentOnly?openGenerate:onManage;const newWallet=host.querySelector("[data-reference-new-wallet]");if(newWallet)newWallet.onclick=openGenerate;
   host.querySelector("#position-assets").onclick=onAssets;
   const previewNotice=(title,message)=>{const doc=host.ownerDocument,dialog=doc.createElement("dialog");dialog.className="reference-wallet-dialog";dialog.innerHTML="<h3>"+esc(title)+"</h3><p>"+esc(message)+"</p><form method=\"dialog\"><button>Close</button></form>";host.append(dialog);dialog.addEventListener("close",()=>dialog.remove(),{once:true});dialog.showModal()};
   const amounts=host.querySelector("#position-amounts");if(amounts)amounts.onclick=()=>previewNotice("Set amounts","Frontend preview only. No batch transaction parameters are connected.");
