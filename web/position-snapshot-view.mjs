@@ -58,10 +58,10 @@ export function validCreatedWalletBatch(result,count){
  return result.wallets.every(w=>typeof w?.address==="string"&&/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(w.address))&&new Set(result.wallets.map(w=>w.address)).size===result.wallets.length;
 }
 export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=false,onSummary=()=>{},adapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET})}){
- let project=null,rows=[],ticket=0,status="Select a Meme.",percent=25,selected=null;
+ let project=null,rows=[],ticket=0,status="Select a token to view token holdings.",percent=25,selected=null;
  let checked=new Set(),query="",sortField="address",sortDirection="asc",busy=false,lastObserved=null;
  let timer=null,disposed=false,generateDialog=null,amountsDialog=null,creating=false,inventory=null,inventoryTicket=0;
- const displayRows=()=>currentOnly&&inventory?rows.concat(inventory.filter(w=>!rows.some(r=>r.address===w.address)).map(w=>({address:w.address,sol:null,tokens:null,decimals:null,status:"Not assigned"}))):rows;
+ const displayRows=()=>currentOnly&&inventory?rows.concat(inventory.filter(w=>!rows.some(r=>r.address===w.address)).map(w=>({address:w.address,sol:null,tokens:null,decimals:null,status:"Balance unverified"}))):rows;
  const visibleRows=()=>sortPositionRows(displayRows().filter(r=>!query||r.address.toLowerCase().includes(query.toLowerCase())),sortField,sortDirection);
  async function loadInventory(){
   const own=++inventoryTicket;
@@ -158,7 +158,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   if(busy||!project)return;
   const id=++ticket,current=project;
   busy=true;status=lastObserved?"Refreshing holdings · Previous observation: "+lastObserved:"Reading Localnet holdings…";draw();
-  if(!current?.token?.mint||current.network?.cluster!=="localnet"||!current.network?.genesis_hash){busy=false;status="No verified Localnet project scope.";draw();return}
+  if(!current?.token?.mint||current.network?.cluster!=="localnet"||!current.network?.genesis_hash){busy=false;status="Localnet token or network not verified.";draw();return}
   try{
    const snapshot=await adapter.portfolio({limit:5});
    if(ticket!==id||!host.isConnected)return;
@@ -168,5 +168,5 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   finally{if(ticket===id){busy=false;if(host.isConnected){draw();schedule()}else dispose()}}
  }
  draw();if(currentOnly)void loadInventory();
- return {setProject(next){if(project?.project_id===next?.project_id&&project?.revision===next?.revision&&project?.token?.mint===next?.token?.mint)return;ticket++;clearTimeout(timer);busy=false;lastObserved=null;project=next;selected=null;checked.clear();query="";percent=25;rows=positionRows(next,null);status=next?"Holdings not yet verified.":"Select a Meme.";draw();if(next?.token?.mint)void refresh();},selectWallet(address){selected=rows.some(r=>r.address===address)?address:null;draw()},refresh,dispose};
+ return {setProject(next){if(project?.project_id===next?.project_id&&project?.revision===next?.revision&&project?.token?.mint===next?.token?.mint)return;ticket++;clearTimeout(timer);busy=false;lastObserved=null;project=next;selected=null;checked.clear();query="";percent=25;rows=positionRows(next,null);status=next?"Holdings not yet verified.":"Select a token to view token holdings.";draw();if(next?.token?.mint)void refresh();},selectWallet(address){selected=rows.some(r=>r.address===address)?address:null;draw()},refresh,dispose};
 }

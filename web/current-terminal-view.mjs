@@ -52,7 +52,7 @@ export function mountCurrentTerminal({main,nav,esc,activeProjectId,getProjectDir
  function selectToken(){
   const input=q("#terminal-project-select"),mint=input.value.trim();if(!mint){onMode("operations");onNavigate("terminal",null);return;}
   const matches=projects.filter(p=>p.token?.mint===mint&&p.network?.cluster==="localnet");
-  if(matches.length!==1){tokenStatus(matches.length?"Multiple local projects use this token. Select it in Meme Archive.":"Token is not registered in this Localnet workspace.");return;}
+  if(matches.length!==1){tokenStatus(matches.length?"Multiple records match this token. Select it in Meme Archive.":"Token is not registered in this Localnet workspace.");return;}
   tokenStatus("");onMode("operations");onNavigate("terminal",matches[0].project_id);
  }
  function drawMode(){

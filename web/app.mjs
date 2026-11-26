@@ -81,15 +81,15 @@ function renderGlobalContext(){
  if(!host)return;
  host.replaceChildren();
  const label=document.createElement("span");
- label.textContent=id?"Loading current project…":"Standalone workspace · No project selected";
+ label.textContent=id?"Loading current token…":"No token selected";
  host.append(label);
   if(!id)return;
  getProjectDirectory().then(({projects})=>{
   if(ticket!==globalContextTicket||activeProjectId!==id)return;
   const p=projects.find(x=>x.project_id===id);
-  label.textContent=p?p.profile.symbol+" · "+lifecycleLabel(p.lifecycle.stage)+" · v"+p.revision:"Project unavailable. Select another.";
-  label.title=p?p.profile.name+" / "+p.project_id:"Project unavailable";
- }).catch(()=>{if(ticket===globalContextTicket&&activeProjectId===id)label.textContent="Project read failed. Refresh to retry.";});
+  label.textContent=p?p.profile.symbol+" · "+lifecycleLabel(p.lifecycle.stage):"Token unavailable. Select another.";
+  label.title=p?p.profile.name:"Token unavailable";
+ }).catch(()=>{if(ticket===globalContextTicket&&activeProjectId===id)label.textContent="Token details unavailable. Refresh to retry.";});
 }
 let workspaceRevision=null,workspaceBusy=false,workspaceMessage="尚未读取数据库；文件导入导出仍可使用。",workspaceVersions=[];
 let data=structuredClone(fixture),report,page="terminal",importTicket=0,offlineReview=false,workflowMessage="";
