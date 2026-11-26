@@ -1,10 +1,9 @@
+import {createWalletAdapter,WALLET_MODE} from "./wallet-adapter.mjs";
 const key="cook.localnet.activeWallet";
 let selected="";try{selected=localStorage.getItem(key)||""}catch{}
 function choose(address){selected=address;try{localStorage.setItem(key,address)}catch{}}
-async function api(action,body){
- const r=await fetch("/api/local-wallet/"+action,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),cache:"no-store"});
- const j=await r.json();if(!r.ok)throw Error(j.code||"请求失败");return j;
-}
+const walletAdapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET});
+const api=(action,body)=>walletAdapter[action](body);
 const fmt=n=>{const v=BigInt(n);return (v/1000000000n)+"."+(v%1000000000n).toString().padStart(9,"0").replace(/0+$/,"").padEnd(2,"0")+" SOL"};
 function fill(select,rows){
  select.replaceChildren();
