@@ -22,15 +22,15 @@ function formatSol(value){const n=BigInt(value),fraction=(n%1000000000n).toStrin
 const short=v=>v.slice(0,6)+"…"+v.slice(-5);
 export function mountTradePanelPreview(host){
  host.innerHTML=`<section class="reference-trade-section reference-bundle">
- <div class="reference-trade-heading"><h3>Bundle Buy / Sell</h3><span class="reference-wallet-count" data-preview-count>0/0 Wallets Buying</span></div>
- <div class="reference-direction" role="group" aria-label="Preview trade direction"><button type="button" data-preview-side="BUY" aria-pressed="true">Bundle Buy</button><button type="button" data-preview-side="SELL" aria-pressed="false">Bundle Sell</button></div>
- <div class="reference-card-grid"><div class="reference-stat"><span>TX count</span><strong>0</strong></div><div class="reference-stat"><span data-preview-total-label>Total buy amount</span><strong data-preview-total>0.0000 SOL</strong></div></div>
- <div class="reference-delay" aria-label="Transaction delay (display only)"><button type="button" disabled aria-label="Decrease delay">−</button><button type="button" disabled>TX Delay (Blocks)</button><button type="button" disabled aria-label="Increase delay">+</button></div>
- <div class="reference-card-grid"><div class="reference-stat"><span>Estimated Interval</span><strong>0.0s (between txs)</strong></div><div class="reference-stat"><span>Estimated Time</span><strong>0.0s (total)</strong></div></div>
- <button class="reference-action reference-buy" type="button" data-preview-action disabled>Buy</button>
+ <div class="reference-trade-heading"><h3>多钱包买卖</h3><span class="reference-wallet-count" data-preview-count>0/0 个钱包买入</span></div>
+ <div class="reference-direction" role="group" aria-label="预览交易方向"><button type="button" data-preview-side="BUY" aria-pressed="true">多钱包买入</button><button type="button" data-preview-side="SELL" aria-pressed="false">多钱包卖出</button></div>
+ <div class="reference-card-grid"><div class="reference-stat"><span>交易笔数</span><strong>0</strong></div><div class="reference-stat"><span data-preview-total-label>买入总额</span><strong data-preview-total>0.0000 SOL</strong></div></div>
+ <div class="reference-delay" aria-label="交易延迟（仅展示）"><button type="button" disabled aria-label="减少延迟">−</button><button type="button" disabled>交易延迟（区块）</button><button type="button" disabled aria-label="增加延迟">+</button></div>
+ <div class="reference-card-grid"><div class="reference-stat"><span>预计间隔</span><strong>0.0 秒（交易间隔）</strong></div><div class="reference-stat"><span>预计耗时</span><strong>0.0 秒（总耗时）</strong></div></div>
+ <button class="reference-action reference-buy" type="button" data-preview-action disabled>买入</button>
  </section>
- <section class="reference-trade-section reference-exit"><h3>Dump It</h3><div class="reference-card-grid"><div class="reference-stat"><span>Tokens To Sell</span><strong>0</strong></div><div class="reference-stat"><span>SOL Amount to Receive</span><strong>0.0000 SOL</strong></div></div><div class="reference-stat"><span>Play Profit</span><strong class="reference-positive">+0.0000 SOL</strong></div><p class="reference-session">Session on this token: <span class="reference-positive">+0.0000 SOL</span></p><button type="button" class="reference-action reference-dump" disabled>Dump It</button></section>
- <section class="reference-trade-section reference-log"><div class="reference-trade-heading"><h3>Trades Log</h3><label class="reference-mint-filter">Current Mint Only <input type="checkbox" checked aria-label="Current Mint Only"></label></div><table aria-label="Preview trades log"><thead><tr><th>Wallet</th><th aria-sort="none"><button type="button" data-preview-sort>SOL <span aria-hidden="true">▴▾</span></button></th><th>Mint</th><th aria-sort="none"><button type="button" data-preview-sort>Time <span aria-hidden="true">▴▾</span></button></th></tr></thead><tbody><tr><td colspan="4">No trades yet.</td></tr></tbody></table></section>`;
+ <section class="reference-trade-section reference-exit"><h3>退出持仓</h3><div class="reference-card-grid"><div class="reference-stat"><span>待卖出代币</span><strong>0</strong></div><div class="reference-stat"><span>预计收到 SOL</span><strong>0.0000 SOL</strong></div></div><div class="reference-stat"><span>本轮收益</span><strong class="reference-positive">+0.0000 SOL</strong></div><p class="reference-session">本代币会话收益：<span class="reference-positive">+0.0000 SOL</span></p><button type="button" class="reference-action reference-dump" disabled>退出持仓</button></section>
+ <section class="reference-trade-section reference-log"><div class="reference-trade-heading"><h3>成交记录</h3><label class="reference-mint-filter">仅当前代币 <input type="checkbox" checked aria-label="仅当前代币"></label></div><table aria-label="成交记录预览"><thead><tr><th>钱包</th><th aria-sort="none"><button type="button" data-preview-sort>SOL <span aria-hidden="true">▴▾</span></button></th><th>代币地址</th><th aria-sort="none"><button type="button" data-preview-sort>时间 <span aria-hidden="true">▴▾</span></button></th></tr></thead><tbody><tr><td colspan="4">暂无成交。</td></tr></tbody></table></section>`;
  const q=s=>host.querySelector(s);
  let receiptHistory=null,currentMint=null,field="time",direction="descending";
  const filter=q(".reference-mint-filter input"),tbody=q(".reference-log tbody");
@@ -39,21 +39,21 @@ export function mountTradePanelPreview(host){
   const doc=host.ownerDocument;tbody.replaceChildren();
   for(const row of rows){
    const tr=doc.createElement("tr");
-   for(const [label,detail] of [[short(row.wallet),row.wallet],[(row.side==="BUY"?"−":"+")+formatSol(row.quote_lamports),"Finalized swap quote; excludes separately charged network costs"],[short(row.mint),row.mint],[new Date(row.block_time*1000).toISOString(),row.signature]]){
+   for(const [label,detail] of [[short(row.wallet),row.wallet],[(row.side==="BUY"?"−":"+")+formatSol(row.quote_lamports),"最终确认的成交报价额，不含单独收取的网络费用"],[short(row.mint),row.mint],[new Date(row.block_time*1000).toISOString(),row.signature]]){
     const td=doc.createElement("td");td.textContent=label;td.title=detail;tr.append(td);
    }
    tbody.append(tr);
   }
-  if(!rows.length){const tr=doc.createElement("tr"),td=doc.createElement("td");td.colSpan=4;td.textContent=filter.checked&&!currentMint?"Select a token.":receiptHistory===null?"Receipt history unavailable.":"No reconciled finalized swaps in recent receipts.";tr.append(td);tbody.append(tr);}
+  if(!rows.length){const tr=doc.createElement("tr"),td=doc.createElement("td");td.colSpan=4;td.textContent=filter.checked&&!currentMint?"请选择代币。":receiptHistory===null?"历史收据不可用。":"近期收据中暂无已核对且最终确认的成交。";tr.append(td);tbody.append(tr);}
  }
  filter.onchange=drawLog;
  host.querySelectorAll("[data-preview-side]").forEach(button=>button.onclick=()=>{
   const sell=button.dataset.previewSide==="SELL";
   host.querySelectorAll("[data-preview-side]").forEach(b=>b.setAttribute("aria-pressed",String(b===button)));
-  q("[data-preview-count]").textContent=sell?"0/0 Wallets Selling":"0/0 Wallets Buying";
-  q("[data-preview-total-label]").textContent=sell?"Total sell amount":"Total buy amount";
-  q("[data-preview-total]").textContent=sell?"0 Tokens":"0.0000 SOL";
-  const action=q("[data-preview-action]");action.textContent=sell?"Sell":"Buy";action.classList.toggle("reference-sell",sell);
+  q("[data-preview-count]").textContent=sell?"0/0 个钱包卖出":"0/0 个钱包买入";
+  q("[data-preview-total-label]").textContent=sell?"卖出总额":"买入总额";
+  q("[data-preview-total]").textContent=sell?"0 代币":"0.0000 SOL";
+  const action=q("[data-preview-action]");action.textContent=sell?"卖出":"买入";action.classList.toggle("reference-sell",sell);
  });
  host.querySelectorAll("[data-preview-sort]").forEach(button=>button.onclick=()=>{
   const th=button.closest("th"),next=th.getAttribute("aria-sort")==="ascending"?"descending":"ascending";

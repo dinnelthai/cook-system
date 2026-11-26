@@ -39,11 +39,11 @@ export function mountProjectSetup(container, {
     return result.aggregate;
   }
   function renderLoading() {
-    container.innerHTML = screenHeading("Project Setup", "Project registry · Local SQLite") +
-      note(loadError ? "Project read failed: " + loadError : "Loading local project registry…");
+    container.innerHTML = screenHeading("项目配置", "项目登记 · 本地 SQLite") +
+      note(loadError ? "项目读取失败：" + loadError : "正在加载本地项目登记…");
     if (loadError) {
       const button = document.createElement("button");
-      button.textContent = "Retry";
+      button.textContent = "重试";
       button.onclick = load;
       container.append(button);
     }
@@ -69,8 +69,8 @@ export function mountProjectSetup(container, {
     const lock = editable ? "" : " disabled";
     const projectRows = projects.map(x => [
       x.profile.name, x.profile.symbol,
-      x.token.supply_base_units === null ? "Not configured" : x.token.supply_base_units + " base units / " + x.token.decimals + " decimals",
-      x.token.creator_wallet_address || "No wallet assigned",
+      x.token.supply_base_units === null ? "未配置" : x.token.supply_base_units + " 基础单位 / " + x.token.decimals + " decimals",
+      x.token.creator_wallet_address || "未分配钱包",
       lifecycleLabel(x.lifecycle.stage) + " · " + operationalLabel(x.lifecycle.operational_status),
       x.token.issuance_status
     ]);
@@ -90,55 +90,55 @@ export function mountProjectSetup(container, {
       current.token.mint && current.token.issuance_signature);
     const issuanceRows = projects.filter(x => x.token.mint).map(x => [
       x.profile.name, x.token.mint, x.token.issuance_signature,
-      x.token.issuance_status, x.token.verification_evidence_ref || "Awaiting on-chain verification"
+      x.token.issuance_status, x.token.verification_evidence_ref || "等待链上验证"
     ]);
 
-    container.innerHTML = screenHeading("Launch Preparation", terminalMode?"Configure your token and creator wallet":"Project configuration · Risk declarations · Historical evidence") +
-      note(terminalMode?"Save a Localnet draft. Saving does not issue a token.":"Local project profile · Issuance records") +
-      (recoveryId||recoveryError?panel("Recover Save Request",'<p id="project-recovery-status" role="status" class="muted">'+esc(recoveryError||"An unconfirmed creation request exists. Query the saved result; do not automatically resend.")+'</p><button id="project-recovery-check"'+(recoveryError?" disabled":"")+'>Check Previous Save</button>'):"")+
-      (missingSelection?note("The previously selected project is missing. Open an existing project or create a new draft."):"")+
+    container.innerHTML = screenHeading("发行准备", terminalMode?"配置代币与创建者钱包":"项目配置 · 风险声明 · 历史证据") +
+      note(terminalMode?"保存 Localnet 草稿，保存不会发行代币。":"本地项目资料 · 发行记录") +
+      (recoveryId||recoveryError?panel("恢复保存请求",'<p id="project-recovery-status" role="status" class="muted">'+esc(recoveryError||"存在未确认的创建请求，请查询保存结果，不要自动重发。")+'</p><button id="project-recovery-check"'+(recoveryError?" disabled":"")+'>检查上次保存</button>'):"")+
+      (missingSelection?note("此前选择的项目不存在，请打开现有项目或新建草稿。"):"")+
       '<div class="setup-workspace"><div class="setup-primary">'+
-      panel("Project Configuration", '<form id="project-draft-form"><h4 class="form-section-title">Token Details & Supply</h4><div class="grid form-section">' +
-        '<div><label for="draft-name">Project Name</label><input id="draft-name" name="name" required maxlength="32" value="' + esc(current?.profile.name ?? "") + '" placeholder="Project name"' + lock + '></div>' +
-        '<div><label for="draft-symbol">Token Symbol</label><input id="draft-symbol" name="symbol" required maxlength="10" pattern="[A-Za-z0-9]{1,10}" value="' + esc(current?.profile.symbol ?? "") + '" placeholder="TOKEN"' + lock + '></div>' +
-        '<div><label for="draft-supply">Total Supply (Tokens)</label><input id="draft-supply" name="supply" inputmode="decimal" maxlength="30" value="' + esc(currentSupply) + '"' + lock + '></div>' +
-        '<div><label for="draft-decimals">Decimals</label><input id="draft-decimals" name="decimals" type="number" min="0" max="9" step="1" value="' + esc(current ? current.token.decimals??"" : 6) + '"' + lock + '></div>' +
-        '</div><h4 class="form-section-title">Network & Registered Wallet</h4><div class="grid form-section">'+
-        '<div><label for="draft-quote">Quote Asset</label><input id="draft-quote" value="SOL" disabled><input type="hidden" name="quote_asset" value="SOL"></div>' +
-        '<div><label for="draft-network">Network</label><input id="draft-network" value="Localnet (Local verification)" disabled><input type="hidden" name="network" value="localnet"></div>' +
-        '<div><label for="draft-genesis">Local Genesis Hash</label><input id="draft-genesis" value="' + esc(current?.network.genesis_hash ?? config?.network?.genesis_hash ?? "Not configured") + '" disabled></div>' +
-        '<div><label for="project-wallet">Creator Wallet</label><select name="creator_wallet" id="project-wallet"' + lock + '><option value="">Loading managed wallets…</option></select></div>' +
-        '</div><details class="profile-optional"><summary>Public Profile & Description (Optional)</summary><div class="grid form-section">'+
-        '<div><label for="draft-website">Website</label><input id="draft-website" name="website" type="url" value="' + esc(current?.profile.website ?? "") + '" placeholder="https://"' + lock + '></div>' +
+      panel("项目配置", '<form id="project-draft-form"><h4 class="form-section-title">代币详情与供应量</h4><div class="grid form-section">' +
+        '<div><label for="draft-name">项目名称</label><input id="draft-name" name="name" required maxlength="32" value="' + esc(current?.profile.name ?? "") + '" placeholder="项目名称"' + lock + '></div>' +
+        '<div><label for="draft-symbol">代币符号</label><input id="draft-symbol" name="symbol" required maxlength="10" pattern="[A-Za-z0-9]{1,10}" value="' + esc(current?.profile.symbol ?? "") + '" placeholder="TOKEN"' + lock + '></div>' +
+        '<div><label for="draft-supply">总供应量（代币）</label><input id="draft-supply" name="supply" inputmode="decimal" maxlength="30" value="' + esc(currentSupply) + '"' + lock + '></div>' +
+        '<div><label for="draft-decimals">小数位</label><input id="draft-decimals" name="decimals" type="number" min="0" max="9" step="1" value="' + esc(current ? current.token.decimals??"" : 6) + '"' + lock + '></div>' +
+        '</div><h4 class="form-section-title">网络与已登记钱包</h4><div class="grid form-section">'+
+        '<div><label for="draft-quote">报价资产</label><input id="draft-quote" value="SOL" disabled><input type="hidden" name="quote_asset" value="SOL"></div>' +
+        '<div><label for="draft-network">网络</label><input id="draft-network" value="Localnet (Local verification)" disabled><input type="hidden" name="network" value="localnet"></div>' +
+        '<div><label for="draft-genesis">本地创世哈希</label><input id="draft-genesis" value="' + esc(current?.network.genesis_hash ?? config?.network?.genesis_hash ?? "未配置") + '" disabled></div>' +
+        '<div><label for="project-wallet">创建者钱包</label><select name="creator_wallet" id="project-wallet"' + lock + '><option value="">正在加载已管理钱包…</option></select></div>' +
+        '</div><details class="profile-optional"><summary>公开资料与描述（可选）</summary><div class="grid form-section">'+
+        '<div><label for="draft-website">网站</label><input id="draft-website" name="website" type="url" value="' + esc(current?.profile.website ?? "") + '" placeholder="https://"' + lock + '></div>' +
         '<div><label for="draft-telegram">Telegram</label><input id="draft-telegram" name="telegram" type="url" value="' + esc(current?.profile.telegram ?? "") + '" placeholder="https://"' + lock + '></div>' +
         '<div><label for="draft-twitter">Twitter / X</label><input id="draft-twitter" name="twitter" type="url" value="' + esc(current?.profile.twitter ?? "") + '" placeholder="https://"' + lock + '></div>' +
-        '<div style="grid-column:1/-1"><label for="draft-description">Description</label><textarea id="draft-description" name="description" maxlength="1000"' + lock + '>' + esc(current?.profile.description ?? "") + '</textarea></div>' +
+        '<div style="grid-column:1/-1"><label for="draft-description">描述</label><textarea id="draft-description" name="description" maxlength="1000"' + lock + '>' + esc(current?.profile.description ?? "") + '</textarea></div>' +
         '</div></details><p class="muted">Supply is converted exactly to base units. Leave supply and decimals blank if unknown. Only public wallet addresses are stored.</p>' +
-        '<div class="row"><button type="submit" class="primary"' + (editable ? "" : " disabled") + '>Save Configuration</button><button type="button" id="project-new">New Project</button></div></form>' +
-        '<p id="project-wallet-status" class="muted" role="status">Wallet list not loaded</p><p id="project-status" role="status" class="muted">' + esc(message) + '</p>') +
+        '<div class="row"><button type="submit" class="primary"' + (editable ? "" : " disabled") + '>Save Configuration</button><button type="button" id="project-new">新建项目</button></div></form>' +
+        '<p id="project-wallet-status" class="muted" role="status">钱包列表未加载</p><p id="project-status" role="status" class="muted">' + esc(message) + '</p>') +
       '</div><aside class="setup-secondary">'+
-      panel("Project Selection & Status", '<div class="setup-summary">'+esc(current?current.profile.name+" · "+current.profile.symbol+" · v"+current.revision:"No project selected")+'</div>'+note(current?lifecycleLabel(current.lifecycle.stage)+" · "+operationalLabel(current.lifecycle.operational_status):"Select an existing project or create a draft.") +
-        '<div class="row"><select id="project-open-select"><option value="">Select Project</option>' + options + '</select>' +
-        '<button id="project-open" ' + (projects.length ? "" : "disabled") + '>Open Project</button>' +
-        '<button id="project-export">Export Project Registry</button>' +
+      panel("项目选择与状态", '<div class="setup-summary">'+esc(current?current.profile.name+" · "+current.profile.symbol+" · v"+current.revision:"未选择项目")+'</div>'+note(current?lifecycleLabel(current.lifecycle.stage)+" · "+operationalLabel(current.lifecycle.operational_status):"选择现有项目或新建草稿。") +
+        '<div class="row"><select id="project-open-select"><option value="">选择项目</option>' + options + '</select>' +
+        '<button id="project-open" ' + (projects.length ? "" : "disabled") + '>打开项目</button>' +
+        '<button id="project-export">导出项目登记</button>' +
         '<button id="project-legacy-export" ' + (legacyCount ? "" : "disabled") + '>Export Legacy Browser Registry (' + legacyCount + ')</button></div>' +
-        '<div class="row"><button id="project-mark-ready" ' + (readyAllowed ? "" : "disabled") + '>Mark Configuration Ready</button>' +
-        '<button id="project-launch-submitted" ' + (launchSubmitAllowed ? "" : "disabled") + '>Record Issuance Submission</button></div><details><summary>All Projects（'+projects.length+'）</summary>'+table(["Project", "Symbol", "Supply", "Dev Wallet", "Lifecycle / Operational Status", "Issuance Verification"], projectRows)+'</details>') +
-      (current?panel("Project Risk Limits",note("Declared limits only; not funds, permission or risk approval. Blank means unset; zero means an explicit zero limit. Changes create a new revision.")+
+        '<div class="row"><button id="project-mark-ready" ' + (readyAllowed ? "" : "disabled") + '>标记配置就绪</button>' +
+        '<button id="project-launch-submitted" ' + (launchSubmitAllowed ? "" : "disabled") + '>Record Issuance Submission</button></div><details><summary>All Projects（'+projects.length+'）</summary>'+table(["Project", "Symbol", "Supply", "开发者钱包", "生命周期 / 运营状态", "发行验证"], projectRows)+'</details>') +
+      (current?panel("项目风险限额",note("Declared limits only; not funds, permission or risk approval. Blank means unset; zero means an explicit zero limit. Changes create a new revision.")+
         '<form id="project-budget-form"><div class="grid">'+limitFields.map(([k,label])=>'<label>'+esc(label)+'<input name="'+k+'" inputmode="decimal" maxlength="30" value="'+esc(budgetInputValue(current.limits[k]))+'"></label>').join("")+
-        '<label>Maximum Drawdown (bps; 100 bps = 1%)<input name="max_drawdown_bps" inputmode="numeric" maxlength="5" value="'+esc(current.limits.max_drawdown_bps??"")+'"></label></div><button type="submit">Save Risk Limits</button><p id="project-budget-status" role="status"></p></form>')+
-        panel("Registered Project Wallets",table(["Group","Purpose","Address","Role","Registration Status","Declared Limit","Ownership Evidence"],projectWalletRegistrationRows(current))+note("Registration only; not evidence of balances, ownership or reserved funds.")):"")+
-      '</aside></div><details class="panel setup-evidence"><summary>Issuance, Market & Report Evidence</summary><div class="setup-evidence-grid">'+
-      panel("Record Issuance Evidence", '<form id="issuance-evidence-form"><label for="issuance-project">Project</label><select id="issuance-project" name="project_id" required><option value="">Select Project</option>' + issuanceOptions + '</select>' +
-        '<label for="issuance-mint">Token Mint Address</label><input id="issuance-mint" name="mint" required maxlength="44" placeholder="Issued token mint address">' +
-        '<label for="issuance-signature">Transaction Signature</label><input id="issuance-signature" name="signature" required minlength="64" maxlength="88" placeholder="On-chain transaction signature">' +
-        '<div class="row"><button type="submit" ' + (projects.length ? "" : "disabled") + '>Record Evidence (UNVERIFIED)</button></div></form>' +
+        '<label>Maximum Drawdown (bps; 100 bps = 1%)<input name="max_drawdown_bps" inputmode="numeric" maxlength="5" value="'+esc(current.limits.max_drawdown_bps??"")+'"></label></div><button type="submit">保存风险限额</button><p id="project-budget-status" role="status"></p></form>')+
+        panel("已登记项目钱包",table(["Group","Purpose","Address","Role","登记状态","声明限额","归属证据"],projectWalletRegistrationRows(current))+note("Registration only; not evidence of balances, ownership or reserved funds.")):"")+
+      '</aside></div><details class="panel setup-evidence"><summary>发行、市场与报告证据</summary><div class="setup-evidence-grid">'+
+      panel("记录发行证据", '<form id="issuance-evidence-form"><label for="issuance-project">项目</label><select id="issuance-project" name="project_id" required><option value="">选择项目</option>' + issuanceOptions + '</select>' +
+        '<label for="issuance-mint">代币 Mint 地址</label><input id="issuance-mint" name="mint" required maxlength="44" placeholder="Issued token mint address">' +
+        '<label for="issuance-signature">交易签名</label><input id="issuance-signature" name="signature" required minlength="64" maxlength="88" placeholder="On-chain transaction signature">' +
+        '<div class="row"><button type="submit" ' + (projects.length ? "" : "disabled") + '>记录证据（未验证）</button></div></form>' +
         '<p class="muted">Manual records remain unverified. Trusted on-chain verification is required for LAUNCHED.</p>') +
-      panel("Issuance Evidence Records", table(["Project", "Mint", "Transaction Signature", "Status", "Verification Evidence"], issuanceRows) +
+      panel("发行证据记录", table(["Project", "Mint", "交易签名", "Status", "验证证据"], issuanceRows) +
         '<div class="row"><button id="project-inspect-evidence"' + (current?.token.mint ? "" : " disabled") + '>Verify Issuance Evidence (Read-only)</button></div><p id="project-evidence-result" role="status" class="muted">Observations do not automatically advance lifecycle.</p><div id="project-evidence-archive"></div>')+
-      panel("Market Account Observation",table(["Market ID","Venue","Account","Registration Status"],(current?.markets??[]).map(m=>[m.market_id,m.venue,m.market_account,m.verification_status]))+
+      panel("市场账户观测",table(["市场 ID","交易场所","Account","登记状态"],(current?.markets??[]).map(m=>[m.market_id,m.venue,m.market_account,m.verification_status]))+
         '<select id="project-market-select">'+(current?.markets??[]).map(m=>'<option value="'+esc(m.market_id)+'">'+esc(m.market_id+" · "+m.venue)+'</option>').join("")+'</select><button id="project-market-inspect"'+(current?.markets?.length?"":" disabled")+'>Verify & Archive (Read-only)</button><p id="project-market-result" role="status" class="muted">Checks registered market identity only; source is not attested.</p>')+
-      panel("Linked Historical Reports",'<button id="project-report-candidates"'+(current?"":" disabled")+'>Find Matching Reports</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>Link Selected Report</button><p id="project-report-result" role="status" class="muted">Only saved reports with matching declared identity can be linked.</p>')+'</div></details>';
+      panel("关联历史报告",'<button id="project-report-candidates"'+(current?"":" disabled")+'>查找匹配报告</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>关联选中报告</button><p id="project-report-result" role="status" class="muted">Only saved reports with matching declared identity can be linked.</p>')+'</div></details>';
     if(terminalMode)mountLaunchSteps(container.querySelector("#project-draft-form"));
     // Native validation must reveal a collapsed optional field before trying to focus it.
     container.querySelector("#project-draft-form").addEventListener("invalid",event=>{
@@ -204,8 +204,8 @@ export function mountProjectSetup(container, {
       try{
         const records=await listProjectArchive(current.project_id);
         if(!isActive()||version!==viewVersion)return;
-        target.innerHTML=table(["Archive Type","Project Revision","Recorded At","Result","Status"],records.map(r=>[r.kind,r.project_revision,new Date(r.recorded_at_ms).toISOString(),r.payload.status,r.stale?"Older Revision":"Current Revision"]))+
-          '<button id="project-archive-export">Export Evidence JSON</button>';
+        target.innerHTML=table(["归档类型","项目版本","记录时间","结果","Status"],records.map(r=>[r.kind,r.project_revision,new Date(r.recorded_at_ms).toISOString(),r.payload.status,r.stale?"较早版本":"当前版本"]))+
+          '<button id="project-archive-export">导出证据 JSON</button>';
         target.querySelector("#project-archive-export").onclick=()=>download("project-evidence-archive.json",JSON.stringify(records,null,2));
       }catch(error){if(isActive()&&version===viewVersion)target.textContent="Archive read failed: "+errorKind(error);}
     }
@@ -233,7 +233,7 @@ export function mountProjectSetup(container, {
       const body = await response.json();
       if (!response.ok) throw Error(body.code || "WALLET_UNAVAILABLE");
       if (!isActive() || version !== viewVersion) return;
-      walletSelect.replaceChildren(new Option("No wallet assigned", ""));
+      walletSelect.replaceChildren(new Option("未分配钱包", ""));
       for (const wallet of body.wallets) walletSelect.add(new Option(wallet.address, wallet.address));
       if (current?.token.creator_wallet_address && !body.wallets.some(w => w.address === current.token.creator_wallet_address)) {
         walletSelect.add(new Option(current.token.creator_wallet_address + " (Current binding)", current.token.creator_wallet_address));
@@ -265,7 +265,7 @@ export function mountProjectSetup(container, {
         const token = {...supply, creator_wallet_address: creator };
         let project;
         const walletGroup = creator ? {
-          group_id: "dev-wallets", name: "Dev Wallets", purpose: "DEV",
+          group_id: "dev-wallets", name: "开发者钱包", purpose: "DEV",
           members: [{ wallet_address: creator, role: "DEV", enabled: true, allocation_limit_base_units: null }]
         } : null;
         if (activeProjectId) {
@@ -303,12 +303,12 @@ export function mountProjectSetup(container, {
         if (!isActive() || version !== viewVersion) return;
         projects=[...projects.filter(p=>p.project_id!==project.project_id),project];
         setActive(project.project_id);
-        message = "Configuration saved to local SQLite. Status: " + project.lifecycle.stage + ".";
+        message = "配置已保存至本地 SQLite，状态：" + project.lifecycle.stage + ".";
         record("project.aggregate.saved", { project_id: project.project_id, revision: project.revision, stage: project.lifecycle.stage });
         render();
       } catch (error) {
         if (!isActive() || version !== viewVersion) return;
-        message = "Save not confirmed. Reload the project: " + errorKind(error);
+        message = "保存未确认，请重新加载项目：" + errorKind(error);
         const status = container.querySelector("#project-status");
         if (status) status.textContent = message;
         button.disabled = false;
@@ -321,8 +321,8 @@ export function mountProjectSetup(container, {
       const status=container.querySelector("#project-budget-status");
       let limits;
       try{limits=parseBudgetDeclaration(Object.fromEntries(new FormData(budgetForm)));}
-      catch(error){status.textContent="Invalid configuration: "+errorKind(error);return;}
-      if(JSON.stringify(limits)===JSON.stringify(current.limits)){status.textContent="Configuration unchanged.";return;}
+      catch(error){status.textContent="配置无效："+errorKind(error);return;}
+      if(JSON.stringify(limits)===JSON.stringify(current.limits)){status.textContent="配置未变更。";return;}
       if(!window.confirm("Save risk limits? This creates a new project revision without enabling execution."))return;
       const button=budgetForm.querySelector("button");button.disabled=true;
       try{
@@ -338,7 +338,7 @@ export function mountProjectSetup(container, {
     };
     container.querySelector("#project-new").onclick = () => {
       if(pendingCreate||recoveryId){message="Previous creation is unconfirmed. Retry the original form or reload the project list.";const status=container.querySelector("#project-status");if(status)status.textContent=message;return;}
-      setActive(null); message = "New project draft"; render();
+      setActive(null); message = "新建项目草稿"; render();
     };
     container.querySelector("#project-open").onclick = () => {
       const id = container.querySelector("#project-open-select").value;
@@ -364,7 +364,7 @@ export function mountProjectSetup(container, {
         const updated=await listProjects(); if(!isActive()||version!==viewVersion)return; projects=updated; message = "Configuration complete. Status: READY."; render();
       } catch (error) {
         if(!isActive()||version!==viewVersion)return;
-        message = "Status update failed: " + errorKind(error);
+        message = "状态更新失败：" + errorKind(error);
         const status = container.querySelector("#project-status"); if (status) status.textContent = message;
         button.disabled = false;
       }
@@ -383,7 +383,7 @@ export function mountProjectSetup(container, {
         const updated=await listProjects(); if(!isActive()||version!==viewVersion)return; projects=updated; message = "Issuance recorded as SUBMITTED; awaiting independent on-chain verification."; render();
       } catch (error) {
         if(!isActive()||version!==viewVersion)return;
-        message = "Issuance state unchanged: " + errorKind(error);
+        message = "发行状态未改变：" + errorKind(error);
         const status = container.querySelector("#project-status"); if (status) status.textContent = message;
         button.disabled = false;
       }
@@ -401,7 +401,7 @@ export function mountProjectSetup(container, {
         render();
       } catch (error) {
         if(!isActive()||version!==viewVersion)return;
-        message = "Issuance evidence not recorded: " + errorKind(error);
+        message = "未记录发行证据：" + errorKind(error);
         const status = container.querySelector("#project-status"); if (status) status.textContent = message;
       }
     };
@@ -415,11 +415,11 @@ export function mountProjectSetup(container, {
 export function mountLaunchSteps(form){
  const doc=form.ownerDocument,children=[...form.children],heads=children.filter(el=>el.matches("h4.form-section-title")),groups=children.filter(el=>el.matches(".grid.form-section")),social=children.find(el=>el.matches("details.profile-optional")),actions=children.find(el=>el.matches(".row"));
  if(heads.length!==2||groups.length!==2||!social||!actions)return;
- const tabs=doc.createElement("div");tabs.className="launch-step-tabs";tabs.setAttribute("role","group");tabs.setAttribute("aria-label","Launch preparation steps");
- const sections=["Token","Socials","Wallet"].map((label,i)=>{const section=doc.createElement("section");section.className="launch-step";section.dataset.launchStep=String(i);const button=doc.createElement("button");button.type="button";button.textContent=(i+1)+". "+label;tabs.append(button);return section});
+ const tabs=doc.createElement("div");tabs.className="launch-step-tabs";tabs.setAttribute("role","group");tabs.setAttribute("aria-label","发行准备步骤");
+ const sections=["代币","社交资料","钱包"].map((label,i)=>{const section=doc.createElement("section");section.className="launch-step";section.dataset.launchStep=String(i);const button=doc.createElement("button");button.type="button";button.textContent=(i+1)+". "+label;tabs.append(button);return section});
  sections[0].append(heads[0],groups[0]);social.open=true;sections[1].append(social);sections[2].append(heads[1],groups[1]);form.prepend(tabs,...sections);
  const nav=doc.createElement("div");nav.className="row launch-step-nav";
- const back=doc.createElement("button"),next=doc.createElement("button");back.type=next.type="button";back.textContent="Back";next.textContent="Next";nav.append(back,next);actions.before(nav);
+ const back=doc.createElement("button"),next=doc.createElement("button");back.type=next.type="button";back.textContent="上一步";next.textContent="下一步";nav.append(back,next);actions.before(nav);
  let current=0;
  function show(i){current=i;sections.forEach((s,j)=>s.hidden=j!==i);[...tabs.children].forEach((b,j)=>b.setAttribute("aria-pressed",String(j===i)));back.disabled=i===0;next.hidden=i===2;actions.hidden=i!==2;}
  function valid(i){for(const input of sections[i].querySelectorAll("input,textarea,select"))if(!input.disabled&&!input.checkValidity()){input.reportValidity();return false}return true;}

@@ -1,8 +1,8 @@
 // Frontend-only review dialogs. No signing, allocation or execution services.
 const actions={
- 0:{title:"Drain SOL",relation:"N → 1",description:"Review the SOL holdings of the selected wallets.",source:"Selected source wallets",destination:"Receiving wallet",button:"Review Transfer"},
- 1:{title:"Migrate",relation:"N → N",description:"Review source and destination wallet addresses.",source:"Selected source wallets",destination:"Receiving wallets",button:"Review Migration",multiple:true},
- 3:{title:"Split",relation:"1 → N",description:"Review the holdings of a single source wallet.",source:"Source wallet",destination:"Destination wallets",button:"Review Allocation",single:true}
+ 0:{title:"归集 SOL",relation:"N → 1",description:"查看所选钱包的 SOL 持仓。",source:"已选来源钱包",destination:"接收钱包",button:"查看转账"},
+ 1:{title:"迁移钱包",relation:"N → N",description:"查看来源与目标钱包地址。",source:"已选来源钱包",destination:"接收钱包",button:"查看迁移",multiple:true},
+ 3:{title:"拆分钱包",relation:"1 → N",description:"查看单个来源钱包持仓。",source:"来源钱包",destination:"目标钱包",button:"查看分配",single:true}
 };
 const safeRaw=x=>typeof x==="string"&&/^(0|[1-9][0-9]{0,38})$/.test(x);
 function sol(x){
@@ -22,16 +22,16 @@ export function openWalletActionReview(anchor,{action,rows,availableWallets=[],e
  dialog.setAttribute("aria-labelledby","wallet-action-title");
  const summary=walletReviewSummary(rows);
  const canDrag=[0,1].includes(Number(action));
- const rowHtml=rows.map(r=>'<tr'+(canDrag?' draggable="true" data-war-drag="'+esc(r.address)+'"':'')+'><td title="'+esc(r.address)+'">'+(canDrag?'<span class="war-grip" aria-hidden="true">⠿</span>':'')+''+esc(r.address.length>16?r.address.slice(0,6)+"…"+r.address.slice(-5):r.address)+'</td><td>'+esc(sol(r.sol))+'</td><td>'+esc(r.status)+'</td></tr>').join("");
+ const rowHtml=rows.map(r=>'<tr'+(canDrag?' draggable="true" data-war-drag="'+esc(r.address)+'"':'')+'><td title="'+esc(r.address)+'">'+(canDrag?'<span class="war-grip" aria-hidden="true">⠿</span>':'')+''+esc(r.address.length>16?r.address.slice(0,6)+"…"+r.address.slice(-5):r.address)+'</td><td>'+esc(sol(r.sol))+'</td><td>'+esc(({Ready:"就绪",Loading:"加载中",Partial:"部分可用","RPC Error":"RPC 错误","Balance unverified":"余额未验证"})[r.status]??r.status)+'</td></tr>').join("");
  const sourceAddresses=new Set(rows.map(r=>r.address));
- const destination=canDrag?'<div class="war-dropzone" data-war-drop tabindex="0" aria-label="'+esc(config.destination)+' address preview"><span class="war-drop-icon" aria-hidden="true">↓</span><div class="war-destination-content"><span data-war-drop-label>Drag '+(config.multiple?'wallets':'a wallet')+' here to review '+(config.multiple?'their addresses':'its address')+'</span><div data-war-addresses></div></div></div>':'<div class="war-placeholder">'+(config.single&&rows.length!==1?'One source wallet required':'Destination not configured')+'</div>';
- const issue=rows.length===0?"Select wallets in the Wallets table first.":config.single&&rows.length!==1?"Select exactly one source wallet to review Split.":summary.unverified>0?"Some wallet assets are not verified. Check Localnet RPC.":"Read-only review. No asset operation will be performed.";
- dialog.innerHTML='<header class="war-header"><div><h3 id="wallet-action-title">'+esc(config.title)+'</h3><p>'+esc(config.description)+'</p></div><button type="button" data-war-close class="war-close" aria-label="Close">×</button></header>'+
- '<div class="war-metrics"><div><small>SELECTED WALLETS</small><strong data-war-count>'+summary.count+'</strong></div><div><small>TOTAL SOL</small><strong data-war-total>'+esc(sol(summary.sol))+'</strong></div><div><small>OPERATION</small><strong>'+esc(config.relation)+'</strong></div></div>'+
- '<section class="war-section"><h4>'+esc(config.source)+'</h4><div class="war-table"><table><thead><tr><th>Wallet</th><th>SOL Balance</th><th>Status</th></tr></thead><tbody>'+(rowHtml||'<tr><td colspan="3">No wallets selected</td></tr>')+'</tbody></table></div></section>'+
+ const destination=canDrag?'<div class="war-dropzone" data-war-drop tabindex="0" aria-label="'+esc(config.destination)+' address preview"><span class="war-drop-icon" aria-hidden="true">↓</span><div class="war-destination-content"><span data-war-drop-label>将'+(config.multiple?'多个钱包':'一个钱包')+'拖到此处查看地址</span><div data-war-addresses></div></div></div>':'<div class="war-placeholder">'+(config.single&&rows.length!==1?'One source wallet required':'Destination not configured')+'</div>';
+ const issue=rows.length===0?"请先在钱包列表中选择钱包。":config.single&&rows.length!==1?"拆分预览仅允许选择一个来源钱包。":summary.unverified>0?"部分钱包资产尚未验证，请检查 Localnet RPC。":"仅只读查看，不执行资产操作。";
+ dialog.innerHTML='<header class="war-header"><div><h3 id="wallet-action-title">'+esc(config.title)+'</h3><p>'+esc(config.description)+'</p></div><button type="button" data-war-close class="war-close" aria-label="关闭">×</button></header>'+
+ '<div class="war-metrics"><div><small>已选钱包</small><strong data-war-count>'+summary.count+'</strong></div><div><small>SOL 总额</small><strong data-war-total>'+esc(sol(summary.sol))+'</strong></div><div><small>操作</small><strong>'+esc(config.relation)+'</strong></div></div>'+
+ '<section class="war-section"><h4>'+esc(config.source)+'</h4><div class="war-table"><table><thead><tr><th>钱包</th><th>SOL 余额</th><th>状态</th></tr></thead><tbody>'+(rowHtml||'<tr><td colspan="3">未选择钱包</td></tr>')+'</tbody></table></div></section>'+
  '<section class="war-section"><h4>'+esc(config.destination)+'</h4>'+destination+'</section>'+
- '<div class="war-message" role="status">'+esc(issue)+'</div><p class="war-preview">UI preview · No wallet migration, transfer, split or deletion will be performed.</p>'+
- '<footer class="war-footer"><button type="button" data-war-cancel>Cancel</button><button type="button" disabled class="war-primary">'+esc(config.button)+'</button></footer>';
+ '<div class="war-message" role="status">'+esc(issue)+'</div><p class="war-preview">界面预览 · 不执行迁移、转账、拆分或删除。</p>'+
+ '<footer class="war-footer"><button type="button" data-war-cancel>取消</button><button type="button" disabled class="war-primary">'+esc(config.button)+'</button></footer>';
  doc.body.append(dialog);
  if(canDrag){
   const zone=dialog.querySelector("[data-war-drop]"),label=dialog.querySelector("[data-war-drop-label]"),addresses=dialog.querySelector("[data-war-addresses]");
@@ -47,13 +47,13 @@ export function openWalletActionReview(anchor,{action,rows,availableWallets=[],e
    const current=walletReviewSummary(remaining);
    dialog.querySelector("[data-war-count]").textContent=String(current.count);
    dialog.querySelector("[data-war-total]").textContent=sol(current.sol);
-   dialog.querySelector(".war-message").textContent=!remaining.length?"Select at least one source wallet.":current.unverified?"Some wallet assets are not verified. Check Localnet RPC.":"Read-only review. No asset operation will be performed.";
+   dialog.querySelector(".war-message").textContent=!remaining.length?"请至少选择一个来源钱包。":current.unverified?"部分钱包资产尚未验证，请检查 Localnet RPC。":"仅只读查看，不执行资产操作。";
    label.hidden=reviewed.size>0;
    zone.classList.toggle("has-address",reviewed.size>0);
    addresses.replaceChildren();
    for(const address of reviewed){
     const item=doc.createElement("div"),value=doc.createElement("span"),remove=doc.createElement("button");
-    item.className="war-address-item";value.textContent=address;remove.type="button";remove.textContent="×";remove.setAttribute("aria-label","Return wallet "+address+" to source list");remove.setAttribute("data-war-clear","");
+    item.className="war-address-item";value.textContent=address;remove.type="button";remove.textContent="×";remove.setAttribute("aria-label","将钱包 "+address+" 返回来源列表");remove.setAttribute("data-war-clear","");
     remove.onclick=()=>{reviewed.delete(address);renderPreview();sourceRows.find(row=>row.dataset.warDrag===address)?.focus({preventScroll:true});};
     item.append(value,remove);addresses.append(item);
    }
@@ -62,7 +62,7 @@ export function openWalletActionReview(anchor,{action,rows,availableWallets=[],e
   sourceRows.forEach(row=>{
    row.addEventListener("dragstart",e=>{if(row.hidden)return;dragging=row.dataset.warDrag;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",dragging);row.classList.add("war-dragging");});
    row.addEventListener("dragend",()=>{dragging=null;row.classList.remove("war-dragging");zone.classList.remove("is-over");});
-   row.tabIndex=0;row.setAttribute("aria-label","Review wallet address "+row.dataset.warDrag);
+   row.tabIndex=0;row.setAttribute("aria-label","查看钱包地址 "+row.dataset.warDrag);
    row.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();preview(row.dataset.warDrag);}});
   });
   zone.addEventListener("dragover",e=>{if(dragging&&sourceAddresses.has(dragging)){e.preventDefault();e.dataTransfer.dropEffect="move";zone.classList.add("is-over");}});
