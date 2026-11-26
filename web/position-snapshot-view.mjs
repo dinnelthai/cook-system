@@ -24,6 +24,21 @@ export function positionRows(project,snapshot){
 }
 // Inventory observation is separate from project-scoped trade observations.
 // The server verifies the configured Localnet genesis before returning this snapshot.
+export function portfolioErrorMessage(error){
+ const messages={
+  PORTFOLIO_UNAVAILABLE:"Check COOK_LOCAL_RPC_URL and COOK_LOCAL_GENESIS_HASH.",
+  GENESIS_MISMATCH:"Configured genesis hash does not match the validator. Verify the intended Localnet.",
+  PORTFOLIO_RPC_UNAVAILABLE:"Localnet RPC unreachable. Check validator and configured port.",
+  PORTFOLIO_BUSY:"Another portfolio read is in progress. Retry on refresh.",
+  WALLET_LIST_INVALID:"Wallet inventory could not be verified.",
+  SCOPE_MISMATCH:"Token network and portfolio network do not match.",
+  PORTFOLIO_DATA_INVALID:"Wallet inventory data invalid.",
+  TOKEN_DECIMALS_CONFLICT:"Conflicting token decimals. Holdings cannot be verified.",
+  LOCAL_RPC_REQUEST_FAILED:"Localnet asset request failed. Inspect server logs."
+ };
+ const code=error?.message;
+ return Object.hasOwn(messages,code)?"Localnet asset query failed ["+code+"]. "+messages[code]:"Localnet asset query failed. Check RPC and genesis configuration.";
+}
 export function validInventorySnapshot(snapshot,project=null){
  return snapshot?.schema_version==="cook-local-wallet-portfolio.1"&&snapshot.network==="localnet"&&typeof snapshot.genesis_hash==="string"&&snapshot.genesis_hash.length>0&&snapshot.read_only===true&&snapshot.execution_enabled===false&&Array.isArray(snapshot.wallets)&&(!project||(project.network?.cluster==="localnet"&&snapshot.genesis_hash===project.network.genesis_hash));
 }
@@ -112,11 +127,11 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   if(disposed||(!currentOnly&&(!project?.token?.mint||!project?.network?.genesis_hash)))return;
   timer=setTimeout(()=>{
    if(!host.isConnected){dispose();return}
-   if(host.ownerDocument.visibilityState!=="hidden"&&!busy&&!host.hidden&&!host.contains(host.ownerDocument.activeElement))void refresh();
+   if(host.ownerDocument.visibilityState!=="hidden"&&!busy&&!host.hidden&&!walletActionDialog?.isConnected&&!generateDialog?.isConnected&&!amountsDialog?.isConnected&&!host.contains(host.ownerDocument.activeElement))void refresh();
    else schedule();
   },20000);
  }
- function onFocus(){if(!host.isConnected){dispose();return}if(!busy&&(currentOnly||project?.token?.mint)&&!host.contains(host.ownerDocument.activeElement))void refresh();}
+ function onFocus(){if(!host.isConnected){dispose();return}if(!busy&&(currentOnly||project?.token?.mint)&&!walletActionDialog?.isConnected&&!generateDialog?.isConnected&&!amountsDialog?.isConnected&&!host.contains(host.ownerDocument.activeElement))void refresh();}
  function dispose(){if(disposed)return;disposed=true;generateDialog?.remove();generateDialog=null;amountsDialog?.remove();amountsDialog=null;walletActionDialog?.remove();walletActionDialog=null;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
  let mounted=host.isConnected;
  const observer=typeof MutationObserver==="function"?new MutationObserver(()=>{if(!host.isConnected&&mounted)dispose();else if(host.isConnected)mounted=true}):null;
@@ -199,7 +214,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   const id=++ticket,current=project;
   busy=true;status=lastObserved?"Refreshing holdings · Previous observation: "+lastObserved:"Reading Localnet holdings…";draw();
   try{
-   if(currentOnly)await loadInventory();
+   if(currentOnly&&!(await loadInventory()))throw Error("WALLET_LIST_INVALID");
    if(ticket!==id||disposed||!host.isConnected)return;
    if(currentOnly&&!inventory)throw Error("WALLET_LIST_INVALID");
    if(!currentOnly&&(!current?.token?.mint||current.network?.cluster!=="localnet"||!current.network?.genesis_hash))throw Error("SCOPE_MISMATCH");
@@ -209,10 +224,10 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
    if(currentOnly){inventorySnapshot=snapshot;inventoryFailed=false}
    // Only the original project-scoped rows are passed to the trade ticket.
    rows=positionRows(current,snapshot);lastObserved=String(snapshot.as_of??"Time unknown");status="Localnet read-only snapshot · "+lastObserved+" · Refreshes automatically while idle. Missing balances and PnL remain unknown.";
-  }catch{
+  }catch(error){
    if(ticket!==id||disposed||!host.isConnected)return;
    if(currentOnly){inventorySnapshot=null;inventoryFailed=true}
-   rows=positionRows(current,null);lastObserved=null;status="Localnet asset query failed. Check RPC and genesis configuration.";
+   rows=positionRows(current,null);lastObserved=null;status=portfolioErrorMessage(error);
   }
   finally{if(ticket===id){busy=false;if(host.isConnected){draw();schedule()}else dispose()}}
  }

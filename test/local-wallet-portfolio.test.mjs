@@ -68,3 +68,5 @@ test("same token account returned for multiple managed wallets is not double cou
  const r=await createLocalWalletPortfolio({endpoint:"http://127.0.0.1:8899",expectedGenesis:genesis,walletStore,connectionFactory}).snapshot();
  assert.equal(r.token_account_scope_conflict,true);assert.equal(r.token_holdings_status,"PARTIAL");assert.equal(r.token_holdings[0].amount_base_units,"500");
 });
+
+test("all wallet balance and token reads precede optional history reads",async()=>{const calls=[],walletStore={list:async()=>[{address:a},{address:b}]};const connectionFactory=()=>({getGenesisHash:async()=>genesis,getBalance:async owner=>{calls.push("balance:"+owner.toBase58());return 0},getParsedTokenAccountsByOwner:async()=>({value:[]}),getSignaturesForAddress:async owner=>{calls.push("history:"+owner.toBase58());return []}});const result=await createLocalWalletPortfolio({endpoint:"http://127.0.0.1:8899",expectedGenesis:genesis,walletStore,connectionFactory}).snapshot();assert.deepEqual(calls,["balance:"+a,"balance:"+b,"history:"+a,"history:"+b]);assert.equal(result.total_sol_balance_lamports,"0");assert.equal(result.wallet_count,2);});

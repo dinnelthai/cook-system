@@ -25,7 +25,7 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
   if(!endpoint||!expectedGenesis||CLUSTER_GENESIS.test(expectedGenesis))throw Error("PORTFOLIO_UNAVAILABLE");
   try{publicKey(expectedGenesis);const u=new URL(endpoint);if(u.protocol!=="http:"||!["127.0.0.1","[::1]"].includes(u.hostname)||u.username||u.password||u.pathname!=="/"||u.search||u.hash)throw Error();return u.href;}catch{throw Error("PORTFOLIO_UNAVAILABLE");}
  }
- async function walletSnapshot(connection,wallet,limit,call){
+ async function walletAssets(connection,wallet,call){
   const owner=new PublicKey(asKey(wallet.address));
   let balance=null,balanceStatus="UNAVAILABLE";
   try{const n=await call(()=>connection.getBalance(owner,"confirmed"));if(Number.isSafeInteger(n)&&n>=0){balance=String(n);balanceStatus="AVAILABLE";}}catch{}
@@ -47,6 +47,10 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
    }catch{}
   }
   const tokenStatus=tokenSuccess===TOKEN_PROGRAMS.length&&invalidAccounts===0?"AVAILABLE":tokenSuccess?"PARTIAL":"UNAVAILABLE";
+  return {address:wallet.address,created_at:wallet.created_at??null,balance_lamports:balance,balance_status:balanceStatus,token_accounts_status:tokenStatus,invalid_token_account_count:invalidAccounts,token_accounts:tokenAccounts,history_status:"UNAVAILABLE",recent_transactions:[]};
+ }
+ async function observeHistory(connection,wallet,limit,call){
+  const owner=new PublicKey(asKey(wallet.address));
   let history=[],historyStatus="UNAVAILABLE";
   try{
    const signatures=await call(()=>connection.getSignaturesForAddress(owner,{limit},"confirmed"));
@@ -61,7 +65,7 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
    });
    historyStatus=history.some(x=>x.status==="UNKNOWN")?"PARTIAL":"AVAILABLE";
   }catch{}
-  return {address:wallet.address,created_at:wallet.created_at??null,balance_lamports:balance,balance_status:balanceStatus,token_accounts_status:tokenStatus,invalid_token_account_count:invalidAccounts,token_accounts:tokenAccounts,history_status:historyStatus,recent_transactions:history};
+  return {...wallet,history_status:historyStatus,recent_transactions:history};
  }
  return {async snapshot({limit=5}={}){
   if(!Number.isSafeInteger(limit)||limit<1||limit>20)throw Error("INVALID_PORTFOLIO_LIMIT");
@@ -82,7 +86,9 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
    const connection=connectionFactory(url,controller.signal);
    let genesis;try{genesis=await call(()=>connection.getGenesisHash())}catch{throw Error("PORTFOLIO_RPC_UNAVAILABLE")}
    if(genesis!==expectedGenesis)throw Error("GENESIS_MISMATCH");
-   const wallets=[];for(const wallet of rows)wallets.push(await walletSnapshot(connection,wallet,limit,call));
+   // Prioritize assets of every managed wallet before optional transaction history.
+   const wallets=[];for(const wallet of rows)wallets.push(await walletAssets(connection,wallet,call));
+   for(let i=0;i<wallets.length;i++)wallets[i]=await observeHistory(connection,wallets[i],limit,call);
    let total=0n;for(const w of wallets)if(w.balance_lamports!==null)total+=BigInt(w.balance_lamports);
    const holdings=new Map(),accountOwners=new Map();let accountConflict=false;
    for(const w of wallets)for(const a of w.token_accounts){if(accountOwners.has(a.token_account)){accountConflict=true;continue;}accountOwners.set(a.token_account,w.address);const old=holdings.get(a.mint);if(old&&old.decimals!==a.decimals)throw Error("TOKEN_DECIMALS_CONFLICT");holdings.set(a.mint,{mint:a.mint,decimals:a.decimals,amount_base_units:(BigInt(old?.amount_base_units??"0")+BigInt(a.amount_base_units)).toString(),account_count:(old?.account_count??0)+1});}
