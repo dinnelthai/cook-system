@@ -19,10 +19,13 @@ test("missing or invalid evidence stays unknown",()=>{
 test("trade position requires matching complete historical inventory evidence",()=>{
  const scope={projectId:"p",tokenMint:"m",quoteAsset:"SOL_LAMPORTS",openingCutoff:"a",closingCutoff:"b"};
  const input={scope,inventory:{scope:{...scope},historyComplete:true,ledger:{
-  inventory_reconciliation:"MATCH",cost_basis_complete:true,realized_pnl_complete:true,
+  inventory_reconciliation:"MATCH",cost_basis_complete:true,realized_pnl_complete:true,ignored_unconfirmed_count:0,position_journal:[{event_id:"b",side:"BUY",cash_cost_quote_base_units:"200"},{event_id:"s",side:"SELL",net_quote_proceeds_base_units:"90",allocated_cost_basis_quote_base_units:"100"}],
   total_buy_cost_quote_base_units:"200",total_net_sell_proceeds_quote_base_units:"90",
   ending_token_balance_base_units:"50",remaining_cost_basis_quote_base_units:"100",realized_pnl_quote_base_units:"-10"}}};
  assert.deepEqual(historicalTradePosition(input),{buy_cost:"200",net_sell_proceeds:"90",token_balance:"50",remaining_cost:"100",realized_pnl:"-10"});
+ input.inventory.ledger.realized_pnl_quote_base_units="99";
+ assert.equal(historicalTradePosition(input).realized_pnl,null);
+ input.inventory.ledger.realized_pnl_quote_base_units="-10";
  input.inventory.ledger.realized_pnl_complete=false;
  assert.equal(historicalTradePosition(input).realized_pnl,null);
  input.inventory.ledger.total_buy_cost_quote_base_units="1e3";

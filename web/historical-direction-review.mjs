@@ -1,4 +1,5 @@
 // Retrospective direction review; no signing, submission, routing or bundle inference.
+import {auditDeclaredRealizedPnl} from "../src/inner-market/ledger-audit.mjs";
 export function historicalDirectionSummary(input,side){
  if(!["BUY","SELL"].includes(side))throw Error("INVALID_DIRECTION");
  if(!input||!Array.isArray(input.market?.trades)||input.scope?.quoteAsset!=="SOL_LAMPORTS")return null;
@@ -13,7 +14,6 @@ export function historicalDirectionSummary(input,side){
 
 // Historical ledger values are declarations, not live balances, quotes, or executable orders.
 const unsigned=v=>typeof v==="string"&&/^(0|[1-9][0-9]{0,39})$/.test(v);
-const signed=v=>typeof v==="string"&&/^(0|-?[1-9][0-9]{0,39})$/.test(v);
 const scopeKeys=["projectId","tokenMint","quoteAsset","openingCutoff","closingCutoff"];
 export function historicalTradePosition(input){
  const scope=input?.scope,inventory=input?.inventory,l=inventory?.ledger;
@@ -26,7 +26,7 @@ export function historicalTradePosition(input){
   net_sell_proceeds:amount("total_net_sell_proceeds_quote_base_units"),
   token_balance:amount("ending_token_balance_base_units"),
   remaining_cost:l.cost_basis_complete===true?amount("remaining_cost_basis_quote_base_units"):null,
-  realized_pnl:l.cost_basis_complete===true&&l.realized_pnl_complete===true&&signed(l.realized_pnl_quote_base_units)?l.realized_pnl_quote_base_units:null
+  realized_pnl:auditDeclaredRealizedPnl(l).realized_pnl_quote_base_units
  };
 }
 // Historical log projection. Never label a record as a transaction signature or live receipt.

@@ -4,7 +4,7 @@ import { auditProjectLedgers } from "../src/inner-market/ledger-audit.mjs";
 const scope={projectId:"fixture",quoteAsset:"SOL",tokenMint:"fixture-mint",openingCutoff:"slot:1",closingCutoff:"slot:20"};
 const post=(id,kind,amountBaseUnits,tradeEventId)=>({id,kind,amountBaseUnits,tradeEventId,projectId:scope.projectId,quoteAsset:scope.quoteAsset,status:"FINALIZED",reconciliation:"PASS"});
 const ledger={
- position_journal:[{event_id:"b",side:"BUY",cash_cost_quote_base_units:"200"},{event_id:"s",side:"SELL",net_quote_proceeds_base_units:"90"}],
+ position_journal:[{event_id:"b",side:"BUY",cash_cost_quote_base_units:"200"},{event_id:"s",side:"SELL",net_quote_proceeds_base_units:"90",allocated_cost_basis_quote_base_units:"100"}],
  total_buy_cost_quote_base_units:"200",total_net_sell_proceeds_quote_base_units:"90",
  inventory_reconciliation:"MATCH",ignored_unconfirmed_count:0,cost_basis_complete:true,realized_pnl_complete:true,realized_pnl_quote_base_units:"-10",
 };
@@ -54,3 +54,8 @@ test("explicit foreign mint or cutoff on an individual posting cannot hide behin
  assert.throws(()=>auditProjectLedgers({...args,inventoryLedger}),/ledger row scope or cutoff mismatch/);
  assert.equal(auditProjectLedgers(args).status,"RECONCILED");
 });
+
+import {auditDeclaredRealizedPnl} from "../src/inner-market/ledger-audit.mjs";
+test("realized PnL is independently recomputed from declared disposed basis and net sale proceeds",()=>{assert.equal(auditDeclaredRealizedPnl(ledger).realized_pnl_quote_base_units,"-10");const r=auditProjectLedgers({...args,inventoryLedger:{...ledger,realized_pnl_quote_base_units:"999"}});assert.equal(r.status,"REVIEW_REQUIRED");assert.equal(r.project_pnl.project_realized_net_pnl_base_units,null);assert.ok(r.issues.some(i=>i.code==="PNL_REALIZED_ARITHMETIC_MISMATCH"));});
+test("missing cost allocation is not treated as zero, even with complete flags",()=>{const incomplete={...ledger,position_journal:[ledger.position_journal[0],{...ledger.position_journal[1],allocated_cost_basis_quote_base_units:null}]};assert.equal(auditDeclaredRealizedPnl(incomplete).status,"PARTIAL");assert.equal(auditProjectLedgers({...args,inventoryLedger:incomplete}).project_pnl.project_realized_net_pnl_base_units,null);});
+test("realized arithmetic preserves exact units and rejects duplicate records",()=>{const l={...ledger,position_journal:[{event_id:"s",side:"SELL",net_quote_proceeds_base_units:"9007199254740993",allocated_cost_basis_quote_base_units:"9007199254740994"}],total_buy_cost_quote_base_units:"0",total_net_sell_proceeds_quote_base_units:"9007199254740993",realized_pnl_quote_base_units:"-1"};assert.equal(auditDeclaredRealizedPnl(l).realized_pnl_quote_base_units,"-1");assert.equal(auditDeclaredRealizedPnl({...l,position_journal:[...l.position_journal,...l.position_journal]}).status,"REVIEW_REQUIRED");});
