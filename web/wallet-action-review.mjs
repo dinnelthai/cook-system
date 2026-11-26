@@ -25,7 +25,7 @@ export function openWalletActionReview(anchor,{action,rows,availableWallets=[],e
  const rowHtml=rows.map(r=>'<tr><td title="'+esc(r.address)+'">'+esc(r.address.length>16?r.address.slice(0,6)+"…"+r.address.slice(-5):r.address)+'</td><td>'+esc(sol(r.sol))+'</td><td>'+esc(r.status)+'</td></tr>').join("");
  const sourceAddresses=new Set(rows.map(r=>r.address));
  const candidates=availableWallets.filter(w=>!sourceAddresses.has(w.address));
- const showWalletPicker=Number(action)===1||Number(action)===2;
+ const showWalletPicker=[0,1,2].includes(Number(action));
  const options=candidates.map(w=>'<option value="'+esc(w.address)+'">'+esc(w.address)+'</option>').join("");
  const destination=showWalletPicker?'<select class="war-wallet-picker" aria-label="'+esc(config.destination)+'"><option value="">'+(candidates.length?'Select wallet for review':'No other wallets available')+'</option>'+options+'</select><small class="war-preview">Address review only.</small>':'<div class="war-placeholder">'+(config.single&&rows.length!==1?'One source wallet required':'Destination not configured')+'</div>';
  const issue=rows.length===0?"Select wallets in the Wallets table first.":config.single&&rows.length!==1?"Select exactly one source wallet to review Split.":summary.unverified>0?"Some wallet assets are not verified. Check Localnet RPC.":"Read-only review. No asset operation will be performed.";
