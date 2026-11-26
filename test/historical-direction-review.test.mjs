@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {historicalDirectionSummary,historicalTradePosition} from "../web/historical-direction-review.mjs";
+import {historicalDirectionSummary,historicalTradePosition,historicalLogPage,historicalScopeMatches} from "../web/historical-direction-review.mjs";
 const trade=(side,amount,status="FINALIZED",reconciliation="PASS")=>({id:side,sequence:1,side,quoteNotionalBaseUnits:amount,status,reconciliation});
 const report={scope:{quoteAsset:"SOL_LAMPORTS"},market:{trades:[trade("BUY","9007199254740993"),trade("BUY","2"),trade("BUY","4","FAILED"),trade("SELL","8"),trade("SELL","99","FINALIZED","FAIL")]}};
 test("directional history excludes unsettled and opposite direction rows",()=>{
@@ -33,3 +33,6 @@ test("trade position requires matching complete historical inventory evidence",(
  input.inventory.historyComplete=false;
  assert.equal(historicalTradePosition(input),null);
 });
+
+test("log pagination and direction filters exclude unconfirmed records",()=>{const r=historicalLogPage(report,{side:"ALL",page:2,pageSize:2});assert.equal(r.total,3);assert.equal(r.pages,2);assert.equal(r.rows.length,1);assert.equal(r.rows[0].quoteNotionalBaseUnits,"9007199254740993");assert.equal(historicalLogPage(report,{side:"SELL",query:"sell"}).total,1);assert.equal(historicalLogPage(report,{query:"missing"}).total,0);assert.equal(historicalLogPage(null),null);});
+test("historical review scope must match selected project and mint",()=>{const p={project_id:"p",token:{mint:"m"}},r={scope:{projectId:"p",tokenMint:"m",quoteAsset:"SOL_LAMPORTS"}};assert.equal(historicalScopeMatches(p,r),true);assert.equal(historicalScopeMatches(p,{scope:{...r.scope,tokenMint:"other"}}),false);assert.equal(historicalScopeMatches(null,r),false);});

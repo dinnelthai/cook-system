@@ -50,14 +50,14 @@ export function sortPositionRows(rows,field,direction="asc"){
   return sign*String(x).localeCompare(String(y));
  });
 }
-export function mountPositionSnapshot(host,{esc,onManage,onAssets,adapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET})}){
+export function mountPositionSnapshot(host,{esc,onManage,onAssets,onSummary=()=>{},adapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET})}){
  let project=null,rows=[],ticket=0,status="Select a Meme.",percent=25,selected=null;
  let checked=new Set(),query="",sortField="address",sortDirection="asc",busy=false,lastObserved=null;
  let timer=null,disposed=false;
  const visibleRows=()=>sortPositionRows(rows.filter(r=>!query||r.address.toLowerCase().includes(query.toLowerCase())),sortField,sortDirection);
  function schedule(){
   clearTimeout(timer);
-  if(disposed||!project?.token?.mint)return;
+  if(disposed||!project?.token?.mint||!project?.network?.genesis_hash)return;
   timer=setTimeout(()=>{
    if(!host.isConnected){dispose();return}
    if(host.ownerDocument.visibilityState!=="hidden"&&!busy&&!host.hidden&&!host.contains(host.ownerDocument.activeElement))void refresh();
@@ -75,6 +75,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,adapter=create
   const estimate=active?previewQuantity(active.tokens,percent):null;
   const all=summarizePositions(rows),visible=visibleRows(),chosen=summarizePositions(rows.filter(r=>checked.has(r.address)));
   const total=displayToken(all.token_balance,all.token_decimals);
+  onSummary({project_id:project?.project_id??null,mint:project?.token?.mint??null,sol:formatUnits(all.sol_balance,9),tokens:total,observed:all.observed_count,count:all.wallet_count,status});
   const header=(label,key)=>'<button type="button" class="position-sort" data-position-sort="'+key+'" aria-label="Sort by '+label+'">'+label+(sortField===key?(sortDirection==="asc"?" ↑":" ↓"):"")+'</button>';
   const button=(id,label)=>'<button type="button" id="'+id+'">'+label+'</button>';
   host.innerHTML='<div class="desk-wallet-toolbar"><div><h3>Wallets</h3><small class="muted">'+rows.length+' registered wallets · '+checked.size+' selected</small></div><div class="desk-wallet-actions">'+button("position-refresh",busy?"Refreshing…":"Refresh Holdings")+button("position-manage","Manage Wallets")+button("position-assets","Assets")+'</div></div>'+
@@ -94,7 +95,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,adapter=create
   allCheck.onchange=()=>{for(const r of visible)allCheck.checked?checked.add(r.address):checked.delete(r.address);draw()};
   host.querySelectorAll("[data-position-check]").forEach(b=>b.onchange=()=>{b.checked?checked.add(b.dataset.positionCheck):checked.delete(b.dataset.positionCheck);draw()});
   host.querySelector("[data-position-clear]").onclick=()=>{checked.clear();draw()};
-  host.querySelector("[data-position-search]").oninput=e=>{query=e.target.value;draw();const input=host.querySelector("[data-position-search]");input.focus();input.setSelectionRange(query.length,query.length)};
+  host.querySelector("[data-position-search]").oninput=e=>{query=e.target.value;draw();const input=host.querySelector("[data-position-search]");input.focus();try{input.setSelectionRange(query.length,query.length)}catch{}};
   host.querySelectorAll("[data-position-sort]").forEach(b=>b.onclick=()=>{const key=b.dataset.positionSort;sortDirection=sortField===key&&sortDirection==="asc"?"desc":"asc";sortField=key;draw()});
   host.querySelector("#position-refresh").onclick=refresh;
   host.querySelector("#position-manage").onclick=onManage;

@@ -171,7 +171,8 @@ function mountMemeDesk(){
  shell.append(center,side);
  const reportArea=main.querySelector("#terminal-report-area"),placeholder=main.querySelector("#terminal-scoped-placeholder");
  const wallet=document.createElement("section");wallet.className="pro-pane meme-wallet";
- const positionSnapshot=mountPositionSnapshot(wallet,{esc,onManage:()=>go("wallet"),onAssets:()=>selectLowerTab("assets")});
+ let publishPosition=()=>{};
+ const positionSnapshot=mountPositionSnapshot(wallet,{esc,onManage:()=>go("wallet"),onAssets:()=>selectLowerTab("assets"),onSummary:model=>publishPosition(model)});
  function drawWallet(project){positionSnapshot.setProject(project);}
 
  const extra=document.createElement("details");extra.className="meme-report-extra";extra.innerHTML="<summary>Market Data and Historical Review</summary>";
@@ -225,6 +226,7 @@ function mountMemeDesk(){
  function selectLowerTab(value){tabState.value=value;drawLower();}
  lower.querySelectorAll("[data-meme-tab]").forEach(b=>b.onclick=()=>selectLowerTab(b.dataset.memeTab));drawLower();drawWallet(null);
  const bundleHost=side.querySelector("#meme-bundle-review"),bundleReview=mountHistoricalDirectionReview(bundleHost,{esc,table,quoteAmount});
+ publishPosition=model=>bundleReview.setLive(model);
  let launchMounted=false,launchProjectId=activeProjectId;
  function mountLaunch(){
   if(launchMounted)return;launchMounted=true;
@@ -265,7 +267,7 @@ function mountMemeDesk(){
  return {selectLowerTab,update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();bundleReview.setProject(current);drawPositionStrip(current);
   chartToolbar.querySelector("#desk-market-symbol").textContent=current?current.profile.symbol+" · "+deskStageLabel(current.lifecycle.stage):"No Meme Selected";
   drawWallet(current);
- },error(){failed=true;drawList();bundleReview.clear("Project directory unavailable.");summaryState("Project directory unavailable; assets and risk are not shown.");},
+ },error(){failed=true;drawList();drawWallet(null);bundleReview.setProject(null);bundleReview.clear("Project directory unavailable.");summaryState("Project directory unavailable; assets and risk are not shown.");},
   pending(){drawPositionStrip(selected);bundleReview.clear("Loading historical trades…");summaryState("Loading accounting and risk…");},
   historicalTrades(input){if(selected&&input.scope?.projectId===selected.project_id&&input.scope?.tokenMint===selected.token?.mint){bundleReview.show(input);drawPositionStrip(selected,historicalTradePosition(input));}},
   unavailable(){drawPositionStrip(selected);bundleReview.clear("Project review unavailable.");summaryState("Project review unavailable. Refresh to retry.");},
