@@ -24,7 +24,7 @@ export function mountCurrentTerminal({main,nav,esc,activeProjectId,getProjectDir
  setPanelCollapsed(panelCollapsed);
  const market=mountCurrentMarket(q("[data-market-body]"),{esc});
  const frame=q(".desk-market-frame"),fullscreen=q("[data-market-fullscreen]");fullscreen.disabled=typeof frame.requestFullscreen!=="function";fullscreen.onclick=async()=>{try{if(frame.ownerDocument.fullscreenElement===frame)await frame.ownerDocument.exitFullscreen();else{const body=q("[data-market-body]");if(body.hidden)q("[data-market-toggle]").click();await frame.requestFullscreen()}}catch{fullscreen.title="Fullscreen unavailable"}};frame.addEventListener("fullscreenchange",()=>{fullscreen.textContent=frame.ownerDocument.fullscreenElement===frame?"Exit Fullscreen":"Fullscreen"});
- let showSingle=false;mountTradePanelPreview(q("[data-reference-trade]"));let selectTradeWallet=()=>{};const trade=mountTradeTicket(q("[data-current-trade]"),{esc,onWalletSelect:address=>selectTradeWallet(address)});
+ let showSingle=false;const receiptLog=mountTradePanelPreview(q("[data-reference-trade]"));let selectTradeWallet=()=>{};const trade=mountTradeTicket(q("[data-current-trade]"),{esc,onWalletSelect:address=>selectTradeWallet(address)});
  function drawHoldings(model){
   if(!alive())return;
   if(model&&(model.project_id!==(project?.project_id??null)||model.mint!==(project?.token?.mint??null)))return;
@@ -32,13 +32,14 @@ export function mountCurrentTerminal({main,nav,esc,activeProjectId,getProjectDir
   n("[data-current-wallet-count]").textContent=model?.inventoryCount==null?"—":String(model.inventoryCount);
   n("[data-current-count]").textContent=model?.inventoryTokenCount==null?"—":String(model.inventoryTokenCount);
   if(model)trade.setWallets(model);
+  receiptLog.setReceiptHistory(model?.receiptHistory??null,project?.token?.mint??null);
  }
  const wallet=mountPositionSnapshot(walletHost,{esc,currentOnly:true,onManage:()=>onNavigate("wallet"),onAssets:()=>onNavigate("wallet"),onSummary:drawHoldings});
  selectTradeWallet=address=>wallet.selectWallet(address);
  function drawProject(){
   const p=currentTerminalProject(project);
   q("[data-market-symbol]").textContent=p?.symbol?p.symbol+" / SOL":"Current market data";q("#terminal-project-select").value=p?.mint??"";
-  market.setProject(project);
+  market.setProject(project);receiptLog.setReceiptHistory(null,project?.token?.mint??null);
   trade.setProject(project);wallet.setProject(project);
  }
  function tokenStatus(message){const el=n("[data-token-status]");el.textContent=message;el.hidden=!message}

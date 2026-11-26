@@ -1,5 +1,6 @@
 import {Connection,PublicKey} from "@solana/web3.js";
 import {publicKey} from "./local-faucet.mjs";
+import {observedReceiptTrades} from "./local-trade-log-observation.mjs";
 const TOKEN_PROGRAMS=["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA","TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"];
 const CLUSTER_GENESIS=/^(5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp|EtWTRABZaYq6iMfeYKouRu166VU2xqa1|4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z)/;
 const validAmount=v=>typeof v==="string"&&v.length<=39&&/^(0|[1-9][0-9]*)$/.test(v);
@@ -61,7 +62,7 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
     const tx=parsed[i],failed=s.err!=null||tx?.meta?.err!=null;
     const known=tx?.meta!=null&&Object.hasOwn(tx.meta,"err");
     const status=failed?"FAILED":known?"CONFIRMED":"UNKNOWN";
-    return {signature:s.signature,block_time:Number.isSafeInteger(s.blockTime)?s.blockTime:null,status,fee_lamports:Number.isSafeInteger(tx?.meta?.fee)&&tx.meta.fee>=0?String(tx.meta.fee):null,transfers:status==="CONFIRMED"?transferRows(tx):[],transfer_evidence:status==="CONFIRMED"?"PARSED_INSTRUCTIONS_ONLY":failed?"FAILED_NOT_EXECUTED":"UNKNOWN"};
+    return {signature:s.signature,block_time:Number.isSafeInteger(s.blockTime)?s.blockTime:null,status,fee_lamports:Number.isSafeInteger(tx?.meta?.fee)&&tx.meta.fee>=0?String(tx.meta.fee):null,trades:status==="CONFIRMED"?observedReceiptTrades(tx,s,wallet.address):[],transfers:status==="CONFIRMED"?transferRows(tx):[],transfer_evidence:status==="CONFIRMED"?"PARSED_INSTRUCTIONS_ONLY":failed?"FAILED_NOT_EXECUTED":"UNKNOWN"};
    });
    historyStatus=history.some(x=>x.status==="UNKNOWN")?"PARTIAL":"AVAILABLE";
   }catch{}
