@@ -1,7 +1,7 @@
 import {generateKeyPairSync} from "node:crypto";
 import {constants} from "node:fs";
 import {Keypair} from "@solana/web3.js";
-import {mkdir,readdir,lstat,open} from "node:fs/promises";
+import {mkdir,readdir,lstat,open,unlink} from "node:fs/promises";
 import {join} from "node:path";
 import {homedir} from "node:os";
 import {publicKey} from "./local-faucet.mjs";
@@ -24,18 +24,38 @@ export function createWalletStore({directory=join(homedir(),".cook-system","loca
   }
   return rows.sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.address.localeCompare(b.address));
  }
+ const capacity=20;
  let busy=false;
- async function create(){
-  if(busy)throw Error("WALLET_CREATE_BUSY");busy=true;
-  try{
-   await ready();if((await list()).length>=20)throw Error("WALLET_LIMIT");
+ async function createOne(){
    const pair=generateKeyPairSync("ed25519"),pub=pair.publicKey.export({format:"jwk"}),priv=pair.privateKey.export({format:"jwk"});
    const bytes=Buffer.from(pub.x,"base64url"),seed=Buffer.from(priv.d,"base64url");
-   if(bytes.length!==32||seed.length!==32)throw Error("WALLET_KEY_INVALID");
-   const address=base58(bytes);publicKey(address);
-   const file=await open(join(directory,address+".json"),"wx",0o600);
-   try{await file.writeFile(JSON.stringify([...seed,...bytes]));await file.sync()}finally{await file.close();seed.fill(0)}
-   return {address};
+   let file=null,path=null,complete=false;
+   try{
+    if(bytes.length!==32||seed.length!==32)throw Error("WALLET_KEY_INVALID");
+    const address=base58(bytes);publicKey(address);
+    path=join(directory,address+".json");file=await open(path,"wx",0o600);
+    await file.writeFile(JSON.stringify([...seed,...bytes]));await file.sync();await file.close();complete=true;
+    return {address};
+   }finally{
+    seed.fill(0);
+    if(file&&!complete){try{await file.close()}catch{}try{await unlink(path)}catch{}}
+   }
+ }
+ async function create(){
+  if(busy)throw Error("WALLET_CREATE_BUSY");busy=true;
+  try{await ready();if((await list()).length>=capacity)throw Error("WALLET_LIMIT");return await createOne()}
+  finally{busy=false}
+ }
+ // Local testing inventory only. No funding, project assignment or transaction submission.
+ async function createBatch(count){
+  if(!Number.isSafeInteger(count)||count<1||count>capacity)throw Error("INVALID_BODY");
+  if(busy)throw Error("WALLET_CREATE_BUSY");busy=true;
+  try{
+   await ready();if((await list()).length+count>capacity)throw Error("WALLET_LIMIT");
+   const created=[];
+   try{for(let i=0;i<count;i++)created.push(await createOne())}
+   catch{return {status:"PARTIAL",requested:count,created_count:created.length,wallets:created,code:"WALLET_CREATE_INCOMPLETE"}}
+   return {status:"CREATED",requested:count,created_count:created.length,wallets:created};
   }finally{busy=false}
  }
  async function loadSigner(address){
@@ -49,5 +69,5 @@ export function createWalletStore({directory=join(homedir(),".cook-system","loca
    try{const signer=Keypair.fromSeed(secret.subarray(0,32));if(!Buffer.from(signer.secretKey).equals(Buffer.from(secret))||signer.publicKey.toBase58()!==address)throw Error("WALLET_KEY_INVALID");return signer}finally{secret.fill(0)}
   }finally{await handle.close()}
  }
- return {list,create,loadSigner};
+ return {list,create,createBatch,loadSigner};
 }

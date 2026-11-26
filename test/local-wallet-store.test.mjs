@@ -22,3 +22,5 @@ test('only managed wallet keyfiles can be loaded for signing',async t=>{
  await assert.rejects(()=>s.loadSigner('11111111111111111111111111111111'));
  await assert.rejects(()=>s.loadSigner('../private'));
 });
+
+test("local batch respects existing capacity and exposes only public metadata",async t=>{const directory=await mkdtemp(join(tmpdir(),"cook-batch-"));t.after(()=>rm(directory,{recursive:true,force:true}));const s=createWalletStore({directory});const b=await s.createBatch(3);assert.equal(b.status,"CREATED");assert.equal(b.created_count,3);assert.equal(new Set(b.wallets.map(w=>w.address)).size,3);for(const w of b.wallets)assert.deepEqual(Object.keys(w),["address"]);assert.equal((await s.list()).length,3);await assert.rejects(()=>s.createBatch(18),/WALLET_LIMIT/);await assert.rejects(()=>s.createBatch(0),/INVALID_BODY/);assert.equal((await s.list()).length,3);});

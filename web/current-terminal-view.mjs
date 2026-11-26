@@ -29,7 +29,7 @@ export function mountCurrentTerminal({main,nav,esc,activeProjectId,getProjectDir
   if(!alive())return;
   if(model&&(model.project_id!==(project?.project_id??null)||model.mint!==(project?.token?.mint??null)))return;
   n("[data-current-sol]").textContent=model?.sol??"—";
-  n("[data-current-wallet-count]").textContent=project?String(model?.count??0):"0";
+  n("[data-current-wallet-count]").textContent=model?.inventoryCount==null?"—":String(model.inventoryCount);
   if(model)trade.setWallets(model);
  }
  const wallet=mountPositionSnapshot(walletHost,{esc,currentOnly:true,onManage:()=>onNavigate("wallet"),onAssets:()=>onNavigate("wallet"),onSummary:drawHoldings});

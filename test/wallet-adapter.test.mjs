@@ -32,3 +32,5 @@ test("reserved Phantom mode fails closed without invoking local transport",async
 test("missing or unknown mode cannot fall back to Localnet",()=>{
  for(const mode of [undefined,"devnet","production","LOCALNET"])assert.throws(()=>createWalletAdapter({mode}),/INVALID_WALLET_MODE/);
 });
+
+test("batch creation uses a Localnet-only adapter action",async()=>{let body,url;const local=createWalletAdapter({mode:"localnet",fetchImpl:async(u,o)=>{url=u;body=JSON.parse(o.body);return {ok:true,json:async()=>({status:"CREATED",requested:1,created_count:1,wallets:[{address:"test"}]})}}});await local.createBatch({count:1});assert.equal(url,"/api/local-wallet/create-batch");assert.deepEqual(body,{count:1});const main=createWalletAdapter({mode:"mainnet",fetchImpl:()=>{throw Error("unexpected")}});await assert.rejects(()=>main.createBatch({count:1}),/PHANTOM_ADAPTER_NOT_IMPLEMENTED/);});
