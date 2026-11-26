@@ -116,7 +116,9 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
  function draw(){
   const active=rows.find(r=>r.address===selected);
   const estimate=active?previewQuantity(active.tokens,percent):null;
-  const all=summarizePositions(rows),visible=visibleRows(),chosen=summarizePositions(rows.filter(r=>checked.has(r.address)));
+  const displayed=displayRows(),visible=visibleRows();
+  const available=new Set(displayed.map(r=>r.address));for(const address of checked)if(!available.has(address))checked.delete(address);
+  const all=summarizePositions(rows),chosen=summarizePositions(displayed.filter(r=>checked.has(r.address)));
   const total=displayToken(all.token_balance,all.token_decimals);
   onSummary({project_id:project?.project_id??null,mint:project?.token?.mint??null,sol:formatUnits(all.sol_balance,9),tokens:total,observed:all.observed_count,count:all.wallet_count,status,rows:rows.map(r=>({...r})),active:selected,busy,inventoryCount:currentOnly&&inventory?inventory.length:null});
   const header=(label,key)=>'<button type="button" class="position-sort" data-position-sort="'+key+'" aria-label="Sort by '+label+'">'+label+(sortField===key?(sortDirection==="asc"?" ↑":" ↓"):"")+'</button>';
@@ -134,9 +136,9 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
    '<div class="trade-kv"><span>Selected Wallet</span><strong>'+esc(active?.address??"—")+'</strong><span>Tokens to Sell</span><strong>'+esc(estimate?displayToken(estimate.quantity,active.decimals):"—")+'</strong><span>Remaining Tokens</span><strong>'+esc(estimate?displayToken(estimate.remaining,active.decimals):"—")+'</strong><span>Estimated SOL Received</span><strong>Quote required</strong></div></section>');
   const refreshButton=host.querySelector("#position-refresh");if(refreshButton)refreshButton.disabled=busy||!project?.token?.mint;
   const allCheck=host.querySelector("[data-position-all]");
-  const selectable=visible.filter(r=>rows.some(p=>p.address===r.address));allCheck.disabled=!selectable.length;allCheck.checked=selectable.length>0&&selectable.every(r=>checked.has(r.address));allCheck.indeterminate=selectable.some(r=>checked.has(r.address))&&!selectable.every(r=>checked.has(r.address));
+  const selectable=visible;allCheck.disabled=!selectable.length;allCheck.checked=selectable.length>0&&selectable.every(r=>checked.has(r.address));allCheck.indeterminate=selectable.some(r=>checked.has(r.address))&&!selectable.every(r=>checked.has(r.address));
   allCheck.onchange=()=>{for(const r of selectable)allCheck.checked?checked.add(r.address):checked.delete(r.address);draw()};
-  host.querySelectorAll("[data-position-check]").forEach(b=>{if(!rows.some(r=>r.address===b.dataset.positionCheck)){b.disabled=true;return}b.onchange=()=>{b.checked?checked.add(b.dataset.positionCheck):checked.delete(b.dataset.positionCheck);draw()}});
+  host.querySelectorAll("[data-position-check]").forEach(b=>{if(!available.has(b.dataset.positionCheck)){b.disabled=true;return}b.onchange=()=>{b.checked?checked.add(b.dataset.positionCheck):checked.delete(b.dataset.positionCheck);draw()}});
   const clear=host.querySelector("[data-position-clear]");if(clear)clear.onclick=()=>{checked.clear();draw()};
   const search=host.querySelector("[data-position-search]");if(search)search.oninput=e=>{query=e.target.value;draw();const input=host.querySelector("[data-position-search]");input.focus();try{input.setSelectionRange(query.length,query.length)}catch{}};
   host.querySelectorAll("[data-position-sort]").forEach(b=>b.onclick=()=>{const key=b.dataset.positionSort;sortDirection=sortField===key&&sortDirection==="asc"?"desc":"asc";sortField=key;draw()});
