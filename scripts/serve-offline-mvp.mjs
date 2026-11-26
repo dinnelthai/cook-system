@@ -70,11 +70,7 @@ const server=createServer(async(req,res)=>{
     if(req.url.endsWith("/list")||req.url.endsWith("/create")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length)throw Error("INVALID_BODY");send(200,req.url.endsWith("/list")?{wallets:await wallets.list()}:await wallets.create());return;}
     if(req.url.endsWith("/create-batch")){
      if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length!==1||!Number.isSafeInteger(data.count)||data.count<1||data.count>20)throw Error("INVALID_BODY");
-     const expected=process.env.COOK_LOCAL_GENESIS_HASH;
-     if(!expected||/^(5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp|EtWTRABZaYq6iMfeYKouRu166VU2xqa1|4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z)/.test(expected))throw Error("INVALID_LOCAL_CONFIGURATION");
-     const health=await checkLocalRpcHealth(process.env.COOK_LOCAL_RPC_URL);
-     if(health.status!=="RPC_REACHABLE")throw Error("RPC_UNAVAILABLE");
-     if(health.genesis_hash!==expected)throw Error("GENESIS_MISMATCH");
+     // Key generation is offline. RPC checks remain in chain-facing services.
      send(200,await wallets.createBatch(data.count));return;
     }
     if(req.url.endsWith("/portfolio")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>k!=="limit"))throw Error("INVALID_BODY");send(200,await walletPortfolio.snapshot(data));return;}

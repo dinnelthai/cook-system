@@ -101,7 +101,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
     if(!["CREATED","PARTIAL"].includes(result?.status)||result.requested!==count||!Number.isInteger(result.created_count)||result.created_count<0||result.created_count>count||!Array.isArray(result.wallets)||result.wallets.length!==result.created_count||(result.status==="CREATED"&&result.created_count!==count))throw Error("WALLET_RESULT_INVALID");
     const refreshed=await loadInventory();
     if(!disposed&&dialog.isConnected){feedback.textContent=result.created_count+" / "+count+" wallet(s) created."+(result.status==="PARTIAL"?" Partial result; check the wallet list before trying again.":"")+(refreshed?"":" Wallet list could not be refreshed.");}
-   }catch(error){await loadInventory();if(!disposed&&dialog.isConnected)feedback.textContent=error.message==="WALLET_LIMIT"?"Wallet limit reached. Maximum 20 stored wallets.":error.message==="GENESIS_MISMATCH"?"Localnet genesis mismatch. No batch started.":error.message==="RPC_UNAVAILABLE"||error.message==="INVALID_LOCAL_CONFIGURATION"?"Verified Localnet RPC required.":"Creation not confirmed. Check the wallet list before retrying.";}
+   }catch(error){await loadInventory();if(!disposed&&dialog.isConnected)feedback.textContent=error.message==="WALLET_LIMIT"?"Wallet limit reached. Maximum 20 stored wallets.":"Creation not confirmed. Check the wallet list before retrying.";}
    finally{creating=false;if(!disposed&&dialog.isConnected){input.disabled=false;submit.disabled=!validWalletPreviewCount(input.value);dialog.querySelector("[data-generate-close]").disabled=false;dialog.removeEventListener("cancel",preventClose);}}
   };
   dialog.showModal();
