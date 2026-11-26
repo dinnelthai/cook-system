@@ -30,7 +30,7 @@ export function createWalletAdapter({mode,fetchImpl=globalThis.fetch}={}){
   create:()=>request("create",{}),
   createBatch:({count})=>request("create-batch",{count}),
   balance:({address})=>request("balance",{address}),
-  portfolio:({limit})=>request("portfolio",{limit}),
+  portfolio:({limit,mint})=>request("portfolio",{limit,...(mint===undefined?{}:{mint})}),
   airdrop:({address,amount})=>request("airdrop",{address,amount}),
   transfer:({from,to,amount})=>request("transfer",{from,to,amount})
  });

@@ -67,7 +67,8 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
   }catch{}
   return {...wallet,history_status:historyStatus,recent_transactions:history};
  }
- return {async snapshot({limit=5}={}){
+ return {async snapshot({limit=5,mint}={}){
+  if(mint!==undefined)publicKey(mint);
   if(!Number.isSafeInteger(limit)||limit<1||limit>20)throw Error("INVALID_PORTFOLIO_LIMIT");
   if(busy)throw Error("PORTFOLIO_BUSY");busy=true;
   const controller=new AbortController(),deadline=performance.now()+snapshotTimeoutMs;
@@ -88,12 +89,19 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
    if(genesis!==expectedGenesis)throw Error("GENESIS_MISMATCH");
    // Prioritize assets of every managed wallet before optional transaction history.
    const wallets=[];for(const wallet of rows)wallets.push(await walletAssets(connection,wallet,call));
+   let tokenSupply=null;
+   if(mint!==undefined){
+    try{
+     const result=await call(()=>connection.getTokenSupply(new PublicKey(mint),"confirmed")),value=result?.value;
+     if(validAmount(value?.amount)&&Number.isInteger(value.decimals)&&value.decimals>=0&&value.decimals<=18&&Number.isSafeInteger(result.context?.slot)&&result.context.slot>=0)tokenSupply={mint,amount_base_units:value.amount,decimals:value.decimals,slot:result.context.slot};
+    }catch{}
+   }
    for(let i=0;i<wallets.length;i++)wallets[i]=await observeHistory(connection,wallets[i],limit,call);
    let total=0n;for(const w of wallets)if(w.balance_lamports!==null)total+=BigInt(w.balance_lamports);
    const holdings=new Map(),accountOwners=new Map();let accountConflict=false;
    for(const w of wallets)for(const a of w.token_accounts){if(accountOwners.has(a.token_account)){accountConflict=true;continue;}accountOwners.set(a.token_account,w.address);const old=holdings.get(a.mint);if(old&&old.decimals!==a.decimals)throw Error("TOKEN_DECIMALS_CONFLICT");holdings.set(a.mint,{mint:a.mint,decimals:a.decimals,amount_base_units:(BigInt(old?.amount_base_units??"0")+BigInt(a.amount_base_units)).toString(),account_count:(old?.account_count??0)+1});}
    const balanceComplete=wallets.every(w=>w.balance_status==="AVAILABLE");
-   return {schema_version:"cook-local-wallet-portfolio.1",network:"localnet",genesis_hash:expectedGenesis,read_only:true,execution_enabled:false,as_of:new Date().toISOString(),wallet_count:wallets.length,total_sol_balance_lamports:balanceComplete?total.toString():null,balance_status:balanceComplete?"AVAILABLE":"PARTIAL",wallets,token_holdings_status:!accountConflict&&wallets.every(w=>w.token_accounts_status==="AVAILABLE")?"AVAILABLE":"PARTIAL",token_account_scope_conflict:accountConflict,snapshot_consistency:"NON_ATOMIC_OBSERVATION",deadline_reached:controller.signal.aborted||performance.now()>=deadline,token_holdings:[...holdings.values()]};
+   return {schema_version:"cook-local-wallet-portfolio.1",network:"localnet",genesis_hash:expectedGenesis,read_only:true,execution_enabled:false,as_of:new Date().toISOString(),wallet_count:wallets.length,token_supply:tokenSupply,total_sol_balance_lamports:balanceComplete?total.toString():null,balance_status:balanceComplete?"AVAILABLE":"PARTIAL",wallets,token_holdings_status:!accountConflict&&wallets.every(w=>w.token_accounts_status==="AVAILABLE")?"AVAILABLE":"PARTIAL",token_account_scope_conflict:accountConflict,snapshot_consistency:"NON_ATOMIC_OBSERVATION",deadline_reached:controller.signal.aborted||performance.now()>=deadline,token_holdings:[...holdings.values()]};
   }finally{clearTimeout(overall);controller.abort();busy=false}
  }};
 }

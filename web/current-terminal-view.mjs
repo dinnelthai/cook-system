@@ -30,6 +30,7 @@ export function mountCurrentTerminal({main,nav,esc,activeProjectId,getProjectDir
   if(model&&(model.project_id!==(project?.project_id??null)||model.mint!==(project?.token?.mint??null)))return;
   n("[data-current-sol]").textContent=model?.sol??"—";
   n("[data-current-wallet-count]").textContent=model?.inventoryCount==null?"—":String(model.inventoryCount);
+  n("[data-current-count]").textContent=model?.inventoryTokenCount==null?"—":String(model.inventoryTokenCount);
   if(model)trade.setWallets(model);
  }
  const wallet=mountPositionSnapshot(walletHost,{esc,currentOnly:true,onManage:()=>onNavigate("wallet"),onAssets:()=>onNavigate("wallet"),onSummary:drawHoldings});
@@ -45,9 +46,8 @@ export function mountCurrentTerminal({main,nav,esc,activeProjectId,getProjectDir
   const own=++directoryTicket,input=q("#terminal-project-select");input.disabled=true;tokenStatus("");
   try{const result=await getProjectDirectory();if(!alive()||own!==directoryTicket)return;
    projects=result.projects;project=projects.find(p=>p.project_id===activeProjectId)??null;
-   n("[data-current-count]").textContent=String(new Set(projects.map(p=>p.token?.mint).filter(Boolean)).size);
    input.disabled=false;drawProject();
-  }catch{if(!alive()||own!==directoryTicket)return;project=null;projects=[];drawProject();drawHoldings(null);n("[data-current-count]").textContent="—";input.disabled=true;tokenStatus("Token directory unavailable. Use Refresh to retry.");}
+  }catch{if(!alive()||own!==directoryTicket)return;project=null;projects=[];drawProject();void wallet.refresh();input.disabled=true;tokenStatus("Token directory unavailable. Use Refresh to retry.");}
  }
  function selectToken(){
   const input=q("#terminal-project-select"),mint=input.value.trim();if(!mint){onMode("operations");onNavigate("terminal",null);return;}

@@ -73,7 +73,7 @@ const server=createServer(async(req,res)=>{
      // Key generation is offline. RPC checks remain in chain-facing services.
      send(200,await wallets.createBatch(data.count));return;
     }
-    if(req.url.endsWith("/portfolio")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>k!=="limit"))throw Error("INVALID_BODY");send(200,await walletPortfolio.snapshot(data));return;}
+    if(req.url.endsWith("/portfolio")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>k!=="limit"&&k!=="mint"))throw Error("INVALID_BODY");send(200,await walletPortfolio.snapshot(data));return;}
     if(req.url.endsWith("/market-data")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>k!=="interval"))throw Error("INVALID_BODY");send(200,await trading.snapshot(data.interval));return;}
     if(req.url.endsWith("/market")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length)throw Error("INVALID_BODY");send(200,await trading.market());return;}
     if(req.url.endsWith("/trade")){send(403,{code:"PROJECT_EXECUTION_DISABLED"});return;}

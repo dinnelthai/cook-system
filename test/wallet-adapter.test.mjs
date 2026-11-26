@@ -34,3 +34,5 @@ test("missing or unknown mode cannot fall back to Localnet",()=>{
 });
 
 test("batch creation uses a Localnet-only adapter action",async()=>{let body,url;const local=createWalletAdapter({mode:"localnet",fetchImpl:async(u,o)=>{url=u;body=JSON.parse(o.body);return {ok:true,json:async()=>({status:"CREATED",requested:1,created_count:1,wallets:[{address:"test"}]})}}});await local.createBatch({count:1});assert.equal(url,"/api/local-wallet/create-batch");assert.deepEqual(body,{count:1});const main=createWalletAdapter({mode:"mainnet",fetchImpl:()=>{throw Error("unexpected")}});await assert.rejects(()=>main.createBatch({count:1}),/PHANTOM_ADAPTER_NOT_IMPLEMENTED/);});
+
+test("portfolio optionally carries selected public mint for read-only supply query",async()=>{let body;const wallet=createWalletAdapter({mode:"localnet",fetchImpl:async(url,options)=>{body=JSON.parse(options.body);return {ok:true,json:async()=>({})}}});await wallet.portfolio({limit:5,mint:"mint"});assert.deepEqual(body,{limit:5,mint:"mint"});});
