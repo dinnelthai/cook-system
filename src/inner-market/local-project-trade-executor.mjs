@@ -9,12 +9,18 @@ const PUBLIC_GENESIS=/^(5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp|EtWTRABZaYq6iMfeYKouRu1
 
 /** Real Localnet signer/broadcaster for a server-bound project preview. The
  * caller must persist onSubmitted before this method sends any bytes. */
-export function createLocalProjectTradeExecutor({endpoint,expectedGenesis,enabled,wallets,connectionFactory=url=>new Connection(url,{commitment:"confirmed",disableRetryOnRateLimit:true,fetch:(u,o)=>fetch(u,{...o,redirect:"error",signal:AbortSignal.timeout(8000)})}),sdkFactory=rpc=>new OnlinePumpAmmSdk(rpc),instructionFactory=(side,state,amount,quote)=>side==="buy"?PUMP_AMM_SDK.buyInstructions(state,new BN(quote.estimated_receive_base_units),new BN(quote.slippage_limit_base_units)):PUMP_AMM_SDK.sellInstructions(state,amount,new BN(quote.slippage_limit_base_units)),polls=30,pollDelayMs=1000}={}){
+export function createLocalProjectTradeExecutor({endpoint,expectedGenesis,enabled,wallets,connectionFactory=url=>new Connection(url,{commitment:"confirmed",disableRetryOnRateLimit:true,fetch:(u,o)=>fetch(u,{...o,redirect:"error",signal:AbortSignal.timeout(8000)})}),sdkFactory=rpc=>new OnlinePumpAmmSdk(rpc),instructionFactory=(side,state,amount,quote)=>side==="buy"?PUMP_AMM_SDK.buyInstructions(state,new BN(quote.estimated_receive_base_units),new BN(quote.slippage_limit_base_units)):PUMP_AMM_SDK.sellInstructions(state,amount,new BN(quote.slippage_limit_base_units)),polls=30,pollDelayMs=1000,blockPollDelayMs=500}={}){
  function rpcUrl(){
   if(!enabled||!expectedGenesis||PUBLIC_GENESIS.test(expectedGenesis))throw Error("PROJECT_TRADE_EXECUTION_DISABLED");
   let url;try{publicKey(expectedGenesis);url=new URL(endpoint)}catch{throw Error("INVALID_LOCAL_CONFIGURATION")}
   if(url.protocol!=="http:"||!["127.0.0.1","[::1]"].includes(url.hostname)||url.username||url.password||url.pathname!=="/"||url.search||url.hash)throw Error("INVALID_LOCAL_CONFIGURATION");
   return url.href;
+ }
+ async function waitBlocks({blocks,project}){
+  if(!Number.isInteger(blocks)||blocks<0||blocks>20||project.network?.cluster!=="localnet"||project.network.genesis_hash!==expectedGenesis)throw Error("INVALID_TRADE_DELAY_BLOCKS");if(blocks===0)return {blocks_waited:0};
+  const rpc=connectionFactory(rpcUrl());if(await rpc.getGenesisHash()!==expectedGenesis)throw Error("GENESIS_MISMATCH");const start=await rpc.getBlockHeight("confirmed");if(!Number.isSafeInteger(start)||start<0)throw Error("BLOCK_HEIGHT_UNAVAILABLE");
+  for(let attempt=0;attempt<120;attempt++){const current=await rpc.getBlockHeight("confirmed");if(Number.isSafeInteger(current)&&current>=start+blocks)return {blocks_waited:current-start};if(blockPollDelayMs)await new Promise(resolve=>setTimeout(resolve,blockPollDelayMs))}
+  throw Error("BLOCK_DELAY_TIMEOUT");
  }
  async function reconcile({signature}){
   if(typeof signature!=="string"||!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(signature))throw Error("INVALID_TRANSACTION_SIGNATURE");
@@ -76,5 +82,5 @@ export function createLocalProjectTradeExecutor({endpoint,expectedGenesis,enable
   }
   return {status:"UNKNOWN",signature:chainSignature,reason:"CONFIRMATION_TIMEOUT"};
  }
- return {quoteWallet,executeWallet,reconcile};
+ return {quoteWallet,executeWallet,reconcile,waitBlocks};
 }

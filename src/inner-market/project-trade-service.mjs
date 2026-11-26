@@ -12,9 +12,11 @@ export function createProjectTradeService({store,wallets,portfolio,market,genesi
  async function createPreview(projectId,input){
   if(!id(projectId)||!input||typeof input!=="object"||Array.isArray(input))throw Error("INVALID_PROJECT_TRADE_REQUEST");
   const project=store.get(projectId);
-  const slippageBps=input.slippage_bps??100;if(!Number.isInteger(slippageBps)||slippageBps<1||slippageBps>5000)throw Error("INVALID_SLIPPAGE_BPS");
-  const {slippage_bps,...tradeInput}=input,request={...tradeInput,project_id:projectId,revision:project.revision};
-  const draft=await preview(request),{revision,...bound}=draft,previewBase={...bound,project_revision:revision,slippage_bps:slippageBps};
+  const slippageBps=input.slippage_bps??100,delayBlocks=input.delay_blocks??0;
+  if(!Number.isInteger(slippageBps)||slippageBps<1||slippageBps>5000)throw Error("INVALID_SLIPPAGE_BPS");
+  if(!Number.isInteger(delayBlocks)||delayBlocks<0||delayBlocks>20)throw Error("INVALID_TRADE_DELAY_BLOCKS");
+  const {slippage_bps,delay_blocks,...tradeInput}=input,request={...tradeInput,project_id:projectId,revision:project.revision};
+  const draft=await preview(request),{revision,...bound}=draft,previewBase={...bound,project_revision:revision,slippage_bps:slippageBps,delay_blocks:delayBlocks};
   if(!executionAdapter||typeof executionAdapter.quoteWallet!=="function")return store.tradeExecution.createPreview(previewBase);
   const orders=[];for(const order of bound.orders){const quote=await executionAdapter.quoteWallet({project:clone(project),preview:previewBase,order:clone(order)});orders.push({...order,...quote})}
   if(bound.side==="buy"){const limits=project.limits,maxOrder=BigInt(limits.max_order_size_base_units),maxWallet=BigInt(limits.max_wallet_exposure_base_units),maxProject=BigInt(limits.max_project_budget_base_units);let total=0n;for(const order of orders){const amount=BigInt(order.slippage_limit_base_units);if(amount>maxOrder||amount>maxWallet)throw Error("PROJECT_TRADE_LIMIT_EXCEEDED");total+=amount}if(total>maxProject)throw Error("PROJECT_TRADE_LIMIT_EXCEEDED")}
@@ -51,6 +53,7 @@ export function createProjectTradeService({store,wallets,portfolio,market,genesi
     if(!["CONFIRMED","FAILED","REJECTED","UNKNOWN"].includes(status))throw Error("INVALID_PROJECT_TRADE_RESULT");
     store.tradeExecution.updateWallet(execution.execution_id,ordinal,{status,signature:result.signature,reason:result.reason});
     if(status==="UNKNOWN")return store.tradeExecution.finishExecution(execution.execution_id,"STOPPED_UNKNOWN",result.reason??"UNKNOWN");
+    if(ordinal<draft.orders.length-1&&saved.delay_blocks>0&&["CONFIRMED","FAILED"].includes(status)){if(typeof executionAdapter.waitBlocks!=="function")throw Error("PROJECT_TRADE_DELAY_UNAVAILABLE");await executionAdapter.waitBlocks({blocks:saved.delay_blocks,project:clone(project),execution_id:execution.execution_id,after_ordinal:ordinal})}
    }
    return store.tradeExecution.finishExecution(execution.execution_id,"COMPLETED");
   }catch(error){
