@@ -1,3 +1,4 @@
+import {mountCurrentTerminal} from "./current-terminal-view.mjs";
 import {mountSettings} from "./settings-view.mjs";
 import {mountPositionSnapshot} from "./position-snapshot-view.mjs";
 import {mountHistoricalDirectionReview,historicalTradePosition} from "./historical-direction-review.mjs";
@@ -162,8 +163,8 @@ function mountMemeDesk(){
  rail.innerHTML='<div class="desk-overview"><div class="desk-overview-title"><strong>My Assets</strong><span>Solana</span></div><div class="desk-balance"><small>SOL Balance</small><strong>— <small>SOL</small></strong></div><div class="desk-overview-stats"><div><small>Meme</small><strong id="desk-token-count">—</strong></div><div><small>Registered Wallets</small><strong id="desk-wallet-count">—</strong></div></div><button type="button" id="desk-wallet-manage">Manage Wallets ↗</button></div><div class="meme-rail-head"><strong>My Memes</strong><button type="button" id="meme-new" aria-label="New Meme">＋</button></div><label for="meme-search">Search Memes</label><input id="meme-search" type="search" placeholder="Name / Symbol / Mint"><div id="meme-list">Loading Memes…</div><button type="button" id="meme-create-footer">＋ Launch Meme</button>';
  nav.prepend(rail);
   const go=(target,id=activeProjectId)=>{importTicket++;selectProjectContext(id);page=target;render();};
- rail.querySelector("#meme-new").onclick=()=>{memeMode="launch";memePanelHidden=false;go("terminal",null);};
- rail.querySelector("#meme-create-footer").onclick=()=>{memeMode="launch";memePanelHidden=false;go("terminal",null);};
+ rail.querySelector("#meme-new").onclick=()=>{memeMode="launch";memePanelHidden=false;go("history",null);};
+ rail.querySelector("#meme-create-footer").onclick=()=>{memeMode="launch";memePanelHidden=false;go("history",null);};
  rail.querySelector("#meme-search").value=memeFilter;
  rail.querySelector("#desk-wallet-manage").onclick=()=>go("wallet");
  const shell=document.createElement("div");shell.className="meme-desk";
@@ -236,7 +237,7 @@ function mountMemeDesk(){
   if(launchMounted)return;launchMounted=true;
   mountProjectSetup(launchHost,{initialProjectId:launchProjectId,initialMessage:projectMessage,
    onActiveProjectId:id=>{launchProjectId=id;},
-   isActive:()=>page==="terminal"&&memeMode==="launch"&&launchHost.isConnected,
+   isActive:()=>page==="history"&&memeMode==="launch"&&launchHost.isConnected,
    screenHeading,panel,note,table,esc,download,projectRegistry,record,errorKind});
  }
  const reviewBox=document.createElement("details");reviewBox.className="meme-report-extra meme-business-extra";reviewBox.hidden=!activeProjectId;reviewBox.innerHTML="<summary>Evidence and Detailed Review</summary>";
@@ -252,7 +253,7 @@ function mountMemeDesk(){
   rail.querySelector("#desk-token-count").textContent=String(projects.filter(issued).length);
   rail.querySelector("#desk-wallet-count").textContent=selected?String(new Set(projectWalletRegistrationRows(selected).map(r=>r[2])).size):"—";
   list.innerHTML=ordered.filter(match).map(row).join("")||'<p class="muted meme-list-empty">'+(q?"No matching Memes":"No Memes yet")+'</p>';
-  list.querySelectorAll("[data-meme-project]").forEach(b=>b.onclick=()=>{record("project.context.selected",{project_id:b.dataset.memeProject});memeMode="operations";memeDetailTab="wallet";go("terminal",b.dataset.memeProject);});
+  list.querySelectorAll("[data-meme-project]").forEach(b=>b.onclick=()=>{record("project.context.selected",{project_id:b.dataset.memeProject});memeMode="operations";memeDetailTab="wallet";go("history",b.dataset.memeProject);});
  }
  rail.querySelector("#meme-search").oninput=e=>{memeFilter=e.target.value;drawList();};
  function drawControls(){
@@ -264,7 +265,7 @@ function mountMemeDesk(){
  }
  side.querySelectorAll("[data-desk-mode]").forEach(b=>b.onclick=()=>{
   const next=b.dataset.deskMode;if(next===memeMode)return;
-  if(next==="operations"){memeMode=next;go("terminal",launchProjectId);return;}
+  if(next==="operations"){memeMode=next;go("history",launchProjectId);return;}
   memeMode=next;drawControls();mountLaunch();
  });
  drawControls();if(memeMode==="launch")mountLaunch();
@@ -288,7 +289,7 @@ function mountMemeDesk(){
   }};
 }
 
-function renderTerminal(){
+function renderHistoricalTerminal(){
  const d=report.terminal_state,a=d.treasury,m=d.market,scope=d.scope;
  const ready=d.status==="REPORT_READY";
  const candleResult=buildTerminalCandles(data,candleInterval);
@@ -344,7 +345,7 @@ function renderTerminal(){
   main.querySelector("#open-data").disabled=Boolean(activeProjectId);
   const contextVersion=++terminalContextVersion;
   getProjectDirectory().then(({projects,directory})=>{
-   if(page!=="terminal"||contextVersion!==terminalContextVersion)return;
+   if(page!=="history"||contextVersion!==terminalContextVersion)return;
    const selected=projects.find(x=>x.project_id===activeProjectId)||null;
     memeDesk.update(projects,selected);
    const options='<option value="">Select Project</option>'+(!selected&&activeProjectId?'<option value="'+esc(activeProjectId)+'" selected>Previous project unavailable. Select another.</option>':"")+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
@@ -362,7 +363,7 @@ function renderTerminal(){
        const card=x=>'<div class="project-stat asset-metric"><span>'+esc(x.label)+'</span><div class="asset-value"><strong>'+esc(x.display_value)+'</strong><small>'+esc(x.display_unit)+'</small></div><small>'+esc(x.evidence_label)+'</small></div>';
        return '<div class="project-asset-grid">'+primary.map(id=>metrics.find(x=>x.id===id)).map(card).join("")+'</div><details class="audit-detail"'+(operatorMode==="AUDIT"?" open":"")+'><summary>其他资产、应收、估值及负债</summary><div class="project-asset-grid">'+metrics.filter(x=>!primary.includes(x.id)).map(card).join("")+'</div></details>';
       };
-      const businessCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&businessArea.isConnected;
+      const businessCurrent=()=>page==="history"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&businessArea.isConnected;
       let businessTicket=0;
       async function refreshBusiness(){
        const ticket=++businessTicket;memeDesk.pending();businessArea.textContent="读取统一项目复核…";riskArea.textContent="读取同一项目快照…";
@@ -452,7 +453,7 @@ function renderTerminal(){
       }
       void refreshBusiness();
       const marketArea=main.querySelector("#terminal-market-evidence");marketArea.hidden=false;
-      const marketCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&marketArea.isConnected;
+      const marketCurrent=()=>page==="history"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&marketArea.isConnected;
       marketArea.innerHTML="<h3>历史行情证据审计</h3>"+note("仅复核已关联历史报告；不提供实时行情或交易信号。")+
        '<label>关联报告<select id="market-evidence-report"><option value="">读取报告中…</option></select></label><button id="market-evidence-review" disabled>复核并归档</button><button id="market-evidence-export" disabled>导出本次复核</button><p id="market-evidence-status" role="status"></p><div id="market-evidence-result"></div>';
       const ms=marketArea.querySelector("#market-evidence-report"),mb=marketArea.querySelector("#market-evidence-review"),mt=marketArea.querySelector("#market-evidence-status"),mr=marketArea.querySelector("#market-evidence-result");
@@ -486,7 +487,7 @@ function renderTerminal(){
       function refreshRisk(){return refreshBusiness();}
       const lifecycleArea=main.querySelector("#terminal-lifecycle-evidence");
       lifecycleArea.hidden=false;lifecycleArea.textContent="读取生命周期证据覆盖…";
-      const stillCurrent=()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&lifecycleArea.isConnected;
+      const stillCurrent=()=>page==="history"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id&&lifecycleArea.isConnected;
       getProjectLifecycleEvidence(selected.project_id,selected.revision).then(v=>{
        if(!stillCurrent())return;
        lifecycleArea.innerHTML="<h3>Project 生命周期证据覆盖</h3>"+note("登记阶段："+v.recorded_stage+" · 观察结果不代表正式阶段推进。")+
@@ -558,7 +559,7 @@ function renderTerminal(){
         finally{if(stillCurrent())button.disabled=false;}
        };
       }).catch(e=>{if(stillCurrent())lifecycleArea.textContent="生命周期证据不可用："+errorKind(e);});
-      const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download,onSummary:model=>memeDesk.orderSummary(model)});}
+      const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="history"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download,onSummary:model=>memeDesk.orderSummary(model)});}
     if(!selected){notice.innerHTML=note("项目不存在或已删除，请选择其他 Meme。")+'<button id="clear-missing-project">退出项目上下文</button>';notice.querySelector("#clear-missing-project").onclick=()=>{importTicket++;selectProjectContext(null);render();};}
     const match=matchProjectReport(selected,data);
     if(selected)notice.innerHTML=note(match.status==="DECLARED_MATCH"?"正在读取项目报告…":"暂无匹配的项目报告。可在项目资料中关联，或打开独立复盘。");
@@ -570,7 +571,7 @@ function renderTerminal(){
    }
    main.querySelector("#terminal-project-select").onchange=e=>{importTicket++;selectProjectContext(e.target.value||null);record("project.context.selected",{project_id:activeProjectId});render()};
   }).catch(()=>{
-   if(page==="terminal"&&contextVersion===terminalContextVersion){
+   if(page==="history"&&contextVersion===terminalContextVersion){
     memeDesk.error();memeDesk.syncChartAvailability();
      projectContext.textContent="Project 数据库不可用；交易执行保持关闭。";
     const retry=document.createElement("button");retry.textContent="重新读取项目";retry.onclick=()=>render();projectContext.append(retry);
@@ -580,7 +581,7 @@ function renderTerminal(){
     }
    }
   });
-  main.querySelector("#workflow-sample").onclick=async()=>{if(activeProjectId)return;if(!isSample&&!window.confirm("切换到离线样本？请先导出当前报告。"))return;const ticket=++importTicket;try{const response=await fetch("../fixtures/synthetic/terminal-candle-report.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("SAMPLE_UNAVAILABLE");const next=await response.json(),nextReport=auditedReport(next);if(!importCurrent(ticket,"terminal"))return;offlineReview=true;data=next;report=nextReport;render()}catch(e){if(importCurrent(ticket,"terminal")){workflowMessage="离线样本载入失败："+errorKind(e);render()}}};
+  main.querySelector("#workflow-sample").onclick=async()=>{if(activeProjectId)return;if(!isSample&&!window.confirm("切换到离线样本？请先导出当前报告。"))return;const ticket=++importTicket;try{const response=await fetch("../fixtures/synthetic/terminal-candle-report.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("SAMPLE_UNAVAILABLE");const next=await response.json(),nextReport=auditedReport(next);if(!importCurrent(ticket,"history"))return;offlineReview=true;data=next;report=nextReport;render()}catch(e){if(importCurrent(ticket,"history")){workflowMessage="离线样本载入失败："+errorKind(e);render()}}};
  main.querySelector("#workflow-cash").onclick=()=>{terminalTab="cash";reviewPaused=false;render()};
  main.querySelector("#workflow-finance").onclick=()=>{if(isSample)return;terminalTab="finance";reviewPaused=false;render()};
  const closeExport=main.querySelector("#financial-close-export");if(closeExport)closeExport.onclick=()=>{if(!isSample)download("project-financial-close-review.json",JSON.stringify(getCloseReview(),null,2));};
@@ -624,9 +625,9 @@ function render(){
  renderGlobalContext();
  document.querySelector(".tag").textContent=activeProjectId?"PROJECT REVIEW":offlineReview?"OFFLINE REVIEW":"LOCALNET";
  nav.replaceChildren();
- nav.hidden=page!=="terminal";
+ nav.hidden=!["terminal","history"].includes(page);
  const topNav=document.querySelector("#top-nav");
- const activeNavPage=page==="create"?"terminal":page;
+ const activeNavPage=page==="history"?"dashboard":page==="create"?"projects":page;
  topNav.innerHTML=pages.map(([id,label])=>'<button type="button" data-page="'+id+'"'+(activeNavPage===id?' class="active" aria-current="page"':'')+'>'+esc(label)+'</button>').join("");
  topNav.querySelectorAll("button").forEach(b=>b.onclick=()=>{
   const keyboardFocus=document.activeElement===b;importTicket++;page=b.dataset.page;record("page.open",{page});render();
@@ -637,7 +638,10 @@ function render(){
  const a=report.accounting,m=report.market_history;
  const links=(items)=>'<div class="row subnav">'+items.map(([id,label])=>'<button data-subpage="'+id+'">'+esc(label)+'</button>').join("")+'</div>';
  const context=()=>note("数据来源："+report.source_mode+" · 离线区间报告；Localnet 实时接口尚未接入。未知值不作估算。");
- if(page==="terminal"){renderTerminal();
+ if(page==="terminal"){
+ const scope=++terminalContextVersion;
+ disposeMemeDesk=mountCurrentTerminal({main,nav,esc,activeProjectId,getProjectDirectory,mountPositionSnapshot,mountProjectSetup,screenHeading,panel,note,table,download,projectRegistry,record,errorKind,projectMessage,isActive:()=>page==="terminal"&&scope===terminalContextVersion,onNavigate:(target,id=activeProjectId)=>{importTicket++;selectProjectContext(id);page=target;render();},onSelect:id=>{selectProjectContext(id);renderGlobalContext();},initialMode:memeMode,onMode:mode=>{memeMode=mode;}});
+ }else if(page==="history"){renderHistoricalTerminal();
  }else if(page==="wallet"){
  main.innerHTML=screenHeading("Wallets & Assets","Project asset evidence · Local wallet tools")+
  '<section id="project-assets" class="panel"></section>'+
@@ -682,7 +686,7 @@ panel("项目全生命周期复盘",'<div id="project-lifecycle-review"></div>')
  dbLoad.disabled=workspaceBusy;dbSave.disabled=workspaceBusy||workspaceRevision===null;dbVersions.disabled=workspaceBusy;
  for(const id of ["workspace-import","catalogue-add","catalogue-file","catalogue-select"])main.querySelector("#"+id).disabled=workspaceBusy;
  if(workspaceBusy){removeButton.disabled=true;openReview.disabled=true;}
- openReview.onclick=()=>{if(!selected||workspaceBusy)return;if(!window.confirm("在离线审阅模式打开该记录？不会绑定钱包。"))return;const next=structuredClone(selected.input),nextReport=auditedReport(next);importTicket++;selectProjectContext(null);offlineReview=true;data=next;report=nextReport;page="terminal";record("page.open",{page});render()};
+ openReview.onclick=()=>{if(!selected||workspaceBusy)return;if(!window.confirm("在离线审阅模式打开该记录？不会绑定钱包。"))return;const next=structuredClone(selected.input),nextReport=auditedReport(next);importTicket++;selectProjectContext(null);offlineReview=true;data=next;report=nextReport;page="history";record("page.open",{page});render()};
  async function databaseAction(action){
   if(workspaceBusy)return;
   if(action==="load"&&projectCatalogue.list().length&&!window.confirm("读取数据库将替换当前会话档案。请先导出未保存记录。继续？"))return;
@@ -881,13 +885,13 @@ panel("角色与风险特征",table(["角色","特征","观测关注","局限"],
  }else{
  main.innerHTML=screenHeading("Risk Center / 风险中心","已观测风险与数据质量 · 非交易信号")+panel("风险检查矩阵",table(["类别","状态"],[["财务对账",report.status],["可信等级",report.trust.grade+" / "+report.trust.status],["库存核算",report.trust.metrics.cost_basis.status],["历史回撤",a.max_observed_drawdown_bps==null?"未知":Number(a.max_observed_drawdown_bps)/100+"%"],["实时流动性","未知"],["市场行为风险","未验证"]]))+note("仅核算已发生的历史事件；未通过统一审计时，财务输出为未知。")+'<div class="stats">'+stat("已实现项目盈亏（lamports）",a.realized_project_pnl_base_units)+stat("已到账手续费（lamports）",a.creator_cash_income_base_units)+stat("历史观测回撤（bps）",a.max_observed_drawdown_bps)+stat("审计状态",report.status)+'</div>'+panel("异常清单",report.issues.length?table(["异常"],report.issues.map(x=>[x])):"<p class='positive'>输入样本通过当前审计规则。</p>")+details("详细审计",report.audits)+"<p class='muted'>合成样本通过不等于本地链数据已验证，也不意味着收益可实现。</p>";
  }
- if(page!=="logs"){
+ if(page!=="logs"&&page!=="terminal"){
   main.insertAdjacentHTML("beforeend",'<div class="row"><button id="quick-log-export">Export Diagnostics</button></div>');
   document.querySelector("#quick-log-export").onclick=exportDiagnostics;
  }
- const extras=page==="market"?[["lab","历史回放 / 导入"],["create","发行资料"]]:page==="lab"?[["market","返回市场中心"]]:["create","logs"].includes(page)?[["terminal","Back to Terminal"]]:[];
+ const extras=page==="dashboard"?[["history","历史报告与订单复核"],["create","项目配置与发行证据"]]:page==="history"?[["dashboard","返回复盘分析"],["terminal","Back to Terminal"]]:page==="market"?[["lab","历史回放 / 导入"],["create","发行资料"]]:page==="lab"?[["market","返回市场中心"]]:["create","logs"].includes(page)?[["terminal","Back to Terminal"]]:[];
  if(extras.length){main.insertAdjacentHTML("afterbegin",links(extras));main.querySelectorAll("[data-subpage]").forEach(b=>b.onclick=()=>{importTicket++;page=b.dataset.subpage;record("page.open",{page});render()});}
- main.insertAdjacentHTML("beforeend",'<p class="foot">Cook System · Historical Review</p>');
+ if(page!=="terminal")main.insertAdjacentHTML("beforeend",'<p class="foot">Cook System · Historical Review</p>');
  if(operatorMode==="AUDIT")main.querySelectorAll("details.audit-detail").forEach(d=>{d.open=true;});
 }
 render();

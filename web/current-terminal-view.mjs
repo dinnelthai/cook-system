@@ -1,0 +1,57 @@
+// Current terminal deliberately excludes historical reports, accounting and audit views.
+export function currentTerminalProject(project){
+ if(!project)return null;
+ return {project_id:project.project_id,name:project.profile?.name??"",symbol:project.profile?.symbol??"",mint:project.token?.mint??null,network:project.network?.cluster??null,stage:project.lifecycle?.stage??"UNKNOWN"};
+}
+export function mountCurrentTerminal({main,nav,esc,activeProjectId,getProjectDirectory,mountPositionSnapshot,mountProjectSetup,screenHeading,panel,note,table,download,projectRegistry,record,errorKind,projectMessage,isActive,onNavigate,onSelect,initialMode,onMode}){
+ let disposed=false,project=null,projects=[],mode=initialMode==="launch"?"launch":"operations",query="",directoryTicket=0,launchMounted=false,last=null;
+ const alive=()=>!disposed&&isActive()&&main.isConnected;
+ nav.innerHTML='<section class="meme-rail"><div class="desk-overview"><div class="desk-overview-title"><strong>My Assets</strong><span>Localnet</span></div><div class="desk-balance"><small>Selected Meme SOL Balance</small><strong data-current-sol>—</strong></div><div class="desk-overview-stats"><div><small>Memes</small><strong data-current-count>—</strong></div><div><small>Registered Wallets</small><strong data-current-wallet-count>—</strong></div></div><button type="button" data-manage-wallets>Manage Wallets</button></div><div class="meme-rail-head"><strong>My Memes</strong><button type="button" data-new-meme aria-label="New Meme">＋</button></div><label>Search Memes<input type="search" data-meme-search placeholder="Name / Symbol / Mint"></label><div data-current-memes role="status">Loading Memes…</div><button type="button" data-launch-meme>＋ Launch Meme</button></section>';
+ main.innerHTML='<div class="meme-desk current-terminal"><section class="meme-center"><section class="cook-position-strip"><div class="cook-position-head"><div><small>CURRENT MEME</small><h2 data-current-symbol>No Meme Selected</h2></div><span class="cook-data-label" data-current-stage>Localnet</span></div><div class="row"><label>Project <select id="terminal-project-select" disabled><option value="">Select Project</option></select></label><button type="button" data-current-reload>Refresh</button></div><p class="muted" data-current-mint>—</p></section><section class="desk-market-frame"><div class="meme-chart-toolbar"><div class="desk-market-title"><strong>Market</strong><small>Current market data</small></div><div class="desk-market-actions"><button type="button" data-market-toggle>Minimize</button></div></div><div class="meme-chart-empty" data-market-body><div class="empty-state"><strong>No token selected</strong><span>Select a Meme to view market data.</span></div></div></section><section class="meme-lower"><div class="meme-lower-tabs" role="group" aria-label="Current Meme Details"><button type="button" aria-pressed="true">Wallets</button></div><section class="meme-wallet" data-current-wallets></section></section></section><aside class="meme-control"><div class="meme-mode" role="group" aria-label="Workspace Mode"><button type="button" data-current-mode="operations">Trade</button><button type="button" data-current-mode="launch">Launch</button></div><div data-current-trade class="smith-trade"><section class="smith-section"><div class="trade-heading"><h3>Current Holdings</h3><small>Localnet</small></div><div class="smith-card-grid" data-current-holdings></div><p class="trade-hint" data-current-status role="status">Select a Meme.</p></section><section class="smith-section"><h3>Transaction Status</h3><p class="trade-hint">Execution: DISABLED</p><p class="muted">No live transaction service is connected. Historical orders are available in Analytics.</p></section></div><div data-current-launch class="terminal-launch-only" hidden></div></aside></div>';
+ const q=s=>main.querySelector(s),n=s=>nav.querySelector(s),walletHost=q("[data-current-wallets]"),launchHost=q("[data-current-launch]");
+ const card=(label,value)=>'<div class="smith-trade-card"><span>'+esc(label)+'</span><strong>'+esc(value??"—")+'</strong></div>';
+ function drawHoldings(model){
+  if(!alive())return;
+  last=model;
+  q("[data-current-holdings]").innerHTML=card("SOL Balance",model?.sol)+card("Tokens",model?.tokens)+card("Observed Wallets",model?.count?model.observed+" / "+model.count:"—")+card("Position Value","—");
+  n("[data-current-sol]").textContent=model?.sol??"—";
+  n("[data-current-wallet-count]").textContent=project?String(model?.count??0):"—";
+  q("[data-current-status]").textContent=model?.status??"Select a Meme.";
+ }
+ const wallet=mountPositionSnapshot(walletHost,{esc,onManage:()=>onNavigate("wallet"),onAssets:()=>onNavigate("wallet"),onSummary:drawHoldings});
+ function list(){
+  const search=query.trim().toLowerCase(),visible=projects.filter(p=>[p.profile?.name,p.profile?.symbol,p.token?.mint].some(v=>String(v??"").toLowerCase().includes(search)));
+  n("[data-current-count]").textContent=String(projects.length);
+  n("[data-current-memes]").innerHTML=visible.map(p=>'<button type="button" class="meme-project '+(p.project_id===activeProjectId?"selected":"")+'" data-current-id="'+esc(p.project_id)+'"><span class="meme-avatar">'+esc((p.profile?.symbol??"?").slice(0,2))+'</span><span class="meme-project-label"><strong>'+esc(p.profile?.symbol)+'</strong><small>'+esc(p.profile?.name)+'</small></span></button>').join("")||'<p class="muted">'+(search?"No matching Memes":"No Memes yet")+'</p>';
+  n("[data-current-memes]").querySelectorAll("[data-current-id]").forEach(b=>b.onclick=()=>{onMode("operations");onNavigate("terminal",b.dataset.currentId)});
+ }
+ function drawProject(){
+  const p=currentTerminalProject(project);
+  q("[data-current-symbol]").textContent=p?.symbol||"No Meme Selected";q("[data-current-stage]").textContent=p?.stage?.replaceAll("_"," ")??"Localnet";
+  q("[data-current-mint]").textContent=p?.mint?"Mint: "+p.mint:"No registered token mint";
+  q("[data-market-body]").innerHTML='<div class="empty-state"><strong>'+esc(p?.mint?"Live market data unavailable":"No token selected")+'</strong><span>'+esc(p?.mint?"Waiting for the project-scoped market data interface.":"Select an issued Meme.")+'</span></div>';
+  wallet.setProject(project);
+ }
+ async function load(){
+  const own=++directoryTicket;q("[data-current-reload]").disabled=true;
+  try{const result=await getProjectDirectory();if(!alive()||own!==directoryTicket)return;
+   projects=result.projects;project=projects.find(p=>p.project_id===activeProjectId)??null;
+   const select=q("#terminal-project-select");select.innerHTML='<option value="">Select Project</option>'+projects.map(p=>'<option value="'+esc(p.project_id)+'"'+(p.project_id===activeProjectId?" selected":"")+'>'+esc(p.profile?.symbol+" · "+p.profile?.name)+'</option>').join("");select.disabled=false;list();drawProject();
+  }catch{if(!alive()||own!==directoryTicket)return;project=null;projects=[];wallet.setProject(null);drawHoldings(null);n("[data-current-memes]").textContent="Project directory unavailable. Retry.";q("[data-current-status]").textContent="Project directory unavailable."}
+  finally{if(alive()&&own===directoryTicket)q("[data-current-reload]").disabled=false}
+ }
+ function drawMode(){
+  q("[data-current-trade]").hidden=mode!=="operations";launchHost.hidden=mode!=="launch";
+  q("[data-current-launch]").classList.toggle("terminal-launch-only",mode==="launch");
+  main.querySelectorAll("[data-current-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.currentMode===mode)));
+  if(mode==="launch"&&!launchMounted){launchMounted=true;mountProjectSetup(launchHost,{initialProjectId:activeProjectId,initialMessage:projectMessage,onActiveProjectId:id=>{onSelect(id);activeProjectId=id;void load()},isActive:()=>alive()&&mode==="launch",screenHeading,panel,note,table,esc,download,projectRegistry,record,errorKind});}
+ }
+ function openNew(){onMode("launch");onNavigate("terminal",null)}
+ n("[data-new-meme]").onclick=openNew;n("[data-launch-meme]").onclick=openNew;n("[data-manage-wallets]").onclick=()=>onNavigate("wallet");
+ n("[data-meme-search]").oninput=e=>{query=e.target.value;list()};
+ q("#terminal-project-select").onchange=e=>{onMode("operations");onNavigate("terminal",e.target.value||null)};
+ q("[data-current-reload]").onclick=()=>{void load();void wallet.refresh()};
+ q("[data-market-toggle]").onclick=e=>{const body=q("[data-market-body]");body.hidden=!body.hidden;e.target.textContent=body.hidden?"Expand":"Minimize"};
+ main.querySelectorAll("[data-current-mode]").forEach(b=>b.onclick=()=>{const next=b.dataset.currentMode;if(next===mode)return;if(mode==="launch"){onMode(next);onNavigate("terminal",activeProjectId);return;}mode=next;onMode(mode);drawMode()});
+ drawMode();void load();return ()=>{disposed=true;directoryTicket++;wallet.dispose()};
+}

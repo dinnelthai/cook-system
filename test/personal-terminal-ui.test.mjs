@@ -9,3 +9,5 @@ test("personal terminal simplifies status language without weakening project iso
  assert.ok(app.includes("hidden inert style=\"display:none\""));
  assert.ok(app.includes("当前不支持交易提交"));
 });
+
+test("current terminal routes historical analysis into a separate Analytics subpage",async()=>{const app=await readFile(new URL("../web/app.mjs",import.meta.url),"utf8");const current=await readFile(new URL("../web/current-terminal-view.mjs",import.meta.url),"utf8");assert.ok(app.includes('else if(page==="history"){renderHistoricalTerminal();'));assert.ok(app.includes('page==="history"?"dashboard"'));assert.ok(!current.includes("mountHistoricalDirectionReview"));assert.ok(!current.includes("Historical Position & PnL"));assert.ok(current.includes("Execution: DISABLED"));});
