@@ -44,12 +44,14 @@ export function historicalScopeMatches(project,input){
 }
 
 export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
- let side="BUY",filter="ALL",input=null,state="Select a Meme",settingsOpen=false,positionOpen=false,project=null,query="",page=1,live=null;
+ let side="BUY",filter="ALL",input=null,state="Select a Meme",settingsOpen=false,positionOpen=false,project=null,query="",page=1,live=null,orders=null;
  const fmt=v=>v==null?"—":esc(quoteAmount(v,"SOL_LAMPORTS"));
  const kv=(label,value)=>'<span>'+esc(label)+'</span><strong>'+value+'</strong>';
  const row=(label,value)=>kv(label,value==null?"—":esc(value));
  const heading=(title,extra="")=>'<div class="trade-heading"><h3>'+title+'</h3>'+extra+'</div>';
  const tile=(label,value,extra="")=>'<div class="smith-trade-card '+extra+'"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>';
+ const orderSummaryMarkup=()=>heading("Order Status",'<small>Historical records</small>')+
+   '<div class="smith-card-grid">'+tile("Recorded Orders",orders?.counts?.total??"—")+tile("Unknown Outcome",orders?.counts?.unknown??"—")+tile("Review Required",orders?.counts?.review??"—")+tile("Reported Failure",orders?.counts?.reported_failure??"—")+'</div><p class="trade-hint">'+esc(orders?.state??"Not loaded")+' · See Orders tab for details. Reported status is not live confirmation.</p>';
  function draw(){
   const buy=historicalDirectionSummary(input,"BUY"),sell=historicalDirectionSummary(input,"SELL");
   const position=buy&&sell?historicalTradePosition(input):null;
@@ -68,6 +70,7 @@ export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
    '<section class="smith-section smith-exit">'+heading("Position Overview",'<small>Historical</small>')+
    '<div class="smith-card-grid">'+tile("Buy Cost",position?.buy_cost!=null?quoteAmount(position.buy_cost,"SOL_LAMPORTS"):"—")+tile("Net Recovered",position?.net_sell_proceeds!=null?quoteAmount(position.net_sell_proceeds,"SOL_LAMPORTS"):"—")+tile("Remaining Cost",position?.remaining_cost!=null?quoteAmount(position.remaining_cost,"SOL_LAMPORTS"):"—")+tile("Realized PnL",position?.realized_pnl!=null?quoteAmount(position.realized_pnl,"SOL_LAMPORTS"):"—")+'</div>'+
    '<p class="trade-hint">Historical interval only. Live valuation and unrealized PnL require verified market data.</p></section>'+
+   '<section class="smith-section order-status-summary">'+orderSummaryMarkup()+'</section>'+
    '<section class="smith-section smith-log trade-log">'+heading("Trades Log",'<small>Current Meme · Historical</small>')+
    '<div class="trade-filters" role="group" aria-label="Trade History Filter">'+["ALL","BUY","SELL"].map(k=>'<button type="button" data-trade-filter="'+k+'" aria-pressed="'+(filter===k)+'">'+({ALL:"All",BUY:"Buy",SELL:"Sell"}[k])+'</button>').join("")+'</div>'+
    '<label class="log-search">Search Records<input type="search" data-log-search placeholder="Record ID or sequence" value="'+esc(query)+'"></label>'+
@@ -86,9 +89,10 @@ export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
  }
  draw();
  return {
-  setProject(next){const changed=project?.project_id!==next?.project_id||project?.revision!==next?.revision;if(changed){side="BUY";filter="ALL";query="";page=1;input=null;live=null;state="Awaiting historical records";}project=next;draw();},
+  setProject(next){const changed=project?.project_id!==next?.project_id||project?.revision!==next?.revision;if(changed){side="BUY";filter="ALL";query="";page=1;input=null;live=null;orders=null;state="Awaiting historical records";}project=next;draw();},
   clear(message){input=null;filter="ALL";query="";page=1;state=message;draw();},
   show(next){input=historicalScopeMatches(project,next)?next:null;page=1;state=input?"No verified trade amounts in this report.":"Historical scope mismatch.";draw();},
+  setOrderSummary(next){orders=next?.project_id===project?.project_id&&next?.revision===project?.revision?next:null;const panel=host.querySelector(".order-status-summary");if(panel)panel.innerHTML=orderSummaryMarkup();},
   setLive(next){live=next?.project_id===project?.project_id&&next?.mint===project?.token?.mint?next:null;
    // Update only the live strip so an asset poll cannot destroy log filters or focus.
    const panel=host.querySelector(".live-position-summary");

@@ -265,7 +265,7 @@ function mountMemeDesk(){
   memeMode=next;drawControls();mountLaunch();
  });
  drawControls();if(memeMode==="launch")mountLaunch();
- return {selectLowerTab,update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();bundleReview.setProject(current);drawPositionStrip(current);
+ return {selectLowerTab,orderSummary(model){bundleReview.setOrderSummary(model);},update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();bundleReview.setProject(current);drawPositionStrip(current);
   chartToolbar.querySelector("#desk-market-symbol").textContent=current?current.profile.symbol+" · "+deskStageLabel(current.lifecycle.stage):"No Meme Selected";
   drawWallet(current);
  },error(){failed=true;drawList();drawWallet(null);bundleReview.setProject(null);bundleReview.clear("Project directory unavailable.");summaryState("Project directory unavailable; assets and risk are not shown.");},
@@ -555,7 +555,7 @@ function renderTerminal(){
         finally{if(stillCurrent())button.disabled=false;}
        };
       }).catch(e=>{if(stillCurrent())lifecycleArea.textContent="生命周期证据不可用："+errorKind(e);});
-      const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download});}
+      const orderArea=main.querySelector("#terminal-order-review");orderArea.hidden=false;mountOrderReview(orderArea,{project:selected,isActive:()=>page==="terminal"&&contextVersion===terminalContextVersion&&activeProjectId===selected.project_id,esc,table,note,download,onSummary:model=>memeDesk.orderSummary(model)});}
     if(!selected){notice.innerHTML=note("项目不存在或已删除，请选择其他 Meme。")+'<button id="clear-missing-project">退出项目上下文</button>';notice.querySelector("#clear-missing-project").onclick=()=>{importTicket++;selectProjectContext(null);render();};}
     const match=matchProjectReport(selected,data);
     if(selected)notice.innerHTML=note(match.status==="DECLARED_MATCH"?"正在读取项目报告…":"暂无匹配的项目报告。可在项目资料中关联，或打开独立复盘。");
