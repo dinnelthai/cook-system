@@ -786,6 +786,9 @@ main[data-page=terminal] .current-terminal .reference-keys-menu button:disabled{
 .wallet-action-review .war-address-item+ .war-address-item{border-top:1px solid #294747}
 .wallet-action-review .war-address-item span{flex:1;min-width:0;overflow-wrap:anywhere}
 .wallet-action-review [data-war-drop-label][hidden]{display:none!important}
+/* Keep the Trade / Launch tabs in the panel's normal scroll flow.
+   The legacy nested sticky rule otherwise covers the content while scrolling. */
+main[data-page=terminal] .current-terminal>#current-trade-panel>.meme-mode{position:static;top:auto;z-index:auto}
 </style></head>
 <body><a class="skip-link" href="#main">跳转至主要内容</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">市场操作台</div></div></div><div id="top-nav" role="navigation" aria-label="主导航"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">本地网络</span></div></header>
 <div class="layout"><nav aria-label="我的 Meme" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">正在初始化操作台。如长时间未完成，请检查浏览器控制台和网络加载错误。</p></main></div>
