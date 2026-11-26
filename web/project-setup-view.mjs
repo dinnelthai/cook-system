@@ -7,7 +7,7 @@ const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 const commandId = () => globalThis.crypto?.randomUUID?.() ?? ("project-ui-" + Date.now() + "-" + Math.random().toString(36).slice(2));
 
 export function mountProjectSetup(container, {
-  initialProjectId = null, onActiveProjectId = () => {}, initialMessage = "",
+  initialProjectId = null, onActiveProjectId = () => {}, initialMessage = "", terminalMode = false,
   isActive = () => true, screenHeading, panel, note, table, esc, download,
   projectRegistry, record = () => {}, errorKind = error => error?.message ?? "UNKNOWN_ERROR"
 } = {}) {
@@ -93,8 +93,8 @@ export function mountProjectSetup(container, {
       x.token.issuance_status, x.token.verification_evidence_ref || "Awaiting on-chain verification"
     ]);
 
-    container.innerHTML = screenHeading("Launch Preparation", "Project configuration · Risk declarations · Historical evidence") +
-      note("Local project profile · Issuance records") +
+    container.innerHTML = screenHeading("Launch Preparation", terminalMode?"Configure your token and creator wallet":"Project configuration · Risk declarations · Historical evidence") +
+      note(terminalMode?"Save a Localnet draft. Saving does not issue a token.":"Local project profile · Issuance records") +
       (recoveryId||recoveryError?panel("Recover Save Request",'<p id="project-recovery-status" role="status" class="muted">'+esc(recoveryError||"An unconfirmed creation request exists. Query the saved result; do not automatically resend.")+'</p><button id="project-recovery-check"'+(recoveryError?" disabled":"")+'>Check Previous Save</button>'):"")+
       (missingSelection?note("The previously selected project is missing. Open an existing project or create a new draft."):"")+
       '<div class="setup-workspace"><div class="setup-primary">'+
@@ -139,6 +139,7 @@ export function mountProjectSetup(container, {
       panel("Market Account Observation",table(["Market ID","Venue","Account","Registration Status"],(current?.markets??[]).map(m=>[m.market_id,m.venue,m.market_account,m.verification_status]))+
         '<select id="project-market-select">'+(current?.markets??[]).map(m=>'<option value="'+esc(m.market_id)+'">'+esc(m.market_id+" · "+m.venue)+'</option>').join("")+'</select><button id="project-market-inspect"'+(current?.markets?.length?"":" disabled")+'>Verify & Archive (Read-only)</button><p id="project-market-result" role="status" class="muted">Checks registered market identity only; source is not attested.</p>')+
       panel("Linked Historical Reports",'<button id="project-report-candidates"'+(current?"":" disabled")+'>Find Matching Reports</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>Link Selected Report</button><p id="project-report-result" role="status" class="muted">Only saved reports with matching declared identity can be linked.</p>')+'</div></details>';
+    if(terminalMode)mountLaunchSteps(container.querySelector("#project-draft-form"));
     // Native validation must reveal a collapsed optional field before trying to focus it.
     container.querySelector("#project-draft-form").addEventListener("invalid",event=>{
       const section=event.target.closest("details");
@@ -408,4 +409,22 @@ export function mountProjectSetup(container, {
 
   renderLoading();
   load();
+}
+
+// Keep the existing form and FormData contract. Only presentation changes.
+export function mountLaunchSteps(form){
+ const doc=form.ownerDocument,children=[...form.children],heads=children.filter(el=>el.matches("h4.form-section-title")),groups=children.filter(el=>el.matches(".grid.form-section")),social=children.find(el=>el.matches("details.profile-optional")),actions=children.find(el=>el.matches(".row"));
+ if(heads.length!==2||groups.length!==2||!social||!actions)return;
+ const tabs=doc.createElement("div");tabs.className="launch-step-tabs";tabs.setAttribute("role","group");tabs.setAttribute("aria-label","Launch preparation steps");
+ const sections=["Token","Socials","Wallet"].map((label,i)=>{const section=doc.createElement("section");section.className="launch-step";section.dataset.launchStep=String(i);const button=doc.createElement("button");button.type="button";button.textContent=(i+1)+". "+label;tabs.append(button);return section});
+ sections[0].append(heads[0],groups[0]);social.open=true;sections[1].append(social);sections[2].append(heads[1],groups[1]);form.prepend(tabs,...sections);
+ const nav=doc.createElement("div");nav.className="row launch-step-nav";
+ const back=doc.createElement("button"),next=doc.createElement("button");back.type=next.type="button";back.textContent="Back";next.textContent="Next";nav.append(back,next);actions.before(nav);
+ let current=0;
+ function show(i){current=i;sections.forEach((s,j)=>s.hidden=j!==i);[...tabs.children].forEach((b,j)=>b.setAttribute("aria-pressed",String(j===i)));back.disabled=i===0;next.hidden=i===2;actions.hidden=i!==2;}
+ function valid(i){for(const input of sections[i].querySelectorAll("input,textarea,select"))if(!input.disabled&&!input.checkValidity()){input.reportValidity();return false}return true;}
+ function move(i){if(i>current){for(let j=current;j<i;j++){show(j);if(!valid(j))return}}show(i);}
+ [...tabs.children].forEach((b,i)=>b.onclick=()=>move(i));back.onclick=()=>move(Math.max(0,current-1));next.onclick=()=>move(Math.min(2,current+1));
+ form.addEventListener("invalid",e=>{const section=e.target.closest("[data-launch-step]");if(section)show(Number(section.dataset.launchStep));},true);
+ show(0);
 }
