@@ -30,7 +30,7 @@ export function historicalTradePosition(input){
  };
 }
 export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
- let side="BUY",filter="ALL",input=null,state="请选择 Meme",settingsOpen=false,positionOpen=false,project=null;
+ let side="BUY",filter="ALL",input=null,state="Select a Meme",settingsOpen=false,positionOpen=false,project=null;
  const fmt=v=>v==null?"—":esc(quoteAmount(v,"SOL_LAMPORTS"));
  const kv=(label,value)=>'<span>'+esc(label)+'</span><strong>'+value+'</strong>';
  const row=(label,value)=>kv(label,value==null?"—":esc(value));
@@ -45,24 +45,24 @@ export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
   const count=project?"—":"0",wallets=project?"—/—":"0/0";
   host.innerHTML='<div class="trade-ticket smith-trade" data-side="'+side+'">'+
    '<section class="smith-section smith-bundle">'+heading("Bundle Buy / Sell",'<span class="smith-wallet-count">'+wallets+' Wallets '+(side==="BUY"?"Buying":"Selling")+'</span>')+
-   '<div class="bundle-direction" role="group" aria-label="买卖方向"><button type="button" data-direction="BUY" aria-pressed="'+(side==="BUY")+'">Bundle Buy</button><button type="button" data-direction="SELL" aria-pressed="'+(side==="SELL")+'">Bundle Sell</button></div>'+
+   '<div class="bundle-direction" role="group" aria-label="Trade Direction"><button type="button" data-direction="BUY" aria-pressed="'+(side==="BUY")+'">Bundle Buy</button><button type="button" data-direction="SELL" aria-pressed="'+(side==="SELL")+'">Bundle Sell</button></div>'+
    '<div class="smith-card-grid">'+tile("TX count",count)+tile(side==="BUY"?"Total buy amount":"Total sell amount","—")+'</div>'+
-   '<div class="smith-stepper" role="group" aria-label="交易参数（待接入）"><button type="button" aria-label="减少交易参数" disabled>−</button><input aria-label="交易参数" type="text" value="5" disabled><button type="button" aria-label="增加交易参数" disabled>+</button></div>'+
+   '<div class="smith-stepper" role="group" aria-label="Execution Parameters (Unavailable)"><button type="button" aria-label="Decrease Parameter" disabled>−</button><input aria-label="Execution Parameter" type="text" value="5" disabled><button type="button" aria-label="Increase Parameter" disabled>+</button></div>'+
    '<div class="smith-card-grid">'+tile("Estimated Interval","—")+tile("Estimated Time","—")+'</div>'+
    '<button class="smith-action smith-primary" type="button" disabled>'+ (side==="BUY"?"Buy":"Sell") +'</button></section>'+
-   '<section class="smith-section smith-exit">'+heading("Exit Position",'<small>持仓退出</small>')+
+   '<section class="smith-section smith-exit">'+heading("Exit Position",'<small>Position Exit</small>')+
    '<div class="smith-card-grid">'+tile("Tokens To Sell","—")+tile("SOL Amount to Receive","—")+'</div>'+
    tile("Estimated Profit","—","smith-profit")+
    '<p class="smith-session">Session on this token: <strong>—</strong></p>'+
    '<button class="smith-action smith-dump" type="button" disabled>Exit / Sell</button></section>'+
-   '<p class="smith-status" role="status"><span aria-hidden="true"></span> 实时执行未接入</p>'+
-   '<section class="smith-section smith-log trade-log">'+heading("Trades Log",'<small>当前 Meme · 历史</small>')+
-   '<div class="trade-filters" role="group" aria-label="成交记录筛选">'+["ALL","BUY","SELL"].map(k=>'<button type="button" data-trade-filter="'+k+'" aria-pressed="'+(filter===k)+'">'+({ALL:"全部",BUY:"买入",SELL:"卖出"}[k])+'</button>').join("")+'</div>'+
-   (trades&&trades.length?table(["方向","记录","序号","金额"],trades.slice(-12).reverse().map(t=>[t.side,t.id,t.sequence,quoteAmount(t.quoteNotionalBaseUnits,"SOL_LAMPORTS")])):'<div class="trade-log-empty">暂无成交记录</div>')+
-   (trades&&trades.length?'<p class="trade-hint">'+esc(trades.length)+' 笔 · 最近最多 12 笔</p>':"")+'</section>'+
-   '<details class="smith-section trade-detail" data-position'+(positionOpen?" open":"")+'><summary>Position / 历史持仓与损益</summary>'+
-   '<div class="trade-kv">'+kv("历史买入成本",fmt(position?.buy_cost))+kv("历史卖出净回收",fmt(position?.net_sell_proceeds))+row("期末 Token（base units）",position?.token_balance)+kv("剩余库存成本",fmt(position?.remaining_cost))+kv("已实现交易损益",fmt(position?.realized_pnl))+'</div><p class="trade-hint">'+esc(position?"历史区间，非实时资产":state)+'</p></details>'+
-   '<details class="smith-section trade-detail" data-settings'+(settingsOpen?" open":"")+'><summary>Execution Settings / 执行设置</summary><div class="trade-kv">'+row("手续费支付方",null)+row("交易保护",null)+row("滑点配置",null)+'</div><p class="trade-hint">等待交易服务提供配置。</p></details></div>';
+   '<p class="smith-status" role="status"><span aria-hidden="true"></span> Live execution unavailable</p>'+
+   '<section class="smith-section smith-log trade-log">'+heading("Trades Log",'<small>Current Meme · Historical</small>')+
+   '<div class="trade-filters" role="group" aria-label="Trade History Filter">'+["ALL","BUY","SELL"].map(k=>'<button type="button" data-trade-filter="'+k+'" aria-pressed="'+(filter===k)+'">'+({ALL:"All",BUY:"Buy",SELL:"Sell"}[k])+'</button>').join("")+'</div>'+
+   (trades&&trades.length?table(["Side","Record","Sequence","Amount"],trades.slice(-12).reverse().map(t=>[t.side,t.id,t.sequence,quoteAmount(t.quoteNotionalBaseUnits,"SOL_LAMPORTS")])):'<div class="trade-log-empty">No trades yet</div>')+
+   (trades&&trades.length?'<p class="trade-hint">'+esc(trades.length)+' trades · Latest 12</p>':"")+'</section>'+
+   '<details class="smith-section trade-detail" data-position'+(positionOpen||position?" open":"")+'><summary>Historical Position & PnL</summary>'+
+   '<div class="trade-kv">'+kv("Historical Buy Cost",fmt(position?.buy_cost))+kv("Historical Net Sell Proceeds",fmt(position?.net_sell_proceeds))+row("Closing Tokens (base units)",position?.token_balance)+kv("Remaining Cost Basis",fmt(position?.remaining_cost))+kv("Realized PnL",fmt(position?.realized_pnl))+'</div><p class="trade-hint">'+esc(position?"Historical period, not live assets":state)+'</p></details>'+
+   '<details class="smith-section trade-detail" data-settings'+(settingsOpen?" open":"")+'><summary>Execution Settings</summary><div class="trade-kv">'+row("Fee Payer",null)+row("Trade Protection",null)+row("Slippage",null)+'</div><p class="trade-hint">Execution settings unavailable.</p></details></div>';
   host.querySelectorAll("[data-direction]").forEach(b=>b.onclick=()=>{side=b.dataset.direction;draw();});
   host.querySelectorAll("[data-trade-filter]").forEach(b=>b.onclick=()=>{filter=b.dataset.tradeFilter;draw();});
   host.querySelector("[data-position]").ontoggle=e=>{positionOpen=e.target.open;};
@@ -70,8 +70,8 @@ export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
  }
  draw();
  return {
-  setProject(next){const changed=project?.project_id!==next?.project_id||project?.revision!==next?.revision;if(changed){side="BUY";filter="ALL";input=null;state="等待当前 Meme 历史记录";}project=next;draw();},
+  setProject(next){const changed=project?.project_id!==next?.project_id||project?.revision!==next?.revision;if(changed){side="BUY";filter="ALL";input=null;state="Awaiting historical records";}project=next;draw();},
   clear(message){input=null;filter="ALL";state=message;draw();},
-  show(next){input=next;state="当前报告缺少可用的成交金额证据。";draw();}
+  show(next){input=next;state="No verified trade amounts in this report.";draw();}
  };
 }
