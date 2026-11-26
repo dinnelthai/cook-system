@@ -30,7 +30,7 @@ export function historicalTradePosition(input){
  };
 }
 export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
- let side="BUY",filter="ALL",input=null,state="Select a Meme",settingsOpen=false,positionOpen=false,project=null;
+ let side="BUY",filter="ALL",input=null,state="Select a Meme",settingsOpen=false,positionOpen=true,project=null;
  const fmt=v=>v==null?"—":esc(quoteAmount(v,"SOL_LAMPORTS"));
  const kv=(label,value)=>'<span>'+esc(label)+'</span><strong>'+value+'</strong>';
  const row=(label,value)=>kv(label,value==null?"—":esc(value));
@@ -42,25 +42,20 @@ export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
   const trades=buy&&sell?input.market.trades.filter(t=>["BUY","SELL"].includes(t.side)&&t.status==="FINALIZED"&&t.reconciliation==="PASS"&&(filter==="ALL"||t.side===filter)):null;
   // Historical reports must never populate live estimates. Zero counts are only
   // used when no project is selected; unknown live balances and quotes remain —.
-  const count=project?"—":"0",wallets=project?"—/—":"0/0";
+  const direction=side==="BUY"?buy:sell;const count=direction?.count??"—";
   host.innerHTML='<div class="trade-ticket smith-trade" data-side="'+side+'">'+
-   '<section class="smith-section smith-bundle">'+heading("Bundle Buy / Sell",'<span class="smith-wallet-count">'+wallets+' Wallets '+(side==="BUY"?"Buying":"Selling")+'</span>')+
-   '<div class="bundle-direction" role="group" aria-label="Trade Direction"><button type="button" data-direction="BUY" aria-pressed="'+(side==="BUY")+'">Bundle Buy</button><button type="button" data-direction="SELL" aria-pressed="'+(side==="SELL")+'">Bundle Sell</button></div>'+
-   '<div class="smith-card-grid">'+tile("TX count",count)+tile(side==="BUY"?"Total buy amount":"Total sell amount","—")+'</div>'+
-   '<div class="smith-stepper" role="group" aria-label="Execution Parameters (Unavailable)"><button type="button" aria-label="Decrease Parameter" disabled>−</button><input aria-label="Execution Parameter" type="text" value="5" disabled><button type="button" aria-label="Increase Parameter" disabled>+</button></div>'+
-   '<div class="smith-card-grid">'+tile("Estimated Interval","—")+tile("Estimated Time","—")+'</div>'+
-   '<button class="smith-action smith-primary" type="button" disabled>'+ (side==="BUY"?"Buy":"Sell") +'</button></section>'+
-   '<section class="smith-section smith-exit">'+heading("Exit Position",'<small>Position Exit</small>')+
-   '<div class="smith-card-grid">'+tile("Tokens To Sell","—")+tile("SOL Amount to Receive","—")+'</div>'+
-   tile("Estimated Profit","—","smith-profit")+
-   '<p class="smith-session">Session on this token: <strong>—</strong></p>'+
-   '<button class="smith-action smith-dump" type="button" disabled>Exit / Sell</button></section>'+
-   '<p class="smith-status" role="status"><span aria-hidden="true"></span> Live execution unavailable</p>'+
+   '<section class="smith-section smith-bundle">'+heading("Trade Overview",'<small>Historical · Reconciled</small>')+
+   '<div class="bundle-direction" role="group" aria-label="Trade Direction"><button type="button" data-direction="BUY" aria-pressed="'+(side==="BUY")+'">Buys</button><button type="button" data-direction="SELL" aria-pressed="'+(side==="SELL")+'">Sells</button></div>'+
+   '<div class="smith-card-grid">'+tile("Confirmed Records",count)+tile(side==="BUY"?"Buy Notional":"Sell Notional",direction?quoteAmount(direction.total_base_units,"SOL_LAMPORTS"):"—")+'</div>'+
+   '<p class="trade-hint">'+esc(direction?"Reconciled historical trades; bundle membership unknown.":state)+'</p></section>'+
+   '<section class="smith-section smith-exit">'+heading("Position Overview",'<small>Historical</small>')+
+   '<div class="smith-card-grid">'+tile("Buy Cost",position?.buy_cost!=null?quoteAmount(position.buy_cost,"SOL_LAMPORTS"):"—")+tile("Net Recovered",position?.net_sell_proceeds!=null?quoteAmount(position.net_sell_proceeds,"SOL_LAMPORTS"):"—")+tile("Remaining Cost",position?.remaining_cost!=null?quoteAmount(position.remaining_cost,"SOL_LAMPORTS"):"—")+tile("Realized PnL",position?.realized_pnl!=null?quoteAmount(position.realized_pnl,"SOL_LAMPORTS"):"—")+'</div>'+
+   '<p class="trade-hint">Historical interval only. Live valuation and unrealized PnL require verified market data.</p></section>'+
    '<section class="smith-section smith-log trade-log">'+heading("Trades Log",'<small>Current Meme · Historical</small>')+
    '<div class="trade-filters" role="group" aria-label="Trade History Filter">'+["ALL","BUY","SELL"].map(k=>'<button type="button" data-trade-filter="'+k+'" aria-pressed="'+(filter===k)+'">'+({ALL:"All",BUY:"Buy",SELL:"Sell"}[k])+'</button>').join("")+'</div>'+
-   (trades&&trades.length?table(["Side","Record","Sequence","Amount"],trades.slice(-12).reverse().map(t=>[t.side,t.id,t.sequence,quoteAmount(t.quoteNotionalBaseUnits,"SOL_LAMPORTS")])):'<div class="trade-log-empty">No trades yet</div>')+
+   (trades&&trades.length?table(["Side","Record","Sequence","Amount"],trades.slice(-12).reverse().map(t=>[t.side,t.id,t.sequence,quoteAmount(t.quoteNotionalBaseUnits,"SOL_LAMPORTS")])):'<div class="trade-log-empty">No reconciled historical trades</div>')+
    (trades&&trades.length?'<p class="trade-hint">'+esc(trades.length)+' trades · Latest 12</p>':"")+'</section>'+
-   '<details class="smith-section trade-detail" data-position'+(positionOpen||position?" open":"")+'><summary>Historical Position & PnL</summary>'+
+   '<details class="smith-section trade-detail" data-position'+(positionOpen?" open":"")+'><summary>Historical Position & PnL</summary>'+
    '<div class="trade-kv">'+kv("Historical Buy Cost",fmt(position?.buy_cost))+kv("Historical Net Sell Proceeds",fmt(position?.net_sell_proceeds))+row("Closing Tokens (base units)",position?.token_balance)+kv("Remaining Cost Basis",fmt(position?.remaining_cost))+kv("Realized PnL",fmt(position?.realized_pnl))+'</div><p class="trade-hint">'+esc(position?"Historical period, not live assets":state)+'</p></details>'+
    '<details class="smith-section trade-detail" data-settings'+(settingsOpen?" open":"")+'><summary>Execution Settings</summary><div class="trade-kv">'+row("Fee Payer",null)+row("Trade Protection",null)+row("Slippage",null)+'</div><p class="trade-hint">Execution settings unavailable.</p></details></div>';
   host.querySelectorAll("[data-direction]").forEach(b=>b.onclick=()=>{side=b.dataset.direction;draw();});
