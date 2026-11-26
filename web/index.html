@@ -727,6 +727,14 @@ body:has(.current-terminal) #nav .reference-token-address button{background:tran
 .amounts-preview-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:9px;color:#8fa4a4;margin-top:10px}
 .reference-amounts-dialog .amounts-preview-foot button{border:0;background:transparent;color:#83b1b1;padding:4px;font-size:10px}
 
+
+/* Reference wallet overflow menu; presentation only. */
+main[data-page=terminal] .current-terminal .reference-wallet-menu{width:max-content;min-width:210px;max-width:calc(100vw - 24px);padding:9px 10px;border:1px solid #294747;border-radius:13px;background:#101616;box-shadow:0 8px 24px #0004;right:0;top:calc(100% + 8px)}
+main[data-page=terminal] .current-terminal .reference-wallet-menu button{display:flex;align-items:center;gap:9px;min-height:36px;width:100%;border:0;background:transparent;border-radius:6px;padding:8px 10px;color:#c1c7c8;font-size:14px;font-weight:500;text-align:left;white-space:nowrap}
+main[data-page=terminal] .current-terminal .reference-wallet-menu button svg{width:16px;height:16px;flex:none}
+main[data-page=terminal] .current-terminal .reference-wallet-menu button:hover{background:#1b2929}
+main[data-page=terminal] .current-terminal .reference-wallet-menu button.reference-wallet-delete{color:#bb2856}
+
 </style></head>
 <body><a class="skip-link" href="#main">Skip to main content</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="Main navigation"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="My Memes" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">Initializing terminal. If this persists, check the browser console and network for module loading errors.</p></main></div>
