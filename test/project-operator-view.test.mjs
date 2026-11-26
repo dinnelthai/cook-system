@@ -14,7 +14,7 @@ test("declared limits preserve unset fields and reject conflicting caps",()=>{
  assert.throws(()=>parseBudgetDeclaration({max_project_budget_base_units:"1",max_order_size_base_units:"2"}),/LIMIT_HIERARCHY_CONFLICT/);
 });
 test("stage and registered operation status remain distinct; wallet labels do not attest ownership",()=>{
- assert.equal(lifecycleLabel("PUMPSWAP_ACTIVE"),"外盘阶段");assert.equal(operationalLabel("HALTED"),"已暂停");
+ assert.equal(lifecycleLabel("PUMPSWAP_ACTIVE"),"PumpSwap");assert.equal(operationalLabel("HALTED"),"Halted");
  const rows=projectWalletRegistrationRows({wallet_groups:[{name:"Reserve",purpose:"TREASURY",members:[{wallet_address:"a",role:"TREASURY",enabled:true,allocation_limit_base_units:"0"}]}]});
- assert.equal(rows[0][5],"0.00 SOL");assert.equal(rows[0][6],"归属未独立核验");
+ assert.equal(rows[0][5],"0.00 SOL");assert.equal(rows[0][6],"Ownership not independently verified");
 });

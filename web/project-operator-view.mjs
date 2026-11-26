@@ -1,10 +1,10 @@
 import {formatHistoricalSol} from "./terminal-display.mjs";
 // Static declarations only. Never infer available funds or grant execution.
-const stages={DRAFT:"项目草稿",READY:"准备登记",LAUNCH_SUBMITTED:"发行提交登记",LAUNCHED:"发行已核验",BONDING_CURVE_ACTIVE:"内盘阶段",GRADUATION_PENDING:"迁移待核对",PUMPSWAP_ACTIVE:"外盘阶段",EXIT_IN_PROGRESS:"项目结束处理中",SETTLEMENT_PENDING:"等待结算",CLOSED:"已关闭",ARCHIVED:"已归档"};
-const runtime={HALTED:"已暂停",ACTIVE:"登记为运行",REVIEW_REQUIRED:"待复核"};
-export const lifecycleLabel=v=>stages[v]??"未知";
-export const operationalLabel=v=>runtime[v]??"未知";
-export const limitFields=[["max_project_budget_base_units","项目预算上限（SOL）"],["max_order_size_base_units","单笔金额上限（SOL）"],["max_wallet_exposure_base_units","单钱包风险敞口上限（SOL）"]];
+const stages={DRAFT:"Draft",READY:"Ready",LAUNCH_SUBMITTED:"Issuance Recorded",LAUNCHED:"Issuance Verified",BONDING_CURVE_ACTIVE:"Bonding Curve",GRADUATION_PENDING:"Graduation Pending",PUMPSWAP_ACTIVE:"PumpSwap",EXIT_IN_PROGRESS:"Exit in Progress",SETTLEMENT_PENDING:"Settlement Pending",CLOSED:"Closed",ARCHIVED:"Archived"};
+const runtime={HALTED:"Halted",ACTIVE:"Registered Active",REVIEW_REQUIRED:"Review Required"};
+export const lifecycleLabel=v=>stages[v]??"Unknown";
+export const operationalLabel=v=>runtime[v]??"Unknown";
+export const limitFields=[["max_project_budget_base_units","Project Budget Limit (SOL)"],["max_order_size_base_units","Order Size Limit (SOL)"],["max_wallet_exposure_base_units","Wallet Exposure Limit (SOL)"]];
 const u64=18446744073709551615n;
 export function parseDeclaredSol(input){
  const s=String(input??"").trim();
@@ -28,5 +28,5 @@ export function parseBudgetDeclaration(fields){
  return limits;
 }
 export function projectWalletRegistrationRows(project){
- return (project?.wallet_groups??[]).flatMap(g=>g.members.map(m=>[g.name,g.purpose,m.wallet_address,m.role,m.enabled?"已启用登记":"已停用登记",m.allocation_limit_base_units===null?"未配置":formatHistoricalSol(m.allocation_limit_base_units)+" SOL","归属未独立核验"]));
+ return (project?.wallet_groups??[]).flatMap(g=>g.members.map(m=>[g.name,g.purpose,m.wallet_address,m.role,m.enabled?"Registered Enabled":"Registered Disabled",m.allocation_limit_base_units===null?"Not configured":formatHistoricalSol(m.allocation_limit_base_units)+" SOL","Ownership not independently verified"]));
 }

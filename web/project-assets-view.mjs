@@ -4,46 +4,46 @@ import {projectWalletRegistrationRows} from "./project-operator-view.mjs";
 // Historical project amounts and independent wallet tools never share a balance.
 export function mountProjectAssets(host,{projectId,isActive,esc,table,note,openTerminal}){
  const current=()=>isActive()&&host.isConnected;
- const title='<h3>项目资产与资金证据</h3>';
- const back='<button type="button" id="asset-open-terminal">返回项目操作台</button>';
+ const title='<h3>Project Assets & Funding Evidence</h3>';
+ const back='<button type="button" id="asset-open-terminal">Back to Terminal</button>';
  const bindBack=()=>{host.querySelector("#asset-open-terminal").onclick=openTerminal;};
- if(!projectId){host.innerHTML=title+note("尚未选择项目。请在操作台选择 Project 后查看其独立历史资产区间。")+back;bindBack();return;}
+ if(!projectId){host.innerHTML=title+note("Select a project in the terminal to inspect its historical asset intervals.")+back;bindBack();return;}
  let loadTicket=0;
  async function load(){
   const ticket=++loadTicket,valid=()=>current()&&loadTicket===ticket;
-  host.innerHTML=title+'<p role="status">读取当前项目及历史资产证据…</p>'+back;bindBack();
+  host.innerHTML=title+'<p role="status">Loading project and historical asset evidence…</p>'+back;bindBack();
   try{
    const project=await getProject(projectId);
    if(!valid())return;
    const v=await getProjectBusinessReview(projectId,project.revision);
    if(!valid())return;
    const model=projectOverviewModel(v);
-   host.innerHTML='<div class="review-section-head"><div>'+title+'<p class="muted">'+esc(project.profile.name+" / "+project.profile.symbol+" · v"+project.revision)+'</p></div><div class="row">'+back+'<button id="asset-refresh">刷新项目</button></div></div>'+
-    note("仅展示当前 Project 已关联的历史区间；未独立认证。实时资产、可用资金、当前 NAV 和 LP 归属未知。禁止跨区间汇总。")+
-    '<div class="secondary-workspace"><section class="workspace-content"><h4>历史资产区间</h4><label>选择历史区间<select id="asset-interval"><option value="">请选择（不会自动选取）</option>'+model.intervals.map(i=>'<option value="'+esc(i.id)+'">'+esc(i.label)+'</option>').join("")+'</select></label>'+
-    '<div id="asset-interval-body" class="workspace-empty" role="status">'+note("尚未选择区间，金额不显示。")+'</div></section><aside class="workspace-side"><h4>已登记钱包</h4><p class="muted">仅登记用途及额度；不代表实际余额或归属。</p>'+(project.wallet_groups.length?table(["分组","用途","地址","角色","登记状态","声明额度","归属证据"],projectWalletRegistrationRows(project)):'<p class="workspace-empty">尚无登记钱包。</p>')+'</aside></div>';
+   host.innerHTML='<div class="review-section-head"><div>'+title+'<p class="muted">'+esc(project.profile.name+" / "+project.profile.symbol+" · v"+project.revision)+'</p></div><div class="row">'+back+'<button id="asset-refresh">Refresh Project</button></div></div>'+
+    note("Linked historical intervals only; not independently verified. Live assets, available funds, current NAV and LP ownership are unknown. Do not aggregate across intervals.")+
+    '<div class="secondary-workspace"><section class="workspace-content"><h4>Historical Asset Intervals</h4><label>Select Historical Interval<select id="asset-interval"><option value="">Select an interval</option>'+model.intervals.map(i=>'<option value="'+esc(i.id)+'">'+esc(i.label)+'</option>').join("")+'</select></label>'+
+    '<div id="asset-interval-body" class="workspace-empty" role="status">'+note("Select an interval to view amounts.")+'</div></section><aside class="workspace-side"><h4>Registered Wallets</h4><p class="muted">Registered purpose and limits only; not proof of balances or ownership.</p>'+(project.wallet_groups.length?table(["Group","Purpose","Address","Role","Registration Status","Declared Limit","Ownership Evidence"],projectWalletRegistrationRows(project)):'<p class="workspace-empty">No registered wallets.</p>')+'</aside></div>';
    bindBack();host.querySelector("#asset-refresh").onclick=load;
    const select=host.querySelector("#asset-interval"),body=host.querySelector("#asset-interval-body");
    select.disabled=!v.runtime_context_id||!model.intervals.length;
-   if(select.disabled)body.textContent="暂无可选历史区间；请先关联历史报告。";
+   if(select.disabled)body.textContent="No linked historical intervals. Link a report first.";
    let intervalTicket=0;
    select.onchange=async()=>{
     const seq=++intervalTicket,archiveId=select.value;
-    if(!archiveId){body.textContent="尚未选择区间，金额不显示。";return;}
-    body.textContent="读取所选历史区间…";
+    if(!archiveId){body.textContent="Select an interval to view amounts.";return;}
+    body.textContent="Loading selected interval…";
     try{
      const ctx=await selectProjectRuntimeInterval(projectId,project.revision,v.runtime_context_id,archiveId);
      if(!valid()||seq!==intervalTicket||!body.isConnected)return;
      const row=ctx.selected_interval;
      body.innerHTML=note(row.status+" · "+row.opening_cutoff+" → "+row.closing_cutoff)+
-      table(["指标","历史声明金额","单位","证据状态"],projectIntervalMetrics(row).map(m=>[m.label,m.display_value,m.display_unit,m.evidence_label]))+
-      note("LP 头寸："+(row.lp_evidence?.status??"未知")+"；归属、估值和 NAV 纳入情况未验证，不额外计入。")+
-      (row.account_coverage?table(["项目 / 账户合计核对","状态"],row.account_coverage.checks.map(c=>[c.field,c.status])):"");
-    }catch(error){if(valid()&&seq===intervalTicket&&body.isConnected)body.textContent="区间不可用，请刷新项目："+error.message;}
+      table(["Metric","Historical Declared Amount","Unit","Evidence Status"],projectIntervalMetrics(row).map(m=>[m.label,m.display_value,m.display_unit,m.evidence_label]))+
+      note("LP Position: "+(row.lp_evidence?.status??"Unknown")+"; ownership, valuation and NAV inclusion are unverified.")+
+      (row.account_coverage?table(["Project / Account Total Check","Status"],row.account_coverage.checks.map(c=>[c.field,c.status])):"");
+    }catch(error){if(valid()&&seq===intervalTicket&&body.isConnected)body.textContent="Interval unavailable. Refresh project: "+error.message;}
    };
   }catch(error){
    if(!valid())return;
-   host.innerHTML=title+note("项目资产不可用："+error.message)+'<button id="asset-refresh">重新读取</button>'+back;
+   host.innerHTML=title+note("Project assets unavailable: "+error.message)+'<button id="asset-refresh">Retry</button>'+back;
    host.querySelector("#asset-refresh").onclick=load;bindBack();
   }
  }
