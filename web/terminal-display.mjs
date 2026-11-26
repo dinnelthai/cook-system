@@ -32,3 +32,14 @@ export function marketQualityRows(q){
  const descriptive=safe?.status==="DESCRIPTIVE_ONLY"||safe?.status==="NO_EXECUTIONS";
  return [["证据状态",safe?.status??"UNKNOWN"],["记录数",descriptive?safe.event_count??"未知":"未知"],["事件顺序",safe?.ordering_status??"UNKNOWN"],["数据质量警报",descriptive?safe.data_quality_alert_count??"未知":"未知"],["独立来源认证","未知"],["实时市场质量","未核验"]];
 }
+
+// Presentation-only chart segments: never interpolate across missing intervals.
+export function candleLineSegments(points,intervalMs){
+ if(!candleTimeLayout(points,intervalMs))return [];
+ const groups=[];
+ for(let i=0;i<points.length;i++){
+  if(i===0||points[i].interval_start_ms-points[i-1].interval_start_ms!==intervalMs)groups.push([]);
+  groups.at(-1).push(i);
+ }
+ return groups;
+}

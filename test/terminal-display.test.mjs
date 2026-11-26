@@ -34,3 +34,6 @@ test("closed market quality does not imply live quality or use unsupported sourc
  assert.equal(marketQualityRows({...q,live_state:true})[1][1],"未知");
  assert.equal(marketQualityRows({...q,status:"REVIEW_REQUIRED"})[1][1],"未知");
 });
+
+import {candleLineSegments} from "../web/terminal-display.mjs";
+test("line chart does not connect gaps in historical trading intervals",()=>{const points=[0,60000,180000,240000,360000].map(interval_start_ms=>({interval_start_ms}));assert.deepEqual(candleLineSegments(points,60000),[[0,1],[2,3],[4]]);assert.deepEqual(candleLineSegments([],60000),[]);});

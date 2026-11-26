@@ -6,7 +6,7 @@ import {mountScopedProjectReview} from "./project-review-dashboard.mjs";
 import {experimentDisplayRows} from "./experiment-display.mjs";
 import {mountProjectAssets} from "./project-assets-view.mjs";
 import {lifecycleLabel,operationalLabel,projectWalletRegistrationRows} from "./project-operator-view.mjs";
-import {historicalSeriesRange,candleTimeLayout,candleEvidenceRows,marketQualityRows} from "./terminal-display.mjs";
+import {historicalSeriesRange,candleTimeLayout,candleLineSegments,candleEvidenceRows,marketQualityRows} from "./terminal-display.mjs";
 import {projectOverviewModel,projectIntervalMetrics} from "./project-overview-view.mjs";
 import {mountLocalFaucet} from "./local-faucet.mjs";
 import { buildHistoricalMvpReport } from "../src/inner-market/historical-mvp-report.mjs";
@@ -123,24 +123,33 @@ function compareBars(items,unit){
 function splitView(left,right){return '<div class="terminal-grid"><div>'+left+'</div><div>'+right+'</div></div>'}
 function screenHeading(title,sub){return '<div class="terminal-heading"><div><p class="eyebrow">COOK / OPERATIONS</p><h2>'+esc(title)+'</h2><span class="muted">'+esc(sub)+'</span></div><span class="source-chip">'+(page==="wallet"?"SOL":activeProjectId?"项目证据复核":report.source_mode==="SYNTHETIC"?"未载入项目记录":"独立历史记录")+'</span></div>'}
 let terminalTab="inventory",reviewPaused=false,metadata=null,reviewStage="REVIEW",reviewInput=data,candleInterval=60000;
-const operatorMode="OPERATOR";let candleWindow=80;
+const operatorMode="OPERATOR";let candleWindow=80,candleStyle="candles";
 function candleChart(result){
- if(result.status!=="CONSISTENT")return emptyState(result.status==="EMPTY"?"区间内无成交":"暂无可验证 K 线",result.reason??"无成交事件");
+ if(result.status!=="CONSISTENT")return emptyState(result.status==="EMPTY"?"No trades in this interval":"No verified candles",result.reason??"No trade events");
  const points=result.candles.slice(-candleWindow),vals=points.flatMap(c=>[Number(c.low_price),Number(c.high_price)]);
- if(vals.some(n=>!Number.isFinite(n)||n<=0))return emptyState("图表超出显示精度","原始价格保留在数据中");
+ if(!points.length||vals.some(n=>!Number.isFinite(n)||n<=0))return emptyState("Price exceeds chart precision","Exact prices remain in the source data");
  const lo=Math.min(...vals),hi=Math.max(...vals),span=hi-lo||hi*.01||1;
  const vols=points.map(c=>Number(c.quote_volume_base_units));
- if(vols.some(v=>!Number.isFinite(v)||v<0))return emptyState("成交量超出显示精度","原始记录保留");
+ if(vols.some(v=>!Number.isFinite(v)||v<0))return emptyState("Volume exceeds chart precision","Original records retained");
  const maxVol=Math.max(1,...vols);
  const layout=candleTimeLayout(points,candleInterval);
- if(!layout)return emptyState("时间轴数据无效","无法验证历史区间顺序");
+ if(!layout)return emptyState("Invalid time axis","Historical interval ordering cannot be verified");
  const X=i=>layout.positions[i],Y=n=>155-(n-lo)/span*120;
  const width=layout.width;
- let svg='<svg class="ohlcv-chart" viewBox="0 0 600 215" role="img" aria-label="历史成交 K 线和成交量">';
+ let svg='<svg class="ohlcv-chart" viewBox="0 0 600 215" role="img" aria-label="Historical price and volume">';
  for(const f of [0,.5,1]){const y=Y(lo+span*f);svg+='<path d="M36 '+y+' H550" stroke="#263449"/><text x="598" y="'+(y+3)+'" fill="#92a6c0" font-size="9" text-anchor="end">'+esc((lo+span*f).toPrecision(5))+'</text>';}
- points.forEach((c,i)=>{const o=Number(c.open_price),cl=Number(c.close_price),x=X(i),color=cl>=o?"#42dfb1":"#ff8293",y=Math.min(Y(o),Y(cl));svg+='<g><title>'+esc(candleEvidenceRows([c])[0].join(" · "))+'</title><path d="M'+x+' '+Y(Number(c.high_price))+' V'+Y(Number(c.low_price))+'" stroke="'+color+'"/><rect x="'+(x-width/2)+'" y="'+y+'" width="'+width+'" height="'+Math.max(1,Math.abs(Y(o)-Y(cl)))+'" fill="'+color+'"/><rect x="'+(x-width/2)+'" y="'+(193-vols[i]/maxVol*28)+'" width="'+width+'" height="'+(vols[i]/maxVol*28)+'" fill="'+color+'" opacity=".55"/></g>';});
+ points.forEach((c,i)=>{
+  const o=Number(c.open_price),cl=Number(c.close_price),x=X(i),color=cl>=o?"#42dfb1":"#ff8293",y=Math.min(Y(o),Y(cl));
+  svg+='<g><title>'+esc(candleEvidenceRows([c])[0].join(" · "))+'</title>';
+  if(candleStyle==="candles")svg+='<path d="M'+x+' '+Y(Number(c.high_price))+' V'+Y(Number(c.low_price))+'" stroke="'+color+'"/><rect x="'+(x-width/2)+'" y="'+y+'" width="'+width+'" height="'+Math.max(1,Math.abs(Y(o)-Y(cl)))+'" fill="'+color+'"/>';
+  if(candleStyle==="bars")svg+='<path d="M'+x+' '+Y(Number(c.high_price))+' V'+Y(Number(c.low_price))+' M'+(x-width/2)+' '+Y(o)+' H'+x+' M'+x+' '+Y(cl)+' H'+(x+width/2)+'" stroke="'+color+'" fill="none"/>';
+  if(candleStyle==="line")svg+='<circle cx="'+x+'" cy="'+Y(cl)+'" r="2" fill="#55d6f4"/>';
+  svg+='<rect x="'+(x-width/2)+'" y="'+(193-vols[i]/maxVol*28)+'" width="'+width+'" height="'+(vols[i]/maxVol*28)+'" fill="'+color+'" opacity=".55"/></g>';
+ });
+ if(candleStyle==="line")for(const group of candleLineSegments(points,candleInterval))if(group.length>1)svg+='<polyline points="'+group.map(i=>X(i)+","+Y(Number(points[i].close_price))).join(" ")+'" fill="none" stroke="#55d6f4" stroke-width="1.5"/>';
+
  svg+='<text x="36" y="210" font-size="9" fill="#92a6c0">'+esc(new Date(points[0].interval_start_ms).toISOString())+'</text><text x="550" y="210" text-anchor="end" font-size="9" fill="#92a6c0">'+esc(new Date(points.at(-1).interval_start_ms).toISOString())+'</text></svg>';
- return svg+'<p class="muted">历史成交 · UTC · 显示 '+points.length+' / '+result.candles.length+' 根 · 图中缺少 K 线的周期：'+esc(layout.missing_intervals)+'（无成交或缺数据，不补造） · 图形近似，原始记录精确。</p><details class="audit-detail"><summary>原始 OHLCV 数值（当前窗口）</summary>'+table(["UTC","开","高","低","收","报价成交量（base units）"],candleEvidenceRows(points))+'</details>';
+ return svg+'<p class="muted">Historical trades · UTC · Showing '+points.length+' / '+result.candles.length+' candles · Missing intervals: '+esc(layout.missing_intervals)+' (no trades or missing data; not filled) · Chart approximate; source values exact.</p><details class="audit-detail"><summary>Raw OHLCV (Visible Range)</summary>'+table(["UTC","Open","High","Low","Close","Quote Volume (base units)"],candleEvidenceRows(points))+'</details>';
 }
 
 const issuedMemeStages=new Set(["LAUNCHED","BONDING_CURVE_ACTIVE","GRADUATION_PENDING","PUMPSWAP_ACTIVE","EXIT_IN_PROGRESS","SETTLEMENT_PENDING","CLOSED","ARCHIVED"]);
@@ -173,12 +182,16 @@ function mountMemeDesk(){
  placeholder.classList.add("meme-chart-empty");
  if(!activeProjectId&&!offlineReview){reportArea.hidden=true;reportArea.inert=true;reportArea.style.display="none";placeholder.hidden=false;placeholder.innerHTML=emptyState("No token selected","Select a Meme to view market data.");}
  else placeholder.innerHTML=emptyState("No market data","No linked market data.");
- const chartToolbar=document.createElement("div");chartToolbar.className="meme-chart-toolbar";chartToolbar.innerHTML='<div class="desk-market-title"><strong>Market</strong><small id="desk-market-symbol">No Meme Selected</small></div><div class="desk-market-actions"><button type="button" id="meme-chart-toggle"></button><button type="button" id="meme-wallet-swap" aria-label="Swap Chart and Wallets">⇅</button><button type="button" id="meme-panel-toggle" aria-label="Toggle Trading Panel"></button></div>';
+ const chartToolbar=document.createElement("div");chartToolbar.className="meme-chart-toolbar";chartToolbar.innerHTML='<div class="desk-market-title"><strong>Market</strong><small id="desk-market-symbol">No Meme Selected</small></div><div class="desk-market-actions"><button type="button" id="meme-chart-fullscreen" aria-label="Expand chart to fullscreen">Fullscreen</button><button type="button" id="meme-chart-toggle"></button><button type="button" id="meme-wallet-swap" aria-label="Swap Chart and Wallets">⇅</button><button type="button" id="meme-panel-toggle" aria-label="Toggle Trading Panel"></button></div>';
  const marketFrame=document.createElement("section");marketFrame.className="desk-market-frame";
  const chartTools=document.createElement("div");chartTools.className="desk-chart-tools";
  const candleTools=chart.querySelector(".candle-controls");if(candleTools)chartTools.append(candleTools);
  const dataButton=main.querySelector("#open-data");chartTools.append(dataButton);
  marketFrame.append(chartToolbar,chartTools,placeholder,reportArea);
+ const full=chartToolbar.querySelector("#meme-chart-fullscreen");
+ full.disabled=typeof marketFrame.requestFullscreen!=="function";
+ full.onclick=async()=>{try{if(document.fullscreenElement===marketFrame)await document.exitFullscreen();else await marketFrame.requestFullscreen();}catch{full.title="Fullscreen unavailable in this browser";}};
+ marketFrame.addEventListener("fullscreenchange",()=>{full.textContent=document.fullscreenElement===marketFrame?"Exit Fullscreen":"Fullscreen";});
  const context=main.querySelector("#terminal-project-context");
  const overview=document.createElement("section");overview.className="cook-position-strip";
  const overviewFields=[["buy_cost","Buy Cost"],["net_sell_proceeds","Net Proceeds"],["remaining_cost","Remaining Cost"],["realized_pnl","Realized PnL"]];
@@ -273,7 +286,7 @@ function renderTerminal(){
  const d=report.terminal_state,a=d.treasury,m=d.market,scope=d.scope;
  const ready=d.status==="REPORT_READY";
  const candleResult=buildTerminalCandles(data,candleInterval);
- const candleControls='<div class="row candle-controls">'+[[60000,"1m"],[300000,"5m"],[900000,"15m"],[3600000,"1h"]].map(([ms,label])=>'<button data-candle-interval="'+ms+'" aria-pressed="'+(candleInterval===ms)+'">'+label+'</button>').join("")+'<label>窗口 <select id="candle-window">'+[30,80,160].map(n=>'<option value="'+n+'"'+(n===candleWindow?" selected":"")+'>'+n+' 根</option>').join("")+'</select></label></div>';
+ const candleControls='<div class="row candle-controls">'+[[60000,"1m"],[300000,"5m"],[900000,"15m"],[3600000,"1h"]].map(([ms,label])=>'<button data-candle-interval="'+ms+'" aria-pressed="'+(candleInterval===ms)+'">'+label+'</button>').join("")+'<div class="row chart-style" role="group" aria-label="Chart Style">'+[["candles","Candles"],["bars","Bars"],["line","Line"]].map(([id,label])=>'<button data-chart-style="'+id+'" aria-pressed="'+(candleStyle===id)+'">'+label+'</button>').join("")+'</div><button type="button" data-chart-zoom="in" aria-label="Zoom In">+</button><button type="button" data-chart-zoom="out" aria-label="Zoom Out">−</button><label>Range <select id="candle-window">'+[30,80,160].map(n=>'<option value="'+n+'"'+(n===candleWindow?" selected":"")+'>'+n+' bars</option>').join("")+'</select></label></div>';
  const isSynthetic=d.source_mode==="SYNTHETIC",isSample=!offlineReview&&isSynthetic;
  const workflow=describeProjectReviewWorkflow({state:d,loaded:!isSample,metadata,reviewStage});
  const money=x=>isSample?"—":quoteAmount(x,scope.quoteAsset);
@@ -294,11 +307,11 @@ function renderTerminal(){
  risk:()=>table(["级别","风险","原因"],d.risk.alerts.map(x=>[x.severity,x.label,x.reason]))+table(["检查","状态","证据"],d.checks.map(x=>[x.id,x.status,x.evidence.join(" / ")]))+details("历史市场状态",d.market_state)+details("数据可信状态",d.trust)+details("审计证据",report.audits)+details("历史回执与现金分录证据",d.archived_evidence)+details("期末账户汇总审计",d.closing_account_set),
  logs:()=>table(["UTC","级别","事件"],diagnostics.snapshot().entries.slice(-30).reverse().map(x=>[x.time,x.level,x.event]))
  };
- const sourceLabel=isSample?"合成验收样本 · 非实时行情 · 交易执行禁用":(isSynthetic?"合成测试报告 · 非链上证据":"历史报告")+" · "+d.trust.grade+" "+(d.trust.status==="REVIEW_REQUIRED"?"待复核":"内部一致 · 暂定数据");
+ const sourceLabel=isSample?"Synthetic sample · Not live · Execution disabled":(isSynthetic?"Synthetic report · Not on-chain evidence":"历史报告")+" · "+d.trust.grade+" "+(d.trust.status==="REVIEW_REQUIRED"?"待复核":"内部一致 · 暂定数据");
  const navContent=seriesChart(snapshots.map(x=>({label:x.sequence,value:x.nav_base_units})),"NAV");
  const participantRows=[["买入地址",isSample?"—":report.market_history.buy_address_count??"—"],["卖出地址",isSample?"—":report.market_history.sell_address_count??"—"],["实际 SOL 储备",money(m.verified_real_reserve_base_units)],["历史回撤",isSample||a.max_observed_drawdown_bps==null?"—":Number(a.max_observed_drawdown_bps)/100+"%"]];
  const actionForm='<form id="terminal-meta"><div class="field-pair"><label>名称<input name="name" required maxlength="32" value="'+esc(metadata?.name??"")+'"></label><label>Symbol<input name="symbol" required maxlength="10" value="'+esc(metadata?.symbol??"")+'"></label></div><div class="row"><button type="submit" class="primary">保存项目资料</button><button type="button" disabled>提交发行</button></div><p class="muted">仅保存当前会话资料，不代表已发行，不调用发行接口。</p></form>';
- main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>Market</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="项目数据管理">载入记录</button></div></div>'+
+ main.innerHTML='<div class="pro-top"><div class="pro-project"><div class="project-avatar" aria-hidden="true">◎</div><div><h2>Market</h2><small>项目运营上下文与离线报告隔离</small></div></div><div class="pro-top-right"><span class="muted">PROJECT CONTEXT</span><button id="open-launch" class="primary">＋ 项目准备</button><button id="open-data" title="Manage Report Data">Load Records</button></div></div>'+
  '<div id="terminal-project-context" class="pro-statebar">正在读取 Project 数据…</div>'+
  '<div id="terminal-context-notice" role="status"></div>'+ 
  '<section id="terminal-business-review" class="pro-pane" hidden></section>'+
@@ -313,13 +326,13 @@ function renderTerminal(){
  '<section class="pro-pane" style="margin-bottom:12px"><h3>项目业务流程 · '+esc(workflow.review_status)+'</h3>'+table(["业务阶段","状态","说明"],workflow.steps.map(x=>[x.label,x.status,x.note]))+'<div class="row"><button id="workflow-sample">载入离线验收样本</button><button id="workflow-cash" '+(isSample?"disabled":"")+'>资金流水</button><button id="workflow-finance" '+(isSample?"disabled":"")+'>财务结算复核</button><button id="workflow-risk" '+(isSample?"disabled":"")+'>风险复核</button><button id="workflow-graduation">毕业与外盘审阅</button><button id="workflow-save" '+(isSample||workspaceBusy?"disabled":"")+'>加入项目档案</button><button id="workflow-export" '+(isSample?"disabled":"")+'>导出原始报告</button></div><p role="status" class="muted">'+esc(workflowMessage)+'</p></section>'+
  '<div class="pro-metrics">'+[["历史期末净值",money(d.performance.closing_nav_base_units)],["历史期末现金",money(a.closing_cash_base_units)],["已实现收益",money(a.realized_project_pnl_base_units)],["库存成本",money(a.remaining_cost_basis_base_units)],["创作者费",money(a.creator_cash_income_base_units)],["最大回撤",isSample||a.max_observed_drawdown_bps==null?"—":Number(a.max_observed_drawdown_bps)/100+"%"]].map(([k,v])=>'<div class="pro-metric"><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div>'+
  '<div class="pro-workspace"><aside class="pro-market"><section class="pro-pane"><h3>市场概览</h3><div class="key-values">'+participantRows.map(([k,v])=>'<div><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div></section><section class="pro-pane"><h3>风险监测</h3><div class="key-values"><div><span>证据风险</span><strong>'+esc(isSample?"待载入":d.risk.status)+'</strong></div><div><span>严重 / 警告</span><strong>'+esc(isSample?"—":d.risk.counts.critical+" / "+d.risk.counts.warning)+'</strong></div><div><span>未知项</span><strong>'+esc(isSample?"—":d.risk.counts.unknown)+'</strong></div><div><span>实时市场风险</span><strong>未核验</strong></div></div></section><section class="pro-pane" id="market-quality"><h3>市场质量</h3><div data-quality-summary>'+esc(isSample?"合成样本行情 · 非实时数据":"历史报告 · 质量数据以证据审计为准")+'</div><div data-quality-metrics>'+table(["证据检查","状态 / 数量"],marketQualityRows(null))+'</div><p class="muted">独立报告仅展示 K 线证据；完整市场质量审计由项目关联报告的服务端复核提供。未复核不视为通过。</p></section><section class="pro-pane"><h3>生命周期</h3><div class="pro-stage-list">'+workflow.steps.map(x=>'<div><i></i>'+esc(x.label+" · "+x.status)+'</div>').join("")+'</div></section></aside>'+
- '<section class="pro-pane pro-chart"><div class="pro-pane-head"><div><h3>市场行情</h3><small>OHLCV · '+esc(sourceLabel)+'</small></div>'+candleControls+'</div><div class="pro-chart-body">'+candleChart(candleResult)+'</div><div class="pro-chart-volume"><div class="pro-volume-label">成交量</div>'+(isSample?'<div class="volume-empty">见上方报价成交量</div>':seriesChart(trades.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE"))+'</div></section>'+
+ '<section class="pro-pane pro-chart"><div class="pro-pane-head"><div><h3>Market Chart</h3><small>OHLCV · '+esc(sourceLabel)+'</small></div>'+candleControls+'</div><div class="pro-chart-body">'+candleChart(candleResult)+'</div><div class="pro-chart-volume"><div class="pro-volume-label">Volume</div>'+(isSample?'<div class="volume-empty">See quote volume above</div>':seriesChart(trades.map(x=>({label:x.sequence,value:x.quoteNotionalBaseUnits,side:x.side})),"TRADE"))+'</div></section>'+
  '<aside class="pro-actions"><section class="pro-pane"><h3>数据状态</h3><div class="notice">历史报告，仅供复盘；当前不支持交易提交。</div></section><section class="pro-pane"><h3>资产核算</h3><div class="key-values"><div><span>库存成本</span><strong>'+esc(money(a.remaining_cost_basis_base_units))+'</strong></div><div><span>已实现收益</span><strong>'+esc(money(a.realized_project_pnl_base_units))+'</strong></div><div><span>可兑现估值</span><strong>— SOL</strong></div></div></section></aside></div>'+
  '<section class="pro-pane pro-blotter"><div class="pro-blotter-head"><div class="terminal-tabs" role="group" aria-label="操作台明细">'+[["inventory","钱包库存"],...tabs.filter(t=>t[0]!=="inventory"),["nav","资产曲线"]].map(([id,label])=>'<button data-tab="'+id+'" aria-pressed="'+(terminalTab===id)+'">'+label+'</button>').join("")+'</div><button id="terminal-pause">'+(reviewPaused?"恢复浏览":"暂停浏览")+'</button></div><div class="tab-content">'+(reviewPaused?emptyState("浏览已暂停","恢复浏览后查看当前报告明细"):terminalTab==="nav"?navContent:isSample&&terminalTab!=="logs"?emptyState("暂无记录","载入项目数据后显示明细"):rows[terminalTab]())+'</div></section>'+
  '<div class="pro-bottom"><span>数据来源：'+esc(sourceLabel)+(!isSample&&!d.settlement_allowed?" · 未通过独立认证，禁止结算":"")+'</span><div class="row"><button id="terminal-export" '+(isSample?"disabled":"")+'>导出报告</button><button id="terminal-settle" '+(!isSample&&workflow.test_settlement_allowed?"":"disabled")+'>合成报告测试结算</button><button id="terminal-archive" '+(workflow.test_archive_allowed?"":"disabled")+'>导出测试归档</button></div></div>'+
  '</div>'+
- '<dialog id="launch-dialog" class="pro-dialog"><div class="pro-dialog-head"><h3>发行配置</h3><button data-close="launch-dialog" aria-label="关闭">×</button></div>'+actionForm+'</dialog>'+
- '<dialog id="data-dialog" class="pro-dialog"><div class="pro-dialog-head"><h3>项目数据</h3><button data-close="data-dialog" aria-label="关闭">×</button></div><label for="terminal-import">导入区间报告</label><input type="file" id="terminal-import" accept=".json"><div class="row"><button id="terminal-local-load" class="primary">读取本地记录</button></div><p id="terminal-error" class="negative" role="status"></p></dialog>';
+ '<dialog id="launch-dialog" class="pro-dialog"><div class="pro-dialog-head"><h3>Launch Configuration</h3><button data-close="launch-dialog" aria-label="关闭">×</button></div>'+actionForm+'</dialog>'+
+ '<dialog id="data-dialog" class="pro-dialog"><div class="pro-dialog-head"><h3>项目数据</h3><button data-close="data-dialog" aria-label="关闭">×</button></div><label for="terminal-import">Import Historical Report</label><input type="file" id="terminal-import" accept=".json"><div class="row"><button id="terminal-local-load" class="primary">Load Local Report</button></div><p id="terminal-error" class="negative" role="status"></p></dialog>';
  const memeDesk=mountMemeDesk();
  const projectContext=main.querySelector("#terminal-project-context");
   main.querySelector("#open-data").disabled=Boolean(activeProjectId);
@@ -573,8 +586,18 @@ function renderTerminal(){
  main.querySelector("#open-launch").onclick=()=>{memeMode="launch";memePanelHidden=false;render()};
  main.querySelector("#open-data").onclick=()=>main.querySelector("#data-dialog").showModal();
  main.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>main.querySelector("#"+b.dataset.close).close());
- main.querySelectorAll("[data-candle-interval]").forEach(b=>b.onclick=()=>{candleInterval=Number(b.dataset.candleInterval);render()});
- main.querySelector("#candle-window").onchange=e=>{const n=Number(e.target.value);if([30,80,160].includes(n)){candleWindow=n;render();}};
+ const refreshChart=()=>{
+  const body=main.querySelector(".pro-chart-body");
+  if(body)body.innerHTML=candleChart(buildTerminalCandles(data,candleInterval));
+  main.querySelectorAll("[data-candle-interval]").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.candleInterval)===candleInterval)));
+  main.querySelectorAll("[data-chart-style]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.chartStyle===candleStyle)));
+  main.querySelector("#candle-window").value=String(candleWindow);
+  main.querySelectorAll("[data-chart-zoom]").forEach(b=>b.disabled=b.dataset.chartZoom==="in"?candleWindow===30:candleWindow===160);
+ };
+ main.querySelectorAll("[data-candle-interval]").forEach(b=>b.onclick=()=>{candleInterval=Number(b.dataset.candleInterval);refreshChart();});
+ main.querySelectorAll("[data-chart-style]").forEach(b=>b.onclick=()=>{candleStyle=b.dataset.chartStyle;refreshChart();});
+ main.querySelectorAll("[data-chart-zoom]").forEach(b=>b.onclick=()=>{const windows=[30,80,160],i=windows.indexOf(candleWindow);candleWindow=windows[Math.max(0,Math.min(2,i+(b.dataset.chartZoom==="in"?-1:1)))];refreshChart();});
+ main.querySelector("#candle-window").onchange=e=>{const n=Number(e.target.value);if([30,80,160].includes(n)){candleWindow=n;refreshChart();}};
  main.querySelector("#terminal-local-load").onclick=async()=>{if(activeProjectId)return;const before=data,ticket=++importTicket,startPage=page;try{const response=await fetch("/api/terminal/report",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error("本地报告桥未配置或数据无效");const next=await response.json();const nextReport=auditedReport(next);if(data!==before||!importCurrent(ticket,startPage))return;offlineReview=true;data=next;report=nextReport;record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#terminal-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
  main.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{terminalTab=b.dataset.tab;render()});
  main.querySelector("#terminal-meta").onsubmit=e=>{e.preventDefault();metadata=Object.fromEntries(new FormData(e.currentTarget));record("metadata.saved");render()};
