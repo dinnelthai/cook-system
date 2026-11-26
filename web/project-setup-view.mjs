@@ -105,7 +105,7 @@ export function mountProjectSetup(container, {
         '<div><label for="draft-decimals">小数位</label><input id="draft-decimals" name="decimals" type="number" min="0" max="9" step="1" value="' + esc(current ? current.token.decimals??"" : 6) + '"' + lock + '></div>' +
         '</div><h4 class="form-section-title">网络与已登记钱包</h4><div class="grid form-section">'+
         '<div><label for="draft-quote">报价资产</label><input id="draft-quote" value="SOL" disabled><input type="hidden" name="quote_asset" value="SOL"></div>' +
-        '<div><label for="draft-network">网络</label><input id="draft-network" value="Localnet (Local verification)" disabled><input type="hidden" name="network" value="localnet"></div>' +
+        '<div><label for="draft-network">网络</label><input id="draft-network" value="Localnet（本地验证）" disabled><input type="hidden" name="network" value="localnet"></div>' +
         '<div><label for="draft-genesis">本地创世哈希</label><input id="draft-genesis" value="' + esc(current?.network.genesis_hash ?? config?.network?.genesis_hash ?? "未配置") + '" disabled></div>' +
         '<div><label for="project-wallet">创建者钱包</label><select name="creator_wallet" id="project-wallet"' + lock + '><option value="">正在加载已管理钱包…</option></select></div>' +
         '</div><details class="profile-optional"><summary>公开资料与描述（可选）</summary><div class="grid form-section">'+
@@ -114,19 +114,19 @@ export function mountProjectSetup(container, {
         '<div><label for="draft-twitter">Twitter / X</label><input id="draft-twitter" name="twitter" type="url" value="' + esc(current?.profile.twitter ?? "") + '" placeholder="https://"' + lock + '></div>' +
         '<div style="grid-column:1/-1"><label for="draft-description">描述</label><textarea id="draft-description" name="description" maxlength="1000"' + lock + '>' + esc(current?.profile.description ?? "") + '</textarea></div>' +
         '</div></details><p class="muted">Supply is converted exactly to base units. Leave supply and decimals blank if unknown. Only public wallet addresses are stored.</p>' +
-        '<div class="row"><button type="submit" class="primary"' + (editable ? "" : " disabled") + '>Save Configuration</button><button type="button" id="project-new">新建项目</button></div></form>' +
+        '<div class="row"><button type="submit" class="primary"' + (editable ? "" : " disabled") + '>保存配置</button><button type="button" id="project-new">新建项目</button></div></form>' +
         '<p id="project-wallet-status" class="muted" role="status">钱包列表未加载</p><p id="project-status" role="status" class="muted">' + esc(message) + '</p>') +
       '</div><aside class="setup-secondary">'+
       panel("项目选择与状态", '<div class="setup-summary">'+esc(current?current.profile.name+" · "+current.profile.symbol+" · v"+current.revision:"未选择项目")+'</div>'+note(current?lifecycleLabel(current.lifecycle.stage)+" · "+operationalLabel(current.lifecycle.operational_status):"选择现有项目或新建草稿。") +
         '<div class="row"><select id="project-open-select"><option value="">选择项目</option>' + options + '</select>' +
         '<button id="project-open" ' + (projects.length ? "" : "disabled") + '>打开项目</button>' +
         '<button id="project-export">导出项目登记</button>' +
-        '<button id="project-legacy-export" ' + (legacyCount ? "" : "disabled") + '>Export Legacy Browser Registry (' + legacyCount + ')</button></div>' +
+        '<button id="project-legacy-export" ' + (legacyCount ? "" : "disabled") + '>导出旧版浏览器登记（' + legacyCount + ')</button></div>' +
         '<div class="row"><button id="project-mark-ready" ' + (readyAllowed ? "" : "disabled") + '>标记配置就绪</button>' +
-        '<button id="project-launch-submitted" ' + (launchSubmitAllowed ? "" : "disabled") + '>Record Issuance Submission</button></div><details><summary>All Projects（'+projects.length+'）</summary>'+table(["Project", "Symbol", "Supply", "开发者钱包", "生命周期 / 运营状态", "发行验证"], projectRows)+'</details>') +
+        '<button id="project-launch-submitted" ' + (launchSubmitAllowed ? "" : "disabled") + '>记录发行提交</button></div><details><summary>全部项目（'+projects.length+'）</summary>'+table(["项目", "符号", "供应量", "开发者钱包", "生命周期 / 运营状态", "发行验证"], projectRows)+'</details>') +
       (current?panel("项目风险限额",note("Declared limits only; not funds, permission or risk approval. Blank means unset; zero means an explicit zero limit. Changes create a new revision.")+
         '<form id="project-budget-form"><div class="grid">'+limitFields.map(([k,label])=>'<label>'+esc(label)+'<input name="'+k+'" inputmode="decimal" maxlength="30" value="'+esc(budgetInputValue(current.limits[k]))+'"></label>').join("")+
-        '<label>Maximum Drawdown (bps; 100 bps = 1%)<input name="max_drawdown_bps" inputmode="numeric" maxlength="5" value="'+esc(current.limits.max_drawdown_bps??"")+'"></label></div><button type="submit">保存风险限额</button><p id="project-budget-status" role="status"></p></form>')+
+        '<label>最大回撤（bps；100 bps = 1%）<input name="max_drawdown_bps" inputmode="numeric" maxlength="5" value="'+esc(current.limits.max_drawdown_bps??"")+'"></label></div><button type="submit">保存风险限额</button><p id="project-budget-status" role="status"></p></form>')+
         panel("已登记项目钱包",table(["Group","Purpose","Address","Role","登记状态","声明限额","归属证据"],projectWalletRegistrationRows(current))+note("Registration only; not evidence of balances, ownership or reserved funds.")):"")+
       '</aside></div><details class="panel setup-evidence"><summary>发行、市场与报告证据</summary><div class="setup-evidence-grid">'+
       panel("记录发行证据", '<form id="issuance-evidence-form"><label for="issuance-project">项目</label><select id="issuance-project" name="project_id" required><option value="">选择项目</option>' + issuanceOptions + '</select>' +
@@ -135,10 +135,10 @@ export function mountProjectSetup(container, {
         '<div class="row"><button type="submit" ' + (projects.length ? "" : "disabled") + '>记录证据（未验证）</button></div></form>' +
         '<p class="muted">Manual records remain unverified. Trusted on-chain verification is required for LAUNCHED.</p>') +
       panel("发行证据记录", table(["Project", "Mint", "交易签名", "Status", "验证证据"], issuanceRows) +
-        '<div class="row"><button id="project-inspect-evidence"' + (current?.token.mint ? "" : " disabled") + '>Verify Issuance Evidence (Read-only)</button></div><p id="project-evidence-result" role="status" class="muted">Observations do not automatically advance lifecycle.</p><div id="project-evidence-archive"></div>')+
+        '<div class="row"><button id="project-inspect-evidence"' + (current?.token.mint ? "" : " disabled") + '>验证发行证据（只读）</button></div><p id="project-evidence-result" role="status" class="muted">观测不会自动推进生命周期。</p><div id="project-evidence-archive"></div>')+
       panel("市场账户观测",table(["市场 ID","交易场所","Account","登记状态"],(current?.markets??[]).map(m=>[m.market_id,m.venue,m.market_account,m.verification_status]))+
-        '<select id="project-market-select">'+(current?.markets??[]).map(m=>'<option value="'+esc(m.market_id)+'">'+esc(m.market_id+" · "+m.venue)+'</option>').join("")+'</select><button id="project-market-inspect"'+(current?.markets?.length?"":" disabled")+'>Verify & Archive (Read-only)</button><p id="project-market-result" role="status" class="muted">Checks registered market identity only; source is not attested.</p>')+
-      panel("关联历史报告",'<button id="project-report-candidates"'+(current?"":" disabled")+'>查找匹配报告</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>关联选中报告</button><p id="project-report-result" role="status" class="muted">Only saved reports with matching declared identity can be linked.</p>')+'</div></details>';
+        '<select id="project-market-select">'+(current?.markets??[]).map(m=>'<option value="'+esc(m.market_id)+'">'+esc(m.market_id+" · "+m.venue)+'</option>').join("")+'</select><button id="project-market-inspect"'+(current?.markets?.length?"":" disabled")+'>验证并归档（只读）</button><p id="project-market-result" role="status" class="muted">仅核对已登记市场身份，来源未认证。</p>')+
+      panel("关联历史报告",'<button id="project-report-candidates"'+(current?"":" disabled")+'>查找匹配报告</button><select id="project-report-select" disabled></select><button id="project-report-link" disabled>关联选中报告</button><p id="project-report-result" role="status" class="muted">仅可关联声明身份匹配的已保存报告。</p>')+'</div></details>';
     if(terminalMode)mountLaunchSteps(container.querySelector("#project-draft-form"));
     // Native validation must reveal a collapsed optional field before trying to focus it.
     container.querySelector("#project-draft-form").addEventListener("invalid",event=>{
@@ -323,7 +323,7 @@ export function mountProjectSetup(container, {
       try{limits=parseBudgetDeclaration(Object.fromEntries(new FormData(budgetForm)));}
       catch(error){status.textContent="配置无效："+errorKind(error);return;}
       if(JSON.stringify(limits)===JSON.stringify(current.limits)){status.textContent="配置未变更。";return;}
-      if(!window.confirm("Save risk limits? This creates a new project revision without enabling execution."))return;
+      if(!window.confirm("保存风险限额？这将创建新项目版本，不会启用执行。"))return;
       const button=budgetForm.querySelector("button");button.disabled=true;
       try{
         const updated=await append(current,"SET_BUDGET_LIMITS",{limits});
@@ -332,7 +332,7 @@ export function mountProjectSetup(container, {
         message="Risk limits saved; execution remains disabled.";render();
       }catch(error){
         if(!isActive()||version!==viewVersion)return;
-        status.textContent="Save unconfirmed. Reload project: "+errorKind(error);
+        status.textContent="保存未确认，请重新加载项目："+errorKind(error);
         button.disabled=false;
       }
     };

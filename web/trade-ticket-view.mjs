@@ -27,12 +27,12 @@ export function mountTradeTicket(host,{esc,onWalletSelect}){
   const dropdown=q("[data-ticket-wallet]");dropdown.innerHTML='<option value="">选择钱包</option>'+rows.map(r=>'<option value="'+esc(r.address)+'"'+(r.address===address?" selected":"")+'>'+esc(short(r.address))+'</option>').join("");dropdown.disabled=!rows.length;
   host.querySelectorAll("[data-ticket-side]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.ticketSide===side)));
   q("[data-ticket-sol]").textContent=display(row?.sol,9);q("[data-ticket-tokens]").textContent=display(row?.tokens,row?.decimals);
-  q("[data-ticket-label]").textContent="金额（"+(side==="BUY"?"SOL":project?.profile?.symbol||"代币")+")";
+  q("[data-ticket-label]").textContent="金额（"+(side==="BUY"?"SOL":project?.profile?.symbol||"代币")+"）";
   const input=q("[data-ticket-amount]");if(input.value!==amount)input.value=amount;input.disabled=!row||!project?.token?.mint;
   q("[data-ticket-percent]").hidden=side!=="SELL";host.querySelectorAll("[data-ticket-pct]").forEach(b=>b.disabled=!row||!raw(row.tokens)||!Number.isInteger(row.decimals)||observationBusy);
   q("[data-ticket-message]").textContent=observationBusy?"正在刷新钱包观测数据…":!project?.token?.mint?"请选择已发行的 Meme。":({SELECT_WALLET:"请从表格或下拉列表选择钱包。",BALANCE_UNKNOWN:"钱包余额不可用。",INVALID_AMOUNT:"请输入符合精度要求的正数金额。",INSUFFICIENT_BALANCE:"金额超过已观测余额。",INPUT_VALID:"金额未超过已观测余额，尚未包含费用。"}[result.status]??"请检查输入。");
   q("[data-ticket-review]").disabled=!ok;q("[data-ticket-review-panel]").hidden=!review||!ok;
-  if(review&&ok){q("[data-review-wallet]").textContent=address;q("[data-review-side]").textContent=side;q("[data-review-amount]").textContent=amount;q("[data-review-remaining]").textContent=display(result.remaining,result.decimals);}
+  if(review&&ok){q("[data-review-wallet]").textContent=address;q("[data-review-side]").textContent=side==="BUY"?"买入":"卖出";q("[data-review-amount]").textContent=amount;q("[data-review-remaining]").textContent=display(result.remaining,result.decimals);}
  }
  host.querySelectorAll("[data-ticket-side]").forEach(b=>b.onclick=()=>{side=b.dataset.ticketSide;amount="";review=false;draw()});
  q("[data-ticket-wallet]").onchange=e=>{address=e.target.value||null;amount="";review=false;onWalletSelect(address);draw()};

@@ -43,7 +43,7 @@ try{
  }else{
  const {stdout}=await run(browser,["--headless","--disable-background-networking","--disable-sync","--no-first-run","--user-data-dir="+join(dir,"browser"),"--virtual-time-budget=5000","--dump-dom",url],{env,timeout:30000,maxBuffer:8*1024*1024});
  // These are rendered DOM markers, not static source-code regular expressions.
- if(!/id="terminal-project-select"/.test(stdout)||!stdout.includes("Execution: DISABLED")||!stdout.includes('data-page="terminal"'))
+ if(!/id="terminal-project-select"/.test(stdout)||!stdout.includes("交易执行：已禁用")||!stdout.includes('data-page="terminal"'))
   throw Error("BROWSER_SMOKE_RENDER_MISMATCH");
  result={status:"BROWSER_SMOKE_PASS",scope:"EMPTY_OFFLINE_TERMINAL",execution_enabled:false,full_browser_e2e_validated:false};
  }
