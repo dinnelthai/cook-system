@@ -51,7 +51,12 @@ export function sortPositionRows(rows,field,direction="asc"){
   return sign*String(x).localeCompare(String(y));
  });
 }
-export function validWalletPreviewCount(value){return value==="1";}
+export function validWalletPreviewCount(value){return typeof value==="string"&&/^[1-9][0-9]?$/.test(value)&&Number(value)<=20;}
+export function validCreatedWalletBatch(result,count){
+ if(!validWalletPreviewCount(String(count))||!["CREATED","PARTIAL"].includes(result?.status)||result.requested!==count||!Number.isInteger(result.created_count)||result.created_count<0||result.created_count>count||!Array.isArray(result.wallets)||result.wallets.length!==result.created_count)return false;
+ if(result.status==="CREATED"?result.created_count!==count:result.created_count>=count)return false;
+ return result.wallets.every(w=>typeof w?.address==="string"&&/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(w.address))&&new Set(result.wallets.map(w=>w.address)).size===result.wallets.length;
+}
 export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=false,onSummary=()=>{},adapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET})}){
  let project=null,rows=[],ticket=0,status="Select a Meme.",percent=25,selected=null;
  let checked=new Set(),query="",sortField="address",sortDirection="asc",busy=false,lastObserved=null;
@@ -85,25 +90,25 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   if(disposed||generateDialog||creating)return;
   const doc=host.ownerDocument,dialog=doc.createElement("dialog");
   generateDialog=dialog;dialog.className="reference-generate-dialog";dialog.setAttribute("aria-labelledby","generate-wallet-title");
-  dialog.innerHTML='<button type="button" data-generate-close class="generate-close" aria-label="Close">×</button><h3 id="generate-wallet-title">Add Wallets</h3><p class="generate-description">Create a Localnet wallet and store its signing key locally.</p><form data-generate-form><label for="generate-wallet-count">Number of wallets to create</label><input id="generate-wallet-count" type="number" min="1" max="1" step="1" value="1" required autofocus><button type="submit" class="generate-submit">Add Wallets</button><p class="generate-feedback" role="status">Real Localnet wallet · One wallet per request.</p></form>';
+  dialog.innerHTML='<button type="button" data-generate-close class="generate-close" aria-label="Close">×</button><h3 id="generate-wallet-title">Add Wallets</h3><p class="generate-description">Create Localnet wallets and store their signing keys locally.</p><form data-generate-form><label for="generate-wallet-count">Number of wallets to create</label><input id="generate-wallet-count" type="number" min="1" max="20" step="1" value="1" required autofocus><button type="submit" class="generate-submit">Add Wallets</button><p class="generate-feedback" role="status">Real Localnet wallets · Existing store capacity: 20.</p></form>';
   doc.body.append(dialog);
   const input=dialog.querySelector("#generate-wallet-count"),submit=dialog.querySelector(".generate-submit"),feedback=dialog.querySelector(".generate-feedback");
   dialog.querySelector("[data-generate-close]").onclick=()=>dialog.close();
   dialog.addEventListener("close",()=>{dialog.remove();if(generateDialog===dialog)generateDialog=null;host.querySelector("#position-manage")?.focus({preventScroll:true})},{once:true});
-  input.oninput=()=>{submit.disabled=creating||!validWalletPreviewCount(input.value);feedback.textContent="Real Localnet wallet · One wallet per request."};
+  input.oninput=()=>{submit.disabled=creating||!validWalletPreviewCount(input.value);feedback.textContent="Real Localnet wallets · Existing store capacity: 20."};
   dialog.querySelector("form").onsubmit=async e=>{
    e.preventDefault();if(creating||disposed||!validWalletPreviewCount(input.value))return;
-   creating=true;submit.disabled=true;input.disabled=true;feedback.textContent="Creating Localnet wallet…";
+   const count=Number(input.value);creating=true;submit.disabled=true;input.disabled=true;feedback.textContent="Creating Localnet wallets…";
    dialog.querySelector("[data-generate-close]").disabled=true;
    const preventClose=e=>e.preventDefault();dialog.addEventListener("cancel",preventClose);
    try{
-    const result=await adapter.create();
-    if(typeof result?.address!=="string"||! /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(result.address))throw Error("WALLET_RESULT_INVALID");
+    const result=await adapter.createBatch({count});
+    if(!validCreatedWalletBatch(result,count))throw Error("WALLET_RESULT_INVALID");
     const refreshed=await loadInventory();
-    const listed=refreshed&&inventory?.some(w=>w.address===result.address);
-    if(!disposed&&dialog.isConnected){feedback.textContent=listed?"Wallet created: "+result.address:"Wallet created, but list refresh could not be confirmed. Use Refresh.";}
+    const listed=refreshed&&result.wallets.every(w=>inventory?.some(x=>x.address===w.address));
+    if(!disposed&&dialog.isConnected){feedback.textContent=result.created_count+" / "+count+" wallets created."+(result.status==="PARTIAL"?" Partial result; check the list before retrying.":"")+(listed?"":" Wallet list refresh could not be confirmed. Use Refresh.");}
 
-   }catch(error){await loadInventory();if(!disposed&&dialog.isConnected)feedback.textContent=error.message==="WALLET_LIMIT"?"Existing signer store limit reached. No new wallet created.":"Creation not confirmed. Check the wallet list before retrying.";}
+   }catch(error){await loadInventory();if(!disposed&&dialog.isConnected)feedback.textContent=error.message==="WALLET_LIMIT"?"Wallet capacity exceeded (20 total). No new wallet created.":"Creation not confirmed. Check the wallet list before retrying.";}
    finally{creating=false;if(!disposed&&dialog.isConnected){input.disabled=false;submit.disabled=!validWalletPreviewCount(input.value);dialog.querySelector("[data-generate-close]").disabled=false;dialog.removeEventListener("cancel",preventClose);}}
   };
   dialog.showModal();
