@@ -14,9 +14,9 @@ export function positionRows(project,snapshot){
  return addresses.map(address=>{
   const matches=valid?snapshot.wallets.filter(w=>w.address===address):[];
   const w=matches.length===1?matches[0]:null;
-  const accounts=w?.token_accounts?.filter(a=>a.mint===mint)??[];
+  const accounts=Array.isArray(w?.token_accounts)?w.token_accounts.filter(a=>a&&a.mint===mint):[];
   const decimals=accounts[0]?.decimals??null;
-  const known=!!w&&!conflicts&&w.token_accounts_status==="AVAILABLE"&&Array.isArray(w.token_accounts)&&accounts.every(a=>raw(a.amount_base_units)&&Number.isInteger(a.decimals)&&a.decimals>=0&&a.decimals<=18&&a.decimals===decimals)&&new Set(accounts.map(a=>a.token_account)).size===accounts.length;
+  const known=!!w&&!conflicts&&w.token_accounts_status==="AVAILABLE"&&Array.isArray(w.token_accounts)&&accounts.every(a=>typeof a.token_account==="string"&&a.token_account&&raw(a.amount_base_units)&&Number.isInteger(a.decimals)&&a.decimals>=0&&a.decimals<=18&&a.decimals===decimals)&&new Set(accounts.map(a=>a.token_account)).size===accounts.length;
   return {address,sol:w?.balance_status==="AVAILABLE"&&raw(w.balance_lamports)?w.balance_lamports:null,tokens:known?accounts.reduce((n,a)=>n+BigInt(a.amount_base_units),0n).toString():null,decimals:known?decimals:null,status:!valid?"Unverified":!w?"Not managed":known?"Observed":"Partial"};
  });
 }
@@ -28,7 +28,7 @@ export function previewQuantity(rawBalance,percent){
 const displayToken=(value,decimals)=>value==="0"?"0":formatUnits(value,decimals);
 // Read-only aggregation: incomplete or inconsistent observations remain unknown.
 export function summarizePositions(rows){
- const count=rows.length,known=rows.filter(r=>r.tokens!==null),positive=known.filter(r=>r.tokens!=="0"),decimals=positive[0]?.decimals??0;
+ const count=rows.length,known=rows.filter(r=>raw(r.tokens)),positive=known.filter(r=>r.tokens!=="0"),decimals=positive[0]?.decimals??0;
  const complete=count>0&&known.length===count&&positive.every(r=>raw(r.tokens)&&r.decimals===decimals)&&known.every(r=>raw(r.tokens));
  const solComplete=count>0&&rows.every(r=>raw(r.sol));
  return {wallet_count:count,observed_count:known.length,
@@ -60,12 +60,15 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,adapter=create
   if(disposed||!project?.token?.mint)return;
   timer=setTimeout(()=>{
    if(!host.isConnected){dispose();return}
-   if(document.visibilityState!=="hidden"&&!busy)void refresh();
+   if(host.ownerDocument.visibilityState!=="hidden"&&!busy&&!host.hidden&&!host.contains(host.ownerDocument.activeElement))void refresh();
    else schedule();
   },20000);
  }
- function onFocus(){if(host.isConnected&&!busy&&project?.token?.mint)void refresh();}
- function dispose(){disposed=true;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);}
+ function onFocus(){if(!host.isConnected){dispose();return}if(!busy&&project?.token?.mint&&!host.contains(host.ownerDocument.activeElement))void refresh();}
+ function dispose(){disposed=true;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
+ let mounted=host.isConnected;
+ const observer=typeof MutationObserver==="function"?new MutationObserver(()=>{if(!host.isConnected&&mounted)dispose();else if(host.isConnected)mounted=true}):null;
+ if(host.ownerDocument?.documentElement)observer?.observe(host.ownerDocument.documentElement,{childList:true,subtree:true});
  globalThis.addEventListener?.("focus",onFocus);
  function draw(){
   const active=rows.find(r=>r.address===selected);
@@ -109,7 +112,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,adapter=create
    const snapshot=await adapter.portfolio({limit:5});
    if(ticket!==id||!host.isConnected)return;
    if(snapshot?.schema_version!=="cook-local-wallet-portfolio.1"||snapshot.genesis_hash!==current.network.genesis_hash||snapshot.network!=="localnet"||snapshot.read_only!==true||snapshot.execution_enabled!==false)throw Error("SCOPE_MISMATCH");
-   rows=positionRows(current,snapshot);lastObserved=String(snapshot.as_of??"Time unknown");status="Localnet read-only snapshot · "+lastObserved+" · Auto-refresh every 20s while visible. Missing balances and PnL remain unknown.";
+   rows=positionRows(current,snapshot);lastObserved=String(snapshot.as_of??"Time unknown");status="Localnet read-only snapshot · "+lastObserved+" · Refreshes automatically while idle. Missing balances and PnL remain unknown.";
   }catch{if(ticket!==id||!host.isConnected)return;rows=positionRows(current,null);lastObserved=null;status="Portfolio unavailable or scope mismatch. No balances inferred."}
   finally{if(ticket===id){busy=false;if(host.isConnected){draw();schedule()}else dispose()}}
  }

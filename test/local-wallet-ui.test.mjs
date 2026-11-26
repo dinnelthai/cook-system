@@ -14,6 +14,6 @@ test("header wallet selector changes active wallet without depending on wallet-m
  await mountWalletSelector(host,()=>{});
  assert.equal(select.options.length,2);assert.equal(select.value,"11111111111111111111111111111111");
  select.value="11111111111111111111111111111112";select.onchange();
- assert.equal(stored,"11111111111111111111111111111112");assert.equal(state.textContent,"当前钱包已切换");
+ assert.equal(stored,"11111111111111111111111111111112");assert.equal(state.textContent,"Active wallet changed");
  assert.equal(added.length,2);
 });

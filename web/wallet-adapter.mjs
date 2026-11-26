@@ -20,7 +20,7 @@ export function createWalletAdapter({mode,fetchImpl=globalThis.fetch}={}){
   if(!LOCAL_ACTIONS.has(action))throw Error("WALLET_ACTION_NOT_SUPPORTED");
   const r=await fetchImpl("/api/local-wallet/"+action,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),cache:"no-store"});
   const j=await r.json();
-  if(!r.ok)throw Error(j.code||"请求失败");
+  if(!r.ok)throw Error(j.code||"REQUEST_FAILED");
   return j;
  }
  return Object.freeze({
