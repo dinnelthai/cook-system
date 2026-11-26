@@ -219,9 +219,26 @@ function normalizeLifecycle(input) {
   };
 }
 function normalizeExecutionPolicy(input) {
-  exactKeys(input, ["mode", "enabled", "requires_risk_approval", "unknown_blocks_execution"], "INVALID_EXECUTION_POLICY");
-  if (input.mode !== "DISABLED" || input.enabled !== false || input.requires_risk_approval !== true || input.unknown_blocks_execution !== true) fail("EXECUTION_POLICY_MUST_REMAIN_DISABLED");
-  return { mode: "DISABLED", enabled: false, requires_risk_approval: true, unknown_blocks_execution: true };
+  record(input, "INVALID_EXECUTION_POLICY");
+  if (input.mode === "DISABLED") {
+    exactKeys(input, ["mode", "enabled", "requires_risk_approval", "unknown_blocks_execution"], "INVALID_EXECUTION_POLICY");
+    if (input.enabled !== false || input.requires_risk_approval !== true || input.unknown_blocks_execution !== true) fail("EXECUTION_POLICY_MUST_REMAIN_DISABLED");
+    return { mode: "DISABLED", enabled: false, requires_risk_approval: true, unknown_blocks_execution: true };
+  }
+  if (input.mode === "LOCALNET_AUTHORIZED") {
+    exactKeys(input, ["mode", "enabled", "requires_risk_approval", "unknown_blocks_execution", "authorization"], "INVALID_EXECUTION_POLICY");
+    if (input.enabled !== true || input.requires_risk_approval !== true || input.unknown_blocks_execution !== true) fail("INVALID_EXECUTION_POLICY");
+    const a = input.authorization;
+    exactKeys(a, ["network", "genesis_hash", "approved_by", "approved_at_ms", "approval_ref"], "INVALID_EXECUTION_AUTHORIZATION");
+    if (a.network !== "localnet" || typeof a.genesis_hash !== "string") fail("INVALID_EXECUTION_AUTHORIZATION");
+    publicKey(a.genesis_hash, "INVALID_EXECUTION_GENESIS");
+    text(a.approved_by, 128, "INVALID_EXECUTION_APPROVER");
+    timestamp(a.approved_at_ms);
+    text(a.approval_ref, 256, "INVALID_EXECUTION_APPROVAL_REF");
+    return { mode: "LOCALNET_AUTHORIZED", enabled: true, requires_risk_approval: true, unknown_blocks_execution: true,
+      authorization: { network: "localnet", genesis_hash: a.genesis_hash, approved_by: a.approved_by, approved_at_ms: a.approved_at_ms, approval_ref: a.approval_ref } };
+  }
+  fail("EXECUTION_POLICY_MUST_REMAIN_DISABLED");
 }
 function assertUniqueWallets(groups) {
   const seen = new Set();
@@ -503,7 +520,29 @@ export function applyProjectCommand(current, command, { now = () => Date.now() }
       )) fail("PROJECT_CANNOT_ACTIVATE");
       if (project.lifecycle.operational_status === "REVIEW_REQUIRED" && payload.status !== "REVIEW_REQUIRED") fail("PROJECT_REVIEW_CLEARANCE_REQUIRED");
       project.lifecycle.operational_status = payload.status;
+      if (payload.status !== "ACTIVE") project.execution_policy = { mode: "DISABLED", enabled: false, requires_risk_approval: true, unknown_blocks_execution: true };
       eventPayload = { status: payload.status, execution_enabled: false };
+      break;
+    }
+    case "AUTHORIZE_LOCALNET_EXECUTION": {
+      exactKeys(payload, ["approved_by", "approval_ref"], "INVALID_EXECUTION_AUTHORIZATION");
+      if (project.network.cluster !== "localnet" || !project.network.genesis_hash) fail("PROJECT_NETWORK_MISMATCH");
+      if (project.lifecycle.operational_status !== "ACTIVE" || project.lifecycle.stage !== "PUMPSWAP_ACTIVE") fail("PROJECT_NOT_EXECUTABLE");
+      if (!project.markets.some(m => m.venue === "PUMP_SWAP" && m.verification_status === "VERIFIED")) fail("VERIFIED_PUMPSWAP_MARKET_REQUIRED");
+      if (!project.wallet_groups.some(g => g.members.some(m => m.enabled && ["OPERATOR","EXECUTOR"].includes(m.role)))) fail("EXECUTION_WALLET_REQUIRED");
+      if ([project.limits.max_project_budget_base_units, project.limits.max_order_size_base_units, project.limits.max_wallet_exposure_base_units].some(v => v === null)) fail("EXECUTION_LIMITS_REQUIRED");
+      const approvedBy = text(payload.approved_by, 128, "INVALID_EXECUTION_APPROVER");
+      const approvalRef = text(payload.approval_ref, 256, "INVALID_EXECUTION_APPROVAL_REF");
+      project.execution_policy = normalizeExecutionPolicy({mode: "LOCALNET_AUTHORIZED", enabled: true, requires_risk_approval: true, unknown_blocks_execution: true,
+        authorization: {network: "localnet", genesis_hash: project.network.genesis_hash, approved_by: approvedBy, approved_at_ms: at, approval_ref: approvalRef}});
+      eventPayload = { execution_policy: project.execution_policy };
+      break;
+    }
+    case "REVOKE_LOCALNET_EXECUTION": {
+      exactKeys(payload, ["reason"], "INVALID_EXECUTION_REVOCATION");
+      const reason = text(payload.reason, 256, "INVALID_EXECUTION_REVOCATION");
+      project.execution_policy = { mode: "DISABLED", enabled: false, requires_risk_approval: true, unknown_blocks_execution: true };
+      eventPayload = { reason, execution_policy: project.execution_policy };
       break;
     }
     case "CLEAR_REVIEW": {
@@ -521,6 +560,10 @@ export function applyProjectCommand(current, command, { now = () => Date.now() }
       break;
     default:
       fail("UNSUPPORTED_PROJECT_COMMAND");
+  }
+  if (project.execution_policy.enabled && command.type !== "AUTHORIZE_LOCALNET_EXECUTION" && command.type !== "UPDATE_PROFILE") {
+    project.execution_policy = { mode: "DISABLED", enabled: false, requires_risk_approval: true, unknown_blocks_execution: true };
+    eventPayload = {...eventPayload, execution_authorization_revoked: true};
   }
   project.revision += 1;
   project.updated_at_ms = at;

@@ -16,11 +16,13 @@ test("project client rejects a mismatched response scope and stale acknowledgeme
  assert.equal((await appendProjectCommand("p",command,1)).aggregate.revision,2);
 });
 
-test("project directory and metadata fail closed on duplicate IDs, permission and attestation mismatches",async t=>{
+test("project directory and metadata accept only known disabled or Localnet-authorized policy shapes",async t=>{
  const previous=globalThis.fetch;t.after(()=>{globalThis.fetch=previous;});
  let response={projects:[p("p",1)],directory:{schema_version:"cook-project-directory.1",execution_enabled:false,project_count:1}};
  globalThis.fetch=async()=>({ok:true,json:async()=>response});
  assert.equal((await getProjectDirectory()).projects.length,1);
+ response={projects:[{...p("p",1),execution_policy:{mode:"LOCALNET_AUTHORIZED",enabled:true,requires_risk_approval:true,unknown_blocks_execution:true,authorization:{network:"localnet",genesis_hash:"g"}}}],directory:{schema_version:"cook-project-directory.1",execution_enabled:false,project_count:1}};
+ assert.equal((await getProjectDirectory()).projects[0].execution_policy.enabled,true);
  response={...response,projects:[p("p",1),p("p",2)],directory:{...response.directory,project_count:2}};
  await assert.rejects(listProjects,/PROJECT_API_INVALID_RESPONSE/);
  await assert.rejects(getProjectDirectory,/PROJECT_API_INVALID_RESPONSE/);

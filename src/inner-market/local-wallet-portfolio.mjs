@@ -83,7 +83,7 @@ export function createLocalWalletPortfolio({endpoint,expectedGenesis,walletStore
   };
   try{
    const url=endpointUrl(),rows=await call(()=>walletStore.list());
-   if(!Array.isArray(rows)||rows.length>20)throw Error("PORTFOLIO_DATA_INVALID");
+   if(!Array.isArray(rows))throw Error("PORTFOLIO_DATA_INVALID");
    const seen=new Set();for(const w of rows){asKey(w.address);if(seen.has(w.address))throw Error("PORTFOLIO_DATA_INVALID");seen.add(w.address);}
    const connection=connectionFactory(url,controller.signal);
    let genesis;try{genesis=await call(()=>connection.getGenesisHash())}catch{throw Error("PORTFOLIO_RPC_UNAVAILABLE")}

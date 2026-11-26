@@ -1,7 +1,7 @@
 import {readFile,readdir} from "node:fs/promises";
 import {join,basename} from "node:path";
 const META=new Set(["$schema","$id","title","description","default","examples","deprecated","readOnly","writeOnly"]);
-const SUPPORTED=new Set(["$ref","type","const","enum","required","properties","additionalProperties","items","pattern","minLength","maxLength","minimum","maximum","allOf","if","then"]);
+const SUPPORTED=new Set(["$ref","type","const","enum","required","properties","additionalProperties","items","pattern","minLength","maxLength","minimum","maximum","allOf","anyOf","oneOf","if","then"]);
 const stable=value=>value===null||typeof value!=="object"?JSON.stringify(value):Array.isArray(value)?"["+value.map(stable).join(",")+"]":"{"+Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+stable(value[k])).join(",")+"}";
 const typeMatches=(value,type)=>(Array.isArray(type)?type:[type]).some(t=>t==="null"?value===null:t==="array"?Array.isArray(value):t==="object"?value!==null&&typeof value==="object"&&!Array.isArray(value):t==="integer"?typeof value==="number"&&Number.isInteger(value):t==="number"?typeof value==="number"&&Number.isFinite(value):t==="string"?typeof value==="string":t==="boolean"?typeof value==="boolean":false);
 export async function loadSchemaRegistry(directory){
@@ -47,10 +47,10 @@ export function inspectSchemaContract(schema,registry){
   }
   if(Object.hasOwn(s,"additionalProperties")&&typeof s.additionalProperties!=="boolean")visit(s.additionalProperties,path+".additionalProperties",depth+1);
   for(const k of ["items","if","then"])if(Object.hasOwn(s,k))visit(s[k],path+"."+k,depth+1);
-  if(Object.hasOwn(s,"allOf")){
-   if(!Array.isArray(s.allOf)||!s.allOf.length)add(path,"INVALID_SCHEMA_ALLOF","nonempty array required");
-   else s.allOf.forEach((v,i)=>visit(v,path+".allOf["+i+"]",depth+1));
-  }
+  for(const keyword of ["allOf","anyOf","oneOf"]){if(Object.hasOwn(s,keyword)){
+   if(!Array.isArray(s[keyword])||!s[keyword].length)add(path,"INVALID_SCHEMA_"+keyword.toUpperCase(),"nonempty array required");
+   else s[keyword].forEach((v,i)=>visit(v,path+"."+keyword+"["+i+"]",depth+1));
+  }}
   active.delete(s);checked.add(s);
  }
  visit(schema,"$",0);return {valid:errors.length===0,errors};
@@ -91,6 +91,7 @@ export function validateJsonSchema(value,schema,registry,{maxErrors=100}={}){
   }
   if(Array.isArray(v)&&s.items!==undefined)for(let i=0;i<v.length;i++)visit(v[i],s.items,path+"["+i+"]",depth+1);
   if(Array.isArray(s.allOf))for(const child of s.allOf)visit(v,child,path,depth+1);
+  for(const keyword of ["anyOf","oneOf"]){if(Array.isArray(s[keyword])){const matches=s[keyword].map(child=>{const before=errors.length;visit(v,child,path,depth+1);const ok=errors.length===before;if(!ok)errors.splice(before);return ok});const valid=keyword==="oneOf"?matches.filter(Boolean).length===1:matches.some(Boolean);if(!valid)add(path,keyword==="oneOf"?"ONE_OF_MISMATCH":"ANY_OF_MISMATCH","schema branch mismatch")}}
   if(s.if!==undefined){const before=errors.length;visit(v,s.if,path,depth+1);const matches=errors.length===before;if(!matches)errors.splice(before);else if(s.then!==undefined)visit(v,s.then,path,depth+1);}
  };
  visit(value,schema,"$",0);return {valid:errors.length===0,errors};

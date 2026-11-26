@@ -278,28 +278,42 @@
       }
     },
     "execution_policy": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "mode",
-        "enabled",
-        "requires_risk_approval",
-        "unknown_blocks_execution"
-      ],
-      "properties": {
-        "mode": {
-          "const": "DISABLED"
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "enabled", "requires_risk_approval", "unknown_blocks_execution"],
+          "properties": {
+            "mode": {"const": "DISABLED"},
+            "enabled": {"const": false},
+            "requires_risk_approval": {"const": true},
+            "unknown_blocks_execution": {"const": true}
+          }
         },
-        "enabled": {
-          "const": false
-        },
-        "requires_risk_approval": {
-          "const": true
-        },
-        "unknown_blocks_execution": {
-          "const": true
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "enabled", "requires_risk_approval", "unknown_blocks_execution", "authorization"],
+          "properties": {
+            "mode": {"const": "LOCALNET_AUTHORIZED"},
+            "enabled": {"const": true},
+            "requires_risk_approval": {"const": true},
+            "unknown_blocks_execution": {"const": true},
+            "authorization": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["network", "genesis_hash", "approved_by", "approved_at_ms", "approval_ref"],
+              "properties": {
+                "network": {"const": "localnet"},
+                "genesis_hash": {"type": "string", "minLength": 32},
+                "approved_by": {"type": "string", "minLength": 1, "maxLength": 128},
+                "approved_at_ms": {"type": "integer", "minimum": 0},
+                "approval_ref": {"type": "string", "minLength": 1, "maxLength": 256}
+              }
+            }
+          }
         }
-      }
+      ]
     },
     "source_attestation": {
       "const": "UNKNOWN"

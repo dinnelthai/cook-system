@@ -2,7 +2,8 @@ import {createWalletAdapter,WALLET_MODE} from "./wallet-adapter.mjs";
 const key="cook.localnet.activeWallet";
 let selected="";try{selected=localStorage.getItem(key)||""}catch{}
 function choose(address){selected=address;try{localStorage.setItem(key,address)}catch{}}
-const walletAdapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET});
+// Resolve fetch at call time so embedded/browser tests can install their transport after module load.
+const walletAdapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET,fetchImpl:(...args)=>globalThis.fetch(...args)});
 const api=(action,body)=>walletAdapter[action](body);
 const fmt=n=>{const v=BigInt(n);return (v/1000000000n)+"."+(v%1000000000n).toString().padStart(9,"0").replace(/0+$/,"").padEnd(2,"0")+" SOL"};
 function fill(select,rows){

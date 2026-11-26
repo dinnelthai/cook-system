@@ -97,6 +97,14 @@ test("Project HTTP API creates, reads, mutates and verifies a persisted project"
   assert.equal(verify.event_count, 2);
 });
 
+test("project trade routes bind preview and execute requests to the route project",async t=>{
+ const calls=[];const tradeService={executionAvailable:true,createPreview:async(id,input)=>{calls.push(["preview",id,input]);return {preview_id:"preview-1",project_id:id,project_revision:1,orders:[],expires_at_ms:2000}},execute:async(id,input)=>{calls.push(["execute",id,input]);return {execution_id:"execution-1",project_id:id,preview_id:input.preview_id,wallets:[]}},getExecution:id=>({execution_id:id,project_id:"trade-http",wallets:[]}),reconcile:async(id,executionId)=>({execution_id:executionId,project_id:id,wallets:[]})};
+ const base=await setup(t,{tradeService}),root=base+"/api/projects";assert.equal((await json(root,"POST",{project_id:"trade-http",profile:{name:"Trade",symbol:"TRADE"}})).status,201);
+ const previewResponse=await json(root+"/trade-http/trade/preview","POST",{market_id:"m",side:"buy",orders:[]});assert.equal(previewResponse.status,201);assert.equal((await previewResponse.json()).preview.preview_id,"preview-1");
+ const executeResponse=await json(root+"/trade-http/trade/execute","POST",{preview_id:"preview-1",idempotency_key:"key",confirm:true});assert.equal(executeResponse.status,200);assert.equal((await executeResponse.json()).execution.execution_id,"execution-1");
+ assert.equal((await fetch(root+"/trade-http/trade/executions/execution-1")).status,200);assert.equal((await json(root+"/trade-http/trade/reconcile","POST",{execution_id:"execution-1"})).status,200);assert.deepEqual(calls.map(x=>x[0]),["preview","execute"]);
+});
+
 test("Project HTTP API rejects malformed, oversized and unsupported requests", async t => {
   const base = await setup(t);
   const wrongType = await fetch(base + "/api/projects", { method: "POST", body: "{}" });

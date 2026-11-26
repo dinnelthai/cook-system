@@ -149,6 +149,26 @@ test("unsupported execution enabling and non-SOL quote assets are rejected", () 
   assert.throws(() => createProjectAggregate({ ...base, network: { cluster: "localnet", genesis_hash: wallet, quote_mint: mint } }), /UNSUPPORTED_QUOTE_ASSET/);
 });
 
+test("Localnet execution authorization is explicit and revocable",()=>{
+ let p=launchedProject();
+ const curveProgram="11111111111111111111111111111113",marketAccount="11111111111111111111111111111114";
+ const curveIdentity={chain_id:"solana",network:"localnet",token_mint:mint,quote_mint:WRAPPED_SOL_MINT,curve_program_id:curveProgram,curve_account:curveProgram,program_version:"pump-v1",idl_revision:null,market_phase:"bonding_curve"};
+ p=run(p,"BIND_MARKET",{market:{market_id:"curve-alpha",venue:"PUMP_BONDING_CURVE",market_account:curveProgram,identity:curveIdentity}},1006);
+ p=run(p,"VERIFY_MARKET",{market_id:"curve-alpha",evidence:{kind:"MARKET_ACCOUNT",source:"observed_chain",verification:"VERIFIED",reference:curveProgram}},1007);
+ p=run(p,"TRANSITION_LIFECYCLE",{to:"BONDING_CURVE_ACTIVE"},1008);
+ p=run(p,"TRANSITION_LIFECYCLE",{to:"GRADUATION_PENDING",evidence:{kind:"CURVE_COMPLETE",source:"observed_chain",verification:"VERIFIED",reference:"curve-complete"}},1009);
+ const identity={chain_id:"solana",network:"localnet",token_mint:mint,quote_mint:WRAPPED_SOL_MINT,curve_program_id:curveProgram,curve_account:null,program_version:"pump-v1",idl_revision:null,market_phase:"post_graduation"};
+ p=run(p,"BIND_MARKET",{market:{market_id:"pump-alpha",venue:"PUMP_SWAP",market_account:marketAccount,identity}},1010);
+ p=run(p,"VERIFY_MARKET",{market_id:"pump-alpha",evidence:{kind:"MARKET_ACCOUNT",source:"observed_chain",verification:"VERIFIED",reference:marketAccount}},1011);
+ p=run(p,"TRANSITION_LIFECYCLE",{to:"PUMPSWAP_ACTIVE"},1012);
+ p=run(p,"SET_BUDGET_LIMITS",{limits:{max_project_budget_base_units:"1000",max_order_size_base_units:"500",max_wallet_exposure_base_units:"500",max_drawdown_bps:1000}},1013);
+ p=run(p,"SET_OPERATIONAL_STATUS",{status:"ACTIVE"},1014);
+ p=run(p,"UPSERT_WALLET_GROUP",{group:{group_id:"executors",name:"Executors",purpose:"OPERATIONS",members:[{wallet_address:mint,role:"EXECUTOR",enabled:true,allocation_limit_base_units:"500"}]}},1015);
+ p=run(p,"AUTHORIZE_LOCALNET_EXECUTION",{approved_by:"operator",approval_ref:"approval-1"},1016);
+ assert.equal(p.execution_policy.mode,"LOCALNET_AUTHORIZED");assert.equal(p.execution_policy.authorization.genesis_hash,wallet);
+ p=run(p,"REVOKE_LOCALNET_EXECUTION",{reason:"test complete"},1017);assert.equal(p.execution_policy.mode,"DISABLED");assert.equal(p.execution_policy.enabled,false);
+});
+
 test("issued projects can record early exit without claiming graduation or settlement", () => {
   let p = launchedProject();
   const approval = { kind: "EXIT_APPROVAL", source: "operator", verification: "OPERATOR_CONFIRMED", reference: "stop-operations" };

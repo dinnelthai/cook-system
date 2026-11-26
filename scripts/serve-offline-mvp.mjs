@@ -4,6 +4,8 @@ import { createServer } from "node:http";
 import { homedir } from "node:os";
 import { openProjectStore } from "../src/inner-market/project-store.mjs";
 import { createProjectHttpHandler } from "../src/inner-market/project-http.mjs";
+import { createProjectTradeService } from "../src/inner-market/project-trade-service.mjs";
+import { createLocalProjectTradeExecutor } from "../src/inner-market/local-project-trade-executor.mjs";
 import { createProjectEvidenceReader, createProjectMarketReader } from "../src/inner-market/project-evidence-reader.mjs";
 import { createProjectMarketEvidenceReviewer } from "../src/inner-market/project-market-evidence-review.mjs";
 import { createProjectTreasuryReviewer } from "../src/inner-market/project-treasury-review.mjs";
@@ -33,7 +35,6 @@ const workspacePath=process.env.COOK_HISTORICAL_WORKSPACE_DB??resolve(root,".coo
 const workspaceHandler=workspaceEnabled?(await import("../src/inner-market/historical-workspace-http.mjs")).createHistoricalWorkspaceHandler({path:workspacePath,readRequestJson}):null;
 const projectStorePath=process.env.COOK_PROJECT_DB??join(homedir(),".cook-system","projects.sqlite");
 const projectStore=openProjectStore(projectStorePath);
-const projectHttp=createProjectHttpHandler({store:projectStore,readRequestJson,reviewProjectMarketEvidence:createProjectMarketEvidenceReviewer({path:workspacePath,enabled:workspaceEnabled}),reviewProjectTreasury:createProjectTreasuryReviewer({path:workspacePath,enabled:workspaceEnabled}),reviewProjectClose:createProjectCloseReviewer({path:workspacePath,enabled:workspaceEnabled}),importOrderReceipts:createOrderReceiptImporter({path:workspacePath,enabled:workspaceEnabled}),reviewOrderReceipt:createOrderReceiptReviewer({path:workspacePath,enabled:workspaceEnabled,endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),inspectMarket:createProjectMarketReader({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),listReportCandidates:createProjectWorkspaceCandidates({path:workspacePath,enabled:workspaceEnabled}),resolveReportLink:createProjectWorkspaceResolver({path:workspacePath,enabled:workspaceEnabled}),inspectEvidence:createProjectEvidenceReader({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),networkConfig:{chain_id:"solana",cluster:"localnet",genesis_hash:process.env.COOK_LOCAL_GENESIS_HASH??null,quote_mint:"So11111111111111111111111111111111111111112"}});
 const port=Number(process.env.PORT??4173);
 if(!Number.isInteger(port)||port<1||port>65535)throw new Error("invalid PORT");
 const wallets=createWalletStore();
@@ -41,6 +42,9 @@ const walletPortfolio=createLocalWalletPortfolio({endpoint:process.env.COOK_LOCA
 const faucet=createLocalFaucet({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.faucet});
 const transfers=createLocalTransfer({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.transfer,loadSigner:wallets.loadSigner});
 const trading=createLocalTrading({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.trading,readEnabled:process.env.COOK_LOCAL_MARKET_READ==="1",labUrl:process.env.COOK_PUMP_LAB_URL,wallets});
+const projectTradeExecutor=localFeatures.trading?createLocalProjectTradeExecutor({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:true,wallets}):null;
+const tradeService=createProjectTradeService({store:projectStore,wallets,portfolio:walletPortfolio,market:trading,genesis:process.env.COOK_LOCAL_GENESIS_HASH??null,executionAdapter:projectTradeExecutor});
+const projectHttp=createProjectHttpHandler({store:projectStore,readRequestJson,tradeService,reviewProjectMarketEvidence:createProjectMarketEvidenceReviewer({path:workspacePath,enabled:workspaceEnabled}),reviewProjectTreasury:createProjectTreasuryReviewer({path:workspacePath,enabled:workspaceEnabled}),reviewProjectClose:createProjectCloseReviewer({path:workspacePath,enabled:workspaceEnabled}),importOrderReceipts:createOrderReceiptImporter({path:workspacePath,enabled:workspaceEnabled}),reviewOrderReceipt:createOrderReceiptReviewer({path:workspacePath,enabled:workspaceEnabled,endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),inspectMarket:createProjectMarketReader({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),listReportCandidates:createProjectWorkspaceCandidates({path:workspacePath,enabled:workspaceEnabled}),resolveReportLink:createProjectWorkspaceResolver({path:workspacePath,enabled:workspaceEnabled}),inspectEvidence:createProjectEvidenceReader({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH}),networkConfig:{chain_id:"solana",cluster:"localnet",genesis_hash:process.env.COOK_LOCAL_GENESIS_HASH??null,quote_mint:"So11111111111111111111111111111111111111112"}});
 const diagnostics=createHttpDiagnostics();
 const server=createServer(async(req,res)=>{
  const setDiagnosticGroup=diagnostics.observe(req,res);
@@ -59,19 +63,27 @@ const server=createServer(async(req,res)=>{
    if(!workspaceHandler){res.writeHead(503,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"WORKSPACE_DISABLED"}));return;}
    await workspaceHandler(req,res);return;
   }
-  if(["/api/local-wallet/balance","/api/local-wallet/airdrop","/api/local-wallet/list","/api/local-wallet/create","/api/local-wallet/create-batch","/api/local-wallet/transfer","/api/local-wallet/portfolio","/api/local-wallet/market","/api/local-wallet/market-data","/api/local-wallet/trade"].includes(req.url)){
+  if(["/api/local-wallet/balance","/api/local-wallet/airdrop","/api/local-wallet/list","/api/local-wallet/create","/api/local-wallet/create-batch","/api/local-wallet/export","/api/local-wallet/import","/api/local-wallet/transfer","/api/local-wallet/portfolio","/api/local-wallet/market","/api/local-wallet/market-data","/api/local-wallet/trade"].includes(req.url)){
    const send=(status,body)=>sendJson(res,status,body);
    const host=req.headers.host,origin=req.headers.origin;
    if(!["127.0.0.1:"+port,"localhost:"+port].includes(host)||req.headers["sec-fetch-site"]==="cross-site"||(origin&&origin!=="http://"+host)){send(403,{code:"FORBIDDEN"});return}
    if(req.method!=="POST"||req.headers["content-type"]!=="application/json"){send(405,{code:"POST_JSON_REQUIRED"});return}
    try{
-    const raw=await readRequestJson(req,4096);
+    const raw=await readRequestJson(req,req.url.endsWith("/import")?64*1024:4096);
     const data=JSON.parse(raw),fund=req.url.endsWith("/airdrop");
     if(req.url.endsWith("/list")||req.url.endsWith("/create")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length)throw Error("INVALID_BODY");send(200,req.url.endsWith("/list")?{wallets:await wallets.list()}:await wallets.create());return;}
     if(req.url.endsWith("/create-batch")){
-     if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length!==1||!Number.isSafeInteger(data.count)||data.count<1||data.count>20)throw Error("INVALID_BODY");
+     if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length!==1||!Number.isSafeInteger(data.count)||data.count<1)throw Error("INVALID_BODY");
      // Key generation is offline. RPC checks remain in chain-facing services.
      send(200,await wallets.createBatch(data.count));return;
+    }
+    if(req.url.endsWith("/export")){
+     if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length!==1||!Array.isArray(data.addresses))throw Error("INVALID_BODY");
+     send(200,await wallets.exportKeys(data.addresses));return;
+    }
+    if(req.url.endsWith("/import")){
+     if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length!==1||!Array.isArray(data.wallets))throw Error("INVALID_BODY");
+     send(200,await wallets.importKeys(data.wallets));return;
     }
     if(req.url.endsWith("/portfolio")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>k!=="limit"&&k!=="mint"))throw Error("INVALID_BODY");send(200,await walletPortfolio.snapshot(data));return;}
     if(req.url.endsWith("/market-data")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>k!=="interval"))throw Error("INVALID_BODY");send(200,await trading.snapshot(data.interval));return;}
@@ -84,7 +96,7 @@ const server=createServer(async(req,res)=>{
     }
     if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).some(k=>!(fund?["address","amount"]:["address"]).includes(k)))throw Error("INVALID_BODY");
     send(200,await (fund?faucet.airdrop(data.address,data.amount):faucet.balance(data.address)));
-   }catch(e){if(e.message==="BODY_TOO_LARGE"){send(413,{code:e.message});return;}if(e.message==="INVALID_BODY_ENCODING"){send(400,{code:e.message});return;}const allowed=new Set(["INVALID_BODY","INVALID_PUBLIC_KEY","INVALID_AMOUNT","AMOUNT_OUT_OF_RANGE","FAUCET_DISABLED","INVALID_LOCAL_CONFIGURATION","GENESIS_MISMATCH","FAUCET_BUSY","RPC_UNAVAILABLE","RPC_REJECTED","SIGNATURE_UNKNOWN","BALANCE_INVALID","WALLET_DIRECTORY_UNSAFE","WALLET_CREATE_BUSY","WALLET_LIMIT","WALLET_KEY_INVALID","WALLET_NOT_FOUND","TRANSFER_DISABLED","TRANSFER_BUSY","SAME_WALLET","TRADE_DISABLED","TRADE_BUSY","PORTFOLIO_UNAVAILABLE","PORTFOLIO_BUSY","PORTFOLIO_DATA_INVALID","INVALID_PORTFOLIO_LIMIT","PORTFOLIO_RPC_UNAVAILABLE","TOKEN_DECIMALS_CONFLICT","LAB_UNAVAILABLE","UNSUPPORTED_MARKET","MARKET_CHANGED"]);send(e.message==="PORTFOLIO_UNAVAILABLE"?503:e.message==="GENESIS_MISMATCH"?409:e.message==="PORTFOLIO_RPC_UNAVAILABLE"?502:400,{code:allowed.has(e.message)?e.message:"LOCAL_RPC_REQUEST_FAILED"})}return;
+   }catch(e){if(e.message==="BODY_TOO_LARGE"){send(413,{code:e.message});return;}if(e.message==="INVALID_BODY_ENCODING"){send(400,{code:e.message});return;}const allowed=new Set(["INVALID_BODY","INVALID_PUBLIC_KEY","INVALID_AMOUNT","AMOUNT_OUT_OF_RANGE","FAUCET_DISABLED","INVALID_LOCAL_CONFIGURATION","GENESIS_MISMATCH","FAUCET_BUSY","RPC_UNAVAILABLE","RPC_REJECTED","SIGNATURE_UNKNOWN","BALANCE_INVALID","WALLET_DIRECTORY_UNSAFE","WALLET_CREATE_BUSY","WALLET_KEY_INVALID","INVALID_KEYPAIR","WALLET_NOT_FOUND","TRANSFER_DISABLED","TRANSFER_BUSY","SAME_WALLET","TRADE_DISABLED","TRADE_BUSY","PORTFOLIO_UNAVAILABLE","PORTFOLIO_BUSY","PORTFOLIO_DATA_INVALID","INVALID_PORTFOLIO_LIMIT","PORTFOLIO_RPC_UNAVAILABLE","TOKEN_DECIMALS_CONFLICT","LAB_UNAVAILABLE","UNSUPPORTED_MARKET","MARKET_CHANGED"]);send(e.message==="PORTFOLIO_UNAVAILABLE"?503:e.message==="GENESIS_MISMATCH"?409:e.message==="PORTFOLIO_RPC_UNAVAILABLE"?502:400,{code:allowed.has(e.message)?e.message:"LOCAL_RPC_REQUEST_FAILED"})}return;
   }
   if(req.method!=="GET"){res.writeHead(405);res.end();return}
   const url=new URL(req.url,"http://127.0.0.1");

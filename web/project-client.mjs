@@ -1,6 +1,7 @@
 // Fail closed on malformed or execution-enabled project metadata from the API.
 function safeProject(p){
- return p&&typeof p.project_id==="string"&&p.project_id.length>0&&Number.isSafeInteger(p.revision)&&p.revision>=1&&p.execution_policy?.enabled===false&&p.execution_policy.mode==="DISABLED"&&p.source_attestation==="UNKNOWN";
+ const policy=p?.execution_policy,disabled=policy?.mode==="DISABLED"&&policy.enabled===false,authorized=policy?.mode==="LOCALNET_AUTHORIZED"&&policy.enabled===true&&policy.requires_risk_approval===true&&policy.unknown_blocks_execution===true&&policy.authorization?.network==="localnet"&&typeof policy.authorization.genesis_hash==="string";
+ return p&&typeof p.project_id==="string"&&p.project_id.length>0&&Number.isSafeInteger(p.revision)&&p.revision>=1&&(disabled||authorized)&&p.source_attestation==="UNKNOWN";
 }
 function safeProjectList(rows){
  return Array.isArray(rows)&&rows.every(safeProject)&&new Set(rows.map(p=>p.project_id)).size===rows.length;

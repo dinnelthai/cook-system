@@ -23,6 +23,8 @@ function commandFromEvent(event){
   case "VERIFY_MARKET":return {market_id:p.market_id,evidence:p.evidence};
   case "SET_BUDGET_LIMITS":return {limits:p.limits};
   case "SET_OPERATIONAL_STATUS":return {status:p.status};
+  case "AUTHORIZE_LOCALNET_EXECUTION":return {approved_by:p.execution_policy.authorization.approved_by,approval_ref:p.execution_policy.authorization.approval_ref};
+  case "REVOKE_LOCALNET_EXECUTION":return {reason:p.reason};
   case "TRANSITION_LIFECYCLE":return {to:p.to,evidence:p.evidence,settlement:p.settlement};
   default:throw Error("PROJECT_EVENT_REPLAY_UNSUPPORTED");
  }

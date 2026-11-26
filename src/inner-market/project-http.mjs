@@ -7,7 +7,7 @@ const ROOT = "/api/projects";
 const OPERATOR_COMMANDS = new Set([
   "UPDATE_PROFILE", "UPDATE_DRAFT_CONFIGURATION", "SET_NETWORK_IDENTITY",
   "SET_TOKEN_CONFIGURATION", "UPSERT_WALLET_GROUP", "RECORD_ISSUANCE_EVIDENCE",
-  "BIND_MARKET", "SET_BUDGET_LIMITS", "SET_OPERATIONAL_STATUS"
+  "BIND_MARKET", "SET_BUDGET_LIMITS", "SET_OPERATIONAL_STATUS", "AUTHORIZE_LOCALNET_EXECUTION", "REVOKE_LOCALNET_EXECUTION"
 ]);
 const OPERATOR_TRANSITIONS = new Set(["READY", "LAUNCH_SUBMITTED", "EXIT_IN_PROGRESS"]);
 function assertOperatorCommand(type, payload) {
@@ -43,7 +43,9 @@ async function bodyJson(req, readRequestJson, maxBytes) {
 function errorResponse(error) {
   const code = typeof error?.message === "string" ? error.message : "";
   if (error?.httpStatus) return { status: error.httpStatus, code };
-  if (["WORKSPACE_DISABLED","EVIDENCE_READER_UNAVAILABLE"].includes(code)) return {status:503,code};
+  if (["WORKSPACE_DISABLED","EVIDENCE_READER_UNAVAILABLE","PROJECT_TRADE_EXECUTION_DISABLED"].includes(code)) return {status:503,code};
+  if (code === "PROJECT_EXECUTION_NOT_AUTHORIZED") return {status:403,code};
+  if (["PROJECT_TRADE_PREVIEW_EXPIRED","PROJECT_TRADE_PREVIEW_ALREADY_USED","PROJECT_TRADE_IDEMPOTENCY_CONFLICT","PROJECT_TRADE_PREVIEW_BINDING_CONFLICT","PROJECT_TRADE_EXECUTION_BUSY"].includes(code)) return {status:409,code};
   if (["PROJECT_ARCHIVE_SIZE_LIMIT","PROJECT_ARCHIVE_CAPACITY","PROJECT_AUDIT_BUNDLE_SIZE_LIMIT"].includes(code)) return {status:413,code};
   if (["WORKSPACE_REVISION_NOT_FOUND","CATALOGUE_RECORD_NOT_FOUND"].includes(code)) return {status:404,code};
   if (["PROJECT_ARCHIVE_INTEGRITY_FAILURE","PROJECT_SNAPSHOT_INTEGRITY_FAILURE","PROJECT_SNAPSHOT_REVISION_MISMATCH","PROJECT_SNAPSHOT_REPLAY_MISMATCH","PROJECT_EVENT_REPLAY_CREATION_INVALID","PROJECT_EVENT_REPLAY_TRANSITION_INVALID","PROJECT_EVENT_CHAIN_INCOMPLETE","PROJECT_EVENT_CHAIN_INVALID"].includes(code)) return {status:422,code};
@@ -61,7 +63,7 @@ function errorResponse(error) {
 
 /** Loopback HTTP adapter for Project CRUD, versioned commands and audit reads.
  * Host/origin enforcement is performed by the parent local-only server. */
-export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence, inspectMarket, resolveReportLink, listReportCandidates, reviewOrderReceipt, importOrderReceipts, reviewProjectClose, reviewProjectTreasury, reviewProjectMarketEvidence } = {}) {
+export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes = 65536, networkConfig, inspectEvidence, inspectMarket, resolveReportLink, listReportCandidates, reviewOrderReceipt, importOrderReceipts, reviewProjectClose, reviewProjectTreasury, reviewProjectMarketEvidence, tradeService } = {}) {
   if (!store || typeof readRequestJson !== "function" || !Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1024) {
     throw Error("INVALID_PROJECT_HTTP_CONFIGURATION");
   }
@@ -97,7 +99,7 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         send(res, 201, { project });
         return true;
       }
-      if (parts.length < 3 || parts.length > 4) { send(res, 404, { code: "PROJECT_ROUTE_NOT_FOUND" }); return true; }
+      if (parts.length < 3 || parts.length > 6) { send(res, 404, { code: "PROJECT_ROUTE_NOT_FOUND" }); return true; }
       let projectId;
       try { projectId = decodeURIComponent(parts[2]); } catch { send(res, 400, { code: "INVALID_PROJECT_ID" }); return true; }
       if (!projectId || projectId.length > 128 || projectId.includes("/") || projectId.includes("\0")) {
@@ -110,6 +112,33 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
         return true;
       }
       const action = parts[3];
+      if (action === "trade") {
+        if (!tradeService) { send(res, 503, {code: "PROJECT_TRADE_EXECUTION_DISABLED"}); return true; }
+        const operation=parts[4];
+        if (parts.length === 5 && operation === "preview") {
+          if (req.method !== "POST") { send(res, 405, {code: "METHOD_NOT_ALLOWED"}); return true; }
+          const input = await bodyJson(req, readRequestJson, maxBodyBytes);
+          const result = await tradeService.createPreview(projectId, input);
+          send(res, 201, {preview: result, execution_enabled: false}); return true;
+        }
+        if (parts.length === 5 && operation === "execute") {
+          if (req.method !== "POST") { send(res, 405, {code: "METHOD_NOT_ALLOWED"}); return true; }
+          const input = await bodyJson(req, readRequestJson, maxBodyBytes);
+          const result = await tradeService.execute(projectId, input);
+          send(res, 200, {execution: result}); return true;
+        }
+        if (parts.length === 6 && operation === "executions") {
+          if (req.method !== "GET") { send(res, 405, {code: "METHOD_NOT_ALLOWED"}); return true; }
+          const result = tradeService.getExecution(decodeURIComponent(parts[5]));
+          send(res, 200, {execution: result}); return true;
+        }
+        if (parts.length === 5 && operation === "reconcile") {
+          if (req.method !== "POST") { send(res, 405, {code: "METHOD_NOT_ALLOWED"}); return true; }
+          const input=await bodyJson(req,readRequestJson,maxBodyBytes);if(Object.keys(input).length!==1||typeof input.execution_id!=="string")throw Error("INVALID_PROJECT_TRADE_EXECUTION_ID");
+          const result=await tradeService.reconcile(projectId,input.execution_id);send(res,200,{execution:result});return true;
+        }
+        send(res, 404, {code: "PROJECT_TRADE_ROUTE_NOT_FOUND"}); return true;
+      }
       if (action === "events" || action === "verify") {
         if (req.method !== "GET") { send(res, 405, { code: "METHOD_NOT_ALLOWED" }); return true; }
         send(res, 200, action === "events" ? { events: store.events(projectId) } : store.verify(projectId));
@@ -298,6 +327,7 @@ export function createProjectHttpHandler({ store, readRequestJson, maxBodyBytes 
           throw Error("INVALID_PROJECT_COMMAND");
         }
         assertOperatorCommand(input.type, input.payload);
+        if(input.type==="AUTHORIZE_LOCALNET_EXECUTION"&&(!tradeService||tradeService.executionAvailable!==true))throw Error("PROJECT_TRADE_EXECUTION_DISABLED");
         const result = store.append(projectId, {
           command_id: input.command_id, type: input.type, payload: input.payload
         }, { expected_revision: input.expected_revision, actor_id: "operator" });

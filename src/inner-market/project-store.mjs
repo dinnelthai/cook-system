@@ -8,6 +8,7 @@ import { createOrderReviewJournal } from "./order-review-journal.mjs";
 import { describeProjectRiskReview } from "./project-risk-review.mjs";
 import { buildProjectAuditBundle, projectRuntimeContextId as runtimeContextId } from "./project-audit-bundle.mjs";
 import { createProjectAggregate, applyProjectCommand, assertProjectAggregate } from "./project-aggregate.mjs";
+import { createProjectTradeExecutionJournal } from "./project-trade-execution-journal.mjs";
 import { replayProjectEvents } from "./project-event-replay.mjs";
 import { evidenceApplicability } from "./project-evidence-scope.mjs";
 import { describeProjectLifecycleEvidence } from "./project-lifecycle-evidence.mjs";
@@ -18,9 +19,9 @@ const MAX_AGGREGATE_BYTES = 1024 * 1024;
 const hash = value => createHash("sha256").update(value, "utf8").digest("hex");
 const clone = value => structuredClone(value);
 const requiredSchemaObjects={
- table:["project_snapshot","project_event","project_archive","order_review_event"],
- index:["project_event_project_revision","project_archive_project","order_review_project"],
- trigger:["project_event_no_update","project_event_no_delete","project_archive_no_update","project_archive_no_delete","order_review_no_update","order_review_no_delete"]
+ table:["project_snapshot","project_event","project_archive","order_review_event","project_trade_preview","project_trade_execution","project_trade_wallet","project_trade_lock"],
+ index:["project_event_project_revision","project_archive_project","order_review_project","project_trade_preview_project","project_trade_wallet_execution"],
+ trigger:["project_event_no_update","project_event_no_delete","project_archive_no_update","project_archive_no_delete","order_review_no_update","order_review_no_delete","project_trade_preview_no_update","project_trade_preview_no_delete"]
 };
 function checkRequiredSchema(db){
  const rows=db.prepare("SELECT type,name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'").all();
@@ -343,6 +344,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
       return getEvidenceSnapshot(projectId).archives;
     }
     const rawOrderReview=createOrderReviewJournal(db,{current,now});
+    const tradeExecution=createProjectTradeExecutionJournal(db,{now,idFactory:makeId});
     const orderReview={append:rawOrderReview.append,importReceipts:rawOrderReview.importReceipts,
       list:projectId=>readSnapshot(()=>rawOrderReview.list(projectId)),
       events:(projectId,orderId)=>readSnapshot(()=>rawOrderReview.events(projectId,orderId))
@@ -398,7 +400,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
         const physical=db.prepare("PRAGMA quick_check").all();
         const foreign=db.prepare("PRAGMA foreign_key_check").all();
         const physicalPass=physical.length===1&&Object.values(physical[0])[0]==="ok";
-        const health=inspectIntegrity();
+        const health=inspectIntegrity();tradeExecution.verify();
         const projects=health.projects.map(row=>{
           if(row.status!=="INTERNALLY_CONSISTENT")return row;
           try{
@@ -438,7 +440,7 @@ export function openProjectStore(path, { idFactory, now = () => Date.now() } = {
           original_database_replaced:false,source_attestation:"UNKNOWN",execution_enabled:false};
       }finally{copy.close();}
     }
-    return { create, lookupCreateRequest, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, exportAuditBundle, getRiskReview, getLifecycleReview, getBusinessReview, getRuntimeContext, getEvidenceSnapshot, close: () => db.close() };
+    return { create, lookupCreateRequest, append, get, list, events, verify, inspectIntegrity, inspectDatabaseIntegrity, createVerifiedBackup, recordArchive, listArchive, orderReview, tradeExecution, exportAuditBundle, getRiskReview, getLifecycleReview, getBusinessReview, getRuntimeContext, getEvidenceSnapshot, close: () => db.close() };
   } catch (error) {
     db.close();
     throw error;

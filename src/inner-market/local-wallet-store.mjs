@@ -24,7 +24,6 @@ export function createWalletStore({directory=join(homedir(),".cook-system","loca
   }
   return rows.sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.address.localeCompare(b.address));
  }
- const capacity=20;
  let busy=false;
  async function createOne(){
    const pair=generateKeyPairSync("ed25519"),pub=pair.publicKey.export({format:"jwk"}),priv=pair.privateKey.export({format:"jwk"});
@@ -43,15 +42,15 @@ export function createWalletStore({directory=join(homedir(),".cook-system","loca
  }
  async function create(){
   if(busy)throw Error("WALLET_CREATE_BUSY");busy=true;
-  try{await ready();if((await list()).length>=capacity)throw Error("WALLET_LIMIT");return await createOne()}
+  try{await ready();return await createOne()}
   finally{busy=false}
  }
  // Local testing inventory only. No funding, project assignment or transaction submission.
  async function createBatch(count){
-  if(!Number.isSafeInteger(count)||count<1||count>capacity)throw Error("INVALID_BODY");
+  if(!Number.isSafeInteger(count)||count<1)throw Error("INVALID_BODY");
   if(busy)throw Error("WALLET_CREATE_BUSY");busy=true;
   try{
-   await ready();if((await list()).length+count>capacity)throw Error("WALLET_LIMIT");
+   await ready();
    const created=[];
    try{for(let i=0;i<count;i++)created.push(await createOne())}
    catch{return {status:"PARTIAL",requested:count,created_count:created.length,wallets:created,code:"WALLET_CREATE_INCOMPLETE"}}
@@ -69,5 +68,45 @@ export function createWalletStore({directory=join(homedir(),".cook-system","loca
    try{const signer=Keypair.fromSeed(secret.subarray(0,32));if(!Buffer.from(signer.secretKey).equals(Buffer.from(secret))||signer.publicKey.toBase58()!==address)throw Error("WALLET_KEY_INVALID");return signer}finally{secret.fill(0)}
   }finally{await handle.close()}
  }
- return {list,create,createBatch,loadSigner};
+ async function exportKeys(addresses){
+  if(!Array.isArray(addresses)||addresses.length<1||addresses.some(address=>typeof address!=="string"))throw Error("INVALID_BODY");
+  const unique=[...new Set(addresses)];
+  const wallets=[],missing=[];
+  for(const address of unique){
+   try{
+    const signer=await loadSigner(address),secret=Array.from(signer.secretKey);
+    signer.secretKey.fill(0);wallets.push({address,secret_key:secret});
+   }catch(error){
+    if(error?.code==="ENOENT"||error?.message==="ENOENT")missing.push(address);else throw error;
+   }
+  }
+  return {requested:unique.length,wallets,missing};
+ }
+ function normalizedSecret(entry){
+  const raw=Array.isArray(entry)?entry:entry&&typeof entry==="object"&&!Array.isArray(entry)?entry.secret_key??entry.secretKey:null;
+  if(!Array.isArray(raw)||raw.length!==64||raw.some(x=>!Number.isInteger(x)||x<0||x>255))throw Error("INVALID_KEYPAIR");
+  const secret=Uint8Array.from(raw);
+  try{
+   const signer=Keypair.fromSeed(secret.subarray(0,32)),address=signer.publicKey.toBase58();
+   if(!Buffer.from(signer.secretKey).equals(Buffer.from(secret)))throw Error("INVALID_KEYPAIR");
+   if(entry&&!Array.isArray(entry)&&entry.address!==undefined&&entry.address!==address)throw Error("INVALID_KEYPAIR");
+   return {address,raw:[...raw]};
+  }catch(error){if(error?.message==="INVALID_KEYPAIR")throw error;throw Error("INVALID_KEYPAIR")}
+  finally{secret.fill(0)}
+ }
+ async function importKeys(entries){
+  if(!Array.isArray(entries)||entries.length<1)throw Error("INVALID_BODY");
+  const normalized=entries.map(normalizedSecret),unique=[];
+  for(const wallet of normalized)if(!unique.some(x=>x.address===wallet.address))unique.push(wallet);
+  if(busy)throw Error("WALLET_CREATE_BUSY");busy=true;
+  const written=[];
+  try{
+   await ready();const existing=new Set((await list()).map(wallet=>wallet.address)),toWrite=unique.filter(wallet=>!existing.has(wallet.address));
+   try{
+    for(const wallet of toWrite){const path=join(directory,wallet.address+".json"),file=await open(path,"wx",0o600);try{await file.writeFile(JSON.stringify(wallet.raw));await file.sync();written.push(path)}finally{await file.close()}}
+   }catch(error){for(const path of written){try{await unlink(path)}catch{}}throw error}
+   return {status:toWrite.length?"IMPORTED":"NOOP",requested:entries.length,imported:toWrite.map(wallet=>({address:wallet.address})),existing:unique.filter(wallet=>existing.has(wallet.address)).map(wallet=>({address:wallet.address}))};
+  }finally{busy=false}
+ }
+ return {list,create,createBatch,loadSigner,exportKeys,importKeys};
 }
