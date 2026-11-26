@@ -1,6 +1,9 @@
-// Execution controls remain disabled. Log contains retrospective, scoped receipt evidence only.
+// The panel prepares project-bound multi-wallet plans. Signing and submission
+// happen only through the project-scoped server client after explicit confirmation.
+import {createTradePreview,executeTradePreview,reconcileTradeExecution,authorizeLocalnetExecution,revokeLocalnetExecution} from "./project-trade-client.mjs";
 const key=v=>typeof v==="string"&&/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v);
 const signature=v=>typeof v==="string"&&/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(v);
+const raw=v=>typeof v==="string"&&/^(0|[1-9][0-9]{0,38})$/.test(v);
 export function receiptTradeRows(history,mint=null,{currentOnly=true,field="time",direction="descending"}={}){
  if(!Array.isArray(history)||currentOnly&&!mint)return [];
  const entries=new Map(),conflicts=new Set();
@@ -18,47 +21,83 @@ export function receiptTradeRows(history,mint=null,{currentOnly=true,field="time
  const rows=[...entries.values()].filter(r=>!conflicts.has(r.signature)&&(!currentOnly||r.mint===mint));
  return rows.sort((a,b)=>{const x=field==="sol"?BigInt(a.quote_lamports):BigInt(a.block_time),y=field==="sol"?BigInt(b.quote_lamports):BigInt(b.block_time);return (direction==="ascending"?1:-1)*(x<y?-1:x>y?1:0)||a.signature.localeCompare(b.signature)});
 }
-function formatSol(value){const n=BigInt(value),fraction=(n%1000000000n).toString().padStart(9,"0").replace(/0+$/,"");return (n/1000000000n).toString()+(fraction?"."+fraction:"")}
-const short=v=>v.slice(0,6)+"…"+v.slice(-5);
-export function mountTradePanelPreview(host){
+function formatSol(value){if(value==null)return "—";const n=BigInt(value),fraction=(n%1000000000n).toString().padStart(9,"0").replace(/0+$/,"" );return (n/1000000000n).toString()+(fraction?"."+fraction:"")+" SOL"}
+function formatToken(value,decimals){if(value==null)return "—";const n=BigInt(value),scale=10n**BigInt(decimals??0),fraction=(n%scale).toString().padStart(Number(decimals??0),"0").replace(/0+$/,"" );return (n/scale).toString()+(fraction?"."+fraction:"")}
+function parseSol(value){const s=String(value??"").trim();if(!/^\d+(?:\.\d{1,9})?$/.test(s))return null;const [whole,fraction=""] = s.split("."),n=BigInt(whole)*1000000000n+BigInt(fraction.padEnd(9,"0"));return n>0n&&n<2n**64n?n:null}
+function planFor(side,plans){return side==="BUY"?plans?.buy??null:plans?.sell??null}
+function planRows(side,selected,plan,mint){
+ if(!mint||!Array.isArray(selected)||!plan)return {valid:[],invalid:selected??[],total:0n,decimals:null,reason:"Set amounts first."};
+ const valid=[],invalid=[];let total=0n,decimals=null;
+ for(const row of selected){
+  let amount=null,reason=null;
+  if(side==="BUY"){
+   if(plan.distribution!=="same")reason="Range buy requires a quote before execution.";
+   else amount=parseSol(plan.amount);
+   if(!amount)reason="Invalid SOL amount.";
+   else if(!raw(row.sol))reason="SOL balance unknown.";
+   else if(amount>BigInt(row.sol))reason="Insufficient observed SOL balance.";
+  }else{
+   decimals=Number.isInteger(row.decimals)?row.decimals:null;
+   if(!raw(row.tokens)||decimals===null)reason="Token balance unknown.";
+   else if(!Number.isInteger(plan.percent)||plan.percent<1||plan.percent>100)reason="Invalid sell percentage.";
+   else {amount=BigInt(row.tokens)*BigInt(plan.percent)/100n;if(amount===0n)reason="Sell amount rounds to zero."}
+  }
+  if(reason)invalid.push({...row,reason});else{valid.push({...row,amount_base_units:amount.toString()});total+=amount}
+ }
+ return {valid,invalid,total,decimals,reason:invalid.length?invalid[0].reason:null};
+}
+function reviewDialog(host,{title,preview,rows,onConfirm}){
+ const doc=host.ownerDocument,dialog=doc.createElement("dialog");dialog.className="reference-wallet-dialog";
+ const body=rows.map(row=>"<li>"+String(row.address).slice(0,6)+"…"+String(row.address).slice(-5)+" · "+row.amount+"</li>").join("");
+ dialog.innerHTML="<h3>"+title+" preview</h3><p>Sequential, non-atomic Localnet execution. Each wallet is simulated, signed, broadcast and confirmed independently.</p><ul>"+(body||"<li>No valid wallets.</li>")+"</ul><p class=\"trade-hint\">Preview "+preview.preview_id+" · Revision "+preview.project_revision+" · Expires "+new Date(preview.expires_at_ms).toISOString()+"</p><p data-execute-status role=\"status\">Ready for explicit confirmation.</p><div class=\"row\"><button type=\"button\" data-execute-cancel>Cancel</button><button type=\"button\" data-execute-confirm>Confirm & Execute</button></div>";
+ const status=dialog.querySelector("[data-execute-status]"),confirm=dialog.querySelector("[data-execute-confirm]");dialog.querySelector("[data-execute-cancel]").onclick=()=>dialog.close();confirm.onclick=async()=>{confirm.disabled=true;status.textContent="Executing wallets in order…";try{await onConfirm();dialog.close()}catch(error){status.textContent="Execution failed: "+error.message;confirm.disabled=false}};
+ doc.body.append(dialog);dialog.addEventListener("close",()=>dialog.remove(),{once:true});dialog.showModal();
+}
+export function mountTradePanelPreview(host,{onExecutionComplete=()=>{},onProjectChanged=()=>{}}={}){
  host.innerHTML=`<section class="reference-trade-section reference-bundle">
  <div class="reference-trade-heading"><h3>多钱包买卖</h3><span class="reference-wallet-count" data-preview-count>0/0 个钱包买入</span></div>
- <div class="reference-direction" role="group" aria-label="预览交易方向"><button type="button" data-preview-side="BUY" aria-pressed="true">多钱包买入</button><button type="button" data-preview-side="SELL" aria-pressed="false">多钱包卖出</button></div>
- <div class="reference-card-grid"><div class="reference-stat"><span>交易笔数</span><strong>0</strong></div><div class="reference-stat"><span data-preview-total-label>买入总额</span><strong data-preview-total>0.0000 SOL</strong></div></div>
- <div class="reference-delay" aria-label="交易延迟（仅展示）"><button type="button" disabled aria-label="减少延迟">−</button><button type="button" disabled>交易延迟（区块）</button><button type="button" disabled aria-label="增加延迟">+</button></div>
- <div class="reference-card-grid"><div class="reference-stat"><span>预计间隔</span><strong>0.0 秒（交易间隔）</strong></div><div class="reference-stat"><span>预计耗时</span><strong>0.0 秒（总耗时）</strong></div></div>
- <button class="reference-action reference-buy" type="button" data-preview-action disabled>买入</button>
+ <div class="reference-direction" role="group" aria-label="Preview trade direction"><button type="button" data-preview-side="BUY" aria-pressed="true">多钱包买入</button><button type="button" data-preview-side="SELL" aria-pressed="false">多钱包卖出</button></div>
+ <div class="reference-card-grid"><div class="reference-stat"><span>交易笔数</span><strong data-preview-tx>0</strong></div><div class="reference-stat"><span data-preview-total-label>买入总额</span><strong data-preview-total>0.0000 SOL</strong></div></div>
+ <div class="reference-card-grid"><div class="reference-stat"><span>预计获得</span><strong data-preview-receive>请选择代币</strong></div><div class="reference-stat"><span>预计 AMM 费用</span><strong data-preview-fee>请选择代币</strong></div></div>
+ <div class="reference-delay" aria-label="Transaction delay in blocks"><button type="button" data-delay-decrease aria-label="Decrease delay">−</button><button type="button" data-delay-value aria-live="polite">TX Delay: 0 Blocks</button><button type="button" data-delay-increase aria-label="Increase delay">+</button></div>
+ <div class="reference-card-grid"><div class="reference-stat"><span>预计间隔</span><strong data-estimated-interval>无延迟</strong></div><div class="reference-stat"><span>预计耗时</span><strong data-estimated-time>无延迟</strong></div></div>
+ <p class="trade-hint" data-preview-status>Select a token and set amounts to prepare a preview.</p><button type="button" data-execution-policy disabled>Authorize Localnet Execution</button><button class="reference-action reference-buy" type="button" data-preview-action disabled>Review Buy</button>
  </section>
- <section class="reference-trade-section reference-exit"><h3>退出持仓</h3><div class="reference-card-grid"><div class="reference-stat"><span>待卖出代币</span><strong>0</strong></div><div class="reference-stat"><span>预计收到 SOL</span><strong>0.0000 SOL</strong></div></div><div class="reference-stat"><span>本轮收益</span><strong class="reference-positive">+0.0000 SOL</strong></div><p class="reference-session">本代币会话收益：<span class="reference-positive">+0.0000 SOL</span></p><button type="button" class="reference-action reference-dump" disabled>退出持仓</button></section>
- <section class="reference-trade-section reference-log"><div class="reference-trade-heading"><h3>成交记录</h3><label class="reference-mint-filter">仅当前代币 <input type="checkbox" checked aria-label="仅当前代币"></label></div><table aria-label="成交记录预览"><thead><tr><th>钱包</th><th aria-sort="none"><button type="button" data-preview-sort>SOL <span aria-hidden="true">▴▾</span></button></th><th>代币地址</th><th aria-sort="none"><button type="button" data-preview-sort>时间 <span aria-hidden="true">▴▾</span></button></th></tr></thead><tbody><tr><td colspan="4">暂无成交。</td></tr></tbody></table></section>`;
- const q=s=>host.querySelector(s);
- let receiptHistory=null,currentMint=null,field="time",direction="descending";
+ <section class="reference-trade-section reference-exit"><h3>Dump It</h3><div class="reference-card-grid"><div class="reference-stat"><span>Tokens To Sell</span><strong data-dump-tokens>0</strong></div><div class="reference-stat"><span>SOL Amount to Receive</span><strong data-dump-sol>请选择代币</strong></div></div><div class="reference-stat"><span>Play Profit</span><strong class="reference-positive" data-dump-profit>Cost basis unavailable</strong></div><p class="reference-session">Session on this token: <span class="reference-positive" data-session-profit>Cost basis unavailable</span></p><p class="trade-hint" data-dump-status>Select wallets with observed token balances.</p><button type="button" class="reference-action reference-dump" data-dump-action disabled>Review Dump</button></section>
+ <section class="reference-trade-section reference-log"><div class="reference-trade-heading"><h3>Trades Log</h3><label class="reference-mint-filter">Current Mint Only <input type="checkbox" checked aria-label="Current Mint Only"></label></div><table aria-label="Preview trades log"><thead><tr><th>Wallet</th><th>Side</th><th aria-sort="none"><button type="button" data-preview-sort>SOL <span aria-hidden="true">▴▾</span></button></th><th>Mint</th><th aria-sort="none"><button type="button" data-preview-sort>Time <span aria-hidden="true">▴▾</span></button></th><th>Status</th></tr></thead><tbody><tr><td colspan="6">No trades yet.</td></tr></tbody></table></section>
+ <section class="reference-trade-section reference-results"><h3>Execution Results</h3><p class="trade-hint" data-execution-status>No execution started.</p><div data-execution-results></div><button type="button" data-execution-reconcile hidden>Reconcile Unknown</button></section>
+ <section class="reference-trade-section reference-settings"><details><summary>Transaction Settings</summary><div class="reference-card-grid"><label class="reference-stat">Priority preset<select data-tx-preset disabled><option>Fast</option><option>Turbo</option><option>Custom</option></select></label><label class="reference-stat">Priority Fee<input data-tx-fee type="text" inputmode="decimal" placeholder="Unsupported" disabled></label><label class="reference-stat">Slippage<input data-tx-slip type="text" inputmode="decimal" placeholder="SDK fixed" disabled></label><label class="reference-stat">Dump Slippage<input data-tx-dump-slip type="text" inputmode="decimal" placeholder="SDK fixed" disabled></label></div><p class="trade-hint">Fee payer is each selected managed wallet. Jito Tip and MEV Protection are unavailable.</p></details></section>`;
+ const q=selector=>host.querySelector(selector);
+ let receiptHistory=null,currentMint=null,field="time",direction="descending",side="BUY",model=null,plans={buy:null,sell:null},project=null,execution=null,busy=false,delayBlocks=0,lastQuote=null;
  const filter=q(".reference-mint-filter input"),tbody=q(".reference-log tbody");
  function drawLog(){
-  const rows=receiptTradeRows(receiptHistory,currentMint,{currentOnly:filter.checked,field,direction});
-  const doc=host.ownerDocument;tbody.replaceChildren();
-  for(const row of rows){
-   const tr=doc.createElement("tr");
-   for(const [label,detail] of [[short(row.wallet),row.wallet],[(row.side==="BUY"?"−":"+")+formatSol(row.quote_lamports),"最终确认的成交报价额，不含单独收取的网络费用"],[short(row.mint),row.mint],[new Date(row.block_time*1000).toISOString(),row.signature]]){
-    const td=doc.createElement("td");td.textContent=label;td.title=detail;tr.append(td);
-   }
-   tbody.append(tr);
-  }
-  if(!rows.length){const tr=doc.createElement("tr"),td=doc.createElement("td");td.colSpan=4;td.textContent=filter.checked&&!currentMint?"请选择代币。":receiptHistory===null?"历史收据不可用。":"近期收据中暂无已核对且最终确认的成交。";tr.append(td);tbody.append(tr);}
+  const rows=receiptTradeRows(receiptHistory,currentMint,{currentOnly:filter.checked,field,direction}),doc=host.ownerDocument;tbody.replaceChildren();
+  for(const row of rows){const tr=doc.createElement("tr");for(const [label,detail] of [[String(row.wallet).slice(0,6)+"…"+String(row.wallet).slice(-5),row.wallet],[row.side,row.side],[(row.side==="BUY"?"−":"+")+formatSol(row.quote_lamports).replace(" SOL","")+" SOL","Finalized swap quote; excludes separately charged network costs"],[String(row.mint).slice(0,6)+"…"+String(row.mint).slice(-5),row.mint],[new Date(row.block_time*1000).toISOString(),row.signature],["CONFIRMED","Finalized receipt"]]){const td=doc.createElement("td");td.textContent=label;td.title=detail;tr.append(td)}tbody.append(tr)}
+  if(!rows.length){const tr=doc.createElement("tr"),td=doc.createElement("td");td.colSpan=6;td.textContent=filter.checked&&!currentMint?"Select a token.":receiptHistory===null?"Receipt history unavailable.":"No reconciled finalized swaps in recent receipts.";tr.append(td);tbody.append(tr)}
  }
+ function authorizationBlocker(){if(!project)return "Select a project.";if(project.network?.cluster!=="localnet"||!project.network?.genesis_hash)return "Project Localnet Genesis is missing.";if(project.lifecycle?.stage!=="PUMPSWAP_ACTIVE"||project.lifecycle?.operational_status!=="ACTIVE")return "Project must be PUMPSWAP_ACTIVE and ACTIVE.";if(!project.markets?.some(m=>m.venue==="PUMP_SWAP"&&m.verification_status==="VERIFIED"))return "A verified PumpSwap market is required.";if(!project.wallet_groups?.some(g=>g.members.some(m=>m.enabled&&["OPERATOR","EXECUTOR"].includes(m.role))))return "An enabled OPERATOR or EXECUTOR wallet is required.";if([project.limits?.max_project_budget_base_units,project.limits?.max_order_size_base_units,project.limits?.max_wallet_exposure_base_units].some(v=>v==null))return "Project, order and wallet execution limits are required.";return null}
+ function drawDelay(txCount){const seconds=delayBlocks*.4,interval=q("[data-estimated-interval]"),total=q("[data-estimated-time]");q("[data-delay-value]").textContent="TX Delay: "+delayBlocks+" Block"+(delayBlocks===1?"":"s");q("[data-delay-decrease]").disabled=busy||delayBlocks===0;q("[data-delay-increase]").disabled=busy||delayBlocks===20;interval.textContent=delayBlocks?seconds.toFixed(1)+"s estimated":"无延迟";total.textContent=delayBlocks&&txCount>1?(seconds*(txCount-1)).toFixed(1)+"s estimated":"无延迟"}
+ function drawPlan(){
+  const selected=Array.isArray(model?.selectedRows)?model.selectedRows:[],plan=planFor(side,plans),result=planRows(side,selected,plan,currentMint),hasToken=!!currentMint;
+  const label=side==="BUY"?"个钱包买入":"个钱包卖出";q("[data-preview-count]").textContent=result.valid.length+"/"+selected.length+" "+label;q("[data-preview-tx]").textContent=String(result.valid.length);q("[data-preview-total-label]").textContent=side==="BUY"?"买入总额":"卖出总额";
+  q("[data-preview-total]").textContent=side==="BUY"?(result.valid.length?formatSol(result.total):"0.0000 SOL"):(result.valid.length?formatToken(result.total,result.decimals):"0 Tokens");
+  const quoteMatches=lastQuote&&lastQuote.side===side&&lastQuote.delay_blocks===delayBlocks&&lastQuote.selected_key===result.valid.map(row=>row.address+":"+row.amount_base_units).join("|");q("[data-preview-receive]").textContent=!hasToken?"请选择代币":quoteMatches?lastQuote.receive:"需要预览";q("[data-preview-fee]").textContent=!hasToken?"请选择代币":quoteMatches?lastQuote.fee:"需要预览";drawDelay(result.valid.length);
+  const authorized=project?.execution_policy?.mode==="LOCALNET_AUTHORIZED"&&project.execution_policy.enabled===true;
+  q("[data-preview-status]").textContent=!hasToken?"Select an issued Meme.":model?.portfolioStatus?.startsWith("Localnet asset query failed")?model.portfolioStatus:!authorized?"Project execution is not authorized.":!selected.length?"Select wallets in the Wallets table.":!plan?"Set Buy Amounts or Sell Percentage.":result.invalid.length?result.invalid.length+" wallet(s) need attention: "+result.reason:result.valid.length+" wallet(s) ready for a server-bound preview.";
+  const blocker=authorizationBlocker(),policy=q("[data-execution-policy]");policy.textContent=authorized?"Revoke Localnet Execution":"Authorize Localnet Execution";policy.disabled=busy||!project||(!authorized&&!!blocker);policy.title=authorized?"Revoke project execution authorization":blocker??"Authorize project-bound Localnet signing and broadcast";
+  const action=q("[data-preview-action]");action.textContent=busy?"Processing…":side==="BUY"?"Preview Buy":"Preview Sell";action.classList.toggle("reference-sell",side==="SELL");action.disabled=busy||!authorized||!hasToken||!result.valid.length||!!result.invalid.length;
+  const dumpPlan={side:"sell",percent:100},sellTokens=planRows("SELL",selected,dumpPlan,currentMint);q("[data-dump-tokens]").textContent=sellTokens.valid.length?formatToken(sellTokens.total,sellTokens.decimals):"0";const dumpQuoteMatches=lastQuote?.dump&&lastQuote.delay_blocks===delayBlocks&&lastQuote.selected_key===sellTokens.valid.map(row=>row.address+":"+row.amount_base_units).join("|");q("[data-dump-sol]").textContent=!hasToken?"请选择代币":dumpQuoteMatches?lastQuote.receive:"需要预览";q("[data-dump-profit]").textContent="Cost basis unavailable";q("[data-session-profit]").textContent="Cost basis unavailable";q("[data-dump-status]").textContent=!hasToken?"Select an issued Meme.":!authorized?"Project execution is not authorized.":!sellTokens.valid.length?"Select wallets with observed token balances.":sellTokens.invalid.length?"Some selected wallets have unknown token balances.":"Wallets with observed tokens are ready for a server-bound dump preview.";q("[data-dump-action]").disabled=busy||!authorized||!hasToken||!sellTokens.valid.length||!!sellTokens.invalid.length;
+ }
+ function drawExecution(){const status=q("[data-execution-status]"),body=q("[data-execution-results]"),reconcile=q("[data-execution-reconcile]");body.replaceChildren();status.textContent=execution?"Batch "+execution.status+" · "+execution.execution_id:"No execution started.";for(const wallet of execution?.wallets??[]){const p=host.ownerDocument.createElement("p");p.className="trade-hint";p.textContent=String(wallet.wallet).slice(0,6)+"…"+String(wallet.wallet).slice(-5)+" · "+wallet.status+(wallet.signature?" · "+wallet.signature:"")+(wallet.reason?" · "+wallet.reason:"");body.append(p)}reconcile.hidden=!execution?.wallets?.some(w=>w.status==="UNKNOWN"&&w.signature)}
+ async function beginPreview(requestSide,rows,title){busy=true;drawPlan();try{const market=project?.markets?.find(m=>m.venue==="PUMP_SWAP"&&m.verification_status==="VERIFIED");if(!market)throw Error("VERIFIED_PUMPSWAP_MARKET_REQUIRED");const preview=await createTradePreview(project.project_id,{market_id:market.market_id,side:requestSide.toLowerCase(),delay_blocks:delayBlocks,orders:rows.valid.map(row=>({wallet:row.address,amount_base_units:row.amount_base_units}))});if(preview.quote_status==="ESTIMATED"){const receive=preview.orders.reduce((sum,row)=>sum+BigInt(row.estimated_receive_base_units),0n),fees=preview.orders.reduce((sum,row)=>sum+BigInt(row.estimated_fee_base_units),0n);lastQuote={side:requestSide,delay_blocks:delayBlocks,selected_key:rows.valid.map(row=>row.address+":"+row.amount_base_units).join("|"),receive:requestSide==="BUY"?formatToken(receive,model?.selectedRows?.find(row=>Number.isInteger(row.decimals))?.decimals??0):formatSol(receive),fee:formatSol(fees),dump:title==="Dump It"};drawPlan();if(title==="Dump It")q("[data-dump-sol]").textContent=formatSol(receive)}reviewDialog(host,{title,preview,rows:rows.valid.map(row=>({...row,amount:requestSide==="BUY"?formatSol(row.amount_base_units):formatToken(row.amount_base_units,row.decimals)})),onConfirm:async()=>{const key=globalThis.crypto?.randomUUID?.()??("execute-"+Date.now());execution=await executeTradePreview(project.project_id,preview.preview_id,key);drawExecution();await onExecutionComplete(execution)}})}finally{busy=false;drawPlan()}}
  filter.onchange=drawLog;
- host.querySelectorAll("[data-preview-side]").forEach(button=>button.onclick=()=>{
-  const sell=button.dataset.previewSide==="SELL";
-  host.querySelectorAll("[data-preview-side]").forEach(b=>b.setAttribute("aria-pressed",String(b===button)));
-  q("[data-preview-count]").textContent=sell?"0/0 个钱包卖出":"0/0 个钱包买入";
-  q("[data-preview-total-label]").textContent=sell?"卖出总额":"买入总额";
-  q("[data-preview-total]").textContent=sell?"0 代币":"0.0000 SOL";
-  const action=q("[data-preview-action]");action.textContent=sell?"卖出":"买入";action.classList.toggle("reference-sell",sell);
- });
- host.querySelectorAll("[data-preview-sort]").forEach(button=>button.onclick=()=>{
-  const th=button.closest("th"),next=th.getAttribute("aria-sort")==="ascending"?"descending":"ascending";
-  host.querySelectorAll("th[aria-sort]").forEach(t=>t.setAttribute("aria-sort","none"));th.setAttribute("aria-sort",next);
-  button.querySelector("span").textContent=next==="ascending"?"▴":"▾";field=button.textContent.startsWith("SOL")?"sol":"time";direction=next;drawLog();
- });
- drawLog();return {setReceiptHistory(history,mint){receiptHistory=history;currentMint=mint;drawLog();}};
+ host.querySelectorAll("[data-preview-side]").forEach(button=>button.onclick=()=>{side=button.dataset.previewSide;lastQuote=null;host.querySelectorAll("[data-preview-side]").forEach(b=>b.setAttribute("aria-pressed",String(b===button)));drawPlan()});
+ q("[data-delay-decrease]").onclick=()=>{if(delayBlocks>0&&!busy){delayBlocks--;lastQuote=null;drawPlan()}};q("[data-delay-increase]").onclick=()=>{if(delayBlocks<20&&!busy){delayBlocks++;lastQuote=null;drawPlan()}};
+ q("[data-execution-policy]").onclick=async()=>{if(!project||busy)return;const authorized=project.execution_policy?.mode==="LOCALNET_AUTHORIZED"&&project.execution_policy.enabled===true;if(!host.ownerDocument.defaultView.confirm(authorized?"Revoke Localnet execution for this project?":"Authorize real Localnet signing and broadcast for this project?"))return;busy=true;drawPlan();try{project=authorized?await revokeLocalnetExecution(project.project_id,project.revision,"operator revoked from Trade panel"):await authorizeLocalnetExecution(project.project_id,project.revision,"operator Trade panel authorization");execution=null;drawExecution();await onProjectChanged(project)}catch(error){q("[data-preview-status]").textContent="Authorization failed: "+error.message}finally{busy=false;drawPlan()}};
+ q("[data-preview-action]").onclick=()=>{const result=planRows(side,model?.selectedRows??[],planFor(side,plans),currentMint);void beginPreview(side,result,side==="BUY"?"多钱包买入":"多钱包卖出")};
+ q("[data-dump-action]").onclick=()=>{const result=planRows("SELL",model?.selectedRows??[],{side:"sell",percent:100},currentMint);void beginPreview("SELL",result,"Dump It")};
+ q("[data-execution-reconcile]").onclick=async()=>{if(!execution||busy)return;busy=true;drawPlan();try{execution=await reconcileTradeExecution(project.project_id,execution.execution_id);drawExecution();await onExecutionComplete(execution)}finally{busy=false;drawPlan()}};
+ host.querySelectorAll("[data-preview-sort]").forEach(button=>button.onclick=()=>{const th=button.closest("th"),next=th.getAttribute("aria-sort")==="ascending"?"descending":"ascending";host.querySelectorAll("th[aria-sort]").forEach(t=>t.setAttribute("aria-sort","none"));th.setAttribute("aria-sort",next);button.querySelector("span").textContent=next==="ascending"?"▴":"▾";field=button.textContent.startsWith("SOL")?"sol":"time";direction=next;drawLog()});
+ drawPlan();drawLog();drawExecution();
+ return {setProject(next){const changed=project?.project_id!==next?.project_id||project?.revision!==next?.revision||project?.token?.mint!==next?.token?.mint;project=next;currentMint=next?.token?.mint??null;receiptHistory=null;if(changed){execution=null;lastQuote=null}drawPlan();drawLog();drawExecution()},setWalletModel(next){const nextPlans=next?.tradePlans??plans,nextKey=(next?.selectedRows??[]).map(row=>row.address).join("|");if(nextKey!==(model?.selectedRows??[]).map(row=>row.address).join("|")||JSON.stringify(nextPlans)!==JSON.stringify(plans))lastQuote=null;model=next;plans=nextPlans;drawPlan();drawLog()},setReceiptHistory(history,mint){receiptHistory=history;currentMint=mint;drawPlan();drawLog()}};
 }
