@@ -61,7 +61,7 @@ export function mountCurrentTerminal({main,nav,esc,activeProjectId,getProjectDir
   main.querySelectorAll("[data-current-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.currentMode===mode)));
   if(mode==="launch"&&!launchMounted){launchMounted=true;mountProjectSetup(launchHost,{terminalMode:true,initialProjectId:activeProjectId,initialMessage:projectMessage,onActiveProjectId:id=>{onSelect(id);activeProjectId=id;void load()},isActive:()=>alive()&&mode==="launch",screenHeading,panel,note,table,esc,download,projectRegistry,record,errorKind});}
  }
- q("[data-footer-settings]").onclick=()=>onNavigate("logs");q("[data-footer-refresh]").onclick=async()=>{await load();if(alive()&&project)void wallet.refresh()};
+ q("[data-footer-settings]").onclick=()=>onNavigate("logs");q("[data-footer-refresh]").onclick=async()=>{await load();if(alive())void wallet.refresh()};
  n("[data-token-form]").onsubmit=e=>{e.preventDefault();selectToken()};
  q("#terminal-project-select").onchange=()=>selectToken();
  n("[data-token-paste]").onclick=async()=>{try{const value=await main.ownerDocument.defaultView.navigator.clipboard.readText();if(!alive())return;q("#terminal-project-select").value=value.trim();selectToken()}catch{if(alive())tokenStatus("Paste the token address into the field.")}};
