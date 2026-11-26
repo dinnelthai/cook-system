@@ -22,12 +22,14 @@ export function openWalletActionReview(anchor,{action,rows,availableWallets=[],e
  dialog.className="wallet-action-review";
  dialog.setAttribute("aria-labelledby","wallet-action-title");
  const summary=walletReviewSummary(rows);
- const rowHtml=rows.map(r=>'<tr><td title="'+esc(r.address)+'">'+esc(r.address.length>16?r.address.slice(0,6)+"…"+r.address.slice(-5):r.address)+'</td><td>'+esc(sol(r.sol))+'</td><td>'+esc(r.status)+'</td></tr>').join("");
+ const canDrag=Number(action)===0;
+ const rowHtml=rows.map(r=>'<tr'+(canDrag?' draggable="true" data-war-drag="'+esc(r.address)+'"':'')+'><td title="'+esc(r.address)+'">'+(canDrag?'<span class="war-grip" aria-hidden="true">⠿</span>':'')+''+esc(r.address.length>16?r.address.slice(0,6)+"…"+r.address.slice(-5):r.address)+'</td><td>'+esc(sol(r.sol))+'</td><td>'+esc(r.status)+'</td></tr>').join("");
  const sourceAddresses=new Set(rows.map(r=>r.address));
  const candidates=availableWallets.filter(w=>!sourceAddresses.has(w.address));
  const showWalletPicker=[0,1,2].includes(Number(action));
  const options=candidates.map(w=>'<option value="'+esc(w.address)+'">'+esc(w.address)+'</option>').join("");
- const destination=showWalletPicker?'<select class="war-wallet-picker" aria-label="'+esc(config.destination)+'"><option value="">'+(candidates.length?'Select wallet for review':'No other wallets available')+'</option>'+options+'</select><small class="war-preview">Address review only.</small>':'<div class="war-placeholder">'+(config.single&&rows.length!==1?'One source wallet required':'Destination not configured')+'</div>';
+ const picker=showWalletPicker?'<select class="war-wallet-picker" aria-label="'+esc(config.destination)+'"><option value="">'+(candidates.length?'Select wallet for review':'No other wallets available')+'</option>'+options+'</select><small class="war-preview">Address review only.</small>':'<div class="war-placeholder">'+(config.single&&rows.length!==1?'One source wallet required':'Destination not configured')+'</div>';
+ const destination=canDrag?'<div class="war-dropzone" data-war-drop tabindex="0" aria-label="Receiving wallet address preview"><span class="war-drop-icon" aria-hidden="true">↓</span><span data-war-drop-label>Drag a wallet here to review its address</span><button type="button" data-war-clear hidden aria-label="Clear address">×</button></div>'+picker:picker;
  const issue=rows.length===0?"Select wallets in the Wallets table first.":config.single&&rows.length!==1?"Select exactly one source wallet to review Split.":summary.unverified>0?"Some wallet assets are not verified. Check Localnet RPC.":"Read-only review. No asset operation will be performed.";
  dialog.innerHTML='<header class="war-header"><div><h3 id="wallet-action-title">'+esc(config.title)+'</h3><p>'+esc(config.description)+'</p></div><button type="button" data-war-close class="war-close" aria-label="Close">×</button></header>'+
  '<div class="war-metrics"><div><small>SELECTED WALLETS</small><strong>'+summary.count+'</strong></div><div><small>TOTAL SOL</small><strong>'+esc(sol(summary.sol))+'</strong></div><div><small>OPERATION</small><strong>'+esc(config.relation)+'</strong></div></div>'+
@@ -36,6 +38,24 @@ export function openWalletActionReview(anchor,{action,rows,availableWallets=[],e
  '<div class="war-message" role="status">'+esc(issue)+'</div><p class="war-preview">UI preview · No wallet migration, transfer, split or deletion will be performed.</p>'+
  '<footer class="war-footer"><button type="button" data-war-cancel>Cancel</button><button type="button" disabled class="war-primary">'+esc(config.button)+'</button></footer>';
  doc.body.append(dialog);
+ if(canDrag){
+  const zone=dialog.querySelector("[data-war-drop]"),label=dialog.querySelector("[data-war-drop-label]"),clear=dialog.querySelector("[data-war-clear]"),select=dialog.querySelector(".war-wallet-picker");
+  let dragging=null;
+  const reset=()=>{label.textContent="Drag a wallet here to review its address";zone.classList.remove("has-address");clear.hidden=true;select.value="";};
+  const preview=address=>{if(!rows.some(r=>r.address===address)&&!candidates.some(r=>r.address===address))return;label.textContent=address;zone.classList.add("has-address");clear.hidden=false;};
+  dialog.querySelectorAll("[data-war-drag]").forEach(row=>{
+   row.addEventListener("dragstart",e=>{dragging=row.dataset.warDrag;e.dataTransfer.effectAllowed="copy";e.dataTransfer.setData("text/plain",dragging);row.classList.add("war-dragging");});
+   row.addEventListener("dragend",()=>{dragging=null;row.classList.remove("war-dragging");zone.classList.remove("is-over");});
+   row.tabIndex=0;row.setAttribute("aria-label","Review wallet address "+row.dataset.warDrag);
+   row.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();preview(row.dataset.warDrag);select.value="";}});
+  });
+  zone.addEventListener("dragover",e=>{if(dragging&&sourceAddresses.has(dragging)){e.preventDefault();e.dataTransfer.dropEffect="copy";zone.classList.add("is-over");}});
+  zone.addEventListener("dragleave",()=>zone.classList.remove("is-over"));
+  zone.addEventListener("drop",e=>{e.preventDefault();zone.classList.remove("is-over");if(dragging&&sourceAddresses.has(dragging)){preview(dragging);select.value="";}dragging=null;});
+  select.addEventListener("change",()=>{if(select.value)preview(select.value);else reset();});
+  clear.addEventListener("click",reset);
+ }
+
  dialog.querySelector("[data-war-close]").onclick=()=>dialog.close();
  dialog.querySelector("[data-war-cancel]").onclick=()=>dialog.close();
  dialog.addEventListener("close",()=>{dialog.remove();if(anchor.isConnected)anchor.focus({preventScroll:true})},{once:true});

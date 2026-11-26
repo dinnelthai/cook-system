@@ -770,6 +770,16 @@ main[data-page=terminal] .current-terminal .reference-keys-menu button:disabled{
 
 .wallet-action-review .war-wallet-picker{display:block;width:100%;min-height:42px;padding:8px 12px;background:#101616;border:1px solid #294747;border-radius:9px;color:#c1c7c8;font:inherit}
 .wallet-action-review .war-wallet-picker + small{display:block;margin:6px 0 0}
+
+.wallet-action-review .war-dropzone{display:flex;align-items:center;gap:10px;min-height:64px;margin:0 0 8px;padding:12px;border:1px dashed #547777;border-radius:10px;background:#132020;color:#a7b6b6;overflow-wrap:anywhere}
+.wallet-action-review .war-dropzone.is-over,.wallet-action-review .war-dropzone.has-address{border-color:#83b1b1;background:#193333;color:#e3eeee}
+.wallet-action-review .war-drop-icon{font-size:18px;color:#83b1b1}
+.wallet-action-review [data-war-drop-label]{flex:1;min-width:0}
+.wallet-action-review [data-war-clear]{border:0;background:transparent;color:#c1c7c8;font-size:20px;padding:0 4px;cursor:pointer}
+.wallet-action-review [data-war-drag]{cursor:grab}
+.wallet-action-review [data-war-drag]:focus-visible{outline:2px solid #83b1b1;outline-offset:-2px}
+.wallet-action-review .war-dragging{opacity:.5}
+.wallet-action-review .war-grip{display:inline-block;color:#83b1b1;margin-right:8px;font-size:15px}
 </style></head>
 <body><a class="skip-link" href="#main">Skip to main content</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="Main navigation"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="My Memes" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">Initializing terminal. If this persists, check the browser console and network for module loading errors.</p></main></div>
