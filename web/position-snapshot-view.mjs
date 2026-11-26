@@ -1,3 +1,4 @@
+import {openWalletActionReview} from "./wallet-action-review.mjs";
 import {openAmountsPreview} from "./amounts-preview.mjs";
 import {createWalletAdapter,WALLET_MODE} from "./wallet-adapter.mjs";
 const raw=v=>typeof v==="string"&&/^(0|[1-9][0-9]{0,38})$/.test(v);
@@ -80,7 +81,7 @@ export function validCreatedWalletBatch(result,count){
 export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=false,onSummary=()=>{},adapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET})}){
  let project=null,rows=[],ticket=0,status="Select a token to view token holdings.",percent=25,selected=null;
  let checked=new Set(),query="",sortField="address",sortDirection="asc",busy=false,lastObserved=null;
- let timer=null,disposed=false,generateDialog=null,amountsDialog=null,creating=false,inventory=null,inventoryTicket=0,inventorySnapshot=null,inventoryFailed=false;
+ let timer=null,disposed=false,generateDialog=null,amountsDialog=null,walletActionDialog=null,creating=false,inventory=null,inventoryTicket=0,inventorySnapshot=null,inventoryFailed=false;
  const displayRows=()=>currentOnly?inventoryPositions(inventory??[],inventorySnapshot,project,busy,inventoryFailed):rows;
  const visibleRows=()=>sortPositionRows(displayRows().filter(r=>!query||r.address.toLowerCase().includes(query.toLowerCase())),sortField,sortDirection);
  async function loadInventory(){
@@ -101,7 +102,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   },20000);
  }
  function onFocus(){if(!host.isConnected){dispose();return}if(!busy&&(currentOnly||project?.token?.mint)&&!host.contains(host.ownerDocument.activeElement))void refresh();}
- function dispose(){if(disposed)return;disposed=true;generateDialog?.remove();generateDialog=null;amountsDialog?.remove();amountsDialog=null;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
+ function dispose(){if(disposed)return;disposed=true;generateDialog?.remove();generateDialog=null;amountsDialog?.remove();amountsDialog=null;walletActionDialog?.remove();walletActionDialog=null;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
  let mounted=host.isConnected;
  const observer=typeof MutationObserver==="function"?new MutationObserver(()=>{if(!host.isConnected&&mounted)dispose();else if(host.isConnected)mounted=true}):null;
  if(host.ownerDocument?.documentElement)observer?.observe(host.ownerDocument.documentElement,{childList:true,subtree:true});
@@ -170,7 +171,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   const assetsButton=host.querySelector("#position-assets");if(assetsButton)assetsButton.onclick=onAssets;
   const previewNotice=(title,message)=>{const doc=host.ownerDocument,dialog=doc.createElement("dialog");dialog.className="reference-wallet-dialog";dialog.innerHTML="<h3>"+esc(title)+"</h3><p>"+esc(message)+"</p><form method=\"dialog\"><button>Close</button></form>";host.append(dialog);dialog.addEventListener("close",()=>dialog.remove(),{once:true});dialog.showModal()};
   const amounts=host.querySelector("#position-amounts");if(amounts)amounts.onclick=()=>{if(amountsDialog?.isConnected)return;amountsDialog=openAmountsPreview(amounts);};
-  host.querySelectorAll("[data-reference-wallet-action]").forEach(button=>button.onclick=()=>{button.closest("details").open=false;previewNotice(button.textContent.trim(),"UI preview only. No wallet migration, transfer, split or deletion will be performed.");});
+  host.querySelectorAll("[data-reference-wallet-action]").forEach(button=>button.onclick=()=>{if(walletActionDialog?.isConnected)return;const menu=button.closest("details");menu.open=false;const source=displayRows().filter(r=>checked.has(r.address));walletActionDialog=openWalletActionReview(menu.querySelector("summary"),{action:button.dataset.referenceWalletAction,rows:source,esc});});
   const menus=host.querySelectorAll(".reference-wallet-more");menus.forEach(menu=>menu.addEventListener("toggle",()=>{if(menu.open)menus.forEach(other=>{if(other!==menu)other.open=false})}));
   host.querySelectorAll("[data-key-preview]:not(:disabled)").forEach(button=>button.onclick=()=>{button.closest("details").open=false;previewNotice(button.textContent.trim(),"UI preview only. No private keys are read, imported or exported.");});
   host.querySelectorAll("[data-position-wallet]").forEach(b=>b.onclick=()=>{selected=rows.some(r=>r.address===b.dataset.positionWallet)?b.dataset.positionWallet:null;draw()});

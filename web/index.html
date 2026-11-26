@@ -740,6 +740,34 @@ main[data-page=terminal] .current-terminal .reference-keys-more>summary{width:au
 main[data-page=terminal] .current-terminal .reference-keys-menu{min-width:200px}
 main[data-page=terminal] .current-terminal .reference-keys-menu button:disabled{color:#676f70;opacity:1;cursor:not-allowed;background:transparent}
 
+
+.wallet-action-review{box-sizing:border-box;width:min(520px,calc(100vw - 32px));max-width:none;max-height:calc(100vh - 32px);overflow:auto;margin:auto;padding:24px;border:1px solid #294747;border-radius:18px;background:#101616;color:#f6f7f7;box-shadow:0 12px 40px #0006;font:inherit}
+.wallet-action-review::backdrop{background:#000b}
+.wallet-action-review .war-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:0 0 20px}
+.wallet-action-review h3{font-size:20px;font-weight:650;line-height:1.4;color:#f6f7f7;margin:0 0 6px}
+.wallet-action-review .war-header p{font-size:13px;line-height:1.5;color:#c1c7c8;margin:0}
+.wallet-action-review .war-close{padding:0 4px;border:0;background:transparent;color:#c1c7c8;font-size:26px;line-height:1;cursor:pointer}
+.war-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:20px}
+.war-metrics>div{padding:12px 10px;min-width:0;border:1px solid #294747;border-radius:10px;background:#121c1c}
+.war-metrics small{display:block;font-size:10px;color:#a7b6b6;margin-bottom:7px}
+.war-metrics strong{display:block;font-size:16px;overflow-wrap:anywhere;color:#83b1b1;font-variant-numeric:tabular-nums}
+.wallet-action-review .war-section{border:0;margin:0 0 18px;padding:0;background:transparent}
+.wallet-action-review h4{font-size:12px;font-weight:600;color:#c1c7c8;margin:0 0 8px}
+.war-table{max-height:180px;overflow:auto;border:1px solid #294747;border-radius:9px}
+.war-table table{width:100%;border-collapse:collapse;font-size:12px;table-layout:auto}
+.war-table th,.war-table td{padding:10px;text-align:left;white-space:nowrap;border-bottom:1px solid #243737}
+.war-table th{color:#8fa4a4;background:#172323;position:sticky;top:0;font-size:10px;text-transform:uppercase}
+.war-table tr:last-child td{border-bottom:0}
+.war-placeholder{border:1px solid #294747;border-radius:9px;padding:12px;font-size:13px;line-height:1.5;color:#a7b6b6}
+.war-message{border-left:2px solid #83b1b1;padding:8px 10px;background:#172323;font-size:12px;line-height:1.5;color:#c1c7c8}
+.war-preview{font-size:11px;color:#8fa4a4;margin:10px 0 16px;line-height:1.4}
+.war-footer{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}
+.wallet-action-review .war-footer button{min-height:42px;border:1px solid #294747;border-radius:9px;background:transparent;color:#c1c7c8;font-size:13px;font-weight:600;cursor:pointer}
+.wallet-action-review .war-footer .war-primary{background:#193333;color:#83b1b1}
+.wallet-action-review .war-footer .war-danger{background:#512333;color:#d98b9f;border-color:#713048}
+.wallet-action-review .war-footer button:disabled{cursor:not-allowed;opacity:.6}
+@media(max-width:420px){.wallet-action-review{padding:16px}.war-metrics{gap:5px}.war-metrics>div{padding:9px 6px}.war-metrics strong{font-size:13px}.war-table th,.war-table td{padding:7px}}
+
 </style></head>
 <body><a class="skip-link" href="#main">Skip to main content</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="Main navigation"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="My Memes" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">Initializing terminal. If this persists, check the browser console and network for module loading errors.</p></main></div>
