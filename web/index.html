@@ -566,6 +566,20 @@ main[data-page=terminal] .reference-log th button{display:inline-flex;gap:4px;al
 .reference-log td{border:0;text-align:center;padding:28px 0 8px;color:#929b9c;font-size:11.5px}
 @media(max-width:400px){.reference-trade-panel .reference-trade-section{padding-left:12px;padding-right:12px}.reference-wallet-count{font-size:10px;padding:7px}.reference-stat{padding:9px}.reference-stat>strong{font-size:13px}}
 
+
+/* Collapsed Trade / Launch panel: center reflows, edge control remains reachable. */
+main[data-page=terminal] .current-terminal.desk-panel-hidden{grid-template-columns:minmax(0,1fr);padding-right:35px}
+main[data-page=terminal] .current-terminal.desk-panel-hidden>.meme-center{width:100%;min-width:0;max-width:none}
+main[data-page=terminal] .current-terminal>.reference-panel-edge[hidden],main[data-page=terminal] .current-terminal>#current-trade-panel[hidden]{display:none!important}
+main[data-page=terminal] .current-terminal .reference-panel-chrome{display:flex;justify-content:flex-end;margin:-9px 7px 5px;min-height:22px}
+main[data-page=terminal] .current-terminal [data-panel-collapse]{display:grid;place-items:center;width:27px;height:25px;min-height:0;padding:0;border:1px solid #385557;border-radius:7px;background:#101616;color:#83b1b1}
+.current-terminal [data-panel-collapse] svg{width:15px;height:15px}
+main[data-page=terminal] .current-terminal .reference-panel-edge{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:25;width:35px;min-width:35px;height:174px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px 5px;border:1px solid #638e8e;border-right:0;border-radius:14px 0 0 14px;background:#0e1515;color:#e1e7e7;box-shadow:-2px 0 8px #0003;font-size:12px;font-weight:600}
+.current-terminal .reference-panel-edge svg{width:16px;height:16px;flex:none;color:#86b5b5}
+.current-terminal .reference-panel-edge span{writing-mode:vertical-rl;text-orientation:mixed;white-space:nowrap}
+main[data-page=terminal] .current-terminal .reference-panel-edge:hover,main[data-page=terminal] .current-terminal [data-panel-collapse]:hover{background:#1a3232;color:#c6e5e5}
+@media(max-width:980px){main[data-page=terminal] .current-terminal.desk-panel-hidden{padding-right:30px}main[data-page=terminal] .current-terminal .reference-panel-edge{width:30px;min-width:30px;height:150px}}
+
 </style></head>
 <body><a class="skip-link" href="#main">Skip to main content</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="Main navigation"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="My Memes" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">Initializing terminal. If this persists, check the browser console and network for module loading errors.</p></main></div>
