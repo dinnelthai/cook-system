@@ -580,6 +580,72 @@ main[data-page=terminal] .current-terminal .reference-panel-edge{position:fixed;
 main[data-page=terminal] .current-terminal .reference-panel-edge:hover,main[data-page=terminal] .current-terminal [data-panel-collapse]:hover{background:#1a3232;color:#c6e5e5}
 @media(max-width:980px){main[data-page=terminal] .current-terminal.desk-panel-hidden{padding-right:30px}main[data-page=terminal] .current-terminal .reference-panel-edge{width:30px;min-width:30px;height:150px}}
 
+
+/* Smithii-inspired current terminal layout, independent of the historical workspace. */
+body:has(.current-terminal) .layout{grid-template-columns:clamp(220px,21.7vw,304px) minmax(0,1fr);background-color:#0b0e0e;background-image:linear-gradient(#19333330 1px,transparent 1px),linear-gradient(90deg,#19333330 1px,transparent 1px);background-size:36px 36px}
+body:has(.current-terminal) #nav{background:#0b0e0ed9;border-right:1px solid #294747;padding:18px 14px;min-width:0}
+body:has(.current-terminal) #nav .meme-rail{display:flex;flex-direction:column;gap:12px;min-height:calc(100vh - var(--header-h) - 36px)}
+body:has(.current-terminal) #nav .desk-overview{padding-bottom:18px;margin:0;border-bottom:1px solid #294747}
+body:has(.current-terminal) #nav .desk-overview-title strong{font-size:17px;color:#edf2f2}
+body:has(.current-terminal) #nav .desk-balance,body:has(.current-terminal) #nav .desk-overview-stats>div{background:#101616;border:1px solid #294747;border-radius:7px;padding:13px}
+body:has(.current-terminal) #nav .desk-overview-stats small,body:has(.current-terminal) #nav .desk-balance small{font-size:12px;color:#b5c1c2}
+body:has(.current-terminal) #nav .desk-balance strong{font-size:16px;color:#edf2f2}
+body:has(.current-terminal) #nav .reference-rail-project{border-top:1px solid #294747;padding-top:12px}
+body:has(.current-terminal) #nav .reference-project-select{background:transparent;border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+body:has(.current-terminal) #nav .reference-project-select .cook-position-head{display:block}
+body:has(.current-terminal) #nav .reference-project-select h2{font-size:14px;margin:4px 0;color:#edf2f2}
+body:has(.current-terminal) #nav .reference-project-select .cook-data-label{display:none}
+body:has(.current-terminal) #nav .reference-project-select select{width:100%;min-width:0}
+body:has(.current-terminal) #nav .reference-project-select label{flex:1;min-width:0}
+body:has(.current-terminal) #nav .reference-project-select p{overflow-wrap:anywhere;font-size:11px}
+.reference-rail-footer{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid #294747;padding:12px 0;color:#b7c5c5;font-size:12px}
+main[data-page=terminal] .current-terminal>.meme-center{padding:18px 26px 0;gap:12px;min-width:0}
+main[data-page=terminal] .current-terminal .desk-market-frame{border:0;background:transparent;border-radius:0;overflow:visible}
+main[data-page=terminal] .current-terminal .meme-chart-toolbar{background:transparent;border:0;padding:0 4px 14px}
+main[data-page=terminal] .current-terminal .desk-market-title strong{font-size:18px;color:#f1f4f4}
+main[data-page=terminal] .current-terminal .desk-market-actions button,main[data-page=terminal] .current-terminal .desk-wallet-actions button{border:1px solid #769f9f;background:transparent;color:#86b3b3;border-radius:14px;padding:9px 12px;font-size:12px}
+.reference-chart-shell{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px}
+.reference-chart-side{display:flex;flex-direction:column;align-items:center;gap:12px;padding:10px 6px;background:#101616;border:1px solid #283939;border-radius:18px}
+main[data-page=terminal] .reference-chart-side button{width:42px;height:42px;min-height:0;border:0;background:transparent;color:#a2b9ba;font-size:27px;padding:0;border-radius:8px}
+main[data-page=terminal] .reference-chart-side button:hover{background:#2a3334}
+.reference-chart-panel{background:#101616;border:1px solid #283939;border-radius:18px;overflow:hidden;min-width:0}
+main[data-page=terminal] .current-terminal .desk-chart-tools{background:#101616;border-bottom:1px solid #283939;padding:10px 14px;gap:10px}
+main[data-page=terminal] .current-terminal .desk-chart-tools button{background:transparent;border:0;color:#a9bfc0;font-size:13px;padding:7px 8px;border-radius:7px;min-height:32px}
+main[data-page=terminal] .current-terminal .desk-chart-tools button[aria-pressed=true]{background:#2a3334;color:#e6eeee}
+main[data-page=terminal] .current-terminal .desk-chart-tools button:disabled{opacity:.35;cursor:not-allowed}
+main[data-page=terminal] .current-terminal .current-chart{min-height:clamp(300px,37vh,450px);background:#101616;padding:16px}
+.reference-chart-empty-icon{display:grid;place-items:center;width:58px;height:58px;border:1px solid #283939;background:#171d1d;border-radius:50%;margin:0 auto 9px;color:#21b1bd}
+.reference-chart-empty-icon svg{width:30px;height:30px}
+main[data-page=terminal] .current-terminal .current-chart .empty-state{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:8px;color:#a5bfc0;min-height:220px}
+main[data-page=terminal] .current-terminal .current-chart .empty-state strong{font-size:17px;color:#e0e6e6}
+.reference-chart-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:45px;border-top:1px solid #283939;padding:8px 14px;color:#a5bfc0;font-size:12px}
+main[data-page=terminal] .current-terminal [data-current-market-status]{padding:0;margin:0;overflow-wrap:anywhere}
+.reference-chart-footer>span{white-space:nowrap}
+.reference-workspace-divider{height:1px;background:#365b5c;display:flex;align-items:center;justify-content:center;margin:8px 0 14px}
+.reference-workspace-divider span{background:#1b2525;border:1px solid #365b5c;border-radius:5px;color:#a8b6b7;font-size:15px;padding:0 4px}
+main[data-page=terminal] .current-terminal .meme-lower{background:transparent;border:0;border-radius:0;margin:0;padding:0}
+main[data-page=terminal] .current-terminal .meme-lower-tabs{margin:0 0 9px;border:0}
+main[data-page=terminal] .current-terminal .meme-lower-tabs button{font-size:15px;padding:8px 4px;color:#e7eeee;border-bottom-color:#418f90}
+main[data-page=terminal] .current-terminal .reference-wallet-table{border:1px solid #294747;border-radius:14px;min-height:320px;background:#0b0e0e90;overflow:hidden;padding:0}
+.reference-wallet-table .desk-wallet-toolbar{padding:14px 17px;border-bottom:1px solid #294747}
+.reference-wallet-table .desk-wallet-toolbar h3{font-size:16px;margin:0 0 3px;color:#f1f4f4}
+.reference-wallet-table .cook-position-grid{display:none}
+.reference-wallet-table .position-filter{padding:6px 16px;margin:0}
+.reference-wallet-table .desk-wallet-foot{padding:3px 16px;margin:0;color:#8ca3a3;font-size:11px}
+.reference-wallet-table table{width:100%;border-collapse:collapse}
+.reference-wallet-table th{background:#101616;color:#b8c4c4;text-transform:uppercase;font-size:11px;padding:14px 10px;border-bottom:1px solid #283939;white-space:nowrap}
+.reference-wallet-table td{padding:12px 10px}
+.reference-wallet-empty{display:flex;min-height:230px;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;color:#aab8b8}
+.reference-wallet-empty svg{width:36px;height:36px;color:#8f9999;margin-bottom:12px}
+.reference-wallet-empty strong{font-size:17px;color:#f0f3f3}
+main[data-page=terminal] .reference-wallet-empty button{border:1px solid #769f9f;border-radius:12px;background:#1b3838;color:#a4caca;padding:9px 16px;margin-top:12px}
+.reference-terminal-footer{order:3;display:flex;align-items:center;gap:10px;border-top:1px solid #294747;background:#101616;padding:10px 12px;color:#a8b9b9;font-size:11px;flex-wrap:wrap;margin-top:auto}
+.reference-footer-dot{height:7px;width:7px;border-radius:50%;background:#459c9c}
+.reference-terminal-footer [data-reference-note]{flex:1}
+main[data-page=terminal] .current-terminal .reference-terminal-footer button{border:1px solid #294747;background:transparent;color:#9abbbb;border-radius:9px;padding:6px 10px}
+@media(max-width:980px){body:has(.current-terminal) .layout{grid-template-columns:190px minmax(0,1fr)}main[data-page=terminal] .current-terminal>.meme-center{padding:12px} .reference-chart-shell{grid-template-columns:44px minmax(0,1fr);gap:6px}main[data-page=terminal] .reference-chart-side button{width:30px;height:34px;font-size:21px}}
+@media(max-width:700px){body:has(.current-terminal) .layout{display:block}body:has(.current-terminal) #nav .meme-rail{min-height:0}.reference-rail-footer{margin-top:0}main[data-page=terminal] .current-terminal>.meme-center{padding:8px}.reference-chart-shell{grid-template-columns:38px minmax(0,1fr)}}
+
 </style></head>
 <body><a class="skip-link" href="#main">Skip to main content</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="Main navigation"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="My Memes" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">Initializing terminal. If this persists, check the browser console and network for module loading errors.</p></main></div>
