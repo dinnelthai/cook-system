@@ -51,21 +51,20 @@ export function sortPositionRows(rows,field,direction="asc"){
   return sign*String(x).localeCompare(String(y));
  });
 }
-export function validWalletPreviewCount(value){return typeof value==="string"&&/^[1-9][0-9]{0,2}$/.test(value)&&Number(value)<=100;}
+export function validWalletPreviewCount(value){return value==="1";}
 export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=false,onSummary=()=>{},adapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET})}){
  let project=null,rows=[],ticket=0,status="Select a Meme.",percent=25,selected=null;
  let checked=new Set(),query="",sortField="address",sortDirection="asc",busy=false,lastObserved=null;
- let timer=null,disposed=false,generateDialog=null,amountsDialog=null,creating=false,inventory=null,fixtureTotal=0,inventoryTicket=0;
- const displayRows=()=>currentOnly&&inventory?rows.concat(inventory.filter(w=>!rows.some(r=>r.address===w.address)).map(w=>({address:w.address,sol:null,tokens:null,decimals:null,status:w.fixture?"Simulation only":"Not assigned",fixture:w.fixture===true}))):rows;
+ let timer=null,disposed=false,generateDialog=null,amountsDialog=null,creating=false,inventory=null,inventoryTicket=0;
+ const displayRows=()=>currentOnly&&inventory?rows.concat(inventory.filter(w=>!rows.some(r=>r.address===w.address)).map(w=>({address:w.address,sol:null,tokens:null,decimals:null,status:"Not assigned"}))):rows;
  const visibleRows=()=>sortPositionRows(displayRows().filter(r=>!query||r.address.toLowerCase().includes(query.toLowerCase())),sortField,sortDirection);
  async function loadInventory(){
   const own=++inventoryTicket;
-  try{const [result,fixtures]=await Promise.all([adapter.list(),adapter.testInventory()]);const list=result?.wallets;
+  try{const result=await adapter.list();const list=result?.wallets;
    if(!Array.isArray(list)||list.length>20||list.some(w=>!w||typeof w.address!=="string"||! /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(w.address))||new Set(list.map(w=>w.address)).size!==list.length)throw Error("WALLET_LIST_INVALID");
-   if(fixtures?.kind!=="SIMULATION_ONLY"||!Number.isSafeInteger(fixtures.total)||fixtures.total<0||!Array.isArray(fixtures.wallets)||fixtures.wallets.length!==Math.min(fixtures.total,200)||fixtures.wallets.some(w=>typeof w?.id!=="string"||!/^test-wallet-[0-9a-f-]{36}$/.test(w.id))||new Set(fixtures.wallets.map(w=>w.id)).size!==fixtures.wallets.length)throw Error("FIXTURE_LIST_INVALID");
    if(disposed||own!==inventoryTicket||!host.isConnected)return false;
-   fixtureTotal=fixtures.total;inventory=list.map(w=>({address:w.address})).concat(fixtures.wallets.map(w=>({address:w.id,fixture:true})));draw();return true;
-  }catch{if(!disposed&&own===inventoryTicket&&host.isConnected){inventory=null;fixtureTotal=0;draw()}return false}
+   inventory=list.map(w=>({address:w.address}));draw();return true;
+  }catch{if(!disposed&&own===inventoryTicket&&host.isConnected){draw()}return false}
  }
  function schedule(){
   clearTimeout(timer);
@@ -86,23 +85,25 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   if(disposed||generateDialog||creating)return;
   const doc=host.ownerDocument,dialog=doc.createElement("dialog");
   generateDialog=dialog;dialog.className="reference-generate-dialog";dialog.setAttribute("aria-labelledby","generate-wallet-title");
-  dialog.innerHTML='<button type="button" data-generate-close class="generate-close" aria-label="Close">×</button><h3 id="generate-wallet-title">Add Wallets</h3><p class="generate-description">This action will create several wallets at the same time.</p><form data-generate-form><label for="generate-wallet-count">Number of wallets to create</label><input id="generate-wallet-count" type="number" min="1" max="100" step="1" value="1" required autofocus><button type="submit" class="generate-submit">Add Wallets</button><p class="generate-feedback" role="status">Simulation accounts only · Up to 100 per request; latest 200 shown.</p></form>';
+  dialog.innerHTML='<button type="button" data-generate-close class="generate-close" aria-label="Close">×</button><h3 id="generate-wallet-title">Add Wallets</h3><p class="generate-description">Create a Localnet wallet and store its signing key locally.</p><form data-generate-form><label for="generate-wallet-count">Number of wallets to create</label><input id="generate-wallet-count" type="number" min="1" max="1" step="1" value="1" required autofocus><button type="submit" class="generate-submit">Add Wallets</button><p class="generate-feedback" role="status">Real Localnet wallet · One wallet per request.</p></form>';
   doc.body.append(dialog);
   const input=dialog.querySelector("#generate-wallet-count"),submit=dialog.querySelector(".generate-submit"),feedback=dialog.querySelector(".generate-feedback");
   dialog.querySelector("[data-generate-close]").onclick=()=>dialog.close();
   dialog.addEventListener("close",()=>{dialog.remove();if(generateDialog===dialog)generateDialog=null;host.querySelector("#position-manage")?.focus({preventScroll:true})},{once:true});
-  input.oninput=()=>{submit.disabled=creating||!validWalletPreviewCount(input.value);feedback.textContent="Simulation accounts only · Up to 100 per request; latest 200 shown."};
+  input.oninput=()=>{submit.disabled=creating||!validWalletPreviewCount(input.value);feedback.textContent="Real Localnet wallet · One wallet per request."};
   dialog.querySelector("form").onsubmit=async e=>{
    e.preventDefault();if(creating||disposed||!validWalletPreviewCount(input.value))return;
-   const count=Number(input.value);creating=true;submit.disabled=true;input.disabled=true;feedback.textContent="Creating simulation accounts…";
+   creating=true;submit.disabled=true;input.disabled=true;feedback.textContent="Creating Localnet wallet…";
    dialog.querySelector("[data-generate-close]").disabled=true;
    const preventClose=e=>e.preventDefault();dialog.addEventListener("cancel",preventClose);
    try{
-    const result=await adapter.createTestFixtures({count});
-    if(result?.kind!=="SIMULATION_ONLY"||!["CREATED","PARTIAL"].includes(result?.status)||result.requested!==count||!Number.isInteger(result.created_count)||result.created_count<0||result.created_count>count||!Array.isArray(result.wallets)||result.wallets.length!==result.created_count||(result.status==="CREATED"&&result.created_count!==count))throw Error("WALLET_RESULT_INVALID");
+    const result=await adapter.create();
+    if(typeof result?.address!=="string"||! /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(result.address))throw Error("WALLET_RESULT_INVALID");
     const refreshed=await loadInventory();
-    if(!disposed&&dialog.isConnected){feedback.textContent=result.created_count+" / "+count+" simulation account(s) created."+(result.status==="PARTIAL"?" Partial result; check the wallet list before trying again.":"")+(refreshed?"":" Wallet list could not be refreshed.");}
-   }catch(error){await loadInventory();if(!disposed&&dialog.isConnected)feedback.textContent="Creation not confirmed. Check the wallet list before retrying.";}
+    const listed=refreshed&&inventory?.some(w=>w.address===result.address);
+    if(!disposed&&dialog.isConnected){feedback.textContent=listed?"Wallet created: "+result.address:"Wallet created, but list refresh could not be confirmed. Use Refresh.";}
+
+   }catch(error){await loadInventory();if(!disposed&&dialog.isConnected)feedback.textContent=error.message==="WALLET_LIMIT"?"Existing signer store limit reached. No new wallet created.":"Creation not confirmed. Check the wallet list before retrying.";}
    finally{creating=false;if(!disposed&&dialog.isConnected){input.disabled=false;submit.disabled=!validWalletPreviewCount(input.value);dialog.querySelector("[data-generate-close]").disabled=false;dialog.removeEventListener("cancel",preventClose);}}
   };
   dialog.showModal();
@@ -112,7 +113,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   const estimate=active?previewQuantity(active.tokens,percent):null;
   const all=summarizePositions(rows),visible=visibleRows(),chosen=summarizePositions(rows.filter(r=>checked.has(r.address)));
   const total=displayToken(all.token_balance,all.token_decimals);
-  onSummary({project_id:project?.project_id??null,mint:project?.token?.mint??null,sol:formatUnits(all.sol_balance,9),tokens:total,observed:all.observed_count,count:all.wallet_count,status,rows:rows.map(r=>({...r})),active:selected,busy,inventoryCount:currentOnly&&inventory?inventory.filter(w=>!w.fixture).length+fixtureTotal:null});
+  onSummary({project_id:project?.project_id??null,mint:project?.token?.mint??null,sol:formatUnits(all.sol_balance,9),tokens:total,observed:all.observed_count,count:all.wallet_count,status,rows:rows.map(r=>({...r})),active:selected,busy,inventoryCount:currentOnly&&inventory?inventory.length:null});
   const header=(label,key)=>'<button type="button" class="position-sort" data-position-sort="'+key+'" aria-label="Sort by '+label+'">'+label+(sortField===key?(sortDirection==="asc"?" ↑":" ↓"):"")+'</button>';
   const button=(id,label)=>'<button type="button" id="'+id+'">'+label+'</button>';
   host.classList.toggle("reference-wallet-table",currentOnly);host.innerHTML='<div class="desk-wallet-toolbar"><div><h3>Wallets</h3><small class="muted">'+displayRows().length+(currentOnly?' visible wallets · ':' registered wallets · ')+checked.size+' selected</small></div><div class="desk-wallet-actions">'+(currentOnly?'<button type="button" id="position-manage"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>Generate</button><button type="button" id="position-amounts" class="reference-set-amounts"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h3c4 0 6 12 10 12h5m-4-4 4 4-4 4M3 18h3c1.5 0 3-2 4-4m4-6c1-1 2-2 3-2h4m-4-4 4 4-4 4"/></svg>Set amounts</button><details class="reference-wallet-more"><summary aria-label="More wallet actions" title="More wallet actions"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></summary><div class="reference-wallet-menu"><button type="button" data-reference-wallet-action="0"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM5 10l3 1 4 2 4-2 3-1 3 4-2 4-3-1-1 4H8l-1-4-3 1-2-4z"/></svg><span>Drain SOL</span></button><button type="button" data-reference-wallet-action="1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h16l-4-4m4 4-4 4M21 17H5l4-4m-4 4 4 4"/></svg><span>Migrate → To New</span></button><button type="button" data-reference-wallet-action="2"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h16l-4-4m4 4-4 4M21 17H5l4-4m-4 4 4 4"/></svg><span>Migrate → To Imported</span></button><button type="button" data-reference-wallet-action="3"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h5c5 0 5-7 10-7h3m-4-4 4 4-4 4M8 12c5 0 5 7 10 7h3m-4-4 4 4-4 4"/></svg><span>Split</span></button><button type="button" data-reference-wallet-action="4" class="reference-wallet-delete"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/></svg><span>Delete</span></button></div></details><details class="reference-wallet-more reference-keys-more"><summary id="position-private-keys">Private keys<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M15 2a7 7 0 0 0-6.7 9L2 17.3V22h4.7l2-2v-2h2l2.3-2.3A7 7 0 1 0 15 2zm2 5a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg></summary><div class="reference-wallet-menu reference-keys-menu"><button type="button" disabled data-key-preview="selected"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M15 2a7 7 0 0 0-6.7 9L2 17.3V22h4.7l2-2v-2h2l2.3-2.3A7 7 0 1 0 15 2zm2 5a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg><span>Export Selected Keys</span></button><button type="button" data-key-preview="removed"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M15 2a7 7 0 0 0-6.7 9L2 17.3V22h4.7l2-2v-2h2l2.3-2.3A7 7 0 1 0 15 2zm2 5a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg><span>Export Removed Keys</span></button><button type="button" data-key-preview="import"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/></svg><span>Import PKs</span></button></div></details>':button("position-refresh",busy?"Refreshing…":"Refresh Holdings")+button("position-manage","Manage Wallets")+button("position-assets","Assets"))+'</div></div>'+
@@ -128,9 +129,9 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
    '<div class="trade-kv"><span>Selected Wallet</span><strong>'+esc(active?.address??"—")+'</strong><span>Tokens to Sell</span><strong>'+esc(estimate?displayToken(estimate.quantity,active.decimals):"—")+'</strong><span>Remaining Tokens</span><strong>'+esc(estimate?displayToken(estimate.remaining,active.decimals):"—")+'</strong><span>Estimated SOL Received</span><strong>Quote required</strong></div></section>');
   const refreshButton=host.querySelector("#position-refresh");if(refreshButton)refreshButton.disabled=busy||!project?.token?.mint;
   const allCheck=host.querySelector("[data-position-all]");
-  const selectable=visible.filter(r=>!r.fixture);allCheck.disabled=!selectable.length;allCheck.checked=selectable.length>0&&selectable.every(r=>checked.has(r.address));allCheck.indeterminate=selectable.some(r=>checked.has(r.address))&&!selectable.every(r=>checked.has(r.address));
+  const selectable=visible.filter(r=>rows.some(p=>p.address===r.address));allCheck.disabled=!selectable.length;allCheck.checked=selectable.length>0&&selectable.every(r=>checked.has(r.address));allCheck.indeterminate=selectable.some(r=>checked.has(r.address))&&!selectable.every(r=>checked.has(r.address));
   allCheck.onchange=()=>{for(const r of selectable)allCheck.checked?checked.add(r.address):checked.delete(r.address);draw()};
-  host.querySelectorAll("[data-position-check]").forEach(b=>{if(visible.some(r=>r.fixture&&r.address===b.dataset.positionCheck)){b.disabled=true;return}b.onchange=()=>{b.checked?checked.add(b.dataset.positionCheck):checked.delete(b.dataset.positionCheck);draw()}});
+  host.querySelectorAll("[data-position-check]").forEach(b=>{if(!rows.some(r=>r.address===b.dataset.positionCheck)){b.disabled=true;return}b.onchange=()=>{b.checked?checked.add(b.dataset.positionCheck):checked.delete(b.dataset.positionCheck);draw()}});
   const clear=host.querySelector("[data-position-clear]");if(clear)clear.onclick=()=>{checked.clear();draw()};
   const search=host.querySelector("[data-position-search]");if(search)search.oninput=e=>{query=e.target.value;draw();const input=host.querySelector("[data-position-search]");input.focus();try{input.setSelectionRange(query.length,query.length)}catch{}};
   host.querySelectorAll("[data-position-sort]").forEach(b=>b.onclick=()=>{const key=b.dataset.positionSort;sortDirection=sortField===key&&sortDirection==="asc"?"desc":"asc";sortField=key;draw()});
@@ -147,7 +148,9 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   const custom=host.querySelector("[data-position-custom]");if(custom)custom.onchange=e=>{const v=e.target.valueAsNumber;if(Number.isInteger(v)&&v>=0&&v<=100){percent=v;draw()}else e.target.value=percent};
  }
  async function refresh(){
-  if(disposed||busy||!project||!host.isConnected)return;
+  if(disposed||!host.isConnected)return;
+  if(currentOnly)void loadInventory();
+  if(busy||!project)return;
   const id=++ticket,current=project;
   busy=true;status=lastObserved?"Refreshing holdings · Previous observation: "+lastObserved:"Reading Localnet holdings…";draw();
   if(!current?.token?.mint||current.network?.cluster!=="localnet"||!current.network?.genesis_hash){busy=false;status="No verified Localnet project scope.";draw();return}

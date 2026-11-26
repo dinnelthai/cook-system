@@ -11,7 +11,6 @@ import { createProjectCloseReviewer } from "../src/inner-market/project-close-ev
 import { createOrderReceiptReviewer, createOrderReceiptImporter } from "../src/inner-market/order-receipt-review.mjs";
 import { createProjectWorkspaceResolver, createProjectWorkspaceCandidates } from "../src/inner-market/project-workspace-link.mjs";
 import {createWalletStore} from "../src/inner-market/local-wallet-store.mjs";
-import {openTestWalletInventory} from "../src/inner-market/test-wallet-inventory.mjs";
 import {createLocalTrading} from "../src/inner-market/local-trading.mjs";
 import {createLocalTransfer} from "../src/inner-market/local-transfer.mjs";
 import {createLocalFaucet} from "../src/inner-market/local-faucet.mjs";
@@ -38,7 +37,6 @@ const projectHttp=createProjectHttpHandler({store:projectStore,readRequestJson,r
 const port=Number(process.env.PORT??4173);
 if(!Number.isInteger(port)||port<1||port>65535)throw new Error("invalid PORT");
 const wallets=createWalletStore();
-const testWallets=openTestWalletInventory();
 const walletPortfolio=createLocalWalletPortfolio({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,walletStore:wallets});
 const faucet=createLocalFaucet({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.faucet});
 const transfers=createLocalTransfer({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.transfer,loadSigner:wallets.loadSigner});
@@ -61,7 +59,7 @@ const server=createServer(async(req,res)=>{
    if(!workspaceHandler){res.writeHead(503,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify({code:"WORKSPACE_DISABLED"}));return;}
    await workspaceHandler(req,res);return;
   }
-  if(["/api/local-wallet/balance","/api/local-wallet/airdrop","/api/local-wallet/list","/api/local-wallet/create","/api/local-wallet/create-batch","/api/local-wallet/test-inventory","/api/local-wallet/test-inventory-create","/api/local-wallet/transfer","/api/local-wallet/portfolio","/api/local-wallet/market","/api/local-wallet/market-data","/api/local-wallet/trade"].includes(req.url)){
+  if(["/api/local-wallet/balance","/api/local-wallet/airdrop","/api/local-wallet/list","/api/local-wallet/create","/api/local-wallet/create-batch","/api/local-wallet/transfer","/api/local-wallet/portfolio","/api/local-wallet/market","/api/local-wallet/market-data","/api/local-wallet/trade"].includes(req.url)){
    const send=(status,body)=>sendJson(res,status,body);
    const host=req.headers.host,origin=req.headers.origin;
    if(!["127.0.0.1:"+port,"localhost:"+port].includes(host)||req.headers["sec-fetch-site"]==="cross-site"||(origin&&origin!=="http://"+host)){send(403,{code:"FORBIDDEN"});return}
@@ -70,14 +68,6 @@ const server=createServer(async(req,res)=>{
     const raw=await readRequestJson(req,4096);
     const data=JSON.parse(raw),fund=req.url.endsWith("/airdrop");
     if(req.url.endsWith("/list")||req.url.endsWith("/create")){if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length)throw Error("INVALID_BODY");send(200,req.url.endsWith("/list")?{wallets:await wallets.list()}:await wallets.create());return;}
-    if(req.url.endsWith("/test-inventory")){
-     if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length)throw Error("INVALID_BODY");
-     send(200,testWallets.list());return;
-    }
-    if(req.url.endsWith("/test-inventory-create")){
-     if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length!==1||!Number.isSafeInteger(data.count)||data.count<1||data.count>100)throw Error("INVALID_BODY");
-     send(200,testWallets.create(data.count));return;
-    }
     if(req.url.endsWith("/create-batch")){
      if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).length!==1||!Number.isSafeInteger(data.count)||data.count<1||data.count>20)throw Error("INVALID_BODY");
      // Key generation is offline. RPC checks remain in chain-facing services.

@@ -3,7 +3,7 @@
  * MVP. Mainnet is reserved for Phantom; no local signing fallback is allowed.
  * Project identity, transaction policy and RPC verification remain server-owned.
  */
-const LOCAL_ACTIONS = new Set(["list","create","create-batch","test-inventory","test-inventory-create","balance","portfolio","airdrop","transfer"]);
+const LOCAL_ACTIONS = new Set(["list","create","create-batch","balance","portfolio","airdrop","transfer"]);
 export const WALLET_MODE = Object.freeze({LOCALNET:"localnet",MAINNET:"mainnet"});
 export function createWalletAdapter({mode,fetchImpl=globalThis.fetch}={}){
  if(mode===WALLET_MODE.MAINNET){
@@ -11,7 +11,7 @@ export function createWalletAdapter({mode,fetchImpl=globalThis.fetch}={}){
   return Object.freeze({
    mode,provider:"phantom",ready:false,
    capabilities:Object.freeze({create:false,balance:false,portfolio:false,faucet:false,transfer:false,sign:false}),
-   list:unavailable,create:unavailable,createBatch:unavailable,testInventory:unavailable,createTestFixtures:unavailable,balance:unavailable,portfolio:unavailable,airdrop:unavailable,transfer:unavailable
+   list:unavailable,create:unavailable,createBatch:unavailable,balance:unavailable,portfolio:unavailable,airdrop:unavailable,transfer:unavailable
   });
  }
  if(mode!==WALLET_MODE.LOCALNET)throw Error("INVALID_WALLET_MODE");
@@ -29,8 +29,6 @@ export function createWalletAdapter({mode,fetchImpl=globalThis.fetch}={}){
   list:()=>request("list",{}),
   create:()=>request("create",{}),
   createBatch:({count})=>request("create-batch",{count}),
-  testInventory:()=>request("test-inventory",{}),
-  createTestFixtures:({count})=>request("test-inventory-create",{count}),
   balance:({address})=>request("balance",{address}),
   portfolio:({limit})=>request("portfolio",{limit}),
   airdrop:({address,amount})=>request("airdrop",{address,amount}),
