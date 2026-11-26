@@ -693,6 +693,8 @@ body:has(.current-terminal) #nav .reference-token-address button{background:tran
 .reference-token-select [hidden]{display:none!important}
 @media(max-width:980px){body:has(.current-terminal) #nav{padding:12px 9px}.reference-token-select form{gap:6px;padding:8px 6px}.reference-token-symbol{width:28px;height:28px}.reference-token-address button svg{width:12px}.reference-chain-tabs button{font-size:11px!important}}
 
+/* Solana is the only supported chain in the current workspace. */
+.reference-token-rail .reference-chain-tabs{grid-template-columns:minmax(0,1fr)}
 </style></head>
 <body><a class="skip-link" href="#main">Skip to main content</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="Main navigation"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="My Memes" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">Initializing terminal. If this persists, check the browser console and network for module loading errors.</p></main></div>
