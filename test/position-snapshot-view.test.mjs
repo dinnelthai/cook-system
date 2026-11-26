@@ -11,3 +11,5 @@ test("selection summaries never substitute zero for unknown balances",()=>{const
 test("wallet sorting preserves unknown rows last and exact token precision",()=>{const rows=[{address:"a",tokens:"100",decimals:3},{address:"b",tokens:"2",decimals:1},{address:"c",tokens:null,decimals:null}];assert.deepEqual(sortPositionRows(rows,"tokens","desc").map(x=>x.address),["b","a","c"]);assert.deepEqual(sortPositionRows(rows,"tokens","asc").map(x=>x.address),["a","b","c"]);});
 
 test("malformed token account arrays remain unknown rather than throwing",()=>{const broken={...snapshot,wallets:[{...snapshot.wallets[0],token_accounts:{}}]};assert.equal(positionRows(project,broken)[0].tokens,null);});
+
+test("partial SOL and malformed token records never appear fully observed",()=>{const noSol={...snapshot,wallets:[{...snapshot.wallets[0],balance_status:"UNAVAILABLE",balance_lamports:null}]};assert.equal(positionRows(project,noSol)[0].status,"Partial");const invalid={...snapshot,wallets:[{...snapshot.wallets[0],token_accounts:[null]}]};assert.equal(positionRows(project,invalid)[0].tokens,null);});

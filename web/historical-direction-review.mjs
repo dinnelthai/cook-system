@@ -89,7 +89,7 @@ export function mountHistoricalDirectionReview(host,{esc,table,quoteAmount}){
  }
  draw();
  return {
-  setProject(next){const changed=project?.project_id!==next?.project_id||project?.revision!==next?.revision;if(changed){side="BUY";filter="ALL";query="";page=1;input=null;live=null;orders=null;state="Awaiting historical records";}project=next;draw();},
+  setProject(next){const changed=project?.project_id!==next?.project_id||project?.revision!==next?.revision||project?.token?.mint!==next?.token?.mint;if(changed){side="BUY";filter="ALL";query="";page=1;input=null;live=null;orders=null;state="Awaiting historical records";}project=next;draw();},
   clear(message){input=null;filter="ALL";query="";page=1;state=message;draw();},
   show(next){input=historicalScopeMatches(project,next)?next:null;page=1;state=input?"No verified trade amounts in this report.":"Historical scope mismatch.";draw();},
   setOrderSummary(next){orders=next?.project_id===project?.project_id&&next?.revision===project?.revision?next:null;const panel=host.querySelector(".order-status-summary");if(panel)panel.innerHTML=orderSummaryMarkup();},

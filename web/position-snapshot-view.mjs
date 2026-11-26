@@ -16,8 +16,8 @@ export function positionRows(project,snapshot){
   const w=matches.length===1?matches[0]:null;
   const accounts=Array.isArray(w?.token_accounts)?w.token_accounts.filter(a=>a&&a.mint===mint):[];
   const decimals=accounts[0]?.decimals??null;
-  const known=!!w&&!conflicts&&w.token_accounts_status==="AVAILABLE"&&Array.isArray(w.token_accounts)&&accounts.every(a=>typeof a.token_account==="string"&&a.token_account&&raw(a.amount_base_units)&&Number.isInteger(a.decimals)&&a.decimals>=0&&a.decimals<=18&&a.decimals===decimals)&&new Set(accounts.map(a=>a.token_account)).size===accounts.length;
-  return {address,sol:w?.balance_status==="AVAILABLE"&&raw(w.balance_lamports)?w.balance_lamports:null,tokens:known?accounts.reduce((n,a)=>n+BigInt(a.amount_base_units),0n).toString():null,decimals:known?decimals:null,status:!valid?"Unverified":!w?"Not managed":known?"Observed":"Partial"};
+  const known=!!w&&!conflicts&&w.token_accounts_status==="AVAILABLE"&&Array.isArray(w.token_accounts)&&w.token_accounts.every(a=>a&&typeof a.mint==="string"&&a.mint)&&accounts.every(a=>typeof a.token_account==="string"&&a.token_account&&raw(a.amount_base_units)&&Number.isInteger(a.decimals)&&a.decimals>=0&&a.decimals<=18&&a.decimals===decimals)&&new Set(accounts.map(a=>a.token_account)).size===accounts.length;
+  return {address,sol:w?.balance_status==="AVAILABLE"&&raw(w.balance_lamports)?w.balance_lamports:null,tokens:known?accounts.reduce((n,a)=>n+BigInt(a.amount_base_units),0n).toString():null,decimals:known?decimals:null,status:!valid?"Unverified":!w?"Not managed":known&&w.balance_status==="AVAILABLE"&&raw(w.balance_lamports)?"Observed":"Partial"};
  });
 }
 export function previewQuantity(rawBalance,percent){
@@ -65,7 +65,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,onSummary=()=>
   },20000);
  }
  function onFocus(){if(!host.isConnected){dispose();return}if(!busy&&project?.token?.mint&&!host.contains(host.ownerDocument.activeElement))void refresh();}
- function dispose(){disposed=true;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
+ function dispose(){if(disposed)return;disposed=true;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
  let mounted=host.isConnected;
  const observer=typeof MutationObserver==="function"?new MutationObserver(()=>{if(!host.isConnected&&mounted)dispose();else if(host.isConnected)mounted=true}):null;
  if(host.ownerDocument?.documentElement)observer?.observe(host.ownerDocument.documentElement,{childList:true,subtree:true});
@@ -105,14 +105,14 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,onSummary=()=>
   host.querySelector("[data-position-custom]").onchange=e=>{const v=e.target.valueAsNumber;if(Number.isInteger(v)&&v>=0&&v<=100){percent=v;draw()}else e.target.value=percent};
  }
  async function refresh(){
-  if(disposed||busy)return;
+  if(disposed||busy||!project||!host.isConnected)return;
   const id=++ticket,current=project;
   busy=true;status=lastObserved?"Refreshing holdings · Previous observation: "+lastObserved:"Reading Localnet holdings…";draw();
   if(!current?.token?.mint||current.network?.cluster!=="localnet"||!current.network?.genesis_hash){busy=false;status="No verified Localnet project scope.";draw();return}
   try{
    const snapshot=await adapter.portfolio({limit:5});
    if(ticket!==id||!host.isConnected)return;
-   if(snapshot?.schema_version!=="cook-local-wallet-portfolio.1"||snapshot.genesis_hash!==current.network.genesis_hash||snapshot.network!=="localnet"||snapshot.read_only!==true||snapshot.execution_enabled!==false)throw Error("SCOPE_MISMATCH");
+   if(snapshot?.schema_version!=="cook-local-wallet-portfolio.1"||snapshot.genesis_hash!==current.network.genesis_hash||snapshot.network!=="localnet"||snapshot.read_only!==true||snapshot.execution_enabled!==false||!Array.isArray(snapshot.wallets))throw Error("SCOPE_MISMATCH");
    rows=positionRows(current,snapshot);lastObserved=String(snapshot.as_of??"Time unknown");status="Localnet read-only snapshot · "+lastObserved+" · Refreshes automatically while idle. Missing balances and PnL remain unknown.";
   }catch{if(ticket!==id||!host.isConnected)return;rows=positionRows(current,null);lastObserved=null;status="Portfolio unavailable or scope mismatch. No balances inferred."}
   finally{if(ticket===id){busy=false;if(host.isConnected){draw();schedule()}else dispose()}}

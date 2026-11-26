@@ -154,7 +154,8 @@ function candleChart(result){
 }
 
 const issuedMemeStages=new Set(["LAUNCHED","BONDING_CURVE_ACTIVE","GRADUATION_PENDING","PUMPSWAP_ACTIVE","EXIT_IN_PROGRESS","SETTLEMENT_PENDING","CLOSED","ARCHIVED"]);
-let memeFilter="",memeMode="operations",memeChartMinimized=false,memePanelHidden=false,memeWalletFirst=false;
+let memeFilter="",memeMode="operations",memeChartMinimized=false,memePanelHidden=false,memeWalletFirst=false,memeDetailTab="wallet";
+let disposeMemeDesk=()=>{};
 function mountMemeDesk(){
  const deskStageLabel=stage=>({"DRAFT":"Draft","READY":"Ready","LAUNCH_SUBMITTED":"Launch Submitted","LAUNCHED":"Launched","BONDING_CURVE_ACTIVE":"Bonding Curve","GRADUATION_PENDING":"Graduation Pending","PUMPSWAP_ACTIVE":"PumpSwap","EXIT_IN_PROGRESS":"Exit in Progress","SETTLEMENT_PENDING":"Settlement Pending","CLOSED":"Closed","ARCHIVED":"Archived"})[stage]??"Unknown";
  const rail=document.createElement("section");rail.className="meme-rail";rail.setAttribute("aria-label","My Memes");
@@ -174,6 +175,7 @@ function mountMemeDesk(){
  const wallet=document.createElement("section");wallet.className="pro-pane meme-wallet";
  let publishPosition=()=>{};
  const positionSnapshot=mountPositionSnapshot(wallet,{esc,onManage:()=>go("wallet"),onAssets:()=>selectLowerTab("assets"),onSummary:model=>publishPosition(model)});
+ disposeMemeDesk=()=>positionSnapshot.dispose();
  function drawWallet(project){positionSnapshot.setProject(project);}
 
  const extra=document.createElement("details");extra.className="meme-report-extra";extra.innerHTML="<summary>Market Data and Historical Review</summary>";
@@ -191,8 +193,9 @@ function mountMemeDesk(){
  const dataButton=main.querySelector("#open-data");chartTools.append(dataButton);
  marketFrame.append(chartToolbar,chartTools,placeholder,reportArea);
  const full=chartToolbar.querySelector("#meme-chart-fullscreen");
- full.disabled=typeof marketFrame.requestFullscreen!=="function";
- full.onclick=async()=>{try{if(document.fullscreenElement===marketFrame)await document.exitFullscreen();else await marketFrame.requestFullscreen();}catch{full.title="Fullscreen unavailable in this browser";}};
+ const syncChartAvailability=()=>{const unavailable=reportArea.hidden||reportArea.inert; if(candleTools)candleTools.hidden=unavailable;full.disabled=unavailable||typeof marketFrame.requestFullscreen!=="function";};
+ syncChartAvailability();
+ full.onclick=async()=>{try{if(document.fullscreenElement===marketFrame)await document.exitFullscreen();else{memeChartMinimized=false;toggleChart();await marketFrame.requestFullscreen();}}catch{full.title="Fullscreen unavailable in this browser";}};
  marketFrame.addEventListener("fullscreenchange",()=>{full.textContent=document.fullscreenElement===marketFrame?"Exit Fullscreen":"Fullscreen";});
  const context=main.querySelector("#terminal-project-context");
  const overview=document.createElement("section");overview.className="cook-position-strip";
@@ -215,7 +218,7 @@ function mountMemeDesk(){
  lower.innerHTML='<div class="meme-lower-tabs" role="group" aria-label="Current Meme Details"><button data-meme-tab="wallet">Wallets</button><button data-meme-tab="orders">Orders</button><button data-meme-tab="assets">Position & PnL</button><button data-meme-tab="risk">Risk Analysis</button></div><div id="meme-live-summary" aria-label="Assets and Risk"></div>';
  const summary=lower.querySelector("#meme-live-summary");
  wallet.before(lower);lower.append(wallet);
- const tabState={value:"wallet"};
+ const tabState={value:memeDetailTab};
  const orderSection=main.querySelector("#terminal-order-review");
  const orderHost=document.createElement("section");orderHost.className="meme-orders-host";orderHost.hidden=true;lower.append(orderHost);orderHost.append(orderSection);
  if(!activeProjectId)orderHost.append(document.createTextNode("Select a Meme to view orders."));
@@ -224,7 +227,7 @@ function mountMemeDesk(){
   wallet.hidden=tabState.value!=="wallet";summary.hidden=!["assets","risk"].includes(tabState.value);
   summary.dataset.memeTab=tabState.value;orderHost.hidden=tabState.value!=="orders";
  }
- function selectLowerTab(value){tabState.value=value;drawLower();}
+ function selectLowerTab(value){if(!["wallet","orders","assets","risk"].includes(value))return;memeDetailTab=value;tabState.value=value;drawLower();if(value==="wallet")void positionSnapshot.refresh();}
  lower.querySelectorAll("[data-meme-tab]").forEach(b=>b.onclick=()=>selectLowerTab(b.dataset.memeTab));drawLower();drawWallet(null);
  const bundleHost=side.querySelector("#meme-bundle-review"),bundleReview=mountHistoricalDirectionReview(bundleHost,{esc,table,quoteAmount});
  publishPosition=model=>bundleReview.setLive(model);
@@ -249,7 +252,7 @@ function mountMemeDesk(){
   rail.querySelector("#desk-token-count").textContent=String(projects.filter(issued).length);
   rail.querySelector("#desk-wallet-count").textContent=selected?String(new Set(projectWalletRegistrationRows(selected).map(r=>r[2])).size):"—";
   list.innerHTML=ordered.filter(match).map(row).join("")||'<p class="muted meme-list-empty">'+(q?"No matching Memes":"No Memes yet")+'</p>';
-  list.querySelectorAll("[data-meme-project]").forEach(b=>b.onclick=()=>{record("project.context.selected",{project_id:b.dataset.memeProject});memeMode="operations";go("terminal",b.dataset.memeProject);});
+  list.querySelectorAll("[data-meme-project]").forEach(b=>b.onclick=()=>{record("project.context.selected",{project_id:b.dataset.memeProject});memeMode="operations";memeDetailTab="wallet";go("terminal",b.dataset.memeProject);});
  }
  rail.querySelector("#meme-search").oninput=e=>{memeFilter=e.target.value;drawList();};
  function drawControls(){
@@ -265,7 +268,7 @@ function mountMemeDesk(){
   memeMode=next;drawControls();mountLaunch();
  });
  drawControls();if(memeMode==="launch")mountLaunch();
- return {selectLowerTab,orderSummary(model){bundleReview.setOrderSummary(model);},update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();bundleReview.setProject(current);drawPositionStrip(current);
+ return {selectLowerTab,syncChartAvailability,orderSummary(model){bundleReview.setOrderSummary(model);},update(rows,current){projects=rows;selected=current;loaded=true;drawList();drawControls();bundleReview.setProject(current);drawPositionStrip(current);
   chartToolbar.querySelector("#desk-market-symbol").textContent=current?current.profile.symbol+" · "+deskStageLabel(current.lifecycle.stage):"No Meme Selected";
   drawWallet(current);
  },error(){failed=true;drawList();drawWallet(null);bundleReview.setProject(null);bundleReview.clear("Project directory unavailable.");summaryState("Project directory unavailable; assets and risk are not shown.");},
@@ -325,7 +328,7 @@ function renderTerminal(){
  '<section id="terminal-scoped-placeholder" class="pro-pane"'+(activeProjectId?"":" hidden")+'><h3>当前项目行情与资产</h3>'+emptyState("暂无项目行情","在项目资料中关联历史报告后显示。")+'</section>'+
  '<div id="terminal-report-area"'+(activeProjectId?' hidden inert style="display:none"':'')+'>'+
  '<section class="pro-pane"><h3>独立离线报告</h3><p class="muted">报告项目：'+esc(scope.projectId)+' · Mint：'+esc(scope.tokenMint)+' · '+esc(sourceLabel)+'</p></section>'+
-  '<div class="pro-statebar"><span><i class="status-dot"></i> '+(isSample?"SYNTHETIC SAMPLE":"OFFLINE REVIEW")+'</span><span>'+esc(sourceLabel)+'</span><span>'+(isSample?"仅展示合成样本 · 执行禁用":"离线审阅 · 禁止交易")+'</span><span>阶段：'+esc(workflow.review_status)+'</span></div>'+
+  '<div class="pro-statebar"><span><i class="status-dot"></i> '+(isSample?"SYNTHETIC SAMPLE":"OFFLINE REVIEW")+'</span><span>'+esc(sourceLabel)+'</span><span>'+(isSample?"仅展示合成样本 · 执行禁用":"离线审阅 · 禁止交易")+'</span><span>Stage: '+esc(workflow.review_status)+'</span></div>'+
  '<section class="pro-pane" style="margin-bottom:12px"><h3>项目业务流程 · '+esc(workflow.review_status)+'</h3>'+table(["业务阶段","状态","说明"],workflow.steps.map(x=>[x.label,x.status,x.note]))+'<div class="row"><button id="workflow-sample">载入离线验收样本</button><button id="workflow-cash" '+(isSample?"disabled":"")+'>资金流水</button><button id="workflow-finance" '+(isSample?"disabled":"")+'>财务结算复核</button><button id="workflow-risk" '+(isSample?"disabled":"")+'>风险复核</button><button id="workflow-graduation">毕业与外盘审阅</button><button id="workflow-save" '+(isSample||workspaceBusy?"disabled":"")+'>加入项目档案</button><button id="workflow-export" '+(isSample?"disabled":"")+'>导出原始报告</button></div><p role="status" class="muted">'+esc(workflowMessage)+'</p></section>'+
  '<div class="pro-metrics">'+[["历史期末净值",money(d.performance.closing_nav_base_units)],["历史期末现金",money(a.closing_cash_base_units)],["已实现收益",money(a.realized_project_pnl_base_units)],["库存成本",money(a.remaining_cost_basis_base_units)],["创作者费",money(a.creator_cash_income_base_units)],["最大回撤",isSample||a.max_observed_drawdown_bps==null?"—":Number(a.max_observed_drawdown_bps)/100+"%"]].map(([k,v])=>'<div class="pro-metric"><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div>'+
  '<div class="pro-workspace"><aside class="pro-market"><section class="pro-pane"><h3>市场概览</h3><div class="key-values">'+participantRows.map(([k,v])=>'<div><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join("")+'</div></section><section class="pro-pane"><h3>风险监测</h3><div class="key-values"><div><span>证据风险</span><strong>'+esc(isSample?"待载入":d.risk.status)+'</strong></div><div><span>严重 / 警告</span><strong>'+esc(isSample?"—":d.risk.counts.critical+" / "+d.risk.counts.warning)+'</strong></div><div><span>未知项</span><strong>'+esc(isSample?"—":d.risk.counts.unknown)+'</strong></div><div><span>实时市场风险</span><strong>未核验</strong></div></div></section><section class="pro-pane" id="market-quality"><h3>市场质量</h3><div data-quality-summary>'+esc(isSample?"合成样本行情 · 非实时数据":"历史报告 · 质量数据以证据审计为准")+'</div><div data-quality-metrics>'+table(["证据检查","状态 / 数量"],marketQualityRows(null))+'</div><p class="muted">独立报告仅展示 K 线证据；完整市场质量审计由项目关联报告的服务端复核提供。未复核不视为通过。</p></section><section class="pro-pane"><h3>生命周期</h3><div class="pro-stage-list">'+workflow.steps.map(x=>'<div><i></i>'+esc(x.label+" · "+x.status)+'</div>').join("")+'</div></section></aside>'+
@@ -344,9 +347,9 @@ function renderTerminal(){
    if(page!=="terminal"||contextVersion!==terminalContextVersion)return;
    const selected=projects.find(x=>x.project_id===activeProjectId)||null;
     memeDesk.update(projects,selected);
-   const options='<option value="">选择 Project</option>'+(!selected&&activeProjectId?'<option value="'+esc(activeProjectId)+'" selected>此前Project unavailable. Select another.</option>':"")+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
-   projectContext.innerHTML='<div class="row"><details class="meme-context-select"><summary>切换项目</summary><label>项目 <select id="terminal-project-select">'+options+'</select></label></details>'+
-    (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(lifecycleLabel(selected.lifecycle.stage))+'</span><span>运行登记：'+esc(operationalLabel(selected.lifecycle.operational_status))+'</span><span>Mint：'+esc(selected.token.mint||"未登记")+'</span><span>市场：'+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' 已核验</span>':'<span>请选择 Meme</span>')+
+   const options='<option value="">Select Project</option>'+(!selected&&activeProjectId?'<option value="'+esc(activeProjectId)+'" selected>Previous project unavailable. Select another.</option>':"")+projects.map(x=>'<option value="'+esc(x.project_id)+'"'+(x.project_id===activeProjectId?" selected":"")+'>'+esc(x.profile.name+" · "+x.profile.symbol+" · "+x.lifecycle.stage)+'</option>').join("");
+   projectContext.innerHTML='<div class="row"><details class="meme-context-select"><summary>Switch Project</summary><label>Project <select id="terminal-project-select">'+options+'</select></label></details>'+
+    (selected?'<span>'+esc(selected.profile.name+' / '+selected.profile.symbol)+'</span><span>阶段：'+esc(lifecycleLabel(selected.lifecycle.stage))+'</span><span>Registered operation: '+esc(operationalLabel(selected.lifecycle.operational_status))+'</span><span>Mint：'+esc(selected.token.mint||"Not registered")+'</span><span>Markets: '+selected.markets.filter(m=>m.verification_status==="VERIFIED").length+'/'+selected.markets.length+' verified</span>':'<span>Select a Meme</span>')+
     '</div><details><summary>登记证据</summary>'+table(["项目","阶段","配置状态","登记重叠"],directory.projects.map(x=>[x.project_id,x.stage,x.configuration_status,x.registration_overlap_count]))+table(["登记异常","项目"],directory.findings.map(x=>[x.code,x.project_ids.join(", ")]))+note("登记重叠不等于共同控制，组合资金与 NAV 未核验")+'</details>';
    const notice=main.querySelector("#terminal-context-notice");
    if(activeProjectId){
@@ -364,7 +367,7 @@ function renderTerminal(){
       async function refreshBusiness(){
        const ticket=++businessTicket;memeDesk.pending();businessArea.textContent="读取统一项目复核…";riskArea.textContent="读取同一项目快照…";
        const area=main.querySelector("#terminal-report-area");area.hidden=true;area.inert=true;area.style.display="none";
-       main.querySelector("#terminal-scoped-placeholder").hidden=false;
+       main.querySelector("#terminal-scoped-placeholder").hidden=false;memeDesk.syncChartAvailability();
        try{
         const v=await getProjectBusinessReview(selected.project_id,selected.revision);
         if(!businessCurrent()||ticket!==businessTicket)return;
@@ -375,10 +378,10 @@ function renderTerminal(){
          if(!businessCurrent()||ticket!==businessTicket)return;
          if(linkedReportMatches(v,digest,data.scope)){
            if(report.source_mode==="ARCHIVED_HISTORICAL"&&report.status==="REPORT_READY")memeDesk.historicalTrades(data);
-          reportArea.hidden=false;reportArea.removeAttribute("inert");reportArea.style.removeProperty("display");placeholder.hidden=true;
-          main.querySelector("#terminal-context-notice").innerHTML=note("已读取当前 Meme 的历史报告。");
+          reportArea.hidden=false;reportArea.removeAttribute("inert");reportArea.style.removeProperty("display");placeholder.hidden=true;memeDesk.syncChartAvailability();
+          main.querySelector("#terminal-context-notice").innerHTML=note("Linked historical report loaded. Not a live quote.");
          }else{
-          main.querySelector("#terminal-context-notice").innerHTML=note("当前报告尚未关联或数据不一致，请在项目资料中检查。");
+          main.querySelector("#terminal-context-notice").innerHTML=note("Report not linked or inconsistent. Check project evidence.");
          }
         }
         businessArea.innerHTML='<div class="project-overview-heading"><div><h3>项目运行概览 · v'+esc(v.project_revision)+'</h3><p class="muted">'+esc(model.status)+' · 历史声明数据 · 执行禁用</p></div><button id="business-refresh">刷新项目</button></div>'+
@@ -568,7 +571,7 @@ function renderTerminal(){
    main.querySelector("#terminal-project-select").onchange=e=>{importTicket++;selectProjectContext(e.target.value||null);record("project.context.selected",{project_id:activeProjectId});render()};
   }).catch(()=>{
    if(page==="terminal"&&contextVersion===terminalContextVersion){
-    memeDesk.error();
+    memeDesk.error();memeDesk.syncChartAvailability();
      projectContext.textContent="Project 数据库不可用；交易执行保持关闭。";
     const retry=document.createElement("button");retry.textContent="重新读取项目";retry.onclick=()=>render();projectContext.append(retry);
     if(activeProjectId){
@@ -611,6 +614,7 @@ function renderTerminal(){
  main.querySelector("#terminal-import").onchange=async e=>{if(activeProjectId)return;const ticket=++importTicket,startPage=page;try{const f=e.target.files[0];if(!f)return;if(f.size>16*1024*1024)throw Error("报告文件超过 16 MiB");const raw=JSON.parse(await f.text());const restored=raw?.schema_version==="cook-review-archive.1"?restoreReviewArchive(raw):null;const next=restored?.input??raw;const nextReport=auditedReport(next);if(!importCurrent(ticket,startPage))return;offlineReview=true;data=next;report=nextReport;reviewInput=data;reviewStage=restored?.stage??"REVIEW";metadata=restored?.metadata??null;reviewPaused=false;workflowMessage="";if(restored)record("review.restored",{page});record("report.import.completed",{page,source_mode:report.source_mode,status:report.status});render()}catch(err){record("report.import.failed",{page,error_kind:errorKind(err)},"ERROR");if(importCurrent(ticket,startPage)){const el=document.querySelector("#terminal-error");if(el)el.textContent=errorKind(err)+"：报告未通过校验";}}};
 }
 function render(){
+ disposeMemeDesk();disposeMemeDesk=()=>{};
  if(reviewInput!==data){reviewInput=data;reviewStage="REVIEW";metadata=null;reviewPaused=false;workflowMessage="";}
   const pageChanged=main.dataset.page!==page;
  main.dataset.page=page;
