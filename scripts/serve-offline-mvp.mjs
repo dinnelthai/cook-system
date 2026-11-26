@@ -40,7 +40,7 @@ const wallets=createWalletStore();
 const walletPortfolio=createLocalWalletPortfolio({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,walletStore:wallets});
 const faucet=createLocalFaucet({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.faucet});
 const transfers=createLocalTransfer({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.transfer,loadSigner:wallets.loadSigner});
-const trading=createLocalTrading({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.trading,labUrl:process.env.COOK_PUMP_LAB_URL,wallets});
+const trading=createLocalTrading({endpoint:process.env.COOK_LOCAL_RPC_URL,expectedGenesis:process.env.COOK_LOCAL_GENESIS_HASH,enabled:localFeatures.trading,readEnabled:process.env.COOK_LOCAL_MARKET_READ==="1",labUrl:process.env.COOK_PUMP_LAB_URL,wallets});
 const diagnostics=createHttpDiagnostics();
 const server=createServer(async(req,res)=>{
  const setDiagnosticGroup=diagnostics.observe(req,res);
