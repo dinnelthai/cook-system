@@ -75,7 +75,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   const estimate=active?previewQuantity(active.tokens,percent):null;
   const all=summarizePositions(rows),visible=visibleRows(),chosen=summarizePositions(rows.filter(r=>checked.has(r.address)));
   const total=displayToken(all.token_balance,all.token_decimals);
-  onSummary({project_id:project?.project_id??null,mint:project?.token?.mint??null,sol:formatUnits(all.sol_balance,9),tokens:total,observed:all.observed_count,count:all.wallet_count,status});
+  onSummary({project_id:project?.project_id??null,mint:project?.token?.mint??null,sol:formatUnits(all.sol_balance,9),tokens:total,observed:all.observed_count,count:all.wallet_count,status,rows:rows.map(r=>({...r})),active:selected,busy});
   const header=(label,key)=>'<button type="button" class="position-sort" data-position-sort="'+key+'" aria-label="Sort by '+label+'">'+label+(sortField===key?(sortDirection==="asc"?" ↑":" ↓"):"")+'</button>';
   const button=(id,label)=>'<button type="button" id="'+id+'">'+label+'</button>';
   host.innerHTML='<div class="desk-wallet-toolbar"><div><h3>Wallets</h3><small class="muted">'+rows.length+' registered wallets · '+checked.size+' selected</small></div><div class="desk-wallet-actions">'+button("position-refresh",busy?"Refreshing…":"Refresh Holdings")+button("position-manage","Manage Wallets")+button("position-assets","Assets")+'</div></div>'+
@@ -86,9 +86,9 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
    '<div class="scroll"><table><thead><tr><th><input type="checkbox" data-position-all aria-label="Select all visible wallets" '+(visible.length&&visible.every(r=>checked.has(r.address))?"checked":"")+'></th><th>'+header("Wallet","address")+'</th><th>'+header("SOL Balance","sol")+'</th><th>'+header("Tokens","tokens")+'</th>'+(currentOnly?'':'<th>Cost</th><th>Unrealized PnL</th><th>Realized PnL</th>')+'<th>'+header("Status","status")+'</th></tr></thead><tbody>'+
    visible.map(r=>'<tr><td><input type="checkbox" data-position-check="'+esc(r.address)+'" aria-label="Select wallet '+esc(r.address)+'" '+(checked.has(r.address)?"checked":"")+'></td><td><button type="button" data-position-wallet="'+esc(r.address)+'" aria-pressed="'+(selected===r.address)+'" title="'+esc(r.address)+'">'+esc(r.address.length>15?r.address.slice(0,6)+"…"+r.address.slice(-5):r.address)+'</button></td><td>'+esc(formatUnits(r.sol,9))+'</td><td>'+esc(displayToken(r.tokens,r.decimals))+'</td>'+(currentOnly?'':'<td>—</td><td>—</td><td>—</td>')+'<td>'+esc(r.status)+'</td></tr>').join("")+
    (!visible.length?'<tr><td colspan="'+(currentOnly?5:8)+'" class="muted">'+(rows.length?"No matching wallets":"No registered wallets")+'</td></tr>':"")+'</tbody></table></div>'+
-   '<section class="smith-section"><h3>Sell Quantity Preview</h3><p class="muted">Select a wallet to calculate a percentage of its observed token balance. Read-only; no order or quote is created.</p><div class="row">'+[10,25,50,75,100].map(p=>'<button type="button" data-position-percent="'+p+'" aria-pressed="'+(p===percent)+'">'+p+'%</button>').join("")+'</div>'+
+   (currentOnly?'':'<section class="smith-section"><h3>Sell Quantity Preview</h3><p class="muted">Select a wallet to calculate a percentage of its observed token balance. Read-only; no order or quote is created.</p><div class="row">'+[10,25,50,75,100].map(p=>'<button type="button" data-position-percent="'+p+'" aria-pressed="'+(p===percent)+'">'+p+'%</button>').join("")+'</div>'+
    '<label>Custom percentage <input data-position-custom type="number" min="0" max="100" step="1" value="'+percent+'"></label>'+
-   '<div class="trade-kv"><span>Selected Wallet</span><strong>'+esc(active?.address??"—")+'</strong><span>Tokens to Sell</span><strong>'+esc(estimate?displayToken(estimate.quantity,active.decimals):"—")+'</strong><span>Remaining Tokens</span><strong>'+esc(estimate?displayToken(estimate.remaining,active.decimals):"—")+'</strong><span>Estimated SOL Received</span><strong>Quote required</strong></div></section>';
+   '<div class="trade-kv"><span>Selected Wallet</span><strong>'+esc(active?.address??"—")+'</strong><span>Tokens to Sell</span><strong>'+esc(estimate?displayToken(estimate.quantity,active.decimals):"—")+'</strong><span>Remaining Tokens</span><strong>'+esc(estimate?displayToken(estimate.remaining,active.decimals):"—")+'</strong><span>Estimated SOL Received</span><strong>Quote required</strong></div></section>');
   host.querySelector("#position-refresh").disabled=busy||!project?.token?.mint;
   const allCheck=host.querySelector("[data-position-all]");
   allCheck.disabled=!visible.length;allCheck.indeterminate=visible.some(r=>checked.has(r.address))&&!visible.every(r=>checked.has(r.address));
@@ -102,7 +102,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   host.querySelector("#position-assets").onclick=onAssets;
   host.querySelectorAll("[data-position-wallet]").forEach(b=>b.onclick=()=>{selected=b.dataset.positionWallet;draw()});
   host.querySelectorAll("[data-position-percent]").forEach(b=>b.onclick=()=>{percent=Number(b.dataset.positionPercent);draw()});
-  host.querySelector("[data-position-custom]").onchange=e=>{const v=e.target.valueAsNumber;if(Number.isInteger(v)&&v>=0&&v<=100){percent=v;draw()}else e.target.value=percent};
+  const custom=host.querySelector("[data-position-custom]");if(custom)custom.onchange=e=>{const v=e.target.valueAsNumber;if(Number.isInteger(v)&&v>=0&&v<=100){percent=v;draw()}else e.target.value=percent};
  }
  async function refresh(){
   if(disposed||busy||!project||!host.isConnected)return;
@@ -118,5 +118,5 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   finally{if(ticket===id){busy=false;if(host.isConnected){draw();schedule()}else dispose()}}
  }
  draw();
- return {setProject(next){if(project?.project_id===next?.project_id&&project?.revision===next?.revision&&project?.token?.mint===next?.token?.mint)return;ticket++;clearTimeout(timer);busy=false;lastObserved=null;project=next;selected=null;checked.clear();query="";percent=25;rows=positionRows(next,null);status=next?"Holdings not yet verified.":"Select a Meme.";draw();if(next?.token?.mint)void refresh();},refresh,dispose};
+ return {setProject(next){if(project?.project_id===next?.project_id&&project?.revision===next?.revision&&project?.token?.mint===next?.token?.mint)return;ticket++;clearTimeout(timer);busy=false;lastObserved=null;project=next;selected=null;checked.clear();query="";percent=25;rows=positionRows(next,null);status=next?"Holdings not yet verified.":"Select a Meme.";draw();if(next?.token?.mint)void refresh();},selectWallet(address){selected=rows.some(r=>r.address===address)?address:null;draw()},refresh,dispose};
 }

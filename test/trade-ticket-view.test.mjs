@@ -1,0 +1,4 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {parseTicketAmount,validateTicket} from "../web/trade-ticket-view.mjs";
+test("single-wallet input uses exact units and rejects unavailable or excessive amounts",()=>{const wallet={sol:"2000000000",tokens:"123456789",decimals:6};assert.equal(parseTicketAmount("0.000000001",9),"1");assert.equal(parseTicketAmount("1e-3",9),null);assert.equal(parseTicketAmount("0.0000000001",9),null);assert.equal(validateTicket({side:"BUY",amount:"2.1",wallet}).status,"INSUFFICIENT_BALANCE");assert.deepEqual(validateTicket({side:"SELL",amount:"1.000001",wallet}),{status:"INPUT_VALID",quantity:"1000001",remaining:"122456788",decimals:6});assert.equal(validateTicket({side:"SELL",amount:"1",wallet:{...wallet,tokens:null}}).status,"BALANCE_UNKNOWN")});
