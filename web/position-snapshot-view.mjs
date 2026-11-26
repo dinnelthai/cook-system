@@ -1,3 +1,4 @@
+import {openAmountsPreview} from "./amounts-preview.mjs";
 import {createWalletAdapter,WALLET_MODE} from "./wallet-adapter.mjs";
 const raw=v=>typeof v==="string"&&/^(0|[1-9][0-9]{0,38})$/.test(v);
 export function formatUnits(v,d){
@@ -54,7 +55,7 @@ export function validWalletPreviewCount(value){return typeof value==="string"&&/
 export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=false,onSummary=()=>{},adapter=createWalletAdapter({mode:WALLET_MODE.LOCALNET})}){
  let project=null,rows=[],ticket=0,status="Select a Meme.",percent=25,selected=null;
  let checked=new Set(),query="",sortField="address",sortDirection="asc",busy=false,lastObserved=null;
- let timer=null,disposed=false,generateDialog=null;
+ let timer=null,disposed=false,generateDialog=null,amountsDialog=null;
  const visibleRows=()=>sortPositionRows(rows.filter(r=>!query||r.address.toLowerCase().includes(query.toLowerCase())),sortField,sortDirection);
  function schedule(){
   clearTimeout(timer);
@@ -66,7 +67,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   },20000);
  }
  function onFocus(){if(!host.isConnected){dispose();return}if(!busy&&project?.token?.mint&&!host.contains(host.ownerDocument.activeElement))void refresh();}
- function dispose(){if(disposed)return;disposed=true;generateDialog?.remove();generateDialog=null;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
+ function dispose(){if(disposed)return;disposed=true;generateDialog?.remove();generateDialog=null;amountsDialog?.remove();amountsDialog=null;ticket++;clearTimeout(timer);globalThis.removeEventListener?.("focus",onFocus);observer?.disconnect();}
  let mounted=host.isConnected;
  const observer=typeof MutationObserver==="function"?new MutationObserver(()=>{if(!host.isConnected&&mounted)dispose();else if(host.isConnected)mounted=true}):null;
  if(host.ownerDocument?.documentElement)observer?.observe(host.ownerDocument.documentElement,{childList:true,subtree:true});
@@ -115,7 +116,7 @@ export function mountPositionSnapshot(host,{esc,onManage,onAssets,currentOnly=fa
   host.querySelector("#position-manage").onclick=currentOnly?openGenerate:onManage;const newWallet=host.querySelector("[data-reference-new-wallet]");if(newWallet)newWallet.onclick=openGenerate;
   host.querySelector("#position-assets").onclick=onAssets;
   const previewNotice=(title,message)=>{const doc=host.ownerDocument,dialog=doc.createElement("dialog");dialog.className="reference-wallet-dialog";dialog.innerHTML="<h3>"+esc(title)+"</h3><p>"+esc(message)+"</p><form method=\"dialog\"><button>Close</button></form>";host.append(dialog);dialog.addEventListener("close",()=>dialog.remove(),{once:true});dialog.showModal()};
-  const amounts=host.querySelector("#position-amounts");if(amounts)amounts.onclick=()=>previewNotice("Set amounts","Frontend preview only. No batch transaction parameters are connected.");
+  const amounts=host.querySelector("#position-amounts");if(amounts)amounts.onclick=()=>{if(amountsDialog?.isConnected)return;amountsDialog=openAmountsPreview(amounts);};
   const keys=host.querySelector("#position-private-keys");if(keys)keys.onclick=()=>previewNotice("Private keys","Key export is not available in this terminal. No private keys are loaded or displayed.");
   host.querySelectorAll("[data-position-wallet]").forEach(b=>b.onclick=()=>{selected=b.dataset.positionWallet;draw()});
   host.querySelectorAll("[data-position-percent]").forEach(b=>b.onclick=()=>{percent=Number(b.dataset.positionPercent);draw()});
