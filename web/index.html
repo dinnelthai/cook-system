@@ -525,6 +525,47 @@ main[data-page=terminal] button:focus-visible,main[data-page=terminal] input:foc
 .current-chart{min-height:240px;padding:12px;display:flex;flex-direction:column;justify-content:center}.current-ohlcv{display:block;width:100%;height:auto;min-height:200px}.current-chart-intervals{gap:4px}.current-terminal [data-current-market-status]{padding:0 12px 8px;margin:0;font-size:11px}.current-terminal .current-chart .empty-state{min-height:200px}
 .current-terminal .desk-market-frame:fullscreen{background:#10161c;overflow:auto;padding:16px}.current-terminal .desk-market-frame:fullscreen .current-ohlcv{max-height:72vh;width:100%}.current-terminal .chart-range{display:flex;align-items:center;gap:6px;margin:0}.current-terminal .chart-range select{width:auto}.current-terminal .desk-chart-tools .row{flex-wrap:wrap}
 .current-terminal .current-trade-ticket{gap:12px}.current-terminal .current-trade-ticket label{margin:0}.current-terminal .current-trade-ticket input,.current-terminal .current-trade-ticket select{width:100%;min-height:36px}.current-terminal .current-trade-ticket .smith-action{width:100%}.current-terminal .ticket-review-panel{border:1px solid var(--line);border-radius:6px;padding:10px;overflow-wrap:anywhere}.current-terminal .ticket-review-panel h4{margin:0 0 8px}.current-terminal [data-ticket-side][data-ticket-side=BUY][aria-pressed=true]{background:#1d4434;color:#a2dfb9}.current-terminal [data-ticket-side][data-ticket-side=SELL][aria-pressed=true]{background:#46292f;color:#f2afb5}.current-terminal .meme-lower .scroll{max-width:100%}
+
+/* Screenshot reference panel (730px source / 2x density). Isolated from other pages. */
+main[data-page=terminal] .reference-trade-panel{background:#0c0e0e;border-left:1px solid #263b3b;padding:16px 0 0;color:#f6f7f7;gap:0;min-width:0}
+main[data-page=terminal] .reference-trade-panel .meme-mode{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#101616;margin:0 7px 0;padding:4px;border-radius:13px}
+main[data-page=terminal] .reference-trade-panel .meme-mode button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:5px;border:0;border-radius:9px;background:transparent;color:#c0c6c7;font-size:14px;font-weight:600}
+main[data-page=terminal] .reference-trade-panel .meme-mode button[aria-pressed=true]{background:#1d3b3b;color:#83b1b1}
+.reference-trade-panel .meme-mode svg{width:16px;height:16px;flex:none}
+.reference-trade-panel .reference-trade-section{display:flex;flex-direction:column;gap:12px;padding:24px 19px;border-bottom:1px solid #263b3b}
+.reference-trade-panel .reference-bundle{padding-top:28px;padding-bottom:24px}
+.reference-trade-panel .reference-trade-heading{display:flex;justify-content:space-between;align-items:center;gap:6px;min-height:28px}
+main[data-page=terminal] .reference-trade-panel .reference-trade-section h3{font-size:16px;font-weight:600;letter-spacing:0;line-height:1.3;margin:0;color:#f6f7f7}
+.reference-wallet-count{padding:7px 10px;border-radius:15px;background:#173333;color:#82aeae;font-size:11.5px;font-weight:600;white-space:nowrap}
+.reference-direction{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:8px;background:#101616;border-radius:13px}
+main[data-page=terminal] .reference-trade-panel .reference-direction button{min-height:28px;padding:5px 4px;border:0;border-radius:8px;background:transparent;color:#919a9a;font-size:12px;font-weight:600}
+main[data-page=terminal] .reference-trade-panel .reference-direction [data-preview-side=BUY][aria-pressed=true]{background:#0b2b08;color:#81e873}
+main[data-page=terminal] .reference-trade-panel .reference-direction [data-preview-side=SELL][aria-pressed=true]{background:#35201f;color:#efa3a3}
+.reference-card-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.reference-stat{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:5px;min-height:62px;padding:11px 12px;background:#101616;border:1px solid #294b4b;border-radius:6px}
+.reference-stat>span{font-size:11.5px;line-height:1.4;color:#c1c7c8}
+.reference-stat>strong{font-size:14px;line-height:1.35;color:#f7f8f8;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.reference-delay{display:grid;grid-template-columns:1fr 2.15fr 1fr;gap:8px}
+main[data-page=terminal] .reference-trade-panel .reference-delay button{height:44px;min-width:0;border:1px solid #294b4b;border-radius:12px;background:#0c0e0e;color:#929b9c;font-size:12px;padding:0;opacity:1;cursor:not-allowed}
+main[data-page=terminal] .reference-trade-panel .reference-delay button:first-child,main[data-page=terminal] .reference-trade-panel .reference-delay button:last-child{font-size:22px}
+main[data-page=terminal] .reference-trade-panel .reference-action{width:100%;min-height:48px;border:0;border-radius:12px;font-size:14px;font-weight:600;opacity:1;cursor:not-allowed}
+main[data-page=terminal] .reference-trade-panel .reference-buy{background:#0d210d;color:#538c46}
+main[data-page=terminal] .reference-trade-panel .reference-sell{background:#2f191b;color:#a66b6b}
+main[data-page=terminal] .reference-trade-panel .reference-dump{background:#132323;color:#587979}
+.reference-trade-panel .reference-positive{color:#81e873}
+.reference-session{font-size:11.5px;line-height:1.5;color:#c1c7c8;margin:0 4px}
+.reference-trade-panel .reference-log{padding-bottom:45px;border-bottom:0}
+.reference-mint-filter{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#c1c7c8;white-space:nowrap;margin:0}
+.reference-mint-filter input{width:20px;height:20px;margin:0;accent-color:#377f80;cursor:pointer}
+.reference-log table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:11.5px}
+.reference-log th{font-weight:500;text-align:left;color:#c1c7c8;border:0;padding:3px 0;background:transparent}
+.reference-log th:first-child{width:35%}
+.reference-log th:last-child{width:18%}
+main[data-page=terminal] .reference-log th button{display:inline-flex;gap:4px;align-items:center;border:0;background:transparent;color:inherit;padding:0;font:inherit}
+.reference-log th button span{color:#929b9c;font-size:10px;letter-spacing:-2px}
+.reference-log td{border:0;text-align:center;padding:28px 0 8px;color:#929b9c;font-size:11.5px}
+@media(max-width:400px){.reference-trade-panel .reference-trade-section{padding-left:12px;padding-right:12px}.reference-wallet-count{font-size:10px;padding:7px}.reference-stat{padding:9px}.reference-stat>strong{font-size:13px}}
+
 </style></head>
 <body><a class="skip-link" href="#main">Skip to main content</a><header><div class="brand"><div class="brand-mark" aria-hidden="true">C</div><div><h1>COOK SYSTEM</h1><div class="brand-sub">MARKET TERMINAL</div></div></div><div id="top-nav" role="navigation" aria-label="Main navigation"></div><div class="header-meta"><div id="global-project-context" role="status"></div><span class="build">V1.0 RC</span><span class="tag">LOCALNET</span></div></header>
 <div class="layout"><nav aria-label="My Memes" id="nav"></nav><main id="main" tabindex="-1"><p class="notice">Initializing terminal. If this persists, check the browser console and network for module loading errors.</p></main></div>
